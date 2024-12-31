@@ -1,8 +1,8 @@
 # Bowerbird App
 
-This is a small app to track expenses.
+Expenses tracker application.
 
-## Thecnologies
+## Technologies
 
 - Golang: backend language
 - OAuth0 2.0: to know about the auth flow used, read [here](https://cloud.google.com/go/getting-started/authenticate-users-with-iap#external_authentication_with_oauth2) and [here](https://developers.google.com/identity/protocols/oauth2/web-server)
