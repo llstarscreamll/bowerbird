@@ -196,7 +196,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func() *MockSessionRepository {
 				m := new(MockSessionRepository)
-				m.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
+				m.AssertNotCalled(t, "Save")
 				return m
 			},
 			http.StatusInternalServerError,
@@ -257,8 +257,9 @@ func TestGoogleLoginCallback(t *testing.T) {
 			}
 
 			ulidMock.AssertExpectations(t)
-			authServerMock.AssertExpectations(t)
 			userRepoMock.AssertExpectations(t)
+			authServerMock.AssertExpectations(t)
+			sessionRepoMock.AssertExpectations(t)
 		})
 	}
 }
