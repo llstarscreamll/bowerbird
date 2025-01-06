@@ -52,7 +52,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		sessionToken, err := ulid.NewFromDate(time.Now())
+		sessionID, err := ulid.NewFromDate(time.Now())
 		if err != nil {
 			log.Printf("Error generating session ID: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -60,7 +60,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		err = sessionRepo.Save(r.Context(), user.ID, sessionToken)
+		err = sessionRepo.Save(r.Context(), user.ID, sessionID)
 		if err != nil {
 			log.Printf("Error storing session: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -70,7 +70,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 
 		http.SetCookie(w, &http.Cookie{
 			Name:     "session_token",
-			Value:    sessionToken,
+			Value:    sessionID,
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   true,
