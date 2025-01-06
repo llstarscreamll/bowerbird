@@ -49,13 +49,13 @@ func TestUpsert(t *testing.T) {
 		t.Run(tc.testCase, func(t *testing.T) {
 			ctx := context.Background()
 			cleanUpTables(db, []string{"users"})
-			writeScenarioData(db, tc.scenarioRows)
+			writeScenarioRows(db, tc.scenarioRows)
 
 			repo := NewPgxUserRepository(db)
 			err := repo.Upsert(ctx, tc.user)
 
 			assert.Nil(t, err)
-			assertDatabaseHasRecords(t, db, tc.expectedRows)
+			assertDatabaseHasRows(t, db, tc.expectedRows)
 		})
 	}
 }
@@ -66,7 +66,7 @@ func cleanUpTables(db *pgxpool.Pool, tables []string) {
 	}
 }
 
-func writeScenarioData(db *pgxpool.Pool, rows []struct{ id, first_name, last_name, email, photo_url string }) {
+func writeScenarioRows(db *pgxpool.Pool, rows []struct{ id, first_name, last_name, email, photo_url string }) {
 	for _, r := range rows {
 		_, err := db.Exec(context.Background(), "INSERT INTO users (id, first_name, last_name, email, photo_url) VALUES ($1, $2, $3, $4, $5)", r.id, r.first_name, r.last_name, r.email, r.photo_url)
 		if err != nil {
@@ -75,7 +75,7 @@ func writeScenarioData(db *pgxpool.Pool, rows []struct{ id, first_name, last_nam
 	}
 }
 
-func assertDatabaseHasRecords(t *testing.T, db *pgxpool.Pool, expectedRows []struct{ id, first_name, last_name, email, photo_url string }) {
+func assertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, expectedRecords []struct{ id, first_name, last_name, email, photo_url string }) {
 	countResult, err := db.Query(context.Background(), "SELECT * FROM users")
 	if err != nil {
 		log.Fatal(err)
@@ -99,13 +99,13 @@ func assertDatabaseHasRecords(t *testing.T, db *pgxpool.Pool, expectedRows []str
 		results = append(results, r)
 	}
 
-	assert.Equal(t, len(expectedRows), len(results), "Mismatched database rows count, expected %d, got %d", len(expectedRows), len(results))
+	assert.Equal(t, len(expectedRecords), len(results), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(results))
 
 	expectedRowFound := slices.ContainsFunc(results, func(result struct {
 		id, first_name, last_name, email, photo_url string
 		created_at, updated_at                      time.Time
 	}) bool {
-		return slices.ContainsFunc(expectedRows, func(expected struct {
+		return slices.ContainsFunc(expectedRecords, func(expected struct {
 			id, first_name, last_name, email, photo_url string
 		}) bool {
 			return expected.id == result.id && expected.first_name == result.first_name && expected.last_name == result.last_name && expected.email == result.email && expected.photo_url == result.photo_url
