@@ -60,7 +60,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		err = sessionRepo.Save(user.ID, sessionToken)
+		err = sessionRepo.Save(r.Context(), user.ID, sessionToken)
 		if err != nil {
 			log.Printf("Error storing session: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
