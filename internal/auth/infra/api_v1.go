@@ -52,7 +52,8 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		sessionID, err := ulid.NewFromDate(time.Now())
+		sessionExpirationDate := time.Now().Add(time.Hour * 2)
+		sessionID, err := ulid.NewFromDate(sessionExpirationDate)
 		if err != nil {
 			log.Printf("Error generating session ID: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -60,7 +61,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		err = sessionRepo.Save(r.Context(), user.ID, sessionID)
+		err = sessionRepo.Save(r.Context(), sessionID, user.ID, sessionExpirationDate)
 		if err != nil {
 			log.Printf("Error storing session: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

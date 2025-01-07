@@ -8,3 +8,10 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     unique("email")
 );
+
+CREATE TABLE IF NOT EXISTS "public"."sessions" (
+    "id" VARCHAR(26) PRIMARY KEY,
+    "user_id" VARCHAR(26) NOt NULL,
+    "expires_at" TIMESTAMP NOt NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

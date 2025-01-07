@@ -84,7 +84,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func() *MockSessionRepository {
 				m := new(MockSessionRepository)
-				m.On("Save", mock.AnythingOfType(fmt.Sprintf("%T", context.Background())), "01JGCA8BBB00000000000000U1", "01JGCA8BBB00000000000000S1").Return(nil)
+				m.On("Save", mock.AnythingOfType(fmt.Sprintf("%T", context.Background())), "01JGCA8BBB00000000000000U1", "01JGCA8BBB00000000000000S1", mock.Anything).Return(nil)
 				return m
 			},
 			http.StatusFound,
@@ -224,7 +224,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func() *MockSessionRepository {
 				m := new(MockSessionRepository)
-				m.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
+				m.On("Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 				return m
 			},
 			http.StatusInternalServerError,

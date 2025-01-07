@@ -51,8 +51,8 @@ type MockSessionRepository struct {
 	mock.Mock
 }
 
-func (m *MockSessionRepository) Save(userID, sessionID string) error {
-	args := m.Called(userID, sessionID)
+func (m *MockSessionRepository) Save(ctx context.Context, userID, sessionID string, expirationDate time.Time) error {
+	args := m.Called(ctx, userID, sessionID, expirationDate)
 	return args.Error(0)
 }
 

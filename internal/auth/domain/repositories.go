@@ -1,11 +1,14 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type UserRepository interface {
 	Upsert(ctx context.Context, user User) error
 }
 
 type SessionRepository interface {
-	Save(userID, sessionID string) error
+	Save(ctx context.Context, userID, sessionID string, expirationDate time.Time) error
 }
