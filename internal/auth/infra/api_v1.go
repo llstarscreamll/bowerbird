@@ -11,9 +11,9 @@ import (
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
 )
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuthService domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) {
-	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuthService))
-	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuthService, userRepo, sessionRepo))
+func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) {
+	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
+	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 }
 
 // redirects the user to the Google login page
@@ -24,7 +24,7 @@ func googleLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
 }
 
 // handles the Google login callback by upsert the user in database, starting session and redirecting to frontend app
-func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServer, repo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
+func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
 		if code == "" {
@@ -44,7 +44,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 
 		user.ID = ulid.New()
 
-		err = repo.Upsert(r.Context(), user)
+		err = userRepo.Upsert(r.Context(), user)
 		if err != nil {
 			log.Printf("Error creating user in database: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

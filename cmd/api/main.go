@@ -25,11 +25,11 @@ func main() {
 	db := postgresql.CreatePgxConnectionPool(ctx, os.Getenv("POSTGRES_DATABASE_URL"))
 	defer db.Close()
 
+	ulid := commonInfra.OklogULIDGenerator{}
 	userRepo := authInfra.NewPgxUserRepository(db)
 	sessionRepo := authInfra.NewPgxSessionRepository(db)
-	ulid := commonInfra.OklogULIDGenerator{}
 
-	googleAuthServer := authInfra.NewGoogleAuthService(
+	googleAuth := authInfra.NewGoogleAuthService(
 		os.Getenv("GOOGLE_CLIENT_ID"),
 		os.Getenv("GOOGLE_CLIENT_SECRET"),
 		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
@@ -41,7 +41,7 @@ func main() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, googleAuthServer, userRepo, sessionRepo)
+	authInfra.RegisterRoutes(mux, config, ulid, googleAuth, userRepo, sessionRepo)
 
 	s := &http.Server{
 		Addr:           config.ServerPort,
