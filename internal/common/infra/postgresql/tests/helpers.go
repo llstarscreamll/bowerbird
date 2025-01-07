@@ -66,6 +66,7 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 
 			equalColumns := 0
 			for k := range expected {
+				fmt.Printf("Comparing DB column %s: %v, %v\n", k, expected[k], result[k])
 				if expected[k] == result[k] {
 					equalColumns++
 				}
