@@ -15,7 +15,7 @@ Execute database migrations:
 
 ```bash
 brew install golang-migrate
-migrate -source file://internal/common/infra/postgresql/migrations -database "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable"
+migrate -source file://internal/common/infra/postgresql/migrations -database "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable" up
 ```
 
 Start the API:
