@@ -6,41 +6,43 @@ import (
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	"llstarscreamll/bowerbird/internal/common/infra/postgresql"
 	"log"
+	"maps"
 	"slices"
+	"strings"
 	"testing"
-	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUpsert(t *testing.T) {
 	// ToDo: get connection url from env var
-	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	var db = postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
 	defer db.Close()
 
 	testCases := []struct {
 		testCase     string
-		scenarioRows []struct{ id, first_name, last_name, email, photo_url string }
+		scenarioRows []map[string]any
 		user         domain.User
-		expectedRows []struct{ id, first_name, last_name, email, photo_url string }
+		expectedRows []map[string]any
 	}{
 		{
 			"should insert a new user",
-			[]struct{ id, first_name, last_name, email, photo_url string }{},
+			[]map[string]any{},
 			testUser,
-			[]struct{ id, first_name, last_name, email, photo_url string }{
-				{testUser.ID, testUser.GivenName, testUser.FamilyName, testUser.Email, testUser.PictureUrl},
+			[]map[string]any{
+				{"id": testUser.ID, "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
 		},
 		{
 			"should not to throw an error upserting an existing user email",
-			[]struct{ id, first_name, last_name, email, photo_url string }{
-				{"01JGCZXZEC0000000000000000", testUser.GivenName, testUser.FamilyName, testUser.Email, testUser.PictureUrl},
+			[]map[string]any{
+				{"id": "01JGCZXZEC0000000000000000", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
 			testUser,
-			[]struct{ id, first_name, last_name, email, photo_url string }{
-				{"01JGCZXZEC0000000000000000", testUser.GivenName, testUser.FamilyName, testUser.Email, testUser.PictureUrl},
+			[]map[string]any{
+				{"id": "01JGCZXZEC0000000000000000", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
 		},
 	}
@@ -49,13 +51,13 @@ func TestUpsert(t *testing.T) {
 		t.Run(tc.testCase, func(t *testing.T) {
 			ctx := context.Background()
 			cleanUpTables(db, []string{"users"})
-			writeScenarioRows(db, tc.scenarioRows)
+			writeScenarioRows(db, "users", tc.scenarioRows)
 
 			repo := NewPgxUserRepository(db)
 			err := repo.Upsert(ctx, tc.user)
 
 			assert.Nil(t, err)
-			assertDatabaseHasRows(t, db, tc.expectedRows)
+			assertDatabaseHasRows(t, db, "users", tc.expectedRows)
 		})
 	}
 }
@@ -66,51 +68,58 @@ func cleanUpTables(db *pgxpool.Pool, tables []string) {
 	}
 }
 
-func writeScenarioRows(db *pgxpool.Pool, rows []struct{ id, first_name, last_name, email, photo_url string }) {
-	for _, r := range rows {
-		_, err := db.Exec(context.Background(), "INSERT INTO users (id, first_name, last_name, email, photo_url) VALUES ($1, $2, $3, $4, $5)", r.id, r.first_name, r.last_name, r.email, r.photo_url)
+func writeScenarioRows(db *pgxpool.Pool, tableName string, rows []map[string]any) {
+	for _, row := range rows {
+		var columns []string
+		var values []interface{}
+		var placeholders []string
+
+		for k, v := range row {
+			columns = append(columns, k)
+			placeholders = append(placeholders, fmt.Sprintf("$%d", len(values)+1))
+			values = append(values, v)
+		}
+
+		query := fmt.Sprintf(
+			"INSERT INTO %s (%s) VALUES (%s)",
+			tableName, strings.Join(columns, ", "), strings.Join(placeholders, ", "),
+		)
+
+		_, err := db.Exec(
+			context.Background(),
+			query,
+			values...,
+		)
 		if err != nil {
 			panic(err)
 		}
 	}
 }
 
-func assertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, expectedRecords []struct{ id, first_name, last_name, email, photo_url string }) {
-	countResult, err := db.Query(context.Background(), "SELECT * FROM users")
+func assertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, expectedRecords []map[string]any) {
+	dbRows, err := db.Query(context.Background(), fmt.Sprintf("SELECT * FROM %s", tableName))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var results []struct {
-		id, first_name, last_name, email, photo_url string
-		created_at, updated_at                      time.Time
-	}
-
-	for countResult.Next() {
-		var r struct {
-			id, first_name, last_name, email, photo_url string
-			created_at, updated_at                      time.Time
-		}
-		err := countResult.Scan(&r.id, &r.first_name, &r.last_name, &r.email, &r.photo_url, &r.created_at, &r.updated_at)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		results = append(results, r)
+	results, err := pgx.CollectRows(dbRows, pgx.RowToMap)
+	if err != nil {
+		panic(err)
 	}
 
 	assert.Equal(t, len(expectedRecords), len(results), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(results))
 
-	expectedRowFound := slices.ContainsFunc(results, func(result struct {
-		id, first_name, last_name, email, photo_url string
-		created_at, updated_at                      time.Time
-	}) bool {
-		return slices.ContainsFunc(expectedRecords, func(expected struct {
-			id, first_name, last_name, email, photo_url string
-		}) bool {
-			return expected.id == result.id && expected.first_name == result.first_name && expected.last_name == result.last_name && expected.email == result.email && expected.photo_url == result.photo_url
-		})
-	})
+	for _, expected := range expectedRecords {
+		for _, result := range results {
 
-	assert.True(t, expectedRowFound, "Expected row not found in database")
+			equalColumns := 0
+			for k := range expected {
+				if expected[k] == result[k] {
+					equalColumns++
+				}
+			}
+
+			assert.True(t, equalColumns == len(slices.Collect(maps.Keys(expected))), "Expected row not found in database: %v", expected)
+		}
+	}
 }
