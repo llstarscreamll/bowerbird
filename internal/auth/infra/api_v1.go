@@ -14,12 +14,14 @@ import (
 func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) {
 	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
+
+	mux.HandleFunc("GET /v1/auth/google-mail/login", googleMailLoginHandler(googleAuth))
 }
 
 // redirects the user to the Google login page
 func googleLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, authServer.GetLoginUrl(), http.StatusFound)
+		http.Redirect(w, r, authServer.GetLoginUrl([]string{}), http.StatusFound)
 	}
 }
 
@@ -78,5 +80,12 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 		})
 
 		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
+	}
+}
+
+// redirects user to Google login page and request access to *read* Gmail inbox
+func googleMailLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, authServer.GetLoginUrl([]string{"https://www.googleapis.com/auth/gmail.readonly"}), http.StatusFound)
 	}
 }
