@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
@@ -14,8 +15,8 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-func (m *MockAuthService) GetLoginUrl() string {
-	args := m.Called()
+func (m *MockAuthService) GetLoginUrl(scopes []string) string {
+	args := m.Called(scopes)
 	return args.String(0)
 }
 
@@ -54,6 +55,66 @@ type MockSessionRepository struct {
 func (m *MockSessionRepository) Save(ctx context.Context, userID, sessionID string, expirationDate time.Time) error {
 	args := m.Called(ctx, userID, sessionID, expirationDate)
 	return args.Error(0)
+}
+
+type MockCrypt struct {
+	mock.Mock
+}
+
+func (m *MockCrypt) EncryptString(str string) string {
+	args := m.Called(str)
+	return args.String(0)
+}
+
+type MockMailSecretRepository struct {
+	mock.Mock
+}
+
+func (m *MockMailSecretRepository) Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error {
+	args := m.Called(ctx, userID, mailProvider, accessToken, refreshToken, expiresAt)
+	return args.Error(0)
+}
+
+func neverCalledMockUlid(t *testing.T) *MockULID {
+	m := new(MockULID)
+	m.AssertNotCalled(t, "New")
+
+	return m
+}
+
+func neverCalledMockCrypt(t *testing.T) *MockCrypt {
+	m := new(MockCrypt)
+	m.AssertNotCalled(t, "EncryptString")
+
+	return m
+}
+
+func neverCalledMockUserRepository(t *testing.T) *MockUserRepository {
+	m := new(MockUserRepository)
+	m.AssertNotCalled(t, "Upsert")
+
+	return m
+}
+
+func neverCalledMockSessionRepository(t *testing.T) *MockSessionRepository {
+	m := new(MockSessionRepository)
+	m.AssertNotCalled(t, "Save")
+
+	return m
+}
+
+func neverCalledMockMailSecretRepository(t *testing.T) *MockMailSecretRepository {
+	m := new(MockMailSecretRepository)
+	m.AssertNotCalled(t, "Save")
+
+	return m
+}
+
+func neverCalledMockAuthService(t *testing.T) *MockAuthService {
+	m := new(MockAuthService)
+	m.AssertNotCalled(t, "Save")
+
+	return m
 }
 
 var config = commonDomain.AppConfig{
