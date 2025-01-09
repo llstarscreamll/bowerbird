@@ -19,7 +19,7 @@ type GoogleAuthServer struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g GoogleAuthServer) GetLoginUrl() string {
+func (g GoogleAuthServer) GetLoginUrl(scopes []string) string {
 	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier()))
 }
 
