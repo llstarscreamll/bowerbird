@@ -7,24 +7,27 @@ import (
 	"net/http"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
+	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 type GoogleAuthServer struct {
-	config   *oauth2.Config
-	verifier string
+	config *oauth2.Config
+	ulid   commonDomain.ULIDGenerator
 }
 
+// ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
 func (g GoogleAuthServer) GetLoginUrl() string {
-	return g.config.AuthCodeURL("", oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(g.verifier))
+	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier()))
 }
 
+// ToDo: state should be validated to prevent CSRF attacks
 func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (domain.User, error) {
 	var user domain.User
 
-	token, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(g.verifier))
+	token, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
 	if err != nil {
 		return user, err
 	}
@@ -49,8 +52,8 @@ func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (dom
 	return user, nil
 }
 
-func NewGoogleAuthService(clientID, clientSecret, redirectUrl string) *GoogleAuthServer {
-	c := &oauth2.Config{
+func NewGoogleAuthService(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GoogleAuthServer {
+	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectUrl,
@@ -58,5 +61,5 @@ func NewGoogleAuthService(clientID, clientSecret, redirectUrl string) *GoogleAut
 		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
 	}
 
-	return &GoogleAuthServer{config: c, verifier: oauth2.GenerateVerifier()}
+	return &GoogleAuthServer{config, ulid}
 }
