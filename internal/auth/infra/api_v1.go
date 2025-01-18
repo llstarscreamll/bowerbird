@@ -11,11 +11,16 @@ import (
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
 )
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) {
+type contextKey string
+
+const userContextKey contextKey = "user"
+
+func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt domain.Crypt, mailSecretRepo domain.MailSecretRepository) {
 	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 
-	mux.HandleFunc("GET /v1/auth/google-mail/login", googleMailLoginHandler(googleAuth))
+	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(googleMailLoginHandler(googleAuth), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(googleMailLoginCallbackHandler(config, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
 }
 
 // redirects the user to the Google login page
@@ -83,9 +88,33 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 	}
 }
 
-// redirects user to Google login page and request access to *read* Gmail inbox
+// redirects user to Google login page and request access to *read* Gmail
 func googleMailLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, authServer.GetLoginUrl([]string{"https://www.googleapis.com/auth/gmail.readonly"}), http.StatusFound)
+	}
+}
+
+func googleMailLoginCallbackHandler(config commonDomain.AppConfig, authServer domain.AuthServer, crypt domain.Crypt, mailSecretRepo domain.MailSecretRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		code := strings.Trim(r.URL.Query().Get("code"), " ")
+		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), code)
+		if err != nil {
+			log.Printf("Error getting tokens from auth server: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting tokens from auth server -> "+err.Error())
+			return
+		}
+
+		user := r.Context().Value(userContextKey).(domain.User)
+		err = mailSecretRepo.Save(r.Context(), user.ID, "google", crypt.EncryptString(accessToken), crypt.EncryptString(refreshToken), expirationTime)
+		if err != nil {
+			log.Printf("Error writing tokens in storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error writing tokens in storage -> "+err.Error())
+			return
+		}
+
+		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
 	}
 }
