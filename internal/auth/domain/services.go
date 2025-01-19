@@ -10,7 +10,3 @@ type AuthServer interface {
 	GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error)
 	GetUserInfo(ctx context.Context, authCode string) (User, error)
 }
-
-type Crypt interface {
-	EncryptString(str string) string
-}
