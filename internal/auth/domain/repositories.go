@@ -15,6 +15,6 @@ type SessionRepository interface {
 	GetByID(ctx context.Context, ID string) (string, error)
 }
 
-type MailSecretRepository interface {
+type MailCredentialRepository interface {
 	Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error
 }

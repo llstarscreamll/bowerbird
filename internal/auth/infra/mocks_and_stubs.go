@@ -81,11 +81,11 @@ func (m *MockCrypt) EncryptString(str string) string {
 	return args.String(0)
 }
 
-type MockMailSecretRepository struct {
+type MockMailCredentialRepository struct {
 	mock.Mock
 }
 
-func (m *MockMailSecretRepository) Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error {
+func (m *MockMailCredentialRepository) Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error {
 	args := m.Called(ctx, userID, mailProvider, accessToken, refreshToken, expiresAt)
 	return args.Error(0)
 }
@@ -114,8 +114,8 @@ func neverCalledMockSessionRepository(t *testing.T) *MockSessionRepository {
 	return m
 }
 
-func neverCalledMockMailSecretRepository(t *testing.T) *MockMailSecretRepository {
-	m := new(MockMailSecretRepository)
+func neverCalledMockMailSecretRepository(t *testing.T) *MockMailCredentialRepository {
+	m := new(MockMailCredentialRepository)
 	m.AssertNotCalled(t, "Save")
 	return m
 }

@@ -15,7 +15,7 @@ type contextKey string
 
 const userContextKey contextKey = "user"
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailSecretRepository) {
+func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
 	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 
@@ -95,7 +95,7 @@ func googleMailLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
 	}
 }
 
-func googleMailLoginCallbackHandler(config commonDomain.AppConfig, authServer domain.AuthServer, crypt commonDomain.Crypt, mailSecretRepo domain.MailSecretRepository) http.HandlerFunc {
+func googleMailLoginCallbackHandler(config commonDomain.AppConfig, authServer domain.AuthServer, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
 		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), code)

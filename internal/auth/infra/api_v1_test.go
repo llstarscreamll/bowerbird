@@ -276,17 +276,17 @@ func TestGoogleMailLogin(t *testing.T) {
 
 func TestGoogleMailLoginCallback(t *testing.T) {
 	testCases := []struct {
-		name               string
-		verb               string
-		endpoint           string
-		requestHeaders     map[string]string
-		sessionRepoMock    func(t *testing.T) *MockSessionRepository
-		userRepoMock       func(t *testing.T) *MockUserRepository
-		authServerMock     func(t *testing.T) *MockAuthServer
-		cryptMock          func(t *testing.T) *MockCrypt
-		mailSecretRepoMock func(t *testing.T) *MockMailSecretRepository
-		expectedStatusCode int
-		expectedHeaders    map[string]string
+		name                   string
+		verb                   string
+		endpoint               string
+		requestHeaders         map[string]string
+		sessionRepoMock        func(t *testing.T) *MockSessionRepository
+		userRepoMock           func(t *testing.T) *MockUserRepository
+		authServerMock         func(t *testing.T) *MockAuthServer
+		cryptMock              func(t *testing.T) *MockCrypt
+		mailCredentialRepoMock func(t *testing.T) *MockMailCredentialRepository
+		expectedStatusCode     int
+		expectedHeaders        map[string]string
 	}{
 		{
 			"should save access and refresh tokens as encrypted values in storage",
@@ -313,8 +313,8 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 				m.On("EncryptString", "refresh-token").Return("refresh-encrypted").Once()
 				return m
 			},
-			func(t *testing.T) *MockMailSecretRepository {
-				m := new(MockMailSecretRepository)
+			func(t *testing.T) *MockMailCredentialRepository {
+				m := new(MockMailCredentialRepository)
 				m.On("Save", mock.Anything, testUser.ID, "google", "access-encrypted", "refresh-encrypted", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)).Return(nil)
 				return m
 			},
@@ -332,7 +332,7 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 			userRepoMock := tc.userRepoMock(t)
 			authServerMock := tc.authServerMock(t)
 			sessionRepoMock := tc.sessionRepoMock(t)
-			mailSecretRepoMock := tc.mailSecretRepoMock(t)
+			mailCredentialRepoMock := tc.mailCredentialRepoMock(t)
 
 			mux := http.NewServeMux()
 			w := httptest.NewRecorder()
@@ -342,7 +342,7 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authServerMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -360,7 +360,7 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 			userRepoMock.AssertExpectations(t)
 			authServerMock.AssertExpectations(t)
 			sessionRepoMock.AssertExpectations(t)
-			mailSecretRepoMock.AssertExpectations(t)
+			mailCredentialRepoMock.AssertExpectations(t)
 		})
 	}
 }
