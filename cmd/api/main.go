@@ -26,6 +26,7 @@ func main() {
 	defer db.Close()
 
 	ulid := commonInfra.OklogULIDGenerator{}
+	crypt := commonInfra.NewGoCrypt(os.Getenv("CRYPT_SECRET"))
 	userRepo := authInfra.NewPgxUserRepository(db)
 	sessionRepo := authInfra.NewPgxSessionRepository(db)
 
@@ -42,7 +43,7 @@ func main() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, googleAuth, userRepo, sessionRepo)
+	authInfra.RegisterRoutes(mux, config, ulid, googleAuth, userRepo, sessionRepo, crypt)
 
 	s := &http.Server{
 		Addr:           config.ServerPort,
