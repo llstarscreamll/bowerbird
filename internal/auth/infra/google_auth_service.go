@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
@@ -27,12 +28,12 @@ func (g GoogleAuthServer) GetLoginUrl(scopes []string) string {
 func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (domain.User, error) {
 	var user domain.User
 
-	token, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
+	accessToken, _, _, err := g.GetTokens(ctx, authCode)
 	if err != nil {
 		return user, err
 	}
 
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + accessToken)
 	if err != nil {
 		return user, err
 	}
@@ -50,6 +51,15 @@ func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (dom
 	}
 
 	return user, nil
+}
+
+func (g GoogleAuthServer) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
+	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
+	if err != nil {
+		return "", "", time.Now().Add(time.Hour * -2), err
+	}
+
+	return t.AccessToken, t.RefreshToken, time.Now().Add(time.Second * time.Duration(t.ExpiresIn)), nil
 }
 
 func NewGoogleAuthService(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GoogleAuthServer {
