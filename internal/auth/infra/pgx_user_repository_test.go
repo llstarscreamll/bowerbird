@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpsert(t *testing.T) {
+func TestPgxUserRepositoryUpsert(t *testing.T) {
 	// ToDo: get connection url from env var
 	var db = postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
 	defer db.Close()
