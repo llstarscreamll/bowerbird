@@ -25,7 +25,7 @@ func TestGoogleLogin(t *testing.T) {
 	cryptMock := neverCalledMockCrypt(t)
 	userRepoMock := neverCalledMockUserRepository(t)
 	sessionRepoMock := neverCalledMockSessionRepository(t)
-	mailSecretRepoMock := neverCalledMockMailSecretRepository(t)
+	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerMock := new(MockAuthServer)
 	authServerMock.On("GetLoginUrl", []string{}).Return("https://some-google.com/auth/login")
@@ -101,7 +101,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			"GET",
 			"/v1/auth/google/callback?code=",
 			neverCalledMockUlid,
-			neverCalledMockAuthService,
+			neverCalledMockAuthServer,
 			neverCalledMockUserRepository,
 			neverCalledMockSessionRepository,
 			http.StatusBadRequest,
@@ -210,7 +210,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			cryptMock := neverCalledMockCrypt(t)
 			authServerMock := tc.authServerMock(t)
 			sessionRepoMock := tc.sessionRepositoryMock(t)
-			mailSecretRepoMock := neverCalledMockMailSecretRepository(t)
+			mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 			RegisterRoutes(mux, config, ulidMock, authServerMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
 			mux.ServeHTTP(w, r)
@@ -251,7 +251,7 @@ func TestGoogleMailLogin(t *testing.T) {
 	sessionRepoMock.On("GetByID", bgContextType, "ABC-S3SS10N").Return(testUser.ID, nil)
 	userRepoMock := new(MockUserRepository)
 	userRepoMock.On("GetByID", bgContextType, testUser.ID).Return(testUser, nil)
-	mailSecretRepoMock := neverCalledMockMailSecretRepository(t)
+	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerMock := new(MockAuthServer)
 	authServerMock.On("GetLoginUrl", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login")
@@ -327,6 +327,23 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 			map[string]string{
 				"Location": config.FrontendUrl + "/dashboard",
 			},
+		},
+		{
+			"should return 401 whe session ID does not exists",
+			"GET", "/v1/auth/google-mail/callback?code=some-auth-code",
+			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
+			func(t *testing.T) *MockSessionRepository {
+				m := new(MockSessionRepository)
+				m.On("GetByID", mock.Anything, "01JGCA8BBB00000000000000S1").Return("", nil).Once()
+				return m
+			},
+			neverCalledMockUserRepository,
+			neverCalledMockAuthServer,
+			neverCalledMockCrypt,
+			neverCalledMockUlid,
+			neverCalledMockMailCredentialRepository,
+			http.StatusUnauthorized,
+			map[string]string{},
 		},
 	}
 

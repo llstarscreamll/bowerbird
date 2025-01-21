@@ -25,6 +25,12 @@ func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, use
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error getting session data from storage"}]}`)
 			return
 		}
+		if userID == "" {
+			log.Printf("Session ID does not exists")
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintf(w, `{"errors":[{"status":"401","title":"Unauthorized","detail":"Session ID does not exists"}]}`)
+			return
+		}
 
 		user, err := userRepo.GetByID(r.Context(), userID)
 		if err != nil {
