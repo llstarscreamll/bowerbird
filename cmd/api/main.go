@@ -29,6 +29,7 @@ func main() {
 	crypt := commonInfra.NewGoCrypt(os.Getenv("CRYPT_SECRET"))
 	userRepo := authInfra.NewPgxUserRepository(db)
 	sessionRepo := authInfra.NewPgxSessionRepository(db)
+	mailCredentialRepo := authInfra.NewPgxMailCredentialRepository(db)
 
 	googleAuth := authInfra.NewGoogleAuthService(
 		os.Getenv("GOOGLE_CLIENT_ID"),
@@ -43,7 +44,7 @@ func main() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, googleAuth, userRepo, sessionRepo, crypt)
+	authInfra.RegisterRoutes(mux, config, ulid, googleAuth, userRepo, sessionRepo, crypt, mailCredentialRepo)
 
 	s := &http.Server{
 		Addr:           config.ServerPort,
