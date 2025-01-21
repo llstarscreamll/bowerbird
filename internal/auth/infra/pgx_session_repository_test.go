@@ -72,7 +72,7 @@ func TestPgxSessionRepositoryGetByID(t *testing.T) {
 		expectedResult string
 	}{
 		{
-			"should return user ID by an existing session ID",
+			"should return user ID by existing session ID",
 			[]map[string]any{
 				{
 					"id":         "01JGCZXZEC00000000000000S1",
