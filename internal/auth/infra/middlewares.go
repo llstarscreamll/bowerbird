@@ -34,8 +34,15 @@ func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, use
 
 		user, err := userRepo.GetByID(r.Context(), userID)
 		if err != nil {
-			log.Printf("Error getting user from storage: %s", err)
+			log.Printf("Error getting auth user from storage: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error getting auth user data from storage"}]}`)
+			return
+		}
+		if user.ID == "" {
+			log.Printf("Error getting auth user from storage, user %s not found", userID)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error getting auth user from storage, user not found"}]}`)
 			return
 		}
 

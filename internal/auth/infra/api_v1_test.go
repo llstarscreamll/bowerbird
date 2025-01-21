@@ -345,6 +345,27 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 			http.StatusUnauthorized,
 			map[string]string{},
 		},
+		{
+			"should return 500 whe user ID is not found",
+			"GET", "/v1/auth/google-mail/callback?code=some-auth-code",
+			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
+			func(t *testing.T) *MockSessionRepository {
+				m := new(MockSessionRepository)
+				m.On("GetByID", mock.Anything, "01JGCA8BBB00000000000000S1").Return(testUser.ID, nil).Once()
+				return m
+			},
+			func(t *testing.T) *MockUserRepository {
+				m := new(MockUserRepository)
+				m.On("GetByID", mock.Anything, testUser.ID).Return(domain.User{}, nil)
+				return m
+			},
+			neverCalledMockAuthServer,
+			neverCalledMockCrypt,
+			neverCalledMockUlid,
+			neverCalledMockMailCredentialRepository,
+			http.StatusInternalServerError,
+			map[string]string{},
+		},
 	}
 
 	for _, tc := range testCases {
