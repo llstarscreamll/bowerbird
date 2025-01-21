@@ -114,13 +114,13 @@ func neverCalledMockSessionRepository(t *testing.T) *MockSessionRepository {
 	return m
 }
 
-func neverCalledMockMailSecretRepository(t *testing.T) *MockMailCredentialRepository {
+func neverCalledMockMailCredentialRepository(t *testing.T) *MockMailCredentialRepository {
 	m := new(MockMailCredentialRepository)
 	m.AssertNotCalled(t, "Save")
 	return m
 }
 
-func neverCalledMockAuthService(t *testing.T) *MockAuthServer {
+func neverCalledMockAuthServer(t *testing.T) *MockAuthServer {
 	m := new(MockAuthServer)
 	m.AssertNotCalled(t, "Save")
 	return m
