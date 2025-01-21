@@ -21,6 +21,7 @@ migrate -source file://internal/common/infra/postgresql/migrations -database "po
 Start the API:
 
 ```bash
+CRYPT_SECRET="6cxaEM3EJm6672FEaFTOlA==" \
 GOOGLE_CLIENT_ID="google-client-id" \
 GOOGLE_CLIENT_SECRET="google-client-secret" \
 GOOGLE_OAUTH_REDIRECT_URL="http://localhost:8080/v1/auth/google/callback" \
