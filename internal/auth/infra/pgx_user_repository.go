@@ -26,6 +26,24 @@ func (r *PgxUserRepository) Upsert(ctx context.Context, user domain.User) error 
 	return nil
 }
 
+func (r *PgxUserRepository) GetByID(ctx context.Context, ID string) (domain.User, error) {
+	var u domain.User
+
+	row := r.pool.QueryRow(
+		ctx,
+		`SELECT id, email, first_name, last_name, photo_url FROM users WHERE id = $1`,
+		ID,
+	)
+
+	row.Scan(&u.ID, &u.Email, &u.GivenName, &u.FamilyName, &u.PictureUrl)
+
+	if u.ID != "" {
+		u.Name = u.GivenName + " " + u.FamilyName
+	}
+
+	return u, nil
+}
+
 func NewPgxUserRepository(pool *pgxpool.Pool) *PgxUserRepository {
 	return &PgxUserRepository{pool}
 }

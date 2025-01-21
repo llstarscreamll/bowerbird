@@ -78,7 +78,6 @@ func TestGoogleLoginCallback(t *testing.T) {
 				m.On("Upsert", bgContextType, mock.MatchedBy(func(u domain.User) bool {
 					return assert.Equal(t, "01JGCA8BBB00000000000000U1", u.ID) &&
 						assert.Equal(t, testUser.Email, u.Email) &&
-						assert.Equal(t, testUser.EmailVerified, u.EmailVerified) &&
 						assert.Equal(t, testUser.Name, u.Name) &&
 						assert.Equal(t, testUser.GivenName, u.GivenName) &&
 						assert.Equal(t, testUser.FamilyName, u.FamilyName) &&

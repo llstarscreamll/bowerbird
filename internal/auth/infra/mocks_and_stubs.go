@@ -132,11 +132,10 @@ var config = commonDomain.AppConfig{
 }
 
 var testUser = domain.User{
-	ID:            "01JGCZXZEC00000000000000U1",
-	Email:         "john@doe.com",
-	EmailVerified: true,
-	Name:          "John Doe",
-	GivenName:     "John",
-	FamilyName:    "Doe",
-	PictureUrl:    "https://some-google.com/picture.jpg",
+	ID:         "01JGCZXZEC00000000000000U1",
+	Email:      "john@doe.com",
+	Name:       "John Doe",
+	GivenName:  "John",
+	FamilyName: "Doe",
+	PictureUrl: "https://some-google.com/picture.jpg",
 }
