@@ -2,8 +2,10 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"llstarscreamll/bowerbird/internal/auth/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,7 +37,10 @@ func (r *PgxUserRepository) GetByID(ctx context.Context, ID string) (domain.User
 		ID,
 	)
 
-	row.Scan(&u.ID, &u.Email, &u.GivenName, &u.FamilyName, &u.PictureUrl)
+	err := row.Scan(&u.ID, &u.Email, &u.GivenName, &u.FamilyName, &u.PictureUrl)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return domain.User{}, err
+	}
 
 	if u.ID != "" {
 		u.Name = u.GivenName + " " + u.FamilyName
