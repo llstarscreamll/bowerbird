@@ -16,5 +16,5 @@ type SessionRepository interface {
 }
 
 type MailCredentialRepository interface {
-	Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error
+	Save(ctx context.Context, ID, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error
 }

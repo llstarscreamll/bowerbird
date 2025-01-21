@@ -85,8 +85,8 @@ type MockMailCredentialRepository struct {
 	mock.Mock
 }
 
-func (m *MockMailCredentialRepository) Save(ctx context.Context, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error {
-	args := m.Called(ctx, userID, mailProvider, accessToken, refreshToken, expiresAt)
+func (m *MockMailCredentialRepository) Save(ctx context.Context, ID, userID, mailProvider, accessToken, refreshToken string, expiresAt time.Time) error {
+	args := m.Called(ctx, ID, userID, mailProvider, accessToken, refreshToken, expiresAt)
 	return args.Error(0)
 }
 

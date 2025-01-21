@@ -283,6 +283,7 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 		userRepoMock           func(t *testing.T) *MockUserRepository
 		authServerMock         func(t *testing.T) *MockAuthServer
 		cryptMock              func(t *testing.T) *MockCrypt
+		ulidMock               func(t *testing.T) *MockULID
 		mailCredentialRepoMock func(t *testing.T) *MockMailCredentialRepository
 		expectedStatusCode     int
 		expectedHeaders        map[string]string
@@ -312,9 +313,14 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 				m.On("EncryptString", "refresh-token").Return("refresh-encrypted", nil).Once()
 				return m
 			},
+			func(t *testing.T) *MockULID {
+				m := new(MockULID)
+				m.On("New").Return("01JJ4DAEJQ0000000000000000").Once()
+				return m
+			},
 			func(t *testing.T) *MockMailCredentialRepository {
 				m := new(MockMailCredentialRepository)
-				m.On("Save", mock.Anything, testUser.ID, "google", "access-encrypted", "refresh-encrypted", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)).Return(nil)
+				m.On("Save", mock.Anything, "01JJ4DAEJQ0000000000000000", testUser.ID, "google", "access-encrypted", "refresh-encrypted", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)).Return(nil)
 				return m
 			},
 			http.StatusFound,
@@ -327,7 +333,7 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cryptMock := tc.cryptMock(t)
-			ulidMock := neverCalledMockUlid(t)
+			ulidMock := tc.ulidMock(t)
 			userRepoMock := tc.userRepoMock(t)
 			authServerMock := tc.authServerMock(t)
 			sessionRepoMock := tc.sessionRepoMock(t)
