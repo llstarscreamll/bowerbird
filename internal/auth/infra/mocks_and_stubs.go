@@ -76,9 +76,9 @@ type MockCrypt struct {
 	mock.Mock
 }
 
-func (m *MockCrypt) EncryptString(str string) string {
+func (m *MockCrypt) EncryptString(str string) (string, error) {
 	args := m.Called(str)
-	return args.String(0)
+	return args.String(0), args.Error(1)
 }
 
 type MockMailCredentialRepository struct {

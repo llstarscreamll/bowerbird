@@ -309,8 +309,8 @@ func TestGoogleMailLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockCrypt {
 				m := new(MockCrypt)
-				m.On("EncryptString", "access-token").Return("access-encrypted").Once()
-				m.On("EncryptString", "refresh-token").Return("refresh-encrypted").Once()
+				m.On("EncryptString", "access-token").Return("access-encrypted", nil).Once()
+				m.On("EncryptString", "refresh-token").Return("refresh-encrypted", nil).Once()
 				return m
 			},
 			func(t *testing.T) *MockMailCredentialRepository {

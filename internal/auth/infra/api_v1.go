@@ -106,8 +106,24 @@ func googleMailLoginCallbackHandler(config commonDomain.AppConfig, authServer do
 			return
 		}
 
+		encryptedAccessToken, err := crypt.EncryptString(accessToken)
+		if err != nil {
+			log.Printf("Error securing access token: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error securing access token -> "+err.Error())
+			return
+		}
+
+		encryptedRefreshToken, err := crypt.EncryptString(refreshToken)
+		if err != nil {
+			log.Printf("Error securing refresh token: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error securing refresh token -> "+err.Error())
+			return
+		}
+
 		user := r.Context().Value(userContextKey).(domain.User)
-		err = mailSecretRepo.Save(r.Context(), user.ID, "google", crypt.EncryptString(accessToken), crypt.EncryptString(refreshToken), expirationTime)
+		err = mailSecretRepo.Save(r.Context(), user.ID, "google", encryptedAccessToken, encryptedRefreshToken, expirationTime)
 		if err != nil {
 			log.Printf("Error writing tokens in storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
