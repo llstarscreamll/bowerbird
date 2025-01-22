@@ -233,7 +233,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 	}
 }
 
-func TestGoogleMailLogin(t *testing.T) {
+func TestGMailLogin(t *testing.T) {
 	mux := http.NewServeMux()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/v1/auth/google-mail/login", nil)
@@ -273,7 +273,7 @@ func TestGoogleMailLogin(t *testing.T) {
 	mailSecretRepoMock.AssertExpectations(t)
 }
 
-func TestGoogleMailLoginCallback(t *testing.T) {
+func TestGMailLoginCallback(t *testing.T) {
 	testCases := []struct {
 		name                   string
 		verb                   string
