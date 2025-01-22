@@ -11,21 +11,21 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockAuthServer struct {
+type MockAuthServerGateway struct {
 	mock.Mock
 }
 
-func (m *MockAuthServer) GetLoginUrl(scopes []string) string {
+func (m *MockAuthServerGateway) GetLoginUrl(scopes []string) (string, error) {
 	args := m.Called(scopes)
-	return args.String(0)
+	return args.String(0), args.Error(1)
 }
 
-func (m *MockAuthServer) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
+func (m *MockAuthServerGateway) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
 	args := m.Called(ctx, authCode)
 	return args.String(0), args.String(1), args.Get(2).(time.Time), args.Error(3)
 }
 
-func (m *MockAuthServer) GetUserInfo(ctx context.Context, authCode string) (domain.User, error) {
+func (m *MockAuthServerGateway) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
 	args := m.Called(ctx, authCode)
 	return args.Get(0).(domain.User), args.Error(1)
 }
@@ -120,8 +120,8 @@ func neverCalledMockMailCredentialRepository(t *testing.T) *MockMailCredentialRe
 	return m
 }
 
-func neverCalledMockAuthServer(t *testing.T) *MockAuthServer {
-	m := new(MockAuthServer)
+func neverCalledMockAuthServerGateway(t *testing.T) *MockAuthServerGateway {
+	m := new(MockAuthServerGateway)
 	m.AssertNotCalled(t, "Save")
 	return m
 }

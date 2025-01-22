@@ -20,12 +20,21 @@ type GoogleAuthServer struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g GoogleAuthServer) GetLoginUrl(scopes []string) string {
-	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier()))
+func (g GoogleAuthServer) GetLoginUrl(scopes []string) (string, error) {
+	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier())), nil
+}
+
+func (g GoogleAuthServer) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
+	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
+	if err != nil {
+		return "", "", time.Now().Add(time.Hour * -2), err
+	}
+
+	return t.AccessToken, t.RefreshToken, time.Now().Add(time.Second * time.Duration(t.ExpiresIn)), nil
 }
 
 // ToDo: state should be validated to prevent CSRF attacks
-func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (domain.User, error) {
+func (g GoogleAuthServer) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
 	var user domain.User
 
 	accessToken, _, _, err := g.GetTokens(ctx, authCode)
@@ -51,15 +60,6 @@ func (g GoogleAuthServer) GetUserInfo(ctx context.Context, authCode string) (dom
 	}
 
 	return user, nil
-}
-
-func (g GoogleAuthServer) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
-	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
-	if err != nil {
-		return "", "", time.Now().Add(time.Hour * -2), err
-	}
-
-	return t.AccessToken, t.RefreshToken, time.Now().Add(time.Second * time.Duration(t.ExpiresIn)), nil
 }
 
 func NewGoogleAuthService(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GoogleAuthServer {

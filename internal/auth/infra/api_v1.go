@@ -15,7 +15,7 @@ type contextKey string
 
 const userContextKey contextKey = "user"
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
+func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
 	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 
@@ -24,14 +24,22 @@ func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid comm
 }
 
 // redirects the user to the Google login page
-func googleLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
+func googleLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, authServer.GetLoginUrl([]string{}), http.StatusFound)
+		url, err := authServer.GetLoginUrl([]string{})
+		if err != nil {
+			log.Printf("Error getting auth server login url: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting auth server login url -> "+err.Error())
+			return
+		}
+
+		http.Redirect(w, r, url, http.StatusFound)
 	}
 }
 
 // handles the Google login callback by upsert the user in database, starting session and redirecting to frontend app
-func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServer, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
+func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
 		if code == "" {
@@ -41,7 +49,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		user, err := authServer.GetUserInfo(r.Context(), code)
+		user, err := authServer.GetUserProfile(r.Context(), code)
 		if err != nil {
 			log.Printf("Error getting user info form auth token: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -89,13 +97,21 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 }
 
 // redirects user to Google login page and request access to *read* Gmail
-func gMailLoginHandler(authServer domain.AuthServer) http.HandlerFunc {
+func gMailLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, authServer.GetLoginUrl([]string{"https://www.googleapis.com/auth/gmail.readonly"}), http.StatusFound)
+		url, err := authServer.GetLoginUrl([]string{"https://www.googleapis.com/auth/gmail.readonly"})
+		if err != nil {
+			log.Printf("Error getting auth server login url: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting auth server login url -> "+err.Error())
+			return
+		}
+
+		http.Redirect(w, r, url, http.StatusFound)
 	}
 }
 
-func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServer, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
+func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
 		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), code)
