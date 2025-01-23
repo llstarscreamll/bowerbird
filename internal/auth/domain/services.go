@@ -6,7 +6,7 @@ import (
 )
 
 type AuthServerGateway interface {
-	GetLoginUrl(scopes []string) (string, error)
-	GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error)
-	GetUserProfile(ctx context.Context, authCode string) (User, error)
+	GetLoginUrl(provider string, scopes []string) (string, error)
+	GetTokens(ctx context.Context, provider string, authCode string) (string, string, time.Time, error)
+	GetUserProfile(ctx context.Context, provider string, authCode string) (User, error)
 }

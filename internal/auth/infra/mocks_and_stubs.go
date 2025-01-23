@@ -15,18 +15,18 @@ type MockAuthServerGateway struct {
 	mock.Mock
 }
 
-func (m *MockAuthServerGateway) GetLoginUrl(scopes []string) (string, error) {
-	args := m.Called(scopes)
+func (m *MockAuthServerGateway) GetLoginUrl(provider string, scopes []string) (string, error) {
+	args := m.Called(provider, scopes)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockAuthServerGateway) GetTokens(ctx context.Context, authCode string) (string, string, time.Time, error) {
-	args := m.Called(ctx, authCode)
+func (m *MockAuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string) (string, string, time.Time, error) {
+	args := m.Called(ctx, provider, authCode)
 	return args.String(0), args.String(1), args.Get(2).(time.Time), args.Error(3)
 }
 
-func (m *MockAuthServerGateway) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
-	args := m.Called(ctx, authCode)
+func (m *MockAuthServerGateway) GetUserProfile(ctx context.Context, provider string, authCode string) (domain.User, error) {
+	args := m.Called(ctx, provider, authCode)
 	return args.Get(0).(domain.User), args.Error(1)
 }
 

@@ -26,7 +26,7 @@ func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid comm
 // redirects the user to the Google login page
 func googleLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl([]string{})
+		url, err := authServer.GetLoginUrl("google", []string{})
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -49,11 +49,11 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		user, err := authServer.GetUserProfile(r.Context(), code)
+		user, err := authServer.GetUserProfile(r.Context(), "google", code)
 		if err != nil {
-			log.Printf("Error getting user info form auth token: %s", err.Error())
+			log.Printf("Error getting user profile form OAuth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting user info from OAuth Server","detail":%q}]}`, err.Error())
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting user profiles from OAuth Server","detail":%q}]}`, err.Error())
 			return
 		}
 
@@ -99,7 +99,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 // redirects user to Google login page and request access to *read* Gmail
 func gMailLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl([]string{"https://www.googleapis.com/auth/gmail.readonly"})
+		url, err := authServer.GetLoginUrl("google", []string{"https://www.googleapis.com/auth/gmail.readonly"})
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -114,7 +114,7 @@ func gMailLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
-		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), code)
+		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), "google", code)
 		if err != nil {
 			log.Printf("Error getting tokens from auth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

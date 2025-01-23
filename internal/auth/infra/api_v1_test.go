@@ -28,7 +28,7 @@ func TestGoogleLogin(t *testing.T) {
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerMock := new(MockAuthServerGateway)
-	authServerMock.On("GetLoginUrl", []string{}).Return("https://some-google.com/auth/login", nil)
+	authServerMock.On("GetLoginUrl", "google", []string{}).Return("https://some-google.com/auth/login", nil)
 
 	RegisterRoutes(mux, config, ulidMock, authServerMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
 	mux.ServeHTTP(w, r)
@@ -70,7 +70,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserInfo", bgContextType, "123").Return(testUser, nil)
+				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -114,7 +114,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			neverCalledMockUlid,
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserInfo", mock.Anything, "123").Return(domain.User{}, assert.AnError)
+				m.On("GetUserProfile", mock.Anything, "google", "123").Return(domain.User{}, assert.AnError)
 				return m
 			},
 			neverCalledMockUserRepository,
@@ -133,7 +133,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserInfo", bgContextType, "123").Return(testUser, nil)
+				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -157,7 +157,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserInfo", bgContextType, "123").Return(testUser, nil)
+				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -181,7 +181,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserInfo", bgContextType, "123").Return(testUser, nil)
+				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -254,7 +254,7 @@ func TestGMailLogin(t *testing.T) {
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerMock := new(MockAuthServerGateway)
-	authServerMock.On("GetLoginUrl", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
+	authServerMock.On("GetLoginUrl", "google", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
 
 	RegisterRoutes(mux, config, ulidMock, authServerMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
 	mux.ServeHTTP(w, r)
@@ -304,7 +304,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetTokens", mock.Anything, "some-auth-code").Return("access-token", "refresh-token", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local), nil).Once()
+				m.On("GetTokens", mock.Anything, "google", "some-auth-code").Return("access-token", "refresh-token", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local), nil).Once()
 				return m
 			},
 			func(t *testing.T) *MockCrypt {
