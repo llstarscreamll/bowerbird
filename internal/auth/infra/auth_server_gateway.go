@@ -24,25 +24,29 @@ func (g GoogleAuthServer) GetLoginUrl(provider string, scopes []string) (string,
 	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier())), nil
 }
 
-func (g GoogleAuthServer) GetTokens(ctx context.Context, provider string, authCode string) (string, string, time.Time, error) {
+func (g GoogleAuthServer) GetTokens(ctx context.Context, provider string, authCode string) (domain.Tokens, error) {
 	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
 	if err != nil {
-		return "", "", time.Now().Add(time.Hour * -2), err
+		return domain.Tokens{}, err
 	}
 
-	return t.AccessToken, t.RefreshToken, time.Now().Add(time.Second * time.Duration(t.ExpiresIn)), nil
+	return domain.Tokens{
+		AccessToken:  t.AccessToken,
+		RefreshToken: t.RefreshToken,
+		ExpiresAt:    time.Now().Add(time.Second * time.Duration(t.ExpiresIn)),
+	}, nil
 }
 
 // ToDo: state should be validated to prevent CSRF attacks
 func (g GoogleAuthServer) GetUserProfile(ctx context.Context, provider string, authCode string) (domain.User, error) {
 	var user domain.User
 
-	accessToken, _, _, err := g.GetTokens(ctx, provider, authCode)
+	tokens, err := g.GetTokens(ctx, provider, authCode)
 	if err != nil {
 		return user, err
 	}
 
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + accessToken)
+	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + tokens.AccessToken)
 	if err != nil {
 		return user, err
 	}

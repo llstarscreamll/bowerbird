@@ -20,9 +20,9 @@ func (m *MockAuthServerGateway) GetLoginUrl(provider string, scopes []string) (s
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockAuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string) (string, string, time.Time, error) {
+func (m *MockAuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string) (domain.Tokens, error) {
 	args := m.Called(ctx, provider, authCode)
-	return args.String(0), args.String(1), args.Get(2).(time.Time), args.Error(3)
+	return args.Get(0).(domain.Tokens), args.Error(1)
 }
 
 func (m *MockAuthServerGateway) GetUserProfile(ctx context.Context, provider string, authCode string) (domain.User, error) {

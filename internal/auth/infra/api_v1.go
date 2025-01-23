@@ -114,7 +114,7 @@ func gMailLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
 func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
-		accessToken, refreshToken, expirationTime, err := authServer.GetTokens(r.Context(), "google", code)
+		tokens, err := authServer.GetTokens(r.Context(), "google", code)
 		if err != nil {
 			log.Printf("Error getting tokens from auth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -122,7 +122,7 @@ func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.
 			return
 		}
 
-		encryptedAccessToken, err := crypt.EncryptString(accessToken)
+		encryptedAccessToken, err := crypt.EncryptString(tokens.AccessToken)
 		if err != nil {
 			log.Printf("Error securing access token: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -130,7 +130,7 @@ func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.
 			return
 		}
 
-		encryptedRefreshToken, err := crypt.EncryptString(refreshToken)
+		encryptedRefreshToken, err := crypt.EncryptString(tokens.RefreshToken)
 		if err != nil {
 			log.Printf("Error securing refresh token: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -139,7 +139,7 @@ func gMailLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.
 		}
 
 		user := r.Context().Value(userContextKey).(domain.User)
-		err = mailSecretRepo.Save(r.Context(), ulid.New(), user.ID, "google", encryptedAccessToken, encryptedRefreshToken, expirationTime)
+		err = mailSecretRepo.Save(r.Context(), ulid.New(), user.ID, "google", encryptedAccessToken, encryptedRefreshToken, tokens.ExpiresAt)
 		if err != nil {
 			log.Printf("Error writing tokens in storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)

@@ -304,7 +304,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetTokens", mock.Anything, "google", "some-auth-code").Return("access-token", "refresh-token", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local), nil).Once()
+				m.On("GetTokens", mock.Anything, "google", "some-auth-code").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
 				return m
 			},
 			func(t *testing.T) *MockCrypt {
