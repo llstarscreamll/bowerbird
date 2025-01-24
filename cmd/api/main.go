@@ -37,8 +37,14 @@ func main() {
 		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
 		ulid,
 	)
+	microsoftAuth := *authInfra.NewMicrosoftAuthStrategy(
+		os.Getenv("MICROSOFT_CLIENT_ID"),
+		os.Getenv("MICROSOFT_CLIENT_SECRET"),
+		os.Getenv("MICROSOFT_OAUTH_REDIRECT_URL"),
+		ulid,
+	)
 
-	authServerGateway := authInfra.NewAuthServerGateway(googleAuth)
+	authServerGateway := authInfra.NewAuthServerGateway(googleAuth, microsoftAuth)
 
 	mux := http.NewServeMux()
 

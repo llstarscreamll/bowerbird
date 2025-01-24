@@ -40,10 +40,11 @@ func (g AuthServerGateway) GetUserProfile(ctx context.Context, provider string, 
 	return strategy.GetUserProfile(ctx, authCode)
 }
 
-func NewAuthServerGateway(googleAuth GoogleAuthStrategy) *AuthServerGateway {
+func NewAuthServerGateway(googleAuth GoogleAuthStrategy, microsoftStrategy MicrosoftAuthStrategy) *AuthServerGateway {
 	return &AuthServerGateway{
 		authStrategies: map[string]domain.AuthServerStrategy{
-			"google": googleAuth,
+			"google":    googleAuth,
+			"microsoft": microsoftStrategy,
 		},
 	}
 }
