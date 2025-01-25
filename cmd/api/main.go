@@ -18,6 +18,7 @@ func main() {
 	ctx := context.Background()
 
 	config := commonDomain.AppConfig{
+		ServerHost:  os.Getenv("SERVER_HOST"),
 		ServerPort:  ":8080",
 		FrontendUrl: os.Getenv("FRONTEND_URL"),
 	}
