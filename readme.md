@@ -25,6 +25,11 @@ CRYPT_SECRET="6cxaEM3EJm6672FEaFTOlA==" \
 GOOGLE_CLIENT_ID="google-client-id" \
 GOOGLE_CLIENT_SECRET="google-client-secret" \
 GOOGLE_OAUTH_REDIRECT_URL="http://localhost:8080/v1/auth/google/callback" \
+MICROSOFT_CLIENT_ID="microsoft-client-id" \
+MICROSOFT_CLIENT_SECRET="microsoft-client-secret" \
+MICROSOFT_OAUTH_REDIRECT_URL="http://localhost:8080/v1/auth/microsoft/callback" \
+POSTGRES_DATABASE_URL="postgres://user:@localhost:5432/bowerbird_local?sslmode=disable" \
+SERVER_HOST="http://localhost:8080" \
 FRONTEND_URL="http://localhost:4200" \
 go run cmd/api/main.go
 ```
