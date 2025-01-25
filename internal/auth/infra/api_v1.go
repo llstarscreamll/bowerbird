@@ -20,10 +20,10 @@ func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid comm
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 
 	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(mailLoginHandler("google", googleAuth), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(gMailLoginCallbackHandler("google", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /v1/auth/outlook/login", authMiddleware(mailLoginHandler("microsoft", googleAuth), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/outlook/callback", authMiddleware(gMailLoginCallbackHandler("microsoft", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(mailLoginHandler("microsoft", googleAuth), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
 }
 
 // redirects the user to the Google login page
@@ -56,7 +56,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 		if err != nil {
 			log.Printf("Error getting user profile form OAuth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting user profiles from OAuth Server","detail":%q}]}`, err.Error())
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting user profile from OAuth Server","detail":%q}]}`, err.Error())
 			return
 		}
 
@@ -114,7 +114,7 @@ func mailLoginHandler(provider string, authServer domain.AuthServerGateway) http
 	}
 }
 
-func gMailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
+func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
 		tokens, err := authServer.GetTokens(r.Context(), provider, code)
