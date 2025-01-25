@@ -22,12 +22,26 @@ type MicrosoftAuthStrategy struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
-	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier())), nil
+func (m MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
+	m.config.RedirectURL = redirectUrl
+	m.config.Scopes = append(m.config.Scopes, scopes...)
+	foo := m.config.AuthCodeURL(m.ulid.New(), oauth2.AccessTypeOffline)
+	fmt.Println("Microsoft Login URL:", foo)
+	parsedUrl, err := url.Parse(foo)
+	if err != nil {
+		return "", err
+	}
+
+	query := parsedUrl.Query()
+	query.Del("state")
+	parsedUrl.RawQuery = query.Encode()
+	fmt.Println("Microsoft Parsed Login URL:", parsedUrl.String())
+
+	return parsedUrl.String(), nil
 }
 
-func (g MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (domain.Tokens, error) {
-	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
+func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (domain.Tokens, error) {
+	t, err := m.config.Exchange(ctx, authCode)
 	if err != nil {
 		return domain.Tokens{}, err
 	}
@@ -40,10 +54,10 @@ func (g MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (
 }
 
 // ToDo: state should be validated to prevent CSRF attacks
-func (g MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
+func (m MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
 	var user domain.User
 
-	tokens, err := g.GetTokens(ctx, authCode)
+	tokens, err := m.GetTokens(ctx, authCode)
 	if err != nil {
 		return user, err
 	}
@@ -86,7 +100,7 @@ func NewMicrosoftAuthStrategy(clientID, clientSecret, redirectUrl string, ulid c
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectUrl,
 		Endpoint:     microsoft.LiveConnectEndpoint,
-		Scopes:       []string{},
+		Scopes:       []string{"offline_access"},
 	}
 
 	return &MicrosoftAuthStrategy{config, ulid}

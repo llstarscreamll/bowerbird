@@ -25,6 +25,7 @@ var foo string = oauth2.GenerateVerifier()
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
 func (g GoogleAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
 	g.config.RedirectURL = redirectUrl
+	g.config.Scopes = append(g.config.Scopes, scopes...)
 	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(foo)), nil
 }
 
