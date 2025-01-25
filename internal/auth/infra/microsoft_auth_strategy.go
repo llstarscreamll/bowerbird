@@ -22,7 +22,7 @@ type MicrosoftAuthStrategy struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g MicrosoftAuthStrategy) GetLoginUrl(scopes []string) (string, error) {
+func (g MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
 	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier())), nil
 }
 

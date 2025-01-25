@@ -19,13 +19,17 @@ type GoogleAuthStrategy struct {
 	ulid   commonDomain.ULIDGenerator
 }
 
+// ToDo: verifier code should be stored in a database 'cause must match on login, callback and requesting tokens
+var foo string = oauth2.GenerateVerifier()
+
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g GoogleAuthStrategy) GetLoginUrl(scopes []string) (string, error) {
-	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(oauth2.GenerateVerifier())), nil
+func (g GoogleAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
+	g.config.RedirectURL = redirectUrl
+	return g.config.AuthCodeURL(g.ulid.New(), oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(foo)), nil
 }
 
 func (g GoogleAuthStrategy) GetTokens(ctx context.Context, authCode string) (domain.Tokens, error) {
-	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(oauth2.GenerateVerifier()))
+	t, err := g.config.Exchange(ctx, authCode, oauth2.VerifierOption(foo))
 	if err != nil {
 		return domain.Tokens{}, err
 	}

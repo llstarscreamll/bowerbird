@@ -15,8 +15,8 @@ type MockAuthServerGateway struct {
 	mock.Mock
 }
 
-func (m *MockAuthServerGateway) GetLoginUrl(provider string, scopes []string) (string, error) {
-	args := m.Called(provider, scopes)
+func (m *MockAuthServerGateway) GetLoginUrl(provider, redirectUrl string, scopes []string) (string, error) {
+	args := m.Called(provider, redirectUrl, scopes)
 	return args.String(0), args.Error(1)
 }
 
@@ -127,6 +127,7 @@ func neverCalledMockAuthServerGateway(t *testing.T) *MockAuthServerGateway {
 }
 
 var config = commonDomain.AppConfig{
+	ServerHost:  "http://localhost:8080",
 	ServerPort:  ":8080",
 	FrontendUrl: "http://localhost:4200",
 }

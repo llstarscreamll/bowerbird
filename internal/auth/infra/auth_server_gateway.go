@@ -12,13 +12,13 @@ type AuthServerGateway struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (g AuthServerGateway) GetLoginUrl(provider string, scopes []string) (string, error) {
+func (g AuthServerGateway) GetLoginUrl(provider, redirectUrl string, scopes []string) (string, error) {
 	strategy, ok := g.authStrategies[provider]
 	if !ok {
 		return "", errors.New("OAuth provider not supported")
 	}
 
-	return strategy.GetLoginUrl(scopes)
+	return strategy.GetLoginUrl(redirectUrl, scopes)
 }
 
 func (g AuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string) (domain.Tokens, error) {

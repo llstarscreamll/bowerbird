@@ -16,20 +16,20 @@ type contextKey string
 const userContextKey contextKey = "user"
 
 func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
-	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(googleAuth))
+	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, googleAuth))
 	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
 
-	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(mailLoginHandler("google", googleAuth), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, googleAuth), sessionRepo, userRepo))
 	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(mailLoginHandler("microsoft", googleAuth), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, googleAuth), sessionRepo, userRepo))
 	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
 }
 
 // redirects the user to the Google login page
-func googleLoginHandler(authServer domain.AuthServerGateway) http.HandlerFunc {
+func googleLoginHandler(config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl("google", []string{})
+		url, err := authServer.GetLoginUrl("google", config.ServerHost+"/v1/auth/google/callback", []string{})
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -99,10 +99,25 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 	}
 }
 
-// redirects user to Google login page and request access to *read* Gmail
-func mailLoginHandler(provider string, authServer domain.AuthServerGateway) http.HandlerFunc {
+// redirects user to Google login page and request access to *read* mail
+func gMailLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, []string{"https://www.googleapis.com/auth/gmail.readonly"})
+		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"})
+		if err != nil {
+			log.Printf("Error getting auth server login url: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting auth server login url -> "+err.Error())
+			return
+		}
+
+		http.Redirect(w, r, url, http.StatusFound)
+	}
+}
+
+// redirects user to Microsoft login page and request access to *read* mail
+func outlookLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/microsoft/callback", []string{})
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
