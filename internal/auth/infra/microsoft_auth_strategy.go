@@ -25,9 +25,9 @@ type MicrosoftAuthStrategy struct {
 func (m MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
 	m.config.RedirectURL = redirectUrl
 	m.config.Scopes = append(m.config.Scopes, scopes...)
-	foo := m.config.AuthCodeURL(m.ulid.New(), oauth2.AccessTypeOffline)
-	fmt.Println("Microsoft Login URL:", foo)
-	parsedUrl, err := url.Parse(foo)
+	authCodeUrl := m.config.AuthCodeURL(m.ulid.New(), oauth2.AccessTypeOffline)
+	fmt.Println("Microsoft Login URL:", authCodeUrl)
+	parsedUrl, err := url.Parse(authCodeUrl)
 	if err != nil {
 		return "", err
 	}
