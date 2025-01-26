@@ -53,7 +53,6 @@ func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (
 	}, nil
 }
 
-// ToDo: state should be validated to prevent CSRF attacks
 func (m MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
 	var user domain.User
 
