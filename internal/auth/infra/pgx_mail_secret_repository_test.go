@@ -22,6 +22,7 @@ func TestPgxMailSecretRepositorySave(t *testing.T) {
 			ID             string
 			userID         string
 			mailProvider   string
+			mailAddress    string
 			accessToken    string
 			refreshToken   string
 			expirationDate time.Time
@@ -36,6 +37,7 @@ func TestPgxMailSecretRepositorySave(t *testing.T) {
 				ID             string
 				userID         string
 				mailProvider   string
+				mailAddress    string
 				accessToken    string
 				refreshToken   string
 				expirationDate time.Time
@@ -43,6 +45,7 @@ func TestPgxMailSecretRepositorySave(t *testing.T) {
 				"01JJ3A890N0000000000000000",
 				testUser.ID,
 				"google",
+				"john@doe.com",
 				"some-access-token",
 				"some-refresh-token",
 				time.Date(2025, time.January, 6, 0, 0, 0, 0, time.UTC),
@@ -53,6 +56,7 @@ func TestPgxMailSecretRepositorySave(t *testing.T) {
 					"id":            "01JJ3A890N0000000000000000",
 					"user_id":       testUser.ID,
 					"mail_provider": "google",
+					"mail_address":  "john@doe.com",
 					"access_token":  "some-access-token",
 					"refresh_token": "some-refresh-token",
 					"expires_at":    time.Date(2025, time.January, 6, 0, 0, 0, 0, time.UTC),
@@ -68,7 +72,7 @@ func TestPgxMailSecretRepositorySave(t *testing.T) {
 			tests.WriteScenarioRows(db, "mail_credentials", tc.scenarioRows)
 
 			repo := NewPgxMailCredentialRepository(db)
-			err := repo.Save(ctx, tc.input.ID, tc.input.userID, tc.input.mailProvider, tc.input.accessToken, tc.input.refreshToken, tc.input.expirationDate)
+			err := repo.Save(ctx, tc.input.ID, tc.input.userID, tc.input.mailProvider, tc.input.mailAddress, tc.input.accessToken, tc.input.refreshToken, tc.input.expirationDate)
 
 			assert.Equal(t, tc.expectedError, err)
 			tests.AssertDatabaseHasRows(t, db, "mail_credentials", tc.expectedRows)

@@ -20,6 +20,7 @@ CREATE TABLE "public"."mail_credentials" (
     "id" VARCHAR(26) PRIMARY KEY,
     "user_id" VARCHAR(26) NOT NULL,
     "mail_provider" VARCHAR(50) NOT NULL,
+    "mail_address" VARCHAR(255) NOT NULL,
     "access_token" TEXT NOT NULL,
     "refresh_token" TEXT NOT NULL,
     "expires_at" TIMESTAMP NOT NULL,
