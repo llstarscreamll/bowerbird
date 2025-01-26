@@ -70,7 +70,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
+				m.On("GetTokens", mock.Anything, "google", "123").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", bgContextType, "google", "access-token").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -114,7 +115,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 			neverCalledMockUlid,
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserProfile", mock.Anything, "google", "123").Return(domain.User{}, assert.AnError)
+				m.On("GetTokens", mock.Anything, "google", "123").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", mock.Anything, "google", "access-token").Return(domain.User{}, assert.AnError)
 				return m
 			},
 			neverCalledMockUserRepository,
@@ -133,7 +135,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
+				m.On("GetTokens", mock.Anything, "google", "123").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", bgContextType, "google", "access-token").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -157,7 +160,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
+				m.On("GetTokens", mock.Anything, "google", "123").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", bgContextType, "google", "access-token").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -181,7 +185,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
-				m.On("GetUserProfile", bgContextType, "google", "123").Return(testUser, nil)
+				m.On("GetTokens", mock.Anything, "google", "123").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", bgContextType, "google", "access-token").Return(testUser, nil)
 				return m
 			},
 			func(t *testing.T) *MockUserRepository {
@@ -305,6 +310,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
 				m.On("GetTokens", mock.Anything, "google", "some-auth-code").Return(domain.Tokens{AccessToken: "access-token", RefreshToken: "refresh-token", ExpiresAt: time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)}, nil).Once()
+				m.On("GetUserProfile", mock.Anything, "google", "access-token").Return(testUser, nil).Once()
 				return m
 			},
 			func(t *testing.T) *MockCrypt {
@@ -320,7 +326,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockMailCredentialRepository {
 				m := new(MockMailCredentialRepository)
-				m.On("Save", mock.Anything, "01JJ4DAEJQ0000000000000000", testUser.ID, "google", "access-encrypted", "refresh-encrypted", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)).Return(nil)
+				m.On("Save", mock.Anything, "01JJ4DAEJQ0000000000000000", testUser.ID, "google", testUser.Email, "access-encrypted", "refresh-encrypted", time.Date(2025, time.January, 18, 13, 30, 00, 0, time.Local)).Return(nil)
 				return m
 			},
 			http.StatusFound,

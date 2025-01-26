@@ -43,15 +43,10 @@ func (g GoogleAuthStrategy) GetTokens(ctx context.Context, authCode string) (dom
 }
 
 // ToDo: state should be validated to prevent CSRF attacks
-func (g GoogleAuthStrategy) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
+func (g GoogleAuthStrategy) GetUserProfile(ctx context.Context, accessToken string) (domain.User, error) {
 	var user domain.User
 
-	tokens, err := g.GetTokens(ctx, authCode)
-	if err != nil {
-		return user, err
-	}
-
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + tokens.AccessToken)
+	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + accessToken)
 	if err != nil {
 		return user, err
 	}

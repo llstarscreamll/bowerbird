@@ -31,13 +31,13 @@ func (g AuthServerGateway) GetTokens(ctx context.Context, provider string, authC
 }
 
 // ToDo: state should be validated to prevent CSRF attacks
-func (g AuthServerGateway) GetUserProfile(ctx context.Context, provider string, authCode string) (domain.User, error) {
+func (g AuthServerGateway) GetUserProfile(ctx context.Context, provider string, accessToken string) (domain.User, error) {
 	strategy, ok := g.authStrategies[provider]
 	if !ok {
 		return domain.User{}, errors.New("OAuth provider not supported")
 	}
 
-	return strategy.GetUserProfile(ctx, authCode)
+	return strategy.GetUserProfile(ctx, accessToken)
 }
 
 func NewAuthServerGateway(googleAuth GoogleAuthStrategy, microsoftStrategy MicrosoftAuthStrategy) *AuthServerGateway {

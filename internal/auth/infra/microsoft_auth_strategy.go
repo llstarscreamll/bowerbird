@@ -53,16 +53,11 @@ func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (
 	}, nil
 }
 
-func (m MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, authCode string) (domain.User, error) {
+func (m MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, accessToken string) (domain.User, error) {
 	var user domain.User
 
-	tokens, err := m.GetTokens(ctx, authCode)
-	if err != nil {
-		return user, err
-	}
-
 	headers := make(http.Header)
-	headers.Add("Authorization", "Bearer "+tokens.AccessToken)
+	headers.Add("Authorization", "Bearer "+accessToken)
 
 	r := &http.Request{
 		Method: http.MethodGet,

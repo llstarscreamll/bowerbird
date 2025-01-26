@@ -44,17 +44,25 @@ func googleLoginHandler(config commonDomain.AppConfig, authServer domain.AuthSer
 // handles the Google login callback by upsert the user in database, starting session and redirecting to frontend app
 func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		code := strings.Trim(r.URL.Query().Get("code"), " ")
-		if code == "" {
+		authCode := strings.Trim(r.URL.Query().Get("code"), " ")
+		if authCode == "" {
 			log.Printf("Error getting code from query params, code is empty")
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"code is empty"}]}`)
 			return
 		}
 
-		user, err := authServer.GetUserProfile(r.Context(), "google", code)
+		tokens, err := authServer.GetTokens(r.Context(), "google", authCode)
 		if err != nil {
-			log.Printf("Error getting user profile form OAuth server: %s", err.Error())
+			log.Printf("Error getting auth tokens from OAuth server: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting auth tokens from OAuth Server","detail":%q}]}`, err.Error())
+			return
+		}
+
+		user, err := authServer.GetUserProfile(r.Context(), "google", tokens.AccessToken)
+		if err != nil {
+			log.Printf("Error getting user profile from OAuth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting user profile from OAuth Server","detail":%q}]}`, err.Error())
 			return
@@ -156,8 +164,16 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		user := r.Context().Value(userContextKey).(domain.User)
-		err = mailSecretRepo.Save(r.Context(), ulid.New(), user.ID, provider, encryptedAccessToken, encryptedRefreshToken, tokens.ExpiresAt)
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		userMailProfile, err := authServer.GetUserProfile(r.Context(), provider, tokens.AccessToken)
+		if err != nil {
+			log.Printf("Error getting user mail profile: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting user mail profile -> "+err.Error())
+			return
+		}
+
+		err = mailSecretRepo.Save(r.Context(), ulid.New(), authUser.ID, provider, userMailProfile.Email, encryptedAccessToken, encryptedRefreshToken, tokens.ExpiresAt)
 		if err != nil {
 			log.Printf("Error writing tokens in storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
