@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"time"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
@@ -38,7 +37,7 @@ func (g GoogleAuthStrategy) GetTokens(ctx context.Context, authCode string) (dom
 	return domain.Tokens{
 		AccessToken:  t.AccessToken,
 		RefreshToken: t.RefreshToken,
-		ExpiresAt:    time.Now().Add(time.Second * time.Duration(t.ExpiresIn)),
+		ExpiresAt:    t.Expiry,
 	}, nil
 }
 

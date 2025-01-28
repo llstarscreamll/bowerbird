@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
@@ -49,7 +48,7 @@ func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (
 	return domain.Tokens{
 		AccessToken:  t.AccessToken,
 		RefreshToken: t.RefreshToken,
-		ExpiresAt:    time.Now().Add(time.Second * time.Duration(t.ExpiresIn)),
+		ExpiresAt:    t.Expiry,
 	}, nil
 }
 
