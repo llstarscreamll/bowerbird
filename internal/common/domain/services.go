@@ -9,4 +9,5 @@ type ULIDGenerator interface {
 
 type Crypt interface {
 	EncryptString(str string) (string, error)
+	DecryptString(text string) (string, error)
 }
