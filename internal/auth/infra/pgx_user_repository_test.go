@@ -16,15 +16,18 @@ func TestPgxUserRepositoryUpsert(t *testing.T) {
 	defer db.Close()
 
 	testCases := []struct {
-		testCase     string
-		scenarioRows []map[string]any
-		user         domain.User
-		expectedRows []map[string]any
+		testCase      string
+		scenarioRows  []map[string]any
+		user          domain.User
+		expectedID    string
+		expectedError error
+		expectedRows  []map[string]any
 	}{
 		{
 			"should insert a new user",
 			[]map[string]any{},
 			testUser,
+			testUser.ID, nil,
 			[]map[string]any{
 				{"id": testUser.ID, "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
@@ -32,11 +35,12 @@ func TestPgxUserRepositoryUpsert(t *testing.T) {
 		{
 			"should not to throw an error upserting an already existing user email",
 			[]map[string]any{
-				{"id": "01JGCZXZEC0000000000000000", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
+				{"id": "01JGCZXZEC0000000000000001", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
 			testUser,
+			"01JGCZXZEC0000000000000001", nil,
 			[]map[string]any{
-				{"id": "01JGCZXZEC0000000000000000", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
+				{"id": "01JGCZXZEC0000000000000001", "first_name": testUser.GivenName, "last_name": testUser.FamilyName, "email": testUser.Email, "photo_url": testUser.PictureUrl},
 			},
 		},
 	}
@@ -48,9 +52,10 @@ func TestPgxUserRepositoryUpsert(t *testing.T) {
 			tests.WriteScenarioRows(db, "users", tc.scenarioRows)
 
 			repo := NewPgxUserRepository(db)
-			err := repo.Upsert(ctx, tc.user)
+			ID, err := repo.Upsert(ctx, tc.user)
 
-			assert.Nil(t, err)
+			assert.Equal(t, tc.expectedError, err)
+			assert.Equal(t, tc.expectedID, ID)
 			tests.AssertDatabaseHasRows(t, db, "users", tc.expectedRows)
 		})
 	}
