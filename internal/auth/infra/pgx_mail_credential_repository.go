@@ -26,7 +26,7 @@ func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, mail
 	return nil
 }
 
-func (r *PgxMailCredentialRepository) SearchByUserID(ctx context.Context, userID string) ([]domain.MailCredential, error) {
+func (r *PgxMailCredentialRepository) FindByUserID(ctx context.Context, userID string) ([]domain.MailCredential, error) {
 	var credentials []domain.MailCredential
 
 	rows, err := r.pool.Query(
