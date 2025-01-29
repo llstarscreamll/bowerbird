@@ -34,9 +34,9 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
-func (m *MockUserRepository) Upsert(ctx context.Context, user domain.User) error {
+func (m *MockUserRepository) Upsert(ctx context.Context, user domain.User) (string, error) {
 	args := m.Called(ctx, user)
-	return args.Error(0)
+	return args.String(0), args.Error(1)
 }
 
 func (m *MockUserRepository) GetByID(ctx context.Context, userID string) (domain.User, error) {
@@ -81,6 +81,11 @@ func (m *MockCrypt) EncryptString(str string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *MockCrypt) DecryptString(str string) (string, error) {
+	args := m.Called(str)
+	return args.String(0), args.Error(1)
+}
+
 type MockMailCredentialRepository struct {
 	mock.Mock
 }
@@ -88,6 +93,12 @@ type MockMailCredentialRepository struct {
 func (m *MockMailCredentialRepository) Save(ctx context.Context, ID, userID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error {
 	args := m.Called(ctx, ID, userID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
 	return args.Error(0)
+}
+
+func (m *MockMailCredentialRepository) FindByUserID(ctx context.Context, userID string) ([]domain.MailCredential, error) {
+	args := m.Called(ctx, userID)
+
+	return args.Get(0).([]domain.MailCredential), args.Error(1)
 }
 
 func neverCalledMockUlid(t *testing.T) *MockULID {

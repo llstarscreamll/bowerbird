@@ -4,26 +4,35 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"slices"
 	"strings"
 	"time"
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/option"
 )
 
 type contextKey string
 
 const userContextKey contextKey = "user"
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, googleAuth domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
-	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, googleAuth))
-	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, googleAuth, userRepo, sessionRepo))
+func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authGateway domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) {
+	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, authGateway))
+	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, authGateway, userRepo, sessionRepo))
 
-	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, googleAuth), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, googleAuth), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, googleAuth, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
+
+	mux.HandleFunc("GET /v1/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, authGateway, mailSecretRepo), sessionRepo, userRepo))
 }
 
 // redirects the user to the Google login page
@@ -69,8 +78,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 		}
 
 		user.ID = ulid.New()
-
-		err = userRepo.Upsert(r.Context(), user)
+		id, err := userRepo.Upsert(r.Context(), user)
 		if err != nil {
 			log.Printf("Error creating user in database: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -78,6 +86,8 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
+		fmt.Printf("User.ID %s and returned user id %s", user.ID, id)
+		user.ID = id
 		sessionExpirationDate := time.Now().Add(time.Hour * 2)
 		sessionID, err := ulid.NewFromDate(sessionExpirationDate)
 		if err != nil {
@@ -156,6 +166,8 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
+		fmt.Println("Callback refresh token: ", tokens.RefreshToken)
+
 		encryptedRefreshToken, err := crypt.EncryptString(tokens.RefreshToken)
 		if err != nil {
 			log.Printf("Error securing refresh token: %s", err.Error())
@@ -182,5 +194,144 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 		}
 
 		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
+	}
+}
+
+func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, authGateway domain.AuthServerGateway, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		mailCredentials, err := mailSecretRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting mail credentials from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting mail credentials from storage -> "+err.Error())
+			return
+		}
+
+		fmt.Println("Credentials from storage:", len(mailCredentials))
+
+		for _, c := range mailCredentials {
+			if c.MailProvider != "google" {
+				continue
+			}
+
+			decryptedAccessToken, err := crypt.DecryptString(c.AccessToken)
+			if err != nil {
+				log.Printf("Error decoding mail access token: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error decoding mail access token -> "+err.Error())
+				return
+			}
+
+			decryptedRefreshToken, err := crypt.DecryptString(c.RefreshToken)
+			if err != nil {
+				log.Printf("Error decoding mail refresh token: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error decoding mail refresh token -> "+err.Error())
+				return
+			}
+
+			// this is for microsoft outlook
+			// r, err := http.NewRequest(http.MethodGet, "https://graph.microsoft.com/v1.0/me/messages?$filter=from in ('colpatriaInforma@scotiabankcolpatria.com','nu@nu.com.co')", nil)
+			// r.Header.Add("Authorization", "Bearer "+decryptedAccessToken)
+			// if err != nil {
+			// 	log.Printf("Error building email provider request: %s", err.Error())
+			// 	w.WriteHeader(http.StatusInternalServerError)
+			// 	fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error building email provider request -> "+err.Error())
+			// 	return
+			// }
+
+			// response, err := http.DefaultClient.Do(r)
+			// if err != nil {
+			// 	log.Printf("Error sending request to mail provider: %s", err.Error())
+			// 	w.WriteHeader(http.StatusInternalServerError)
+			// 	fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error sending request to mail provider -> "+err.Error())
+			// 	return
+			// }
+
+			config := &oauth2.Config{
+				ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+				ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+				RedirectURL:  os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+				Endpoint:     google.Endpoint,
+				Scopes:       []string{gmail.GmailReadonlyScope},
+			}
+
+			fmt.Println("Encrypted Refresh token: ", c.RefreshToken)
+			fmt.Println("Decrypted Refresh token: ", decryptedRefreshToken)
+
+			t := &oauth2.Token{AccessToken: decryptedAccessToken, RefreshToken: decryptedRefreshToken, Expiry: c.ExpiresAt, TokenType: "Bearer"}
+			ts := config.TokenSource(r.Context(), t)
+			tt, err := ts.Token()
+			if err != nil {
+				log.Printf("Error building token source: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error building token source -> "+err.Error())
+				return
+			}
+
+			client := config.Client(r.Context(), tt)
+			service, err := gmail.NewService(r.Context(), option.WithHTTPClient(client))
+			if err != nil {
+				log.Printf("Error building Gmail client: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error building Gmail client -> "+err.Error())
+				return
+			}
+
+			messagesList, err := service.Users.Messages.List("me").IncludeSpamTrash(true).Q("from:nu@nu.com.co OR from:colpatriaInforma@scotiabankcolpatria.com OR from:bancodavivienda@davivienda.com").Do()
+			if err != nil {
+				log.Printf("Error building Gmail client: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error building Gmail client -> "+err.Error())
+				return
+			}
+
+			fmt.Println("Messages count: ", len(messagesList.Messages))
+			for i, v := range messagesList.Messages {
+				fmt.Printf("Message %s index: %v \n", v.Id, i)
+
+				msg, err := service.Users.Messages.Get("me", v.Id).Format("full").Do()
+				if err != nil {
+					log.Printf("Error retrieving Gmail message %s: %s", v.Id, err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error retrieving Gmail message "+v.Id+" -> "+err.Error())
+					return
+				}
+
+				fmt.Println("-------")
+				fmt.Println("message ID -> ", msg.Id)
+
+				for _, v := range msg.Payload.Headers {
+					if !slices.Contains([]string{"from", "subject", "to", "date"}, strings.ToLower(v.Name)) {
+						continue
+					}
+
+					fmt.Println(v.Name + " -> " + v.Value)
+				}
+				fmt.Println("parts -> ", len(msg.Payload.Parts))
+
+				for _, p := range msg.Payload.Parts {
+					fmt.Println(p.MimeType + " -> " + p.PartId)
+				}
+				fmt.Println("-------")
+
+				if i == 0 {
+					return
+				}
+
+				// fmt.Println("-------")
+				// fmt.Println("message data: ", msg.Payload.MimeType)
+				// fmt.Println("-------")
+				// decodedBody, err := base64.URLEncoding.DecodeString(msg.Payload.Body.Data)
+				// if err != nil {
+				// 	log.Printf("Error decoding mail body: %s", err.Error())
+				// 	w.WriteHeader(http.StatusInternalServerError)
+				// 	fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error decoding mail body -> "+err.Error())
+				// 	return
+				// }
+				// fmt.Println(string(decodedBody))
+			}
+		}
 	}
 }

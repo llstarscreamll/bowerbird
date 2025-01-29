@@ -83,7 +83,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 						assert.Equal(t, testUser.GivenName, u.GivenName) &&
 						assert.Equal(t, testUser.FamilyName, u.FamilyName) &&
 						assert.Equal(t, testUser.PictureUrl, u.PictureUrl)
-				})).Return(nil)
+				})).Return("01JGCA8BBB00000000000000U1", nil)
 				return m
 			},
 			func(t *testing.T) *MockSessionRepository {
@@ -141,7 +141,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockUserRepository {
 				m := new(MockUserRepository)
-				m.On("Upsert", mock.Anything, mock.Anything).Return(assert.AnError)
+				m.On("Upsert", mock.Anything, mock.Anything).Return("", assert.AnError)
 				return m
 			},
 			neverCalledMockSessionRepository,
@@ -166,7 +166,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockUserRepository {
 				m := new(MockUserRepository)
-				m.On("Upsert", mock.Anything, mock.Anything).Return(nil)
+				m.On("Upsert", mock.Anything, mock.Anything).Return("01JGCA8BBB00000000000000U1", nil)
 				return m
 			},
 			neverCalledMockSessionRepository,
@@ -191,7 +191,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			func(t *testing.T) *MockUserRepository {
 				m := new(MockUserRepository)
-				m.On("Upsert", mock.Anything, mock.Anything).Return(nil)
+				m.On("Upsert", mock.Anything, mock.Anything).Return("01JGCA8BBB00000000000000U1", nil)
 				return m
 			},
 			func(t *testing.T) *MockSessionRepository {
