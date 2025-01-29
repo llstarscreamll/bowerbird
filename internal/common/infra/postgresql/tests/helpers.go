@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,6 +68,16 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 			equalColumns := 0
 			for k := range expected {
 				fmt.Printf("Comparing DB column %s: %v, %v\n", k, expected[k], result[k])
+
+				expectedTime, ok1 := expected[k].(time.Time)
+				resultTime, ok2 := result[k].(time.Time)
+				if ok1 && ok2 {
+					if expectedTime.Equal(resultTime) {
+						equalColumns++
+						continue
+					}
+				}
+
 				if expected[k] == result[k] {
 					equalColumns++
 				}
