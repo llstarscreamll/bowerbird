@@ -6,7 +6,7 @@ import (
 )
 
 type UserRepository interface {
-	Upsert(ctx context.Context, user User) error
+	Upsert(ctx context.Context, user User) (string, error)
 	GetByID(ctx context.Context, ID string) (User, error)
 }
 
@@ -17,4 +17,5 @@ type SessionRepository interface {
 
 type MailCredentialRepository interface {
 	Save(ctx context.Context, ID, userID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error
+	FindByUserID(ctx context.Context, userID string) ([]MailCredential, error)
 }
