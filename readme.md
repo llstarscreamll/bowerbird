@@ -9,6 +9,16 @@ Expenses tracker application.
 - Typescript: frontend language
 - Angular: frontend framework
 
+## Deploy to production for the first time
+
+These are some topics to have in mind to deploy this project in a production environment:
+
+- Setup a GCP project.
+- Setup the Google Login Concent page and get app client ID and secret from GCP.
+- Enable the Gmail API on your GCP project.
+- Create an Azure account
+- Create and setup outlook read only messages for an Azure Entra application and get the client ID and secret.
+
 ## Running the project
 
 Execute database migrations:
