@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPgxMailSecretRepositorySave(t *testing.T) {
+func TestPgxMailCredentialRepositorySave(t *testing.T) {
 	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
 	defer db.Close()
 

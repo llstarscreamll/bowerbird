@@ -16,3 +16,14 @@ type Tokens struct {
 	RefreshToken string
 	ExpiresAt    time.Time
 }
+
+type MailCredential struct {
+	ID           string
+	UserID       string
+	MailProvider string
+	MailAddress  string
+	AccessToken  string
+	RefreshToken string
+	ExpiresAt    time.Time
+	CreatedAt    time.Time
+}
