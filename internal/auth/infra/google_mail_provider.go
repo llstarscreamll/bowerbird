@@ -57,7 +57,8 @@ func (g GoogleMailProvider) SearchByDateRangeAndSenders(ctx context.Context, tok
 
 func (g GoogleMailProvider) listMessages(mail *gmail.Service, startDate time.Time, senders []string) ([]string, error) {
 	var result []string
-	query := fmt.Sprintf("after:%s AND from:nu@nu.com.co OR from:colpatriaInforma@scotiabankcolpatria.com OR from:bancodavivienda@davivienda.com", startDate.Format("02/01/2006"))
+	from := strings.Join(senders, " OR from:")
+	query := fmt.Sprintf("after:%s AND from:%s", startDate.Format("02/01/2006"), from)
 
 	messagesList, err := mail.Users.Messages.
 		List("me").
