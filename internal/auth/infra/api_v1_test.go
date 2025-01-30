@@ -24,13 +24,15 @@ func TestGoogleLogin(t *testing.T) {
 	ulidMock := neverCalledMockUlid(t)
 	cryptMock := neverCalledMockCrypt(t)
 	userRepoMock := neverCalledMockUserRepository(t)
+	mailGatewayMock := neverCalledMockMailGateway(t)
 	sessionRepoMock := neverCalledMockSessionRepository(t)
+	mailMessageRepo := neverCalledMockMailMessageRepository(t)
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
 	authServerGatewayMock.On("GetLoginUrl", "google", config.ServerHost+"/v1/auth/google/callback", []string{}).Return("https://some-google.com/auth/login", nil)
 
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -42,6 +44,8 @@ func TestGoogleLogin(t *testing.T) {
 	ulidMock.AssertExpectations(t)
 	cryptMock.AssertExpectations(t)
 	userRepoMock.AssertExpectations(t)
+	mailGatewayMock.AssertExpectations(t)
+	mailMessageRepo.AssertExpectations(t)
 	sessionRepoMock.AssertExpectations(t)
 	mailSecretRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
@@ -214,10 +218,12 @@ func TestGoogleLoginCallback(t *testing.T) {
 			userRepoMock := tc.userRepoMock(t)
 			cryptMock := neverCalledMockCrypt(t)
 			sessionRepoMock := tc.sessionRepositoryMock(t)
+			mailGatewayMock := neverCalledMockMailGateway(t)
 			authServerGatewayMock := tc.authServerGatewayMock(t)
+			mailMessageRepo := neverCalledMockMailMessageRepository(t)
 			mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -232,6 +238,8 @@ func TestGoogleLoginCallback(t *testing.T) {
 
 			ulidMock.AssertExpectations(t)
 			userRepoMock.AssertExpectations(t)
+			mailGatewayMock.AssertExpectations(t)
+			mailMessageRepo.AssertExpectations(t)
 			sessionRepoMock.AssertExpectations(t)
 			authServerGatewayMock.AssertExpectations(t)
 		})
@@ -256,12 +264,14 @@ func TestGMailLogin(t *testing.T) {
 	sessionRepoMock.On("GetByID", bgContextType, "ABC-S3SS10N").Return(testUser.ID, nil)
 	userRepoMock := new(MockUserRepository)
 	userRepoMock.On("GetByID", bgContextType, testUser.ID).Return(testUser, nil)
+	mailGatewayMock := neverCalledMockMailGateway(t)
+	mailMessageRepo := neverCalledMockMailMessageRepository(t)
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
 	authServerGatewayMock.On("GetLoginUrl", "google", config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
 
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -273,6 +283,8 @@ func TestGMailLogin(t *testing.T) {
 	ulidMock.AssertExpectations(t)
 	cryptMock.AssertExpectations(t)
 	userRepoMock.AssertExpectations(t)
+	mailGatewayMock.AssertExpectations(t)
+	mailMessageRepo.AssertExpectations(t)
 	sessionRepoMock.AssertExpectations(t)
 	mailSecretRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
@@ -379,8 +391,155 @@ func TestGMailLoginCallback(t *testing.T) {
 			cryptMock := tc.cryptMock(t)
 			ulidMock := tc.ulidMock(t)
 			userRepoMock := tc.userRepoMock(t)
-			authServerGatewayMock := tc.authServerGatewayMock(t)
 			sessionRepoMock := tc.sessionRepoMock(t)
+			mailGatewayMock := neverCalledMockMailGateway(t)
+			authServerGatewayMock := tc.authServerGatewayMock(t)
+			mailCredentialRepoMock := tc.mailCredentialRepoMock(t)
+			mailMessageRepo := neverCalledMockMailMessageRepository(t)
+
+			mux := http.NewServeMux()
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(tc.verb, tc.endpoint, nil)
+
+			for k, v := range tc.requestHeaders {
+				r.Header.Add(k, v)
+			}
+
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepo)
+			mux.ServeHTTP(w, r)
+
+			response := w.Result()
+			defer response.Body.Close()
+
+			assert.Equal(t, tc.expectedStatusCode, response.StatusCode, "unexpected status code %d, expected %d", response.StatusCode, tc.expectedStatusCode)
+
+			for headerName, headerValue := range tc.expectedHeaders {
+				assert.Contains(t, response.Header, headerName)
+				assert.Equal(t, headerValue, response.Header.Get(headerName))
+			}
+
+			ulidMock.AssertExpectations(t)
+			cryptMock.AssertExpectations(t)
+			userRepoMock.AssertExpectations(t)
+			mailGatewayMock.AssertExpectations(t)
+			mailMessageRepo.AssertExpectations(t)
+			sessionRepoMock.AssertExpectations(t)
+			authServerGatewayMock.AssertExpectations(t)
+			mailCredentialRepoMock.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSyncTransactionsFromEmails(t *testing.T) {
+	twoHourLater := time.Now().Add(time.Hour * 2)
+	twoHourBefore := time.Now().Add(-time.Hour * 2)
+	testCases := []struct {
+		name                   string
+		verb                   string
+		endpoint               string
+		requestHeaders         map[string]string
+		sessionRepoMock        func(t *testing.T) *MockSessionRepository
+		userRepoMock           func(t *testing.T) *MockUserRepository
+		mailCredentialRepoMock func(t *testing.T) *MockMailCredentialRepository
+		cryptMock              func(t *testing.T) *MockCrypt
+		mailGatewayMock        func(t *testing.T) *MockMailGateway
+		mailMessageMock        func(t *testing.T) *MockMailMessageRepository
+		expectedStatusCode     int
+		expectedHeaders        map[string]string
+	}{
+		{
+			"should return 200 when sync transactions from emails succeeds",
+			"POST", "/v1/transactions/sync-from-mail",
+			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
+			func(t *testing.T) *MockSessionRepository {
+				m := new(MockSessionRepository)
+				m.On("GetByID", mock.Anything, "01JGCA8BBB00000000000000S1").Return(testUser.ID, nil).Once()
+				return m
+			},
+			func(t *testing.T) *MockUserRepository {
+				m := new(MockUserRepository)
+				m.On("GetByID", mock.Anything, testUser.ID).Return(testUser, nil).Once()
+				return m
+			},
+			func(t *testing.T) *MockMailCredentialRepository {
+				m := new(MockMailCredentialRepository)
+				m.On("FindByUserID", mock.Anything, testUser.ID).Return([]domain.MailCredential{
+					{
+						ID:           "01JJ4DAEJQ0000000000000000",
+						UserID:       testUser.ID,
+						MailProvider: "google",
+						MailAddress:  testUser.Email,
+						AccessToken:  "access-encrypted",
+						RefreshToken: "refresh-encrypted",
+						ExpiresAt:    twoHourLater,
+						CreatedAt:    twoHourBefore,
+					},
+				}, nil).
+					Once()
+				return m
+			},
+			func(t *testing.T) *MockCrypt {
+				m := new(MockCrypt)
+				m.On("DecryptString", "access-encrypted").Return("access-token", nil).Once()
+				m.On("DecryptString", "refresh-encrypted").Return("refresh-token", nil).Once()
+				return m
+			},
+			func(t *testing.T) *MockMailGateway {
+				m := new(MockMailGateway)
+				m.On(
+					"SearchFromDateAndSenders",
+					mock.Anything,
+					"google",
+					domain.Tokens{
+						AccessToken:  "access-token",
+						RefreshToken: "refresh-token",
+						ExpiresAt:    twoHourLater,
+					},
+					mock.MatchedBy(func(date time.Time) bool {
+						return assert.Equal(t, date.Format("02/01/2006 15:04"), time.Now().Add(-time.Hour*24).Format("02/01/2006 15:04"))
+					}), []string{"nu@nu.com.co", "colpatriaInforma@scotiabankcolpatria.com", "bancodavivienda@davivienda.com"},
+				).
+					Return([]domain.MailMessage{
+						{
+							ID:         "01JJTGEG2X0000000000000000",
+							ExternalID: "194b4c06e8bc41ec",
+							From:       "nu@nu.com.co",
+							To:         "john@doe.com",
+							Subject:    "El dinero que enviaste ya está del otro lado",
+							Body:       nuBankTransactionMailExample,
+						},
+					}, nil).Once()
+				return m
+			},
+			func(t *testing.T) *MockMailMessageRepository {
+				m := new(MockMailMessageRepository)
+				m.On("UpsertMany", mock.Anything, []domain.MailMessage{
+					{
+						ID:         "01JJTGEG2X0000000000000000",
+						ExternalID: "194b4c06e8bc41ec",
+						UserID:     testUser.ID,
+						From:       "nu@nu.com.co",
+						To:         "john@doe.com",
+						Subject:    "El dinero que enviaste ya está del otro lado",
+						Body:       nuBankTransactionMailExample,
+					},
+				}).Return(nil).Once()
+				return m
+			},
+			http.StatusOK,
+			map[string]string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cryptMock := tc.cryptMock(t)
+			userRepoMock := tc.userRepoMock(t)
+			ulidMock := neverCalledMockUlid(t)
+			sessionRepoMock := tc.sessionRepoMock(t)
+			mailGatewayMock := tc.mailGatewayMock(t)
+			mailMessageRepoMock := tc.mailMessageMock(t)
+			authGatewayMock := neverCalledMockAuthServerGateway(t)
 			mailCredentialRepoMock := tc.mailCredentialRepoMock(t)
 
 			mux := http.NewServeMux()
@@ -391,7 +550,7 @@ func TestGMailLoginCallback(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -408,7 +567,9 @@ func TestGMailLoginCallback(t *testing.T) {
 			cryptMock.AssertExpectations(t)
 			userRepoMock.AssertExpectations(t)
 			sessionRepoMock.AssertExpectations(t)
-			authServerGatewayMock.AssertExpectations(t)
+			mailGatewayMock.AssertExpectations(t)
+			authGatewayMock.AssertExpectations(t)
+			mailMessageRepoMock.AssertExpectations(t)
 			mailCredentialRepoMock.AssertExpectations(t)
 		})
 	}

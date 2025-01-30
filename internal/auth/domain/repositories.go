@@ -19,3 +19,7 @@ type MailCredentialRepository interface {
 	Save(ctx context.Context, ID, userID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error
 	FindByUserID(ctx context.Context, userID string) ([]MailCredential, error)
 }
+
+type MailMessageRepository interface {
+	UpsertMany(ctx context.Context, messages []MailMessage) error
+}

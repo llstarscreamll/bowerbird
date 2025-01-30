@@ -27,3 +27,14 @@ type MailCredential struct {
 	ExpiresAt    time.Time
 	CreatedAt    time.Time
 }
+
+type MailMessage struct {
+	ID         string
+	ExternalID string
+	UserID     string
+	From       string
+	To         string
+	Subject    string
+	Body       string
+	ReceivedAt time.Time
+}
