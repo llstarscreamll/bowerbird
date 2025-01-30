@@ -44,8 +44,14 @@ func main() {
 		os.Getenv("MICROSOFT_OAUTH_REDIRECT_URL"),
 		ulid,
 	)
-
 	authServerGateway := authInfra.NewAuthServerGateway(googleAuth, microsoftAuth)
+
+	gMailProvider := authInfra.NewGoogleMailProvider(
+		os.Getenv("GOOGLE_CLIENT_ID"),
+		os.Getenv("GOOGLE_CLIENT_SECRET"),
+		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+	)
+	mailGateway := authInfra.NewMailGateway(gMailProvider)
 
 	mux := http.NewServeMux()
 
@@ -53,7 +59,7 @@ func main() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, authServerGateway, userRepo, sessionRepo, crypt, mailCredentialRepo)
+	authInfra.RegisterRoutes(mux, config, ulid, authServerGateway, userRepo, sessionRepo, crypt, mailCredentialRepo, mailGateway)
 
 	s := &http.Server{
 		Addr:           config.ServerPort,
