@@ -63,6 +63,7 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 	assert.Equal(t, len(expectedRecords), len(results), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(results))
 
 	for _, expected := range expectedRecords {
+		expectedRecordFound := false
 		for _, result := range results {
 
 			equalColumns := 0
@@ -83,7 +84,11 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 				}
 			}
 
-			assert.True(t, equalColumns == len(slices.Collect(maps.Keys(expected))), "Expected row not found in database: %v", expected)
+			expectedRecordFound = equalColumns == len(slices.Collect(maps.Keys(expected)))
+			if expectedRecordFound {
+				break
+			}
 		}
+		assert.True(t, expectedRecordFound, "Expected row not found in database: %v", expected)
 	}
 }
