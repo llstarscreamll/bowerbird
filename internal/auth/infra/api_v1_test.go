@@ -506,7 +506,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 							From:       "nu@nu.com.co",
 							To:         "john@doe.com",
 							Subject:    "El dinero que enviaste ya está del otro lado",
-							Body:       nuBankTransactionMailExample,
+							Body:       "Example message body",
 						},
 					}, nil).Once()
 				return m
@@ -521,7 +521,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 						From:       "nu@nu.com.co",
 						To:         "john@doe.com",
 						Subject:    "El dinero que enviaste ya está del otro lado",
-						Body:       nuBankTransactionMailExample,
+						Body:       "Example message body",
 					},
 				}).Return(nil).Once()
 				return m
