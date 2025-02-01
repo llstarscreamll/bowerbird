@@ -236,16 +236,8 @@ func syncTransactionsFromEmailHandler(crypt commonDomain.Crypt, mailSecretRepo d
 				return
 			}
 
-			for i, m := range mailMessages {
+			for i := range mailMessages {
 				mailMessages[i].UserID = authUser.ID
-
-				fmt.Println("-------------------------------------------------")
-				fmt.Printf("mail ID: %s\n", m.ExternalID)
-				fmt.Printf("mail From: %s\n", m.From)
-				fmt.Printf("mail To: %s\n", m.To)
-				fmt.Printf("mail Subject: %s\n", m.Subject)
-				fmt.Printf("mail ReceivedAt: %s\n", m.ReceivedAt)
-				fmt.Printf("mail Body length: %d\n", len(m.Body))
 			}
 
 			err = mailMessageRepo.UpsertMany(r.Context(), mailMessages)
