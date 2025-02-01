@@ -28,7 +28,7 @@ func WriteScenarioRows(db *pgxpool.Pool, tableName string, rows []map[string]any
 		var placeholders []string
 
 		for k, v := range row {
-			columns = append(columns, k)
+			columns = append(columns, "\""+k+"\"")
 			placeholders = append(placeholders, fmt.Sprintf("$%d", len(values)+1))
 			values = append(values, v)
 		}

@@ -25,7 +25,18 @@ func TestPgxMailMessageRepositoryUpsertMany(t *testing.T) {
 	}{
 		{
 			"should insert a new mail message",
-			[]map[string]interface{}{},
+			[]map[string]interface{}{
+				{
+					"id":          "01JGCZXZEC0000000000000001",
+					"external_id": "external-id-1",
+					"user_id":     "01JGCZXZEC00000000000000U1",
+					"from":        "test@mail.com",
+					"to":          "john@doe.com",
+					"subject":     "Test subject",
+					"body":        "Test body",
+					"received_at": time.Date(2025, time.January, 6, 0, 0, 0, 0, time.UTC),
+				},
+			},
 			[]domain.MailMessage{
 				{
 					ID:         "01JGCZXZEC0000000000000001",
@@ -36,6 +47,16 @@ func TestPgxMailMessageRepositoryUpsertMany(t *testing.T) {
 					Subject:    "Test subject",
 					Body:       "Test body",
 					ReceivedAt: time.Date(2025, time.January, 6, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					ID:         "01JGCZXZEC0000000000000002",
+					ExternalID: "external-id-2",
+					UserID:     "01JGCZXZEC00000000000000U1",
+					From:       "another-test@mail.com",
+					To:         "john-the-hacker@doe.com",
+					Subject:    "Test subject II",
+					Body:       "Test body II",
+					ReceivedAt: time.Date(2025, time.January, 10, 0, 0, 0, 0, time.UTC),
 				},
 			},
 			nil,
@@ -49,6 +70,16 @@ func TestPgxMailMessageRepositoryUpsertMany(t *testing.T) {
 					"subject":     "Test subject",
 					"body":        "Test body",
 					"received_at": time.Date(2025, time.January, 6, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					"id":          "01JGCZXZEC0000000000000002",
+					"external_id": "external-id-2",
+					"user_id":     "01JGCZXZEC00000000000000U1",
+					"from":        "another-test@mail.com",
+					"to":          "john-the-hacker@doe.com",
+					"subject":     "Test subject II",
+					"body":        "Test body II",
+					"received_at": time.Date(2025, time.January, 10, 0, 0, 0, 0, time.UTC),
 				},
 			},
 		},

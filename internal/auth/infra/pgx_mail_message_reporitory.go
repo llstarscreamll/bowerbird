@@ -22,13 +22,15 @@ func (r *PgxMailMessageRepository) UpsertMany(ctx context.Context, messages []do
 		values = append(values, v.ID, v.ExternalID, v.UserID, v.From, v.To, v.Subject, v.Body, v.ReceivedAt)
 	}
 
+	query := fmt.Sprintf(`
+	INSERT INTO mail_messages (id, external_id, user_id, "from", "to", subject, body, received_at)
+	VALUES %s
+	ON CONFLICT (external_id, user_id) DO NOTHING
+	`, strings.Join(placeHolders, ", "))
+
 	_, err := r.pool.Exec(
 		ctx,
-		fmt.Sprintf(`
-		INSERT INTO mail_messages (id, external_id, user_id, from, to, subject, body, received_at)
-		VALUES %s
-		ON CONFLICT (external_id, user_id) DO NOTHING
-		`, strings.Join(placeHolders, ", ")),
+		query,
 		values...,
 	)
 
