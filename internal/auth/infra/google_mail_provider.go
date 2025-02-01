@@ -101,8 +101,8 @@ func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID stri
 		}
 
 		if strings.ToLower(h.Name) == "date" {
-			h.Value = strings.TrimSuffix(h.Value, " (COT)")
-			date, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", h.Value) // date has format: Wed, 29 Jan 2025 15:20:41 -0500 (COT)
+			h.Value = strings.TrimSuffix(h.Value, " (COT)") // date has format: Wed, 29 Jan 2025 15:20:41 -0500 (COT)
+			date, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", h.Value)
 			if err != nil {
 				return domain.MailMessage{}, err
 			}
