@@ -247,6 +247,8 @@ func syncTransactionsFromEmailHandler(crypt commonDomain.Crypt, mailSecretRepo d
 				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error persisting mails on storage -> "+err.Error())
 				return
 			}
+
+			fmt.Fprintf(w, `{"data":"ok"}`)
 		}
 	}
 }
