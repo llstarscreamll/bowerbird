@@ -29,3 +29,17 @@ CREATE TABLE "public"."mail_credentials" (
 );
 
 CREATE UNIQUE INDEX "unique_mail_credentials_user_id_and_email" ON "public"."mail_credentials" ("user_id", "mail_address");
+
+CREATE TABLE "public"."mail_messages" (
+    "id" VARCHAR(26) PRIMARY KEY,
+    "external_id" VARCHAR(50) NOT NULL,
+    "user_id" VARCHAR(26) NOT NULL,
+    "from" VARCHAR(255) NOT NULL,
+    "to" VARCHAR(255) NOT NULL,
+    "subject" VARCHAR(255) NOT NULL,
+    "body" TEXT NOT NULL,
+    "received_at" TIMESTAMP WITH TIME ZONE NOT NULL,
+    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX "unique_mail_messages_user_id_and_external_id" ON "public"."mail_messages" ("user_id", "external_id");
