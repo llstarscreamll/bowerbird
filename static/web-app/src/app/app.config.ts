@@ -7,8 +7,8 @@ import { reducers, metaReducers } from './reducers';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
+    provideZoneChangeDetection({ eventCoalescing: true }),
     provideStore(reducers, { metaReducers }),
   ],
 };
