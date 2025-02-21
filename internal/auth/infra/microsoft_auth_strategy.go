@@ -21,7 +21,7 @@ type MicrosoftAuthStrategy struct {
 }
 
 // ToDo: state should be stored somewhere and be validated on callback to prevent CSRF attacks
-func (m MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) (string, error) {
+func (m MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string, state string) (string, error) {
 	m.config.RedirectURL = redirectUrl
 	m.config.Scopes = append(m.config.Scopes, scopes...)
 	authCodeUrl := m.config.AuthCodeURL(m.ulid.New(), oauth2.AccessTypeOffline)
@@ -39,7 +39,7 @@ func (m MicrosoftAuthStrategy) GetLoginUrl(redirectUrl string, scopes []string) 
 	return parsedUrl.String(), nil
 }
 
-func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode string) (domain.Tokens, error) {
+func (m MicrosoftAuthStrategy) GetTokens(ctx context.Context, authCode, state string) (domain.Tokens, error) {
 	t, err := m.config.Exchange(ctx, authCode)
 	if err != nil {
 		return domain.Tokens{}, err

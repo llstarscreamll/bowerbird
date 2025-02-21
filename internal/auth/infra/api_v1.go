@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,23 +16,64 @@ type contextKey string
 
 const userContextKey contextKey = "user"
 
-func RegisterRoutes(mux *http.ServeMux, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authGateway domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository) {
-	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, authGateway))
-	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, authGateway, userRepo, sessionRepo))
+func RegisterRoutes(
+	mux *http.ServeMux,
+	config commonDomain.AppConfig,
+	ulid commonDomain.ULIDGenerator,
+	authGateway domain.AuthServerGateway,
+	userRepo domain.UserRepository,
+	sessionRepo domain.SessionRepository,
+	crypt commonDomain.Crypt,
+	mailSecretRepo domain.MailCredentialRepository,
+	mailGateway domain.MailGateway,
+	mailMessageRepo domain.MailMessageRepository,
+	walletRepo domain.WalletRepository,
+	transactionRepo domain.TransactionRepository,
+) {
+	mux.HandleFunc("GET /v1/auth/user", authMiddleware(getUserProfileHandler(), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, ulid, sessionRepo, authGateway))
+	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, authGateway, userRepo, sessionRepo, walletRepo))
 
-	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, authGateway), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, ulid, sessionRepo, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, authGateway), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("POST /v1/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(crypt, mailSecretRepo, mailGateway, mailMessageRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /v1/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
+}
+
+func getUserProfileHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		fmt.Fprintf(w, `{"data":{"id":%q,"name":%q,"email":%q,"pictureUrl":%q}}`, authUser.ID, authUser.Name, authUser.Email, authUser.PictureUrl)
+	}
 }
 
 // redirects the user to the Google login page
-func googleLoginHandler(config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
+func googleLoginHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, sessionRepo domain.SessionRepository, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl("google", config.ServerHost+"/v1/auth/google/callback", []string{})
+		sessionExpirationDate := time.Now().Add(time.Minute * 10)
+		stateID, err := ulid.NewFromDate(sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error generating state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error generating state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		stateID = "googleOAuth-" + stateID
+
+		err = sessionRepo.Save(r.Context(), stateID, "ABC-123", sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error storing state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error storing state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		url, err := authServer.GetLoginUrl("google", config.ServerHost+"/v1/auth/google/callback", []string{}, stateID)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -44,8 +86,39 @@ func googleLoginHandler(config commonDomain.AppConfig, authServer domain.AuthSer
 }
 
 // handles the Google login callback by upsert the user in database, starting session and redirecting to frontend app
-func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository) http.HandlerFunc {
+func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, userRepo domain.UserRepository, sessionRepo domain.SessionRepository, walletRepo domain.WalletRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		state := strings.Trim(r.URL.Query().Get("state"), " ")
+		if state == "" {
+			log.Printf("Error getting state from query params, state is empty")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"state is empty"}]}`)
+			return
+		}
+
+		userID, err := sessionRepo.GetByID(r.Context(), state)
+		if err != nil {
+			log.Printf("Error getting state from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting state from storage","detail":%q}]}`, err.Error())
+			return
+		}
+
+		if userID == "" || userID != "ABC-123" {
+			log.Printf("State was not found in session storage or is mismatched with auth user ID: " + state)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"State miss match"}]}`)
+			return
+		}
+
+		err = sessionRepo.Delete(r.Context(), state)
+		if err != nil {
+			log.Printf("Error cleaning state from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error cleaning state from storage -> "+err.Error())
+			return
+		}
+
 		authCode := strings.Trim(r.URL.Query().Get("code"), " ")
 		if authCode == "" {
 			log.Printf("Error getting code from query params, code is empty")
@@ -54,7 +127,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		tokens, err := authServer.GetTokens(r.Context(), "google", authCode)
+		tokens, err := authServer.GetTokens(r.Context(), "google", authCode, state)
 		if err != nil {
 			log.Printf("Error getting auth tokens from OAuth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -79,7 +152,18 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		fmt.Printf("User.ID %s and returned user id %s", user.ID, id)
+		// if the user does not exists, then create the default wallet to him
+		if id == user.ID {
+			err := walletRepo.Create(r.Context(), domain.UserWallet{ID: ulid.New(), UserID: id, Name: "Main", Role: "owner", JoinedAt: time.Now(), CreatedAt: time.Now()})
+
+			if err != nil {
+				log.Printf("Error creating default wallet for user: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error creating default wallet for user","detail":%q}]}`, err.Error())
+				return
+			}
+		}
+
 		user.ID = id
 		sessionExpirationDate := time.Now().Add(time.Hour * 2)
 		sessionID, err := ulid.NewFromDate(sessionExpirationDate)
@@ -103,17 +187,38 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			Value:    sessionID,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   config.IsProduction,
 		})
 
 		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
 	}
 }
 
-// redirects user to Google login page and request access to *read* mail
-func gMailLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
+// redirects user to Google login page and request access to *read* Gmail
+func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, sessionRepo domain.SessionRepository, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"})
+		walletID := strings.Trim(r.URL.Query().Get("wallet_id"), " ")
+		sessionExpirationDate := time.Now().Add(time.Minute * 10)
+		state, err := ulid.NewFromDate(sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error generating state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error generating state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+
+		state = state + "-" + walletID
+		err = sessionRepo.Save(r.Context(), state, authUser.ID, sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error storing state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error storing state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -128,7 +233,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, authServe
 // redirects user to Microsoft login page and request access to *read* mail
 func outlookLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"})
+		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -140,10 +245,43 @@ func outlookLoginHandler(provider string, config commonDomain.AppConfig, authSer
 	}
 }
 
-func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
+func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, sessionRepo domain.SessionRepository, authServer domain.AuthServerGateway, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		state := strings.Trim(r.URL.Query().Get("state"), " ")
+		if state == "" {
+			log.Printf("Error getting state from query params, state is empty")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"state is empty"}]}`)
+			return
+		}
+
+		userID, err := sessionRepo.GetByID(r.Context(), state)
+		if err != nil {
+			log.Printf("Error getting state from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error getting state from storage","detail":%q}]}`, err.Error())
+			return
+		}
+
+		if userID == "" || userID != authUser.ID {
+			log.Printf("State was not found in session storage or is mismatched with auth user ID: " + state)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"State miss match"}]}`)
+			return
+		}
+
+		err = sessionRepo.Delete(r.Context(), state)
+		if err != nil {
+			log.Printf("Error cleaning state from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error cleaning state from storage -> "+err.Error())
+			return
+		}
+
+		walletID := strings.Split(state, "-")[1]
 		code := strings.Trim(r.URL.Query().Get("code"), " ")
-		tokens, err := authServer.GetTokens(r.Context(), provider, code)
+		tokens, err := authServer.GetTokens(r.Context(), provider, code, state)
 		if err != nil {
 			log.Printf("Error getting tokens from auth server: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -169,7 +307,6 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		authUser := r.Context().Value(userContextKey).(domain.User)
 		userMailProfile, err := authServer.GetUserProfile(r.Context(), provider, tokens.AccessToken)
 		if err != nil {
 			log.Printf("Error getting user mail profile: %s", err.Error())
@@ -178,7 +315,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		err = mailSecretRepo.Save(r.Context(), ulid.New(), authUser.ID, provider, userMailProfile.Email, encryptedAccessToken, encryptedRefreshToken, tokens.ExpiresAt)
+		err = mailSecretRepo.Save(r.Context(), ulid.New(), authUser.ID, walletID, provider, userMailProfile.Email, encryptedAccessToken, encryptedRefreshToken, tokens.ExpiresAt)
 		if err != nil {
 			log.Printf("Error writing tokens in storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -190,7 +327,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 	}
 }
 
-func syncTransactionsFromEmailHandler(crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository) http.HandlerFunc {
+func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authUser := r.Context().Value(userContextKey).(domain.User)
 		mailCredentials, err := mailSecretRepo.FindByUserID(r.Context(), authUser.ID)
@@ -248,7 +385,60 @@ func syncTransactionsFromEmailHandler(crypt commonDomain.Crypt, mailSecretRepo d
 				return
 			}
 
+			// ToDo: what happens if user has many wallets?
+			// ToDo: which wallet should be used to store the transactions?
+			wallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+			if err != nil {
+				log.Printf("Error getting wallet from storage: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallet from storage -> "+err.Error())
+				return
+			}
+
+			transactions := make([]domain.Transaction, 0, len(mailMessages))
+			for _, m := range mailMessages {
+				var parserStrategy domain.EmailParserStrategy
+				if strings.Contains(m.From, "nu@nu.com.co") {
+					parserStrategy = &NuBankEmailParserStrategy{}
+				}
+
+				t := parserStrategy.Parse(m)
+				transactions = append(transactions, t...)
+			}
+
+			for i := range transactions {
+				transactions[i].ID = ulid.New()
+				transactions[i].UserID = authUser.ID
+				transactions[i].WalletID = wallets[0].ID
+				transactions[i].CreatedAt = time.Now()
+			}
+
+			transactionRepo.UpsertMany(r.Context(), transactions)
+
 			fmt.Fprintf(w, `{"data":"ok"}`)
 		}
+	}
+}
+
+func searchWalletsHandler(walletRepo domain.WalletRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		wallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
+		}
+
+		walletsJSON, err := json.Marshal(wallets)
+		if err != nil {
+			log.Printf("Error encoding wallets to JSON: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error encoding wallets to JSON"}]}`)
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":%s}`, walletsJSON)
 	}
 }

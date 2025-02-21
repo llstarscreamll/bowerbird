@@ -1,1 +1,15 @@
-<h1>Welcome to dashboard</h1>
+<div class="flex px-3 py-4 items-center">
+  <div>
+    <h1 class="font-bold">{{ (selectedWallet$ | async)?.name }}</h1>
+  </div>
+  <div class="grow"></div>
+  <div *ngIf="user$ | async">
+    <img
+      [src]="(user$ | async)?.pictureUrl"
+      [alt]="(user$ | async)?.name + ' picture'"
+      class="object-cover rounded-full h-10 w-10"
+    />
+  </div>
+</div>
+
+<div></div>

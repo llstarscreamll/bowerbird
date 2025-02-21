@@ -1,7 +1,18 @@
-import { Component } from '@angular/core';
+import { Store } from '@ngrx/store';
+
+import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+
+import { getUser } from '@app/ngrx/auth';
+import { getSelectedWallet } from '@app/ngrx/finance';
 
 @Component({
+  imports: [CommonModule],
   selector: 'app-dashboard-page',
   templateUrl: './dashboard.page.html',
 })
-export class DashboardPageComponent {}
+export class DashboardPageComponent {
+  private store = inject(Store);
+  user$ = this.store.select(getUser);
+  selectedWallet$ = this.store.select(getSelectedWallet);
+}

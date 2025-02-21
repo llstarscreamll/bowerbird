@@ -39,6 +39,15 @@ func (r *PgxSessionRepository) GetByID(ctx context.Context, ID string) (string, 
 	return userID, nil
 }
 
+func (r *PgxSessionRepository) Delete(ctx context.Context, sessionID string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM sessions WHERE id = $1`, sessionID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewPgxSessionRepository(pool *pgxpool.Pool) *PgxSessionRepository {
 	return &PgxSessionRepository{pool}
 }

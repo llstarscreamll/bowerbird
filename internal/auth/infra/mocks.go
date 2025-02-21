@@ -15,13 +15,13 @@ type MockAuthServerGateway struct {
 	mock.Mock
 }
 
-func (m *MockAuthServerGateway) GetLoginUrl(provider, redirectUrl string, scopes []string) (string, error) {
-	args := m.Called(provider, redirectUrl, scopes)
+func (m *MockAuthServerGateway) GetLoginUrl(provider, redirectUrl string, scopes []string, state string) (string, error) {
+	args := m.Called(provider, redirectUrl, scopes, state)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockAuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string) (domain.Tokens, error) {
-	args := m.Called(ctx, provider, authCode)
+func (m *MockAuthServerGateway) GetTokens(ctx context.Context, provider string, authCode string, state string) (domain.Tokens, error) {
+	args := m.Called(ctx, provider, authCode, state)
 	return args.Get(0).(domain.Tokens), args.Error(1)
 }
 
@@ -85,6 +85,11 @@ func (m *MockSessionRepository) Save(ctx context.Context, userID, sessionID stri
 	return args.Error(0)
 }
 
+func (m *MockSessionRepository) Delete(ctx context.Context, sessionID string) error {
+	args := m.Called(ctx, sessionID)
+	return args.Error(0)
+}
+
 func (m *MockSessionRepository) GetByID(ctx context.Context, ID string) (string, error) {
 	args := m.Called(ctx, ID)
 	return args.String(0), args.Error(1)
@@ -108,8 +113,8 @@ type MockMailCredentialRepository struct {
 	mock.Mock
 }
 
-func (m *MockMailCredentialRepository) Save(ctx context.Context, ID, userID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error {
-	args := m.Called(ctx, ID, userID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
+func (m *MockMailCredentialRepository) Save(ctx context.Context, ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error {
+	args := m.Called(ctx, ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
 	return args.Error(0)
 }
 
@@ -117,6 +122,31 @@ func (m *MockMailCredentialRepository) FindByUserID(ctx context.Context, userID 
 	args := m.Called(ctx, userID)
 
 	return args.Get(0).([]domain.MailCredential), args.Error(1)
+}
+
+type MockWalletRepository struct {
+	mock.Mock
+}
+
+func (m *MockWalletRepository) Create(ctx context.Context, wallet domain.UserWallet) error {
+	args := m.Called(ctx, wallet)
+
+	return args.Error(0)
+}
+
+func (m *MockWalletRepository) FindByUserID(ctx context.Context, userID string) ([]domain.UserWallet, error) {
+	args := m.Called(ctx, userID)
+
+	return args.Get(0).([]domain.UserWallet), args.Error(1)
+}
+
+type MockTransactionRepository struct {
+	mock.Mock
+}
+
+func (m *MockTransactionRepository) UpsertMany(ctx context.Context, transactions []domain.Transaction) error {
+	args := m.Called(ctx, transactions)
+	return args.Error(0)
 }
 
 func neverCalledMockUlid(t *testing.T) *MockULID {
@@ -164,6 +194,18 @@ func neverCalledMockMailGateway(t *testing.T) *MockMailGateway {
 func neverCalledMockMailMessageRepository(t *testing.T) *MockMailMessageRepository {
 	m := new(MockMailMessageRepository)
 	m.AssertNotCalled(t, "UpsertMany")
+	return m
+}
+
+func neverCalledMockTransactionRepository(t *testing.T) *MockTransactionRepository {
+	m := new(MockTransactionRepository)
+	m.AssertNotCalled(t, "New")
+	return m
+}
+
+func neverCalledMockMockWalletRepository(t *testing.T) *MockWalletRepository {
+	m := new(MockWalletRepository)
+	m.AssertNotCalled(t, "New")
 	return m
 }
 

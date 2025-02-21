@@ -1,17 +1,27 @@
 <div
-  class="flex flex-col items-center justify-center min-h-screen bg-neutral-50 text-gray-700"
+  class="flex flex-col items-center justify-center min-h-screen bg-neutral-50 text-gray-700 text-center"
 >
   <h1
-    class="text-4xl md:text-5xl text-center md:text-left bg-clip-text text-transparent bg-gradient-to-r from-red-400 via-purple-500 to-red-600 animate-gradient"
+    class="text-4xl md:text-5xl md:text-left bg-clip-text text-transparent bg-gradient-to-r from-red-400 via-purple-500 to-red-600 animate-gradient"
   >
-    <strong class="text-5xl">Bowerbird</strong><br>Finance Assistant
+    <strong class="block text-5xl text-center">Bowerbird</strong>
+    Finance Assistant
   </h1>
 
-  <p class="mt-10 text-lg md:text-2xl text-center md:text-left text-blue-600">
+  <p class="mt-10 text-xl md:text-2xl md:text-left text-blue-600">
     Take control of your finances with ease and confidence.
   </p>
 
-  <div class="mt-10 space-y-4">
+  <div *ngIf="(loggedIn$ | async)" class="mt-10">
+    <a
+      routerLink="dashboard"
+      class="mx-2 py-3 px-6 text-center text-white bg-pink-600 rounded-lg shadow-md hover:bg-pink-700 transition duration-300"
+    >
+      Entrar
+    </a>
+  </div>
+
+  <div *ngIf="!(loggedIn$ | async)" class="mt-10">
     <p class="text-center font-medium mb-5">Get started with:</p>
     <a
       [href]="apiBaseURl + '/v1/auth/google/login'"

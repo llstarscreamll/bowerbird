@@ -12,13 +12,13 @@ type PgxMailCredentialRepository struct {
 	pool *pgxpool.Pool
 }
 
-func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error {
+func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error {
 	_, err := r.pool.Exec(
 		ctx,
-		`INSERT INTO mail_credentials (id, user_id, mail_provider, mail_address, access_token, refresh_token, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO mail_credentials (id, user_id, wallet_id, mail_provider, mail_address, access_token, refresh_token, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, mail_address) DO UPDATE SET access_token = $5, refresh_token = $6`,
-		ID, userID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
+		ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (r *PgxMailCredentialRepository) FindByUserID(ctx context.Context, userID s
 
 		err := rows.Scan(&credential.ID, &credential.UserID, &credential.MailProvider, &credential.MailAddress, &credential.AccessToken, &credential.RefreshToken, &credential.ExpiresAt)
 		if err != nil {
-			return credentials, err
+			return nil, err
 		}
 
 		credentials = append(credentials, credential)

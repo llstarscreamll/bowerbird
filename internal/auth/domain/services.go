@@ -6,14 +6,14 @@ import (
 )
 
 type AuthServerGateway interface {
-	GetLoginUrl(provider, redirectUrl string, scopes []string) (string, error)
-	GetTokens(ctx context.Context, provider string, authCode string) (Tokens, error)
+	GetLoginUrl(provider, redirectUrl string, scopes []string, state string) (string, error)
+	GetTokens(ctx context.Context, provider string, authCode string, state string) (Tokens, error)
 	GetUserProfile(ctx context.Context, provider string, authCode string) (User, error)
 }
 
 type AuthServerStrategy interface {
-	GetLoginUrl(redirectUrl string, scopes []string) (string, error)
-	GetTokens(ctx context.Context, authCode string) (Tokens, error)
+	GetLoginUrl(redirectUrl string, scopes []string, state string) (string, error)
+	GetTokens(ctx context.Context, authCode, state string) (Tokens, error)
 	GetUserProfile(ctx context.Context, authCode string) (User, error)
 }
 

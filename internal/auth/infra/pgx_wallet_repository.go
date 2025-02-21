@@ -39,10 +39,10 @@ func (r *PgxWalletRepository) FindByUserID(ctx context.Context, userID string) (
 
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT w.id, w.name, role, joined_at
+		`SELECT w.id, w.name, uw."role", uw.joined_at, w.created_at
 		FROM wallets w
 		JOIN user_has_wallets uw ON w.id = uw.wallet_id
-		WHERE us.user_id = $1`,
+		WHERE uw.user_id = $1`,
 		userID,
 	)
 
@@ -55,7 +55,7 @@ func (r *PgxWalletRepository) FindByUserID(ctx context.Context, userID string) (
 	for rows.Next() {
 		w := domain.UserWallet{}
 
-		err := rows.Scan(&w.ID, &w.Name, &w.Role, &w.JoinedAt)
+		err := rows.Scan(&w.ID, &w.Name, &w.Role, &w.JoinedAt, &w.CreatedAt)
 		if err != nil {
 			return nil, err
 		}

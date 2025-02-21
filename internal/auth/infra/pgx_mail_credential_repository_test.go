@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"llstarscreamll/bowerbird/internal/auth/testdata"
 	"llstarscreamll/bowerbird/internal/common/infra/postgresql"
 	"llstarscreamll/bowerbird/internal/common/infra/postgresql/tests"
 
@@ -21,6 +22,7 @@ func TestPgxMailCredentialRepositorySave(t *testing.T) {
 		input        struct {
 			ID             string
 			userID         string
+			walletID       string
 			mailProvider   string
 			mailAddress    string
 			accessToken    string
@@ -36,6 +38,7 @@ func TestPgxMailCredentialRepositorySave(t *testing.T) {
 			struct {
 				ID             string
 				userID         string
+				walletID       string
 				mailProvider   string
 				mailAddress    string
 				accessToken    string
@@ -43,7 +46,8 @@ func TestPgxMailCredentialRepositorySave(t *testing.T) {
 				expirationDate time.Time
 			}{
 				"01JJ3A890N0000000000000000",
-				testUser.ID,
+				testdata.TestUser.ID,
+				"01JMJHAD350000000000000000",
 				"google",
 				"john@doe.com",
 				"some-access-token",
@@ -54,7 +58,8 @@ func TestPgxMailCredentialRepositorySave(t *testing.T) {
 			[]map[string]any{
 				{
 					"id":            "01JJ3A890N0000000000000000",
-					"user_id":       testUser.ID,
+					"user_id":       testdata.TestUser.ID,
+					"wallet_id":     "01JMJHAD350000000000000000",
 					"mail_provider": "google",
 					"mail_address":  "john@doe.com",
 					"access_token":  "some-access-token",
@@ -72,7 +77,7 @@ func TestPgxMailCredentialRepositorySave(t *testing.T) {
 			tests.WriteScenarioRows(db, "mail_credentials", tc.scenarioRows)
 
 			repo := NewPgxMailCredentialRepository(db)
-			err := repo.Save(ctx, tc.input.ID, tc.input.userID, tc.input.mailProvider, tc.input.mailAddress, tc.input.accessToken, tc.input.refreshToken, tc.input.expirationDate)
+			err := repo.Save(ctx, tc.input.ID, tc.input.userID, tc.input.walletID, tc.input.mailProvider, tc.input.mailAddress, tc.input.accessToken, tc.input.refreshToken, tc.input.expirationDate)
 
 			assert.Equal(t, tc.expectedError, err)
 			tests.AssertDatabaseHasRows(t, db, "mail_credentials", tc.expectedRows)

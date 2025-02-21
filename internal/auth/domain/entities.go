@@ -38,3 +38,26 @@ type MailMessage struct {
 	Body       string
 	ReceivedAt time.Time
 }
+
+type UserWallet struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"userID,omitempty"`
+	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	JoinedAt  time.Time `json:"joinedAt"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type Transaction struct {
+	ID                string
+	WalletID          string
+	UserID            string
+	Origin            string
+	Reference         string
+	Type              string
+	Amount            float32
+	UserDescription   string
+	SystemDescription string
+	ProcessedAt       time.Time
+	CreatedAt         time.Time
+}
