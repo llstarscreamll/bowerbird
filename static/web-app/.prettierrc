@@ -1,0 +1,9 @@
+{
+  "plugins": ["@trivago/prettier-plugin-sort-imports"],
+  "importOrderParserPlugins": ["typescript", "decorators"],
+  "printWidth": 120,
+  "importOrder": ["^rxjs", "^@ngrx", "^@angular", "^@app|@env", "^[./]"],
+  "importOrderSeparation": true,
+  "importOrderSortSpecifiers": true,
+  "trailingComma": "all"
+}
