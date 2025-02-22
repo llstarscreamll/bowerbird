@@ -15,4 +15,6 @@ export class DashboardPageComponent {
   private store = inject(Store);
   user$ = this.store.select(getUser);
   selectedWallet$ = this.store.select(getSelectedWallet);
+
+  walletMenuIsOpen = false;
 }
