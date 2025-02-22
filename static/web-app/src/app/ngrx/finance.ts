@@ -44,7 +44,7 @@ export const actions = createActionGroup({
 
     'set selected wallet': props<{ wallet: Wallet }>(),
 
-    'get transactions': emptyProps(),
+    'get transactions': props<{ walletID: string }>(),
     'get transactions ok': props<{ transactions: any[] }>(),
     'get transactions error': props<{ error: HttpErrorResponse }>(),
   },
@@ -90,6 +90,25 @@ export class Effects {
     this.actions$.pipe(
       ofType(actions.getWalletsOk),
       map(({ wallets }) => actions.setSelectedWallet({ wallet: wallets[0] })),
+    ),
+  );
+
+  getWalletTransactions$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.setSelectedWallet),
+      map(({ wallet }) => actions.getTransactions({ walletID: wallet.ID })),
+    ),
+  );
+
+  getTransactions$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.getTransactions),
+      switchMap(({ walletID }) =>
+        this.walletService.searchTransactions(walletID).pipe(
+          map((transactions) => actions.getTransactionsOk({ transactions })),
+          catchError((error) => of(actions.getTransactionsError({ error }))),
+        ),
+      ),
     ),
   );
 }

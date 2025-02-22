@@ -37,6 +37,38 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	return err
 }
 
+func (r *PgxTransactionRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Transaction, error) {
+	rows, err := r.pool.Query(
+		ctx,
+		`SELECT id, wallet_id, user_id, origin, reference, "type", amount, user_description, system_description, processed_at, created_at
+		FROM transactions
+		WHERE wallet_id = $1
+		ORDER BY processed_at DESC
+		LIMIT 100`,
+		walletID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	transactions := make([]domain.Transaction, 0)
+
+	for rows.Next() {
+		t := domain.Transaction{}
+
+		err := rows.Scan(&t.ID, &t.WalletID, &t.UserID, &t.Origin, &t.Reference, &t.Type, &t.Amount, &t.UserDescription, &t.SystemDescription, &t.ProcessedAt, &t.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		transactions = append(transactions, t)
+	}
+
+	return transactions, nil
+}
+
 func NewPgxTransactionRepository(pool *pgxpool.Pool) *PgxTransactionRepository {
 	return &PgxTransactionRepository{pool: pool}
 }

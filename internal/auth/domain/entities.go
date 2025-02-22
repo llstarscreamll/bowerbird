@@ -40,7 +40,7 @@ type MailMessage struct {
 }
 
 type UserWallet struct {
-	ID        string    `json:"id"`
+	ID        string    `json:"ID"`
 	UserID    string    `json:"userID,omitempty"`
 	Name      string    `json:"name"`
 	Role      string    `json:"role"`

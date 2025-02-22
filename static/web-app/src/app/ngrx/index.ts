@@ -18,9 +18,18 @@ export const reducers: ActionReducerMap<AppState> = {
 export const metaReducers: MetaReducer<AppState>[] = isDevMode() ? [debug] : [];
 
 function debug(reducer: ActionReducer<any>): ActionReducer<any> {
-  return function (state, action) {
+  return function (state, action: any) {
     const r = reducer(state, action);
-    console.log(action.type + ':', { 0: state, 1: r });
+    console.log(action.type + ':', {
+      props: Object.keys(action).reduce((acc, key) => {
+        if (key === 'type') {
+          return acc;
+        }
+        return { ...acc, [key]: action[key] };
+      }, {}),
+      0: state,
+      1: r,
+    });
 
     return r;
   };

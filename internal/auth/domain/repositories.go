@@ -32,4 +32,5 @@ type WalletRepository interface {
 
 type TransactionRepository interface {
 	UpsertMany(ctx context.Context, transactions []Transaction) error
+	FindByWalletID(ctx context.Context, walletID string) ([]Transaction, error)
 }

@@ -1,3 +1,11 @@
+export type User = {
+  ID: string;
+  name: string;
+  email: string;
+  pictureUrl: string;
+  wallets: Wallet[];
+};
+
 export type Wallet = {
   ID: string;
   name: string;
@@ -5,10 +13,9 @@ export type Wallet = {
   joinedAt: Date;
 };
 
-export type User = {
+export type Transaction = {
   ID: string;
-  name: string;
-  email: string;
-  pictureUrl: string;
-  wallets: Wallet[];
+  amount: number;
+  date: Date;
+  walletID: string;
 };
