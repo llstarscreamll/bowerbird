@@ -17,7 +17,7 @@ func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, wall
 		ctx,
 		`INSERT INTO mail_credentials (id, user_id, wallet_id, mail_provider, mail_address, access_token, refresh_token, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (user_id, mail_address) DO UPDATE SET access_token = $5, refresh_token = $6`,
+		ON CONFLICT (wallet_id, mail_address) DO UPDATE SET access_token = $5, refresh_token = $6`,
 		ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
 	if err != nil {
 		return err
@@ -26,15 +26,15 @@ func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, wall
 	return nil
 }
 
-func (r *PgxMailCredentialRepository) FindByUserID(ctx context.Context, userID string) ([]domain.MailCredential, error) {
+func (r *PgxMailCredentialRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.MailCredential, error) {
 	var credentials []domain.MailCredential
 
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, user_id, mail_provider, mail_address, access_token, refresh_token, expires_at
+		`SELECT id, wallet_id, user_id, mail_provider, mail_address, access_token, refresh_token, expires_at
 		FROM mail_credentials
-		WHERE user_id = $1`,
-		userID,
+		WHERE wallet_id = $1`,
+		walletID,
 	)
 	if err != nil {
 		return credentials, err
@@ -44,7 +44,7 @@ func (r *PgxMailCredentialRepository) FindByUserID(ctx context.Context, userID s
 	for rows.Next() {
 		credential := domain.MailCredential{}
 
-		err := rows.Scan(&credential.ID, &credential.UserID, &credential.MailProvider, &credential.MailAddress, &credential.AccessToken, &credential.RefreshToken, &credential.ExpiresAt)
+		err := rows.Scan(&credential.ID, &credential.WalletID, &credential.UserID, &credential.MailProvider, &credential.MailAddress, &credential.AccessToken, &credential.RefreshToken, &credential.ExpiresAt)
 		if err != nil {
 			return nil, err
 		}

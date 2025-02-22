@@ -19,6 +19,7 @@ type Tokens struct {
 
 type MailCredential struct {
 	ID           string
+	WalletID     string
 	UserID       string
 	MailProvider string
 	MailAddress  string

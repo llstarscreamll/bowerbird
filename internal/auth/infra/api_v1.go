@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -43,7 +44,7 @@ func RegisterRoutes(
 
 	mux.HandleFunc("GET /v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
-	mux.HandleFunc("POST /v1/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -200,6 +201,13 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, sessionRepo domain.SessionRepository, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		walletID := strings.Trim(r.URL.Query().Get("wallet_id"), " ")
+		if walletID == "" {
+			log.Printf("Error getting walletID from query params, walletID is empty")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"Wallet ID is empty"}]}`)
+			return
+		}
+
 		sessionExpirationDate := time.Now().Add(time.Minute * 10)
 		state, err := ulid.NewFromDate(sessionExpirationDate)
 		if err != nil {
@@ -220,7 +228,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 			return
 		}
 
-		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
+		redirectUrl, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -228,7 +236,19 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 			return
 		}
 
-		http.Redirect(w, r, url, http.StatusFound)
+		parsedUrl, err := url.Parse(redirectUrl)
+		if err != nil {
+			log.Printf("Error parsing login url: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error parsing login url -> "+err.Error())
+			return
+		}
+
+		query := parsedUrl.Query()
+		query.Set("prompt", "consent")
+		parsedUrl.RawQuery = query.Encode()
+
+		http.Redirect(w, r, parsedUrl.String(), http.StatusFound)
 	}
 }
 
@@ -331,8 +351,16 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 
 func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		if walletID == "" {
+			log.Printf("Error getting walletID from path params")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Wallet ID is not valid")
+			return
+		}
+
 		authUser := r.Context().Value(userContextKey).(domain.User)
-		mailCredentials, err := mailSecretRepo.FindByUserID(r.Context(), authUser.ID)
+		mailCredentials, err := mailSecretRepo.FindByWalletID(r.Context(), walletID)
 		if err != nil {
 			log.Printf("Error getting mail credentials from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -387,9 +415,6 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
-			// ToDo: what happens if user has many wallets?
-			// ToDo: which wallet should be used to store the transactions?
-			wallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
 			if err != nil {
 				log.Printf("Error getting wallet from storage: %s", err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
@@ -411,7 +436,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			for i := range transactions {
 				transactions[i].ID = ulid.New()
 				transactions[i].UserID = authUser.ID
-				transactions[i].WalletID = wallets[0].ID
+				transactions[i].WalletID = c.WalletID
 				transactions[i].CreatedAt = time.Now()
 			}
 

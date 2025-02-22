@@ -5,6 +5,7 @@ import { Component, inject } from '@angular/core';
 
 import { getUser } from '@app/ngrx/auth';
 import { getSelectedWallet } from '@app/ngrx/finance';
+import { environment } from '@env/environment';
 
 @Component({
   imports: [CommonModule],
@@ -17,4 +18,5 @@ export class DashboardPageComponent {
   selectedWallet$ = this.store.select(getSelectedWallet);
 
   walletMenuIsOpen = false;
+  apiUrl = environment.apiBaseUrl;
 }
