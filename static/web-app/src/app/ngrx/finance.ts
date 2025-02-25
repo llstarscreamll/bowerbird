@@ -10,7 +10,7 @@ import { Injectable, inject } from '@angular/core';
 
 import * as auth from '@app/ngrx/auth';
 import { WalletService } from '@app/services/wallet.service';
-import { Wallet } from '@app/types';
+import { Transaction, Wallet } from '@app/types';
 
 export enum Status {
   empty = '',
@@ -23,7 +23,7 @@ export interface State {
   status: Status;
   wallets: Wallet[];
   selectedWallet: Wallet | null;
-  transactions: Array<{ id: number; amount: number; description: string }>;
+  transactions: Transaction[];
   error: HttpErrorResponse | null;
 }
 
@@ -58,6 +58,8 @@ export const reducer = createReducer(
   on(actions.getWalletsOk, (state, { wallets }) => ({ ...state, status: Status.ok, wallets })),
   on(actions.getWalletsError, (state, { error }) => ({ ...state, status: Status.error, error })),
   on(actions.setSelectedWallet, (state, { wallet }) => ({ ...state, selectedWallet: wallet })),
+  on(actions.getTransactions, (state) => ({ ...state, status: Status.loading })),
+  on(actions.getTransactionsOk, (state, { transactions }) => ({ ...state, transactions, status: Status.ok })),
 );
 
 export const getFinanceState = createFeatureSelector<State>('finance');

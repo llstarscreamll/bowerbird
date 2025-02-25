@@ -20,6 +20,7 @@ export class DashboardPageComponent {
   selectedWallet$ = this.store
     .select(finance.getSelectedWallet)
     .pipe(tap((w) => (this.selectedWalletID = w?.ID || '')));
+  transactions$ = this.store.select(finance.getTransactions);
 
   selectedWalletID: string = '';
   walletMenuIsOpen = false;

@@ -15,7 +15,15 @@ export type Wallet = {
 
 export type Transaction = {
   ID: string;
-  amount: number;
-  date: Date;
   walletID: string;
+  userID: string;
+  origin: string;
+  reference: string;
+  type: string;
+  amount: number;
+  systemDescription: string;
+  userDescription: string;
+  date: Date;
+  processedAt: string;
+  createdAt: string;
 };
