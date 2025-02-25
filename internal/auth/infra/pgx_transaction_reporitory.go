@@ -13,6 +13,7 @@ type PgxTransactionRepository struct {
 	pool *pgxpool.Pool
 }
 
+// ToDo: handle the case when there are more than 100 transactions
 func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions []domain.Transaction) error {
 	if len(transactions) == 0 {
 		return nil
