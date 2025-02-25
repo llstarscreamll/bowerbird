@@ -212,8 +212,7 @@ func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextM
 	bankMatches := reBank.FindStringSubmatch(plainTextMessage)
 
 	if len(receiverMatches) > 1 {
-		match := receiverMatches[1]
-		desc = "Envío a " + match
+		desc = receiverMatches[1]
 	}
 
 	if len(bankMatches) > 1 {
@@ -230,8 +229,7 @@ func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string
 	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
 
 	if len(receiverMatches) > 1 {
-		match := receiverMatches[1]
-		desc = "Pago en " + match
+		desc = receiverMatches[1]
 	}
 
 	return desc
