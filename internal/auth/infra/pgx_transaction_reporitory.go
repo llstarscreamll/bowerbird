@@ -34,9 +34,6 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	SET system_description = EXCLUDED.system_description
 	`, strings.Join(placeHolders, ", "))
 
-	fmt.Println("params length", len(values))
-	fmt.Println(query)
-
 	_, err := r.pool.Exec(
 		ctx,
 		query,
