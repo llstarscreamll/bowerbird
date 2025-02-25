@@ -84,7 +84,7 @@ func main() {
 		Addr:           config.ServerPort,
 		Handler:        corsHandler(mux),
 		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		WriteTimeout:   20 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
