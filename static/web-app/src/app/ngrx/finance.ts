@@ -44,6 +44,8 @@ export const actions = createActionGroup({
 
     'set selected wallet': props<{ wallet: Wallet }>(),
 
+    'sync transactions from email': props<{ walletID: string }>(),
+
     'get transactions': props<{ walletID: string }>(),
     'get transactions ok': props<{ transactions: any[] }>(),
     'get transactions error': props<{ error: HttpErrorResponse }>(),
@@ -106,6 +108,18 @@ export class Effects {
       switchMap(({ walletID }) =>
         this.walletService.searchTransactions(walletID).pipe(
           map((transactions) => actions.getTransactionsOk({ transactions })),
+          catchError((error) => of(actions.getTransactionsError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  syncTransactionsFromEmail$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.syncTransactionsFromEmail),
+      switchMap(({ walletID }) =>
+        this.walletService.syncTransactionsFromEmail(walletID).pipe(
+          map(() => actions.getTransactions({ walletID })),
           catchError((error) => of(actions.getTransactionsError({ error }))),
         ),
       ),

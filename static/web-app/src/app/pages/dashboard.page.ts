@@ -1,10 +1,12 @@
+import { tap } from 'rxjs';
+
 import { Store } from '@ngrx/store';
 
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 
 import { getUser } from '@app/ngrx/auth';
-import { getSelectedWallet } from '@app/ngrx/finance';
+import * as finance from '@app/ngrx/finance';
 import { environment } from '@env/environment';
 
 @Component({
@@ -15,8 +17,15 @@ import { environment } from '@env/environment';
 export class DashboardPageComponent {
   private store = inject(Store);
   user$ = this.store.select(getUser);
-  selectedWallet$ = this.store.select(getSelectedWallet);
+  selectedWallet$ = this.store
+    .select(finance.getSelectedWallet)
+    .pipe(tap((w) => (this.selectedWalletID = w?.ID || '')));
 
+  selectedWalletID: string = '';
   walletMenuIsOpen = false;
   apiUrl = environment.apiBaseUrl;
+
+  syncWalletTransactionsWithEmails() {
+    this.store.dispatch(finance.actions.syncTransactionsFromEmail({ walletID: this.selectedWalletID }));
+  }
 }

@@ -64,7 +64,11 @@
     </div>
   </div>
 
-  <div class="grow"></div>
+  <div class="grow">
+    <button (click)="syncWalletTransactionsWithEmails()" class="pl-4 text-sm text-gray-700" type="button">
+      Sync now
+    </button>
+  </div>
 
   <div *ngIf="user$ | async">
     <img
