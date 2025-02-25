@@ -53,6 +53,7 @@ func main() {
 		os.Getenv("GOOGLE_CLIENT_ID"),
 		os.Getenv("GOOGLE_CLIENT_SECRET"),
 		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+		ulid,
 	)
 	mailGateway := authInfra.NewMailGateway(gMailProvider)
 
