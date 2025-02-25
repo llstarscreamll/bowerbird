@@ -422,8 +422,6 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
-			fmt.Println("Mail messages count: ", len(mailMessages))
-
 			transactions := make([]domain.Transaction, 0, len(mailMessages))
 			for _, m := range mailMessages {
 				var parserStrategy domain.EmailParserStrategy
