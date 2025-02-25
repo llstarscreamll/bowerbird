@@ -1,44 +1,67 @@
 package infra
 
 import (
-	"fmt"
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	"log"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
 
 type NuBankEmailParserStrategy struct{}
 
+var payment = " con cuenta nu"
+var transferToExternalBank = "tu dinero ya va en camino"
+var transferToNuBank = "el dinero que enviaste ya está del otro lado"
+
 func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []domain.Transaction {
+	messageSubject := strings.ToLower(emailMessage.Subject)
 	plainTextMessage := s.cleanUpHTML(emailMessage.Body)
 	plainTextMessage = s.extractPlainText(plainTextMessage)
 
-	fmt.Println(plainTextMessage)
+	subjects := []string{payment, transferToNuBank, transferToExternalBank}
 
-	if !strings.Contains(plainTextMessage, "Aquí puedes ver los detalles del envío") {
+	if !slices.ContainsFunc(subjects, func(s string) bool {
+		return strings.Contains(messageSubject, s)
+	}) {
 		return []domain.Transaction{}
 	}
 
 	transactionType := "expense"
-	transferAmount := s.getTransferAmount(plainTextMessage)
-	transferTaxAmount := s.getTransferTaxAmount(plainTextMessage)
+	transferAmount := float32(0)
+	transferTaxAmount := float32(0)
+	description := ""
 
-	if transactionType == "expense" {
-		transferAmount = -transferAmount
+	transferAmount = s.getTransferAmount(plainTextMessage)
+	transferTaxAmount = s.getTransferTaxAmount(plainTextMessage)
+
+	if strings.Contains(messageSubject, transferToNuBank) {
+		description = s.getNuTransferDescription(plainTextMessage)
+	}
+
+	if strings.Contains(messageSubject, transferToExternalBank) {
+		description = s.getExternalBankTransferDescription(plainTextMessage)
+	}
+
+	if strings.Contains(messageSubject, payment) {
+		description = s.getPaymentDescription(plainTextMessage)
+		transferAmount = s.getPaymentAmount(plainTextMessage)
+		transferTaxAmount = s.getPaymentTaxAmount(plainTextMessage)
 	}
 
 	return []domain.Transaction{
 		{
 			Origin:            "email",
+			Reference:         emailMessage.ExternalID,
 			Amount:            transferAmount,
 			Type:              transactionType,
-			SystemDescription: s.getTransferDescription(plainTextMessage),
+			SystemDescription: description,
 			ProcessedAt:       emailMessage.ReceivedAt,
 		},
 		{
 			Origin:            "email",
+			Reference:         emailMessage.ExternalID + "_tax",
 			Amount:            transferTaxAmount,
 			Type:              transactionType,
 			SystemDescription: "Impuesto 4x1.000",
@@ -96,20 +119,30 @@ func (s NuBankEmailParserStrategy) getTransferAmount(plainTextMessage string) fl
 		}
 	}
 
-	return amount
+	return -amount
 }
 
-func (s NuBankEmailParserStrategy) getTransferDescription(plainTextMessage string) string {
-	desc := ""
-	reAmount := regexp.MustCompile(`Recibe\n([\w\s\.,]+) Nu`)
+func (s NuBankEmailParserStrategy) getPaymentAmount(plainTextMessage string) float32 {
+	amount := float32(0)
+	reAmount := regexp.MustCompile(`La cantidad de:\n\$([\d\.,]+)\n`)
 	matches := reAmount.FindStringSubmatch(plainTextMessage)
 
 	if len(matches) > 1 {
-		match := matches[1]
-		desc = "Transferencia a " + match
+		amountStr := matches[1]
+		amountStr = strings.ReplaceAll(amountStr, ".", "")
+		amountStr = strings.ReplaceAll(amountStr, ",", ".")
+
+		parsedAmount, err := strconv.ParseFloat(amountStr, 32)
+		if err != nil {
+			log.Println("Error parsing amount ("+amountStr+") from email body:", err)
+		}
+
+		if err == nil {
+			amount = float32(parsedAmount)
+		}
 	}
 
-	return desc
+	return -amount
 }
 
 func (s NuBankEmailParserStrategy) getTransferTaxAmount(plainTextMessage string) float32 {
@@ -133,4 +166,73 @@ func (s NuBankEmailParserStrategy) getTransferTaxAmount(plainTextMessage string)
 	}
 
 	return -amount
+}
+
+func (s NuBankEmailParserStrategy) getPaymentTaxAmount(plainTextMessage string) float32 {
+	amount := float32(0)
+	reAmount := regexp.MustCompile(`Más el impuesto del 4xmil de:\n\$([\d\.,]+)\n`)
+	matches := reAmount.FindStringSubmatch(plainTextMessage)
+
+	if len(matches) > 1 {
+		amountStr := matches[1]
+		amountStr = strings.ReplaceAll(amountStr, ".", "")
+		amountStr = strings.ReplaceAll(amountStr, ",", ".")
+
+		parsedAmount, err := strconv.ParseFloat(amountStr, 32)
+		if err != nil {
+			log.Println("Error parsing amount ("+amountStr+") from email body:", err)
+		}
+
+		if err == nil {
+			amount = float32(parsedAmount)
+		}
+	}
+
+	return -amount
+}
+
+func (s NuBankEmailParserStrategy) getNuTransferDescription(plainTextMessage string) string {
+	desc := ""
+	reReceiver := regexp.MustCompile(`Recibe\n([\w\s\.,]+) Nu`)
+	matches := reReceiver.FindStringSubmatch(plainTextMessage)
+
+	if len(matches) > 1 {
+		match := matches[1]
+		desc = "Envío a " + match
+	}
+
+	return desc
+}
+
+func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextMessage string) string {
+	desc := ""
+	reReceiver := regexp.MustCompile(`Recibe\n([\w \d\.,_-]+)\n`)
+	reBank := regexp.MustCompile(`Banco\n([\w \d\.,_-]+)\n`)
+	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
+	bankMatches := reBank.FindStringSubmatch(plainTextMessage)
+
+	if len(receiverMatches) > 1 {
+		match := receiverMatches[1]
+		desc = "Envío a " + match
+	}
+
+	if len(bankMatches) > 1 {
+		match := bankMatches[1]
+		desc += " (" + match + ")"
+	}
+
+	return desc
+}
+
+func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string) string {
+	desc := ""
+	reReceiver := regexp.MustCompile(`Pagaste en:\n([\w \d\./,_-]+)\n`)
+	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
+
+	if len(receiverMatches) > 1 {
+		match := receiverMatches[1]
+		desc = "Pago en " + match
+	}
+
+	return desc
 }

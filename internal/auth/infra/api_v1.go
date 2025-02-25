@@ -359,7 +359,6 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			return
 		}
 
-		authUser := r.Context().Value(userContextKey).(domain.User)
 		mailCredentials, err := mailSecretRepo.FindByWalletID(r.Context(), walletID)
 		if err != nil {
 			log.Printf("Error getting mail credentials from storage: %s", err.Error())
@@ -389,12 +388,13 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
+			startOfMonth := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
 			mailMessages, err := mailGateway.SearchFromDateAndSenders(
 				r.Context(),
 				c.MailProvider,
 				domain.Tokens{AccessToken: decryptedAccessToken, RefreshToken: decryptedRefreshToken, ExpiresAt: c.ExpiresAt},
-				time.Now().Add(-time.Hour*24),
-				[]string{"nu@nu.com.co", "colpatriaInforma@scotiabankcolpatria.com", "bancodavivienda@davivienda.com"},
+				startOfMonth,
+				[]string{"nu@nu.com.co"},
 			)
 			if err != nil {
 				log.Printf("Error getting mails from provider "+c.MailProvider+": %s", err.Error())
@@ -404,7 +404,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			}
 
 			for i := range mailMessages {
-				mailMessages[i].UserID = authUser.ID
+				mailMessages[i].UserID = c.UserID
 			}
 
 			err = mailMessageRepo.UpsertMany(r.Context(), mailMessages)
@@ -422,6 +422,8 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
+			fmt.Println("Mail messages count: ", len(mailMessages))
+
 			transactions := make([]domain.Transaction, 0, len(mailMessages))
 			for _, m := range mailMessages {
 				var parserStrategy domain.EmailParserStrategy
@@ -435,12 +437,18 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 
 			for i := range transactions {
 				transactions[i].ID = ulid.New()
-				transactions[i].UserID = authUser.ID
+				transactions[i].UserID = c.UserID
 				transactions[i].WalletID = c.WalletID
 				transactions[i].CreatedAt = time.Now()
 			}
 
-			transactionRepo.UpsertMany(r.Context(), transactions)
+			err = transactionRepo.UpsertMany(r.Context(), transactions)
+			if err != nil {
+				log.Printf("Error persisting transactions on storage: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error persisting transactions on storage -> "+err.Error())
+				return
+			}
 
 			fmt.Fprintf(w, `{"data":"ok"}`)
 		}

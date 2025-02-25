@@ -72,3 +72,5 @@ CREATE TABLE "public"."transactions" (
     "processed_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX "unique_transactions_wallet_id_and_reference" ON "public"."transactions" ("wallet_id", "reference");

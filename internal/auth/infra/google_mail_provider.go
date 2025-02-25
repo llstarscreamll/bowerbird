@@ -77,7 +77,7 @@ func (g GoogleMailProvider) listMessages(mail *gmail.Service, startDate time.Tim
 }
 
 func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID string) (domain.MailMessage, error) {
-	var message domain.MailMessage
+	message := domain.MailMessage{}
 
 	msg, err := mail.Users.Messages.Get("me", messageID).Format("full").Do()
 	if err != nil {
@@ -102,7 +102,7 @@ func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID stri
 
 		if strings.ToLower(h.Name) == "date" {
 			h.Value = strings.TrimSuffix(h.Value, " (COT)") // date has format: Wed, 29 Jan 2025 15:20:41 -0500 (COT)
-			date, err := time.Parse("Mon, 02 Jan 2006 15:04:05 -0700", h.Value)
+			date, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", h.Value)
 			if err != nil {
 				return domain.MailMessage{}, err
 			}
@@ -121,7 +121,7 @@ func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID stri
 	return message, nil
 }
 
-func NewGoogleMailProvider(clientID, clientSecret, redirectUrl string) *GoogleMailProvider {
+func NewGoogleMailProvider(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GoogleMailProvider {
 	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -130,5 +130,5 @@ func NewGoogleMailProvider(clientID, clientSecret, redirectUrl string) *GoogleMa
 		Scopes:       []string{gmail.GmailReadonlyScope},
 	}
 
-	return &GoogleMailProvider{config: config}
+	return &GoogleMailProvider{config: config, ulid: ulid}
 }

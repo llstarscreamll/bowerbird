@@ -14,12 +14,16 @@ type PgxTransactionRepository struct {
 }
 
 func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions []domain.Transaction) error {
+	if len(transactions) == 0 {
+		return nil
+	}
+
 	placeHolders := make([]string, 0, len(transactions))
-	values := make([]interface{}, 0, len(transactions)*8)
+	values := make([]interface{}, 0, len(transactions)*11)
 
 	for i, v := range transactions {
-		placeHolders = append(placeHolders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*8+1, i*8+2, i*8+3, i*8+4, i*8+5, i*8+6, i*8+7, i*8+8, i*8+9, i*8+10))
-		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt)
+		placeHolders = append(placeHolders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*11+1, i*11+2, i*11+3, i*11+4, i*11+5, i*11+6, i*11+7, i*11+8, i*11+9, i*11+10, i*11+11))
+		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Reference, v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt)
 	}
 
 	query := fmt.Sprintf(`
@@ -27,6 +31,9 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	VALUES %s
 	ON CONFLICT (wallet_id, reference) DO NOTHING
 	`, strings.Join(placeHolders, ", "))
+
+	fmt.Println("params length", len(values))
+	fmt.Println(query)
 
 	_, err := r.pool.Exec(
 		ctx,
