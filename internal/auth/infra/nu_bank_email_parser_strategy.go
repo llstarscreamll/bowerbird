@@ -50,7 +50,7 @@ func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []doma
 		transferTaxAmount = s.getPaymentTaxAmount(plainTextMessage)
 	}
 
-	return []domain.Transaction{
+	return slices.DeleteFunc([]domain.Transaction{
 		{
 			Origin:            "email",
 			Reference:         emailMessage.ExternalID,
@@ -64,10 +64,12 @@ func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []doma
 			Reference:         emailMessage.ExternalID + "_tax",
 			Amount:            transferTaxAmount,
 			Type:              transactionType,
-			SystemDescription: "Impuesto 4x1.000",
+			SystemDescription: "4x1.000",
 			ProcessedAt:       emailMessage.ReceivedAt,
 		},
-	}
+	}, func(t domain.Transaction) bool {
+		return t.Amount == 0
+	})
 }
 
 func (s NuBankEmailParserStrategy) cleanUpHTML(html string) string {
