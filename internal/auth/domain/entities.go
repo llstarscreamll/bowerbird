@@ -50,15 +50,15 @@ type UserWallet struct {
 }
 
 type Transaction struct {
-	ID                string
-	WalletID          string
-	UserID            string
-	Origin            string
-	Reference         string
-	Type              string
-	Amount            float32
-	UserDescription   string
-	SystemDescription string
-	ProcessedAt       time.Time
-	CreatedAt         time.Time
+	ID                string    `json:"ID"`
+	WalletID          string    `json:"walletID"`
+	UserID            string    `json:"userID"`
+	Origin            string    `json:"origin"`
+	Reference         string    `json:"reference"`
+	Type              string    `json:"type"`
+	Amount            float32   `json:"amount"`
+	UserDescription   string    `json:"userDescription"`
+	SystemDescription string    `json:"systemDescription"`
+	ProcessedAt       time.Time `json:"processedAt"`
+	CreatedAt         time.Time `json:"createdAt"`
 }
