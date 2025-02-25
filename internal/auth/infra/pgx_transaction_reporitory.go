@@ -30,7 +30,8 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	query := fmt.Sprintf(`
 	INSERT INTO transactions (id, wallet_id, user_id, origin, reference, "type", amount, user_description, system_description, processed_at, created_at)
 	VALUES %s
-	ON CONFLICT (wallet_id, reference) DO NOTHING
+	ON CONFLICT (wallet_id, reference) DO UPDATE 
+	SET system_description = EXCLUDED.system_description
 	`, strings.Join(placeHolders, ", "))
 
 	fmt.Println("params length", len(values))
