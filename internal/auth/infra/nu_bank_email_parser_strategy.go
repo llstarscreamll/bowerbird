@@ -193,7 +193,7 @@ func (s NuBankEmailParserStrategy) getPaymentTaxAmount(plainTextMessage string) 
 
 func (s NuBankEmailParserStrategy) getNuTransferDescription(plainTextMessage string) string {
 	desc := ""
-	reReceiver := regexp.MustCompile(`Recibe\n([\w\s\.,]+) Nu`)
+	reReceiver := regexp.MustCompile(`Recibe\n(.+) Nu`)
 	matches := reReceiver.FindStringSubmatch(plainTextMessage)
 
 	if len(matches) > 1 {
@@ -206,8 +206,8 @@ func (s NuBankEmailParserStrategy) getNuTransferDescription(plainTextMessage str
 
 func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextMessage string) string {
 	desc := ""
-	reReceiver := regexp.MustCompile(`Recibe\n([\w \d\.,_-]+)\n`)
-	reBank := regexp.MustCompile(`Banco\n([\w \d\.,_-]+)\n`)
+	reReceiver := regexp.MustCompile(`Recibe\n(.+)\n`)
+	reBank := regexp.MustCompile(`Banco\n(.+)\n`)
 	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
 	bankMatches := reBank.FindStringSubmatch(plainTextMessage)
 
@@ -226,7 +226,7 @@ func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextM
 
 func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string) string {
 	desc := ""
-	reReceiver := regexp.MustCompile(`Pagaste en:\n([\w \d\./,_-]+)\n`)
+	reReceiver := regexp.MustCompile(`Pagaste en:\n(.+)\n`)
 	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
 
 	if len(receiverMatches) > 1 {
