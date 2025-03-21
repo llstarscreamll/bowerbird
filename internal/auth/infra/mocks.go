@@ -118,8 +118,8 @@ func (m *MockMailCredentialRepository) Save(ctx context.Context, ID, userID, wal
 	return args.Error(0)
 }
 
-func (m *MockMailCredentialRepository) FindByUserID(ctx context.Context, userID string) ([]domain.MailCredential, error) {
-	args := m.Called(ctx, userID)
+func (m *MockMailCredentialRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.MailCredential, error) {
+	args := m.Called(ctx, walletID)
 
 	return args.Get(0).([]domain.MailCredential), args.Error(1)
 }
@@ -147,6 +147,11 @@ type MockTransactionRepository struct {
 func (m *MockTransactionRepository) UpsertMany(ctx context.Context, transactions []domain.Transaction) error {
 	args := m.Called(ctx, transactions)
 	return args.Error(0)
+}
+
+func (m *MockTransactionRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Transaction, error) {
+	args := m.Called(ctx, walletID)
+	return args.Get(0).([]domain.Transaction), args.Error(1)
 }
 
 func neverCalledMockUlid(t *testing.T) *MockULID {
