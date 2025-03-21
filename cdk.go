@@ -3,29 +3,30 @@ package main
 import (
 	"os"
 
-	"github.com/aws/aws-cdk-go/awscdk/v2"
-	// "github.com/aws/aws-cdk-go/awscdk/v2/awssqs"
+	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
 )
 
 type CdkGoStackProps struct {
-	awscdk.StackProps
+	cdk.StackProps
 }
 
-func NewCdkGoStack(scope constructs.Construct, id string, props *CdkGoStackProps) awscdk.Stack {
-	var sprops awscdk.StackProps
+func NewCdkGoStack(scope constructs.Construct, id string, props *CdkGoStackProps) cdk.Stack {
+	var sProps cdk.StackProps
 	if props != nil {
-		sprops = props.StackProps
+		sProps = props.StackProps
 	}
-	stack := awscdk.NewStack(scope, &id, &sprops)
+	stack := cdk.NewStack(scope, &id, &sProps)
 
-	// The code that defines your stack goes here
-
-	// example resource
-	// queue := awssqs.NewQueue(stack, jsii.String("CdkGoQueue"), &awssqs.QueueProps{
-	// 	VisibilityTimeout: awscdk.Duration_Seconds(jsii.Number(300)),
-	// })
+	lambda.NewFunction(stack, jsii.String("GoServer"), &lambda.FunctionProps{
+		FunctionName: jsii.String("API"),
+		Runtime:      lambda.Runtime_PROVIDED_AL2023(),
+		Handler:      jsii.String("bootstrap"),
+		Code:         lambda.Code_FromAsset(jsii.String("cmd/lambda-api/bootstrap.zip"), nil),
+		Architecture: lambda.Architecture_ARM_64(),
+	})
 
 	return stack
 }
@@ -33,10 +34,10 @@ func NewCdkGoStack(scope constructs.Construct, id string, props *CdkGoStackProps
 func main() {
 	defer jsii.Close()
 
-	app := awscdk.NewApp(nil)
+	app := cdk.NewApp(nil)
 
 	NewCdkGoStack(app, "BowerbirdApp", &CdkGoStackProps{
-		awscdk.StackProps{
+		cdk.StackProps{
 			Env: env(),
 		},
 	})
@@ -44,8 +45,8 @@ func main() {
 	app.Synth(nil)
 }
 
-func env() *awscdk.Environment {
-	return &awscdk.Environment{
+func env() *cdk.Environment {
+	return &cdk.Environment{
 		Account: jsii.String(os.Getenv("CDK_DEFAULT_ACCOUNT")),
 		Region:  jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
 	}

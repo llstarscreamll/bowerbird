@@ -41,6 +41,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
+	github.com/aws/aws-lambda-go v1.47.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/oklog/ulid/v2 v2.1.0 // indirect
