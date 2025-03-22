@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +22,6 @@ import (
 	"llstarscreamll/bowerbird/internal/common/infra/postgresql"
 )
 
-var mux *http.ServeMux
 var server *http.Server
 
 func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -61,7 +62,7 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (even
 }
 
 func main() {
-	if mux == nil || server == nil {
+	if server == nil {
 		setUpAPIServer()
 	}
 
@@ -71,17 +72,24 @@ func main() {
 func setUpAPIServer() {
 	ctx := context.Background()
 
-	config := commonDomain.AppConfig{
-		ServerHost:  os.Getenv("SERVER_HOST"),
-		ServerPort:  ":8080",
-		FrontendUrl: os.Getenv("FRONTEND_URL"),
+	// get app secrets from parameter store
+	ps := commonInfra.NewAwsParameterStore(ctx)
+	jsonConfig, err := ps.GetParameter(ctx, os.Getenv("PARAMETER_STORE_KEY_NAME"), true)
+	if err != nil {
+		log.Fatalf("Error getting secrets from parameter store: %v", err)
 	}
 
-	db := postgresql.CreatePgxConnectionPool(ctx, os.Getenv("POSTGRES_DATABASE_URL"))
+	var config commonDomain.AppConfig
+	err = json.Unmarshal([]byte(jsonConfig), &config)
+	if err != nil {
+		log.Fatalf("Error un-marshalling json secrets: %v", err)
+	}
+
+	db := postgresql.CreatePgxConnectionPool(ctx, config.PostgresDbUrl)
 	defer db.Close()
 
 	ulid := commonInfra.OklogULIDGenerator{}
-	crypt := commonInfra.NewGoCrypt(os.Getenv("CRYPT_SECRET"))
+	crypt := commonInfra.NewGoCrypt(config.CryptSecret)
 	userRepo := authInfra.NewPgxUserRepository(db)
 	sessionRepo := authInfra.NewPgxSessionRepository(db)
 	mailMessageRepo := authInfra.NewPgxMailMessageRepository(db)
@@ -90,28 +98,28 @@ func setUpAPIServer() {
 	transactionRepo := authInfra.NewPgxTransactionRepository(db)
 
 	googleAuth := *authInfra.NewGoogleAuthStrategy(
-		os.Getenv("GOOGLE_CLIENT_ID"),
-		os.Getenv("GOOGLE_CLIENT_SECRET"),
-		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+		config.GoogleClientID,
+		config.GoogleClientSecret,
+		config.GoogleOAuthRedirectUrl,
 		ulid,
 	)
 	microsoftAuth := *authInfra.NewMicrosoftAuthStrategy(
-		os.Getenv("MICROSOFT_CLIENT_ID"),
-		os.Getenv("MICROSOFT_CLIENT_SECRET"),
-		os.Getenv("MICROSOFT_OAUTH_REDIRECT_URL"),
+		config.MicrosoftClientID,
+		config.MicrosoftClientSecret,
+		config.MicrosoftOAuthRedirectUrl,
 		ulid,
 	)
 	authServerGateway := authInfra.NewAuthServerGateway(googleAuth, microsoftAuth)
 
 	gMailProvider := authInfra.NewGoogleMailProvider(
-		os.Getenv("GOOGLE_CLIENT_ID"),
-		os.Getenv("GOOGLE_CLIENT_SECRET"),
-		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
+		config.GoogleClientID,
+		config.GoogleClientSecret,
+		config.GoogleOAuthRedirectUrl,
 		ulid,
 	)
 	mailGateway := authInfra.NewMailGateway(gMailProvider)
 
-	mux = http.NewServeMux()
+	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /v1", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
@@ -122,7 +130,7 @@ func setUpAPIServer() {
 	// Enable CORS
 	corsHandler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", config.FrontendUrl)
+			w.Header().Set("Access-Control-Allow-Origin", config.WebUrl)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
