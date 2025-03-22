@@ -1,0 +1,25 @@
+name: bowerbird
+
+services:
+  build-api:
+    container_name: build-api
+    build:
+      context: .
+      dockerfile: ./cmd/lambda-api/Dockerfile
+    volumes:
+      - .:/app
+      - $GOPATH/pkg/mod:/go/pkg/mod
+
+  deploy:
+    container_name: deploy
+    build:
+      context: .
+      dockerfile: ./cmd/aws-cdk/Dockerfile
+    volumes:
+      - .:/app
+      - ~/.npm:/root/.npm
+      - $GOPATH/pkg/mod:/go/pkg/mod
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
