@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type ULIDGenerator interface {
 	New() string
@@ -10,4 +13,8 @@ type ULIDGenerator interface {
 type Crypt interface {
 	EncryptString(str string) (string, error)
 	DecryptString(text string) (string, error)
+}
+
+type ParameterStore interface {
+	GetParameter(ctx context.Context, name string, secure bool) (string, error)
 }
