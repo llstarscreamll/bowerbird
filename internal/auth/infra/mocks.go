@@ -215,9 +215,9 @@ func neverCalledMockMockWalletRepository(t *testing.T) *MockWalletRepository {
 }
 
 var config = commonDomain.AppConfig{
-	ServerHost:  "http://localhost:8080",
-	ServerPort:  ":8080",
-	FrontendUrl: "http://localhost:4200",
+	ApiUrl:     "http://localhost:8080",
+	ServerPort: ":8080",
+	WebUrl:     "http://localhost:4200",
 }
 
 var testUser = domain.User{

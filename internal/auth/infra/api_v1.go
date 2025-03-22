@@ -76,7 +76,7 @@ func googleLoginHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGen
 			return
 		}
 
-		url, err := authServer.GetLoginUrl("google", config.ServerHost+"/v1/auth/google/callback", []string{}, stateID)
+		url, err := authServer.GetLoginUrl("google", config.ApiUrl+"/v1/auth/google/callback", []string{}, stateID)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -193,7 +193,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			Secure:   config.IsProduction,
 		})
 
-		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
+		http.Redirect(w, r, config.WebUrl+"/dashboard", http.StatusFound)
 	}
 }
 
@@ -228,7 +228,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 			return
 		}
 
-		redirectUrl, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
+		redirectUrl, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -255,7 +255,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 // redirects user to Microsoft login page and request access to *read* mail
 func outlookLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, config.ServerHost+"/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
+		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -345,7 +345,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		http.Redirect(w, r, config.FrontendUrl+"/dashboard", http.StatusFound)
+		http.Redirect(w, r, config.WebUrl+"/dashboard", http.StatusFound)
 	}
 }
 

@@ -33,7 +33,7 @@ func TestGoogleLogin(t *testing.T) {
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
-	authServerGatewayMock.On("GetLoginUrl", "google", config.ServerHost+"/v1/auth/google/callback", []string{}).Return("https://some-google.com/auth/login", nil)
+	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/v1/auth/google/callback", []string{}).Return("https://some-google.com/auth/login", nil)
 
 	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
 	mux.ServeHTTP(w, r)
@@ -102,7 +102,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			http.StatusFound,
 			map[string]string{
-				"Location":   config.FrontendUrl + "/dashboard",
+				"Location":   config.WebUrl + "/dashboard",
 				"Set-Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure",
 			},
 		},
@@ -282,7 +282,7 @@ func TestGMailLogin(t *testing.T) {
 	transactionRepoMock := neverCalledMockTransactionRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
-	authServerGatewayMock.On("GetLoginUrl", "google", config.ServerHost+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
+	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
 
 	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
 	mux.ServeHTTP(w, r)
@@ -358,7 +358,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			},
 			http.StatusFound,
 			map[string]string{
-				"Location": config.FrontendUrl + "/dashboard",
+				"Location": config.WebUrl + "/dashboard",
 			},
 		},
 		{
