@@ -18,9 +18,9 @@ func main() {
 	ctx := context.Background()
 
 	config := commonDomain.AppConfig{
-		ServerHost:  os.Getenv("SERVER_HOST"),
-		ServerPort:  ":8080",
-		FrontendUrl: os.Getenv("FRONTEND_URL"),
+		ApiUrl:     os.Getenv("SERVER_HOST"),
+		ServerPort: ":8080",
+		WebUrl:     os.Getenv("FRONTEND_URL"),
 	}
 
 	db := postgresql.CreatePgxConnectionPool(ctx, os.Getenv("POSTGRES_DATABASE_URL"))
@@ -68,7 +68,7 @@ func main() {
 	// Enable CORS
 	corsHandler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", config.FrontendUrl)
+			w.Header().Set("Access-Control-Allow-Origin", config.WebUrl)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
