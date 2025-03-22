@@ -1,4 +1,4 @@
-package postgresql
+package infra
 
 import (
 	"crypto/aes"
