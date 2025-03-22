@@ -19,6 +19,15 @@ These are some topics to have in mind to deploy this project in a production env
 - Create an Azure account
 - Create and setup outlook read only messages for an Azure Entra application and get the client ID and secret.
 
+## Deploy
+
+```bash
+AWS_ACCESS_KEY_ID=some-access \
+AWS_SECRET_ACCESS_KEY=some-secret \
+AWS_DEFAULT_REGION=us-east-1 \
+make deploy
+```
+
 ## Running the project
 
 Execute database migrations:
