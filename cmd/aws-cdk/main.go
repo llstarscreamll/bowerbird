@@ -4,6 +4,8 @@ import (
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	apiGatewayV2 "github.com/aws/aws-cdk-go/awscdk/v2/awsapigatewayv2"
+	apiGatewayV2Integrations "github.com/aws/aws-cdk-go/awscdk/v2/awsapigatewayv2integrations"
 	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	parameterStore "github.com/aws/aws-cdk-go/awscdk/v2/awsssm"
 	"github.com/aws/constructs-go/constructs/v10"
@@ -25,7 +27,8 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		ParameterName: jsii.String("prod-bowerbird-backend"),
 	})
 
-	apiLambda := lambda.NewFunction(stack, jsii.String("GoServer"), &lambda.FunctionProps{
+	// Create Lambda function
+	lambdaFn := lambda.NewFunction(stack, jsii.String("GoServer"), &lambda.FunctionProps{
 		FunctionName: jsii.String("API"),
 		Runtime:      lambda.Runtime_PROVIDED_AL2023(),
 		Handler:      jsii.String("api-server"),
@@ -36,7 +39,34 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		},
 	})
 
-	secrets.GrantRead(apiLambda)
+	// Create HTTP API with Lambda integration
+	httpApi := apiGatewayV2.NewHttpApi(stack, jsii.String("HttpApi"), &apiGatewayV2.HttpApiProps{
+		ApiName:            jsii.String("BowerbirdApi"),
+		CreateDefaultStage: jsii.Bool(true),
+	})
+
+	// Create Lambda integration
+	integration := apiGatewayV2Integrations.NewHttpLambdaIntegration(
+		jsii.String("LambdaProxyIntegration"),
+		lambdaFn,
+		&apiGatewayV2Integrations.HttpLambdaIntegrationProps{},
+	)
+
+	// Add routes
+	httpApi.AddRoutes(&apiGatewayV2.AddRoutesOptions{
+		Path:        jsii.String("/{proxy+}"),
+		Methods:     &[]apiGatewayV2.HttpMethod{apiGatewayV2.HttpMethod_ANY},
+		Integration: integration,
+	})
+
+	httpApi.AddRoutes(&apiGatewayV2.AddRoutesOptions{
+		Path:        jsii.String("/"),
+		Methods:     &[]apiGatewayV2.HttpMethod{apiGatewayV2.HttpMethod_ANY},
+		Integration: integration,
+	})
+
+	// Grant Lambda permission to read from Parameter Store
+	secrets.GrantRead(lambdaFn)
 
 	return stack
 }

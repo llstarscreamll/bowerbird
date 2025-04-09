@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-
-	"fmt"
-	"os"
-	"time"
 
 	authInfra "llstarscreamll/bowerbird/internal/auth/infra"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
@@ -24,14 +24,66 @@ import (
 
 var server *http.Server
 
-func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	r, err := http.NewRequest(req.HTTPMethod, req.Path, strings.NewReader(req.Body))
+func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	// Log incoming request for debugging
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		fmt.Printf("Error marshalling request: %v\n", err)
+	} else {
+		fmt.Printf("Received API Gateway V2 request: %s\n", string(reqBytes))
+	}
+
+	// Extract path from request
+	path := strings.Replace(req.RawPath, "/prod", "", 1)
+	if path == "" {
+		path = "/"
+	}
+
+	// Decode base64 body if necessary
+	body := req.Body
+	if req.IsBase64Encoded {
+		decodedBody, err := base64.StdEncoding.DecodeString(req.Body)
+		if err != nil {
+			fmt.Printf("Error decoding base64 body: %v\n", err)
+		}
+
+		if err == nil {
+			body = string(decodedBody)
+		}
+	}
+
+	fmt.Printf("Processing request: Method=%s, Path=%s\n", req.RequestContext.HTTP.Method, path)
+
+	// Create a new HTTP request for our server handler
+	r, err := http.NewRequest(req.RequestContext.HTTP.Method, path, strings.NewReader(body))
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
-		return events.APIGatewayProxyResponse{
+
+		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "Internal Server Error",
 		}, nil
+	}
+
+	// Add headers from the API Gateway request
+	for key, value := range req.Headers {
+		r.Header.Set(key, value)
+	}
+
+	// Add query string parameters
+	if len(req.QueryStringParameters) > 0 {
+		q := r.URL.Query()
+		for key, value := range req.QueryStringParameters {
+			q.Add(key, value)
+		}
+		r.URL.RawQuery = q.Encode()
+	}
+
+	// Add cookies if present
+	if cookies := req.Cookies; len(cookies) > 0 {
+		for _, cookie := range cookies {
+			r.Header.Add("Cookie", cookie)
+		}
 	}
 
 	w := httptest.NewRecorder()
@@ -43,8 +95,7 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (even
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("Error reading response body from Go server: %v\n", err)
-
-		return events.APIGatewayProxyResponse{
+		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "Internal Server Error",
 		}, nil
@@ -52,12 +103,29 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayProxyRequest) (even
 
 	bodyString := string(bodyBytes)
 
-	fmt.Printf("Response status: %s\n", resp.Status)
+	fmt.Printf("Response status: %d\n", resp.StatusCode)
 	fmt.Printf("Response body: %s\n", bodyString)
 
-	return events.APIGatewayProxyResponse{
-		StatusCode: resp.StatusCode,
-		Body:       bodyString,
+	// Prepare headers for the response
+	headers := make(map[string]string)
+	for k, v := range resp.Header {
+		if len(v) > 0 {
+			headers[k] = v[0]
+		}
+	}
+
+	// Extract cookies for the response
+	cookies := make([]string, 0)
+	for _, cookie := range resp.Cookies() {
+		cookies = append(cookies, cookie.String())
+	}
+
+	return events.APIGatewayV2HTTPResponse{
+		StatusCode:      resp.StatusCode,
+		Headers:         headers,
+		Cookies:         cookies,
+		Body:            bodyString,
+		IsBase64Encoded: false,
 	}, nil
 }
 
