@@ -189,7 +189,11 @@ func setUpAPIServer() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /v1", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data": "Welcome to API"}`)
+	})
+
+	mux.HandleFunc("GET /api/v1", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
