@@ -15,6 +15,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	authInfra "llstarscreamll/bowerbird/internal/auth/infra"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
@@ -23,23 +24,21 @@ import (
 )
 
 var server *http.Server
+var db *pgxpool.Pool
 
 func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	// Log incoming request for debugging
-	reqBytes, err := json.Marshal(req)
+	eventJson, err := json.Marshal(req)
 	if err != nil {
 		fmt.Printf("Error marshalling request: %v\n", err)
 	} else {
-		fmt.Printf("Received API Gateway V2 request: %s\n", string(reqBytes))
+		fmt.Printf("Received API Gateway V2 request: %s\n", string(eventJson))
 	}
 
-	// Extract path from request
 	path := strings.Replace(req.RawPath, "/prod", "", 1)
 	if path == "" {
 		path = "/"
 	}
 
-	// Decode base64 body if necessary
 	body := req.Body
 	if req.IsBase64Encoded {
 		decodedBody, err := base64.StdEncoding.DecodeString(req.Body)
@@ -54,7 +53,6 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 
 	fmt.Printf("Processing request: Method=%s, Path=%s\n", req.RequestContext.HTTP.Method, path)
 
-	// Create a new HTTP request for our server handler
 	r, err := http.NewRequest(req.RequestContext.HTTP.Method, path, strings.NewReader(body))
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
@@ -65,12 +63,10 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 		}, nil
 	}
 
-	// Add headers from the API Gateway request
 	for key, value := range req.Headers {
 		r.Header.Set(key, value)
 	}
 
-	// Add query string parameters
 	if len(req.QueryStringParameters) > 0 {
 		q := r.URL.Query()
 		for key, value := range req.QueryStringParameters {
@@ -79,7 +75,6 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 		r.URL.RawQuery = q.Encode()
 	}
 
-	// Add cookies if present
 	if cookies := req.Cookies; len(cookies) > 0 {
 		for _, cookie := range cookies {
 			r.Header.Add("Cookie", cookie)
@@ -106,7 +101,6 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 	fmt.Printf("Response status: %d\n", resp.StatusCode)
 	fmt.Printf("Response body: %s\n", bodyString)
 
-	// Prepare headers for the response
 	headers := make(map[string]string)
 	for k, v := range resp.Header {
 		if len(v) > 0 {
@@ -114,7 +108,6 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 		}
 	}
 
-	// Extract cookies for the response
 	cookies := make([]string, 0)
 	for _, cookie := range resp.Cookies() {
 		cookies = append(cookies, cookie.String())
@@ -129,15 +122,9 @@ func lambdaHandler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (eve
 	}, nil
 }
 
-func main() {
-	if server == nil {
-		setUpAPIServer()
-	}
-
-	lambda.Start(lambdaHandler)
-}
-
 func setUpAPIServer() {
+	fmt.Println("Setting up API server...")
+
 	ctx := context.Background()
 
 	// get app secrets from parameter store
@@ -153,8 +140,11 @@ func setUpAPIServer() {
 		log.Fatalf("Error un-marshalling json secrets: %v", err)
 	}
 
-	db := postgresql.CreatePgxConnectionPool(ctx, config.PostgresDbUrl)
-	defer db.Close()
+	fmt.Println("Configuration loaded successfully")
+
+	db = postgresql.CreatePgxConnectionPool(ctx, config.PostgresDbUrl)
+
+	fmt.Println("Database connection established")
 
 	ulid := commonInfra.OklogULIDGenerator{}
 	crypt := commonInfra.NewGoCrypt(config.CryptSecret)
@@ -165,18 +155,22 @@ func setUpAPIServer() {
 	walletRepo := authInfra.NewPgxWalletRepository(db)
 	transactionRepo := authInfra.NewPgxTransactionRepository(db)
 
+	fmt.Println("Repositories initialized")
+
 	googleAuth := *authInfra.NewGoogleAuthStrategy(
 		config.GoogleClientID,
 		config.GoogleClientSecret,
 		config.GoogleOAuthRedirectUrl,
 		ulid,
 	)
+
 	microsoftAuth := *authInfra.NewMicrosoftAuthStrategy(
 		config.MicrosoftClientID,
 		config.MicrosoftClientSecret,
 		config.MicrosoftOAuthRedirectUrl,
 		ulid,
 	)
+
 	authServerGateway := authInfra.NewAuthServerGateway(googleAuth, microsoftAuth)
 
 	gMailProvider := authInfra.NewGoogleMailProvider(
@@ -186,6 +180,8 @@ func setUpAPIServer() {
 		ulid,
 	)
 	mailGateway := authInfra.NewMailGateway(gMailProvider)
+
+	fmt.Println("Services initialized")
 
 	mux := http.NewServeMux()
 
@@ -221,4 +217,16 @@ func setUpAPIServer() {
 		WriteTimeout:   20 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
+
+	fmt.Println("API Serer initialized")
+}
+
+func main() {
+	if server == nil {
+		setUpAPIServer()
+	}
+
+	defer db.Close()
+
+	lambda.Start(lambdaHandler)
 }
