@@ -147,6 +147,6 @@ func main() {
 func env() *cdk.Environment {
 	return &cdk.Environment{
 		Account: jsii.String(os.Getenv("CDK_DEFAULT_ACCOUNT")),
-		Region:  jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
+		Region:  jsii.String(os.Getenv("AWS_DEFAULT_REGION")),
 	}
 }
