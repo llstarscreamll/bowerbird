@@ -22,13 +22,14 @@ These are some topics to have in mind to deploy this project in a production env
 ## Deploy
 
 ```bash
+BOWERBIRD=true \
 AWS_ACCESS_KEY_ID=some-access \
 AWS_SECRET_ACCESS_KEY=some-secret \
 AWS_DEFAULT_REGION=us-east-1 \
 make deploy
 ```
 
-## Running the project
+## Running the project locally
 
 Execute database migrations:
 
@@ -51,4 +52,11 @@ POSTGRES_DATABASE_URL="postgres://user:@localhost:5432/bowerbird_local?sslmode=d
 SERVER_HOST="http://localhost:8080" \
 FRONTEND_URL="http://localhost:4200" \
 go run cmd/api/main.go
+```
+
+Start the SPA:
+
+```bash
+cd static/web-app
+npm run start
 ```
