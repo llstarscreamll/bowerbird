@@ -14,6 +14,10 @@ type PgxMailMessageRepository struct {
 }
 
 func (r *PgxMailMessageRepository) UpsertMany(ctx context.Context, messages []domain.MailMessage) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
 	placeHolders := make([]string, 0, len(messages))
 	values := make([]interface{}, 0, len(messages)*8)
 
