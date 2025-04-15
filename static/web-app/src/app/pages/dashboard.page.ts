@@ -1,12 +1,15 @@
+import { initFlowbite } from 'flowbite';
+
 import { tap } from 'rxjs';
 
 import { Store } from '@ngrx/store';
 
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { AfterViewInit, Component, OnInit, inject } from '@angular/core';
 
 import { getUser } from '@app/ngrx/auth';
 import * as finance from '@app/ngrx/finance';
+import { FlowbiteService } from '@app/services/flowbite.service';
 import { environment } from '@env/environment';
 
 @Component({
@@ -14,8 +17,10 @@ import { environment } from '@env/environment';
   selector: 'app-dashboard-page',
   templateUrl: './dashboard.page.html',
 })
-export class DashboardPageComponent {
+export class DashboardPageComponent implements AfterViewInit {
   private store = inject(Store);
+  private flowbite = inject(FlowbiteService);
+
   user$ = this.store.select(getUser);
   selectedWallet$ = this.store
     .select(finance.getSelectedWallet)
@@ -25,6 +30,10 @@ export class DashboardPageComponent {
   selectedWalletID: string = '';
   walletMenuIsOpen = false;
   apiUrl = environment.apiBaseUrl;
+
+  ngAfterViewInit(): void {
+    this.flowbite.load(() => initFlowbite());
+  }
 
   syncWalletTransactionsWithEmails() {
     this.store.dispatch(finance.actions.syncTransactionsFromEmail({ walletID: this.selectedWalletID }));
