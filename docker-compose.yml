@@ -10,6 +10,14 @@ services:
       - .:/app
       - $GOPATH/pkg/mod:/go/pkg/mod
 
+  build-spa:
+    container_name: build-spa
+    build:
+      dockerfile: ./static/web-app/Dockerfile
+    volumes:
+      - .:/app
+      - ~/.npm:/root/.npm
+
   deploy:
     container_name: deploy
     build:
