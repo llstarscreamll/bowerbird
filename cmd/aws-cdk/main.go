@@ -102,7 +102,20 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			AllowedMethods:       cloudfront.AllowedMethods_ALLOW_GET_HEAD_OPTIONS(),
 			CachedMethods:        cloudfront.CachedMethods_CACHE_GET_HEAD_OPTIONS(),
 		},
-		ErrorResponses: &[]*cloudfront.ErrorResponse{},
+		ErrorResponses: &[]*cloudfront.ErrorResponse{
+			{
+				HttpStatus:         jsii.Number(403),
+				ResponsePagePath:   jsii.String("/index.html"),
+				ResponseHttpStatus: jsii.Number(200),
+				Ttl:                cdk.Duration_Seconds(jsii.Number(60)),
+			},
+			{
+				HttpStatus:         jsii.Number(404),
+				ResponsePagePath:   jsii.String("/index.html"),
+				ResponseHttpStatus: jsii.Number(200),
+				Ttl:                cdk.Duration_Seconds(jsii.Number(60)),
+			},
+		},
 		AdditionalBehaviors: &map[string]*cloudfront.BehaviorOptions{
 			"/api/*": {
 				Origin: cloudfrontOrigins.NewHttpOrigin(jsii.Sprintf("%s.execute-api.%s.amazonaws.com", *httpApi.ApiId(), *stack.Region()), &cloudfrontOrigins.HttpOriginProps{
