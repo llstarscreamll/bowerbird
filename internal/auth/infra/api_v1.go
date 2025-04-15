@@ -32,19 +32,19 @@ func RegisterRoutes(
 	walletRepo domain.WalletRepository,
 	transactionRepo domain.TransactionRepository,
 ) {
-	mux.HandleFunc("GET /v1/auth/user", authMiddleware(getUserProfileHandler(), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/google/login", googleLoginHandler(config, ulid, sessionRepo, authGateway))
-	mux.HandleFunc("GET /v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, authGateway, userRepo, sessionRepo, walletRepo))
+	mux.HandleFunc("GET /api/v1/auth/user", authMiddleware(getUserProfileHandler(), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/google/login", googleLoginHandler(config, ulid, sessionRepo, authGateway))
+	mux.HandleFunc("GET /api/v1/auth/google/callback", googleLoginCallbackHandler(config, ulid, authGateway, userRepo, sessionRepo, walletRepo))
 
-	mux.HandleFunc("GET /v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, ulid, sessionRepo, authGateway), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, ulid, sessionRepo, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, authGateway), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
-	mux.HandleFunc("GET /v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
-	mux.HandleFunc("POST /v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -76,7 +76,7 @@ func googleLoginHandler(config commonDomain.AppConfig, ulid commonDomain.ULIDGen
 			return
 		}
 
-		url, err := authServer.GetLoginUrl("google", config.ApiUrl+"/v1/auth/google/callback", []string{}, stateID)
+		url, err := authServer.GetLoginUrl("google", config.ApiUrl+"/api/v1/auth/google/callback", []string{}, stateID)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -228,7 +228,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 			return
 		}
 
-		redirectUrl, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
+		redirectUrl, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -255,7 +255,7 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 // redirects user to Microsoft login page and request access to *read* mail
 func outlookLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
+		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
