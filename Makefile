@@ -12,9 +12,14 @@ help:
 # Build API Server
 build-api:
 	@echo "Building Lambda function..."
-	@docker compose up --build --remove-orphans --quiet-pull build-api
+	@docker compose up --remove-orphans --quiet-pull build-api
+
+# Build SPA
+build-spa:
+	@echo "Building SPA..."
+	@docker compose up --quiet-pull build-spa
 
 # Deploy
-deploy: build-api
+deploy: build-api build-spa
 	@echo "Deploying project..."
-	@docker compose up --build --remove-orphans --quiet-pull deploy
+	@docker compose up --remove-orphans --quiet-pull deploy
