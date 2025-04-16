@@ -17,7 +17,7 @@ func (r *PgxMailCredentialRepository) Save(ctx context.Context, ID, userID, wall
 		ctx,
 		`INSERT INTO mail_credentials (id, user_id, wallet_id, mail_provider, mail_address, access_token, refresh_token, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (wallet_id, mail_address) DO UPDATE SET access_token = $5, refresh_token = $6`,
+		ON CONFLICT (wallet_id, mail_address) DO UPDATE SET access_token = $6, refresh_token = $7`,
 		ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken, expiresAt)
 	if err != nil {
 		return err
