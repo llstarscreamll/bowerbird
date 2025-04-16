@@ -20,8 +20,11 @@ func (g MailGateway) SearchFromDateAndSenders(ctx context.Context, provider stri
 	return p.SearchByDateRangeAndSenders(ctx, tokens, startDate, senders)
 }
 
-func NewMailGateway(googleMail domain.MailProvider) *MailGateway {
-	return &MailGateway{strategies: map[string]domain.MailProvider{
-		"google": googleMail,
-	}}
+func NewMailGateway(providers ...domain.MailProvider) *MailGateway {
+	providersMap := make(map[string]domain.MailProvider)
+	for _, provider := range providers {
+		providersMap[provider.Name()] = provider
+	}
+
+	return &MailGateway{strategies: providersMap}
 }

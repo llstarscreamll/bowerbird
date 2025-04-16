@@ -23,4 +23,5 @@ type MailGateway interface {
 
 type MailProvider interface {
 	SearchByDateRangeAndSenders(ctx context.Context, tokens Tokens, startDate time.Time, senders []string) ([]MailMessage, error)
+	Name() string
 }

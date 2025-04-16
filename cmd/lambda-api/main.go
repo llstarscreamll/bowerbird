@@ -179,7 +179,13 @@ func setUpAPIServer() {
 		config.GoogleOAuthRedirectUrl,
 		ulid,
 	)
-	mailGateway := authInfra.NewMailGateway(gMailProvider)
+	outlookProvider := authInfra.NewOutlookProvider(
+		config.MicrosoftClientID,
+		config.MicrosoftClientSecret,
+		config.MicrosoftOAuthRedirectUrl,
+		ulid,
+	)
+	mailGateway := authInfra.NewMailGateway(gMailProvider, outlookProvider)
 
 	fmt.Println("Services initialized")
 

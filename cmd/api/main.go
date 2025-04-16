@@ -55,7 +55,14 @@ func main() {
 		os.Getenv("GOOGLE_OAUTH_REDIRECT_URL"),
 		ulid,
 	)
-	mailGateway := authInfra.NewMailGateway(gMailProvider)
+
+	outlookProvider := authInfra.NewOutlookProvider(
+		os.Getenv("MICROSOFT_CLIENT_ID"),
+		os.Getenv("MICROSOFT_CLIENT_SECRET"),
+		os.Getenv("MICROSOFT_OAUTH_REDIRECT_URL"),
+		ulid,
+	)
+	mailGateway := authInfra.NewMailGateway(gMailProvider, outlookProvider)
 
 	mux := http.NewServeMux()
 

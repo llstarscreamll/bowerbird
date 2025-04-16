@@ -121,6 +121,10 @@ func (g GMailProvider) getMessageDetail(mail *gmail.Service, messageID string) (
 	return message, nil
 }
 
+func (g GMailProvider) Name() string {
+	return "google"
+}
+
 func NewGMailProvider(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GMailProvider {
 	config := &oauth2.Config{
 		ClientID:     clientID,
