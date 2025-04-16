@@ -1,6 +1,7 @@
 import { Store } from '@ngrx/store';
+
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Component, inject, OnInit } from '@angular/core';
 
 import * as auth from './ngrx/auth';
 
