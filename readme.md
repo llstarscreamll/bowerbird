@@ -19,6 +19,10 @@ These are some topics to have in mind to deploy this project in a production env
 - Create an Azure account
 - Create and setup outlook read only messages for an Azure Entra application and get the client ID and secret.
 
+Check the next links to remove permissions from identity providers platforms:
+
+- https://account.live.com/consent/Manage
+
 ## Deploy
 
 ```bash
