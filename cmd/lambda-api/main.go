@@ -173,7 +173,7 @@ func setUpAPIServer() {
 
 	authServerGateway := authInfra.NewAuthServerGateway(googleAuth, microsoftAuth)
 
-	gMailProvider := authInfra.NewGoogleMailProvider(
+	gMailProvider := authInfra.NewGMailProvider(
 		config.GoogleClientID,
 		config.GoogleClientSecret,
 		config.GoogleOAuthRedirectUrl,

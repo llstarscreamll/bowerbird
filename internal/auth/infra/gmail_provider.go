@@ -15,12 +15,12 @@ import (
 	"google.golang.org/api/option"
 )
 
-type GoogleMailProvider struct {
+type GMailProvider struct {
 	config *oauth2.Config
 	ulid   commonDomain.ULIDGenerator
 }
 
-func (g GoogleMailProvider) SearchByDateRangeAndSenders(ctx context.Context, tokens domain.Tokens, startDate time.Time, senders []string) ([]domain.MailMessage, error) {
+func (g GMailProvider) SearchByDateRangeAndSenders(ctx context.Context, tokens domain.Tokens, startDate time.Time, senders []string) ([]domain.MailMessage, error) {
 	var result []domain.MailMessage
 
 	oauthToken := &oauth2.Token{AccessToken: tokens.AccessToken, RefreshToken: tokens.RefreshToken, Expiry: tokens.ExpiresAt}
@@ -55,7 +55,7 @@ func (g GoogleMailProvider) SearchByDateRangeAndSenders(ctx context.Context, tok
 	return result, nil
 }
 
-func (g GoogleMailProvider) listMessages(mail *gmail.Service, startDate time.Time, senders []string) ([]string, error) {
+func (g GMailProvider) listMessages(mail *gmail.Service, startDate time.Time, senders []string) ([]string, error) {
 	var result []string
 	from := strings.Join(senders, " OR from:")
 	query := fmt.Sprintf("after:%s AND from:%s", startDate.Format("01/02/2006"), from)
@@ -76,7 +76,7 @@ func (g GoogleMailProvider) listMessages(mail *gmail.Service, startDate time.Tim
 	return result, nil
 }
 
-func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID string) (domain.MailMessage, error) {
+func (g GMailProvider) getMessageDetail(mail *gmail.Service, messageID string) (domain.MailMessage, error) {
 	message := domain.MailMessage{}
 
 	msg, err := mail.Users.Messages.Get("me", messageID).Format("full").Do()
@@ -121,7 +121,7 @@ func (g GoogleMailProvider) getMessageDetail(mail *gmail.Service, messageID stri
 	return message, nil
 }
 
-func NewGoogleMailProvider(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GoogleMailProvider {
+func NewGMailProvider(clientID, clientSecret, redirectUrl string, ulid commonDomain.ULIDGenerator) *GMailProvider {
 	config := &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -130,5 +130,5 @@ func NewGoogleMailProvider(clientID, clientSecret, redirectUrl string, ulid comm
 		Scopes:       []string{gmail.GmailReadonlyScope},
 	}
 
-	return &GoogleMailProvider{config: config, ulid: ulid}
+	return &GMailProvider{config: config, ulid: ulid}
 }

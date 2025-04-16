@@ -410,10 +410,6 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 		}
 
 		for _, c := range mailCredentials {
-			if c.MailProvider != "google" {
-				continue
-			}
-
 			decryptedAccessToken, err := crypt.DecryptString(c.AccessToken)
 			if err != nil {
 				log.Printf("Error decoding mail access token: %s", err.Error())
