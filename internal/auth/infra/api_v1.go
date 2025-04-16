@@ -285,7 +285,7 @@ func outlookLoginHandler(provider string, config commonDomain.AppConfig, ulid co
 
 		fmt.Println("Outlook OAuth State: ", state)
 
-		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, state)
+		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"Mail.Read", "User.Read", "openid", "profile", "email"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
