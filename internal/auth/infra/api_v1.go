@@ -285,7 +285,7 @@ func outlookLoginHandler(provider string, config commonDomain.AppConfig, ulid co
 
 		fmt.Println("Outlook OAuth State: ", state)
 
-		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"Mail.Read", "User.Read", "openid", "profile", "email"}, state)
+		redirectUrl, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"user.readbasic.all", "mail.read", "user.read", "openid", "profile", "email"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -293,7 +293,19 @@ func outlookLoginHandler(provider string, config commonDomain.AppConfig, ulid co
 			return
 		}
 
-		http.Redirect(w, r, url, http.StatusFound)
+		parsedUrl, err := url.Parse(redirectUrl)
+		if err != nil {
+			log.Printf("Error parsing login url: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error parsing login url -> "+err.Error())
+			return
+		}
+
+		query := parsedUrl.Query()
+		query.Set("prompt", "consent")
+		parsedUrl.RawQuery = query.Encode()
+
+		http.Redirect(w, r, parsedUrl.String(), http.StatusFound)
 	}
 }
 
@@ -341,6 +353,8 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
+		fmt.Printf("%s provider tokens: %+v \n", provider, tokens)
+
 		encryptedAccessToken, err := crypt.EncryptString(tokens.AccessToken)
 		if err != nil {
 			log.Printf("Error securing access token: %s", err.Error())
@@ -348,8 +362,6 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error securing access token -> "+err.Error())
 			return
 		}
-
-		fmt.Println("Callback refresh token: ", tokens.RefreshToken)
 
 		encryptedRefreshToken, err := crypt.EncryptString(tokens.RefreshToken)
 		if err != nil {
