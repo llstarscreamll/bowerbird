@@ -39,7 +39,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/auth/google-mail/login", authMiddleware(gMailLoginHandler("google", config, ulid, sessionRepo, authGateway), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/auth/google-mail/callback", authMiddleware(mailLoginCallbackHandler("google", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /api/v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, authGateway), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, ulid, authGateway, sessionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
@@ -253,9 +253,39 @@ func gMailLoginHandler(provider string, config commonDomain.AppConfig, ulid comm
 }
 
 // redirects user to Microsoft login page and request access to *read* mail
-func outlookLoginHandler(provider string, config commonDomain.AppConfig, authServer domain.AuthServerGateway) http.HandlerFunc {
+func outlookLoginHandler(provider string, config commonDomain.AppConfig, ulid commonDomain.ULIDGenerator, authServer domain.AuthServerGateway, sessionRepo domain.SessionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, "state")
+		walletID := strings.Trim(r.URL.Query().Get("wallet_id"), " ")
+		if walletID == "" {
+			log.Printf("Error getting walletID from query params, walletID is empty")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"Wallet ID is empty"}]}`)
+			return
+		}
+
+		sessionExpirationDate := time.Now().Add(time.Minute * 10)
+		state, err := ulid.NewFromDate(sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error generating state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error generating state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+
+		state = state + "-" + walletID
+		err = sessionRepo.Save(r.Context(), state, authUser.ID, sessionExpirationDate)
+		if err != nil {
+			log.Printf("Error storing state: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Error storing state","detail":%q}]}`, err.Error())
+			return
+		}
+
+		fmt.Println("Outlook OAuth State: ", state)
+
+		url, err := authServer.GetLoginUrl(provider, config.ApiUrl+"/api/v1/auth/microsoft/callback", []string{"https://graph.microsoft.com/Mail.Read", "https://graph.microsoft.com/User.Read"}, state)
 		if err != nil {
 			log.Printf("Error getting auth server login url: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
