@@ -426,7 +426,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 		}
 
 		for _, c := range mailCredentials {
-			if c.MailProvider != "google" {
+			if c.MailProvider != "microsoft" {
 				continue
 			}
 
@@ -454,6 +454,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				startOfMonth,
 				[]string{"nu@nu.com.co"},
 			)
+
 			if err != nil {
 				log.Printf("Error getting mails from provider "+c.MailProvider+": %s", err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
@@ -466,17 +467,11 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			}
 
 			err = mailMessageRepo.UpsertMany(r.Context(), mailMessages)
+
 			if err != nil {
 				log.Printf("Error persisting mails on storage: %s", err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error persisting mails on storage -> "+err.Error())
-				return
-			}
-
-			if err != nil {
-				log.Printf("Error getting wallet from storage: %s", err.Error())
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallet from storage -> "+err.Error())
 				return
 			}
 
@@ -499,6 +494,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			}
 
 			err = transactionRepo.UpsertMany(r.Context(), transactions)
+
 			if err != nil {
 				log.Printf("Error persisting transactions on storage: %s", err.Error())
 				w.WriteHeader(http.StatusInternalServerError)

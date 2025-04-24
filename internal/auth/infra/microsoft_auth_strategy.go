@@ -71,7 +71,7 @@ func (m MicrosoftAuthStrategy) GetUserProfile(ctx context.Context, accessToken s
 		return domain.User{}, err
 	}
 
-	fmt.Printf("Microsoft user info: %s", string(body))
+	fmt.Printf("Microsoft user info: %s\n", string(body))
 
 	err = json.Unmarshal(body, &microsoftUser)
 	if err != nil {
