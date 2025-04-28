@@ -13,11 +13,26 @@
   <h1 class="text-xl font-bold">Detalle de transacción</h1>
 </div>
 
-<div class="px-5" *ngIf="transaction$ | async as transaction">
+<div class="px-5 mt-12" *ngIf="transaction$ | async as transaction">
   <div class="bg-white rounded-lg shadow py-3 px-4 text-center">
+    <button
+      #categoryDropdownButton
+      id="categoryDropdownButton"
+      type="button"
+      data-dropdown-toggle="category-dropdown"
+      class="cursor-pointer focus:ring-4 focus:ring-pink-300 font-medium text-sm px-4 py-2.5 -mt-16 m-auto flex flex-col items-center gap-2"
+    >
+      <div class="rounded-full bg-white h-20 w-20 shadow-md flex items-center justify-center">
+        <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem', 'color': transaction.categoryColor}">
+          {{ transaction.categoryIcon || 'help' }}
+        </span>
+      </div>
+      <div class="text-cm font-light">{{ transaction.categoryName || 'Sin categoría' }}</div>
+    </button>
+
     <div
       [ngClass]="{'text-rose-500': transaction.type === 'expense', 'text-emerald-500': transaction.type !== 'expense'}"
-      class="text-3xl font-bold"
+      class="text-4xl font-bold"
     >
       {{ transaction.amount | number }}
     </div>
@@ -26,46 +41,31 @@
 
     <p class="mt-4">{{ transaction.systemDescription }}</p>
 
-    <button
-      id="categoryDropdownButton"
-      type="button"
-      data-dropdown-toggle="category-dropdown"
-      class="cursor-pointer hover:bg-slate-50 border border-gray-300 focus:ring-4 focus:ring-pink-300 font-medium rounded text-sm px-4 py-2.5 mt-5 text-center inline-flex items-center"
-    >
-      Sin categoría
-      <svg
-        class="w-2.5 h-2.5 ms-3"
-        aria-hidden="true"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 10 6"
-      >
-        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
-      </svg>
-    </button>
-
     <div
+      #categoryDropdown
       id="category-dropdown"
       class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 dark:bg-gray-700 text-left"
     >
       <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="categoryDropdownButton">
         <li *ngFor="let category of categories$ | async">
-          <a
-            [style.color]="category.color"
-            href="#"
-            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+          <button
+            type="button"
+            (click)="updateCategory(transaction, category.ID)"
+            class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white flex items-center w-full"
           >
-            {{ category.name }}
-          </a>
+            <span class="material-symbols-outlined"> {{ category.icon }} </span>
+            <div class="ml-2">{{ category.name }}</div>
+          </button>
         </li>
       </ul>
 
       <div class="py-2">
         <a
           [routerLink]="['/wallets', walletID, 'categories', 'create']"
-          class="block text-sm px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+          class="text-sm px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white flex items-center"
         >
-          Crear categoría
+          <span class="material-symbols-outlined"> add </span>
+          <span class="ml-2"> Crear categoría </span>
         </a>
       </div>
     </div>

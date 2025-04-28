@@ -89,21 +89,52 @@ func (r *PgxTransactionRepository) GetByWalletIDAndID(ctx context.Context, walle
 				transactions.user_description,
 				transactions.system_description,
 				transactions.processed_at,
-				transactions.created_at
+				transactions.created_at,
+				categories.name as category_name,
+				categories.color as category_color,
+				categories.icon as category_icon,
+				categories.id as category_id
 		FROM transactions
 		INNER JOIN users ON transactions.user_id = users.id
+		LEFT JOIN categories ON transactions.category_id = categories.id
 		WHERE transactions.wallet_id = $1 AND transactions.id = $2`,
 		walletID, transactionID,
 	)
 
 	var t domain.Transaction
-	err := row.Scan(&t.ID, &t.WalletID, &t.UserID, &t.UserName, &t.Origin, &t.Reference, &t.Type, &t.Amount, &t.UserDescription, &t.SystemDescription, &t.ProcessedAt, &t.CreatedAt)
+	err := row.Scan(&t.ID,
+		&t.WalletID,
+		&t.UserID,
+		&t.UserName,
+		&t.Origin,
+		&t.Reference,
+		&t.Type,
+		&t.Amount,
+		&t.UserDescription,
+		&t.SystemDescription,
+		&t.ProcessedAt,
+		&t.CreatedAt,
+		&t.CategoryName,
+		&t.CategoryColor,
+		&t.CategoryIcon,
+		&t.CategoryID,
+	)
 
 	if err != nil {
 		return domain.Transaction{}, err
 	}
 
 	return t, nil
+}
+
+func (r *PgxTransactionRepository) Update(ctx context.Context, transaction domain.Transaction) error {
+	_, err := r.pool.Exec(
+		ctx,
+		`UPDATE transactions SET category_id = $1 WHERE id = $2 AND wallet_id = $3`,
+		transaction.CategoryID, transaction.ID, transaction.WalletID,
+	)
+
+	return err
 }
 
 func NewPgxTransactionRepository(pool *pgxpool.Pool) *PgxTransactionRepository {

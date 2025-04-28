@@ -67,6 +67,10 @@ export const actions = createActionGroup({
     'create category': props<{ walletID: string; category: Category }>(),
     'create category ok': props<{ response: string }>(),
     'create category error': props<{ error: HttpErrorResponse }>(),
+
+    'update transaction': props<{ walletID: string; transactionID: string; transaction: Transaction }>(),
+    'update transaction ok': props<{ walletID: string; transactionID: string }>(),
+    'update transaction error': props<{ error: HttpErrorResponse }>(),
   },
 });
 
@@ -92,12 +96,16 @@ export const reducer = createReducer(
   on(actions.createCategory, (state) => ({ ...state, status: Status.loading })),
   on(actions.createCategoryOk, (state) => ({ ...state, status: Status.ok })),
   on(actions.createCategoryError, (state, { error }) => ({ ...state, error, status: Status.error })),
+
+  on(actions.updateTransaction, (state) => ({ ...state, status: Status.loading })),
+  on(actions.updateTransactionOk, (state) => ({ ...state, status: Status.ok })),
+  on(actions.updateTransactionError, (state, { error }) => ({ ...state, error, status: Status.error })),
 );
 
 export const getFinanceState = createFeatureSelector<State>('finance');
 export const getSelectedWallet = createSelector(getFinanceState, (state: State) => state.selectedWallet);
 export const getTransactions = createSelector(getFinanceState, (state: State) => state.transactions);
-export const getTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
+export const getSelectedTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
 export const getCategories = createSelector(getFinanceState, (state: State) => state.categories);
 
 @Injectable()
@@ -208,5 +216,24 @@ export class Effects {
         }),
       ),
     { dispatch: false },
+  );
+
+  updateTransaction$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.updateTransaction),
+      switchMap(({ walletID, transactionID, transaction }) =>
+        this.walletService.updateTransaction(walletID, transactionID, transaction).pipe(
+          map(() => actions.updateTransactionOk({ walletID, transactionID })),
+          catchError((error) => of(actions.updateTransactionError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  updateTransactionSuccess$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.updateTransactionOk),
+      map(({ walletID, transactionID }) => actions.getTransaction({ walletID, transactionID })),
+    ),
   );
 }

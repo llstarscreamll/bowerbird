@@ -46,4 +46,10 @@ export class WalletService {
       .post<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/categories`, category)
       .pipe(map((r) => r.data));
   }
+
+  updateTransaction(walletID: string, transactionID: string, transaction: Transaction) {
+    return this.httpClient
+      .patch<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/${transactionID}`, transaction)
+      .pipe(map((r) => r.data));
+  }
 }

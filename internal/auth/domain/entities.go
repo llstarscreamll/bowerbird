@@ -53,6 +53,10 @@ type Transaction struct {
 	ID                string    `json:"ID"`
 	WalletID          string    `json:"walletID"`
 	UserID            string    `json:"userID"`
+	CategoryID        string    `json:"categoryID"`
+	CategoryName      string    `json:"categoryName"`
+	CategoryColor     string    `json:"categoryColor"`
+	CategoryIcon      string    `json:"categoryIcon"`
 	UserName          string    `json:"userName"`
 	Origin            string    `json:"origin"`
 	Reference         string    `json:"reference"`

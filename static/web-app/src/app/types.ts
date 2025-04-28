@@ -18,6 +18,10 @@ export type Transaction = {
   walletID: string;
   userID: string;
   userName: string;
+  categoryID: string;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
   origin: string;
   reference: string;
   type: string;

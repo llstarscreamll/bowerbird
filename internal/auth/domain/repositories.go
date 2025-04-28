@@ -34,6 +34,7 @@ type TransactionRepository interface {
 	UpsertMany(ctx context.Context, transactions []Transaction) error
 	FindByWalletID(ctx context.Context, walletID string) ([]Transaction, error)
 	GetByWalletIDAndID(ctx context.Context, walletID, transactionID string) (Transaction, error)
+	Update(ctx context.Context, transaction Transaction) error
 }
 
 type CategoryRepository interface {

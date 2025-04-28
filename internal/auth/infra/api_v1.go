@@ -47,6 +47,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("PATCH /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(updateTransaction(walletRepo, transactionRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/categories", authMiddleware(searchWalletCategoriesHandler(walletRepo, categoryRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/categories", authMiddleware(createCategoryHandler(ulid, walletRepo, categoryRepo), sessionRepo, userRepo))
@@ -722,6 +723,55 @@ func createCategoryHandler(ulid commonDomain.ULIDGenerator, walletRepo domain.Wa
 			log.Printf("Error creating category: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error creating category -> "+err.Error())
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":"ok"}`)
+	}
+}
+
+func updateTransaction(walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		transactionID := r.PathValue("transactionID")
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		userWallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
+		}
+
+		walletBelongsToUser := slices.ContainsFunc(userWallets, func(w domain.UserWallet) bool {
+			return w.ID == walletID
+		})
+
+		if !walletBelongsToUser {
+			log.Printf("Error wallet does not belong to user")
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, `{"errors":[{"status":"403","title":"Forbidden","detail":%q}]}`, "Wallet does not belong to user")
+			return
+		}
+
+		var transaction domain.Transaction
+		err = json.NewDecoder(r.Body).Decode(&transaction)
+		if err != nil {
+			log.Printf("Error decoding transaction from JSON: %s", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Error decoding transaction from JSON -> "+err.Error())
+			return
+		}
+
+		transaction.ID = transactionID
+		transaction.WalletID = walletID
+
+		err = transactionRepo.Update(r.Context(), transaction)
+		if err != nil {
+			log.Printf("Error updating transaction: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error updating transaction -> "+err.Error())
 			return
 		}
 

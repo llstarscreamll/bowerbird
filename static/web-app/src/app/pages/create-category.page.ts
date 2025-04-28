@@ -24,6 +24,7 @@ export class CreateCategoryPage implements AfterViewInit {
 
   @ViewChild('dropdownSearch') dropdownSearch!: ElementRef;
   @ViewChild('dropdownSearchButton') dropdownSearchButton!: ElementRef;
+
   iconsDropdown: Dropdown | null = null;
   categoryForm = this.fb.group({
     name: ['', Validators.required],
