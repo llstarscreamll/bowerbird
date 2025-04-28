@@ -119,10 +119,10 @@ func (r *PgxTransactionRepository) GetByWalletIDAndID(ctx context.Context, walle
 				transactions.system_description,
 				transactions.processed_at,
 				transactions.created_at,
-				categories.name as category_name,
-				categories.color as category_color,
-				categories.icon as category_icon,
-				categories.id as category_id
+				COALESCE(categories.name, '') as category_name,
+				COALESCE(categories.color, '') as category_color,
+				COALESCE(categories.icon, '') as category_icon,
+				COALESCE(categories.id, '') as category_id
 		FROM transactions
 		INNER JOIN users ON transactions.user_id = users.id
 		LEFT JOIN categories ON transactions.category_id = categories.id
