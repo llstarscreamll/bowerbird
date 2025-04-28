@@ -52,7 +52,7 @@ export const actions = createActionGroup({
     'sync transactions from email': props<{ walletID: string }>(),
 
     'get transactions': props<{ walletID: string }>(),
-    'get transactions ok': props<{ transactions: any[] }>(),
+    'get transactions ok': props<{ transactions: Transaction[] }>(),
     'get transactions error': props<{ error: HttpErrorResponse }>(),
 
     'get transaction': props<{ walletID: string; transactionID: string }>(),
@@ -137,13 +137,6 @@ export class Effects {
     this.actions$.pipe(
       ofType(actions.getWalletsOk),
       map(({ wallets }) => actions.setSelectedWallet({ wallet: wallets[0] })),
-    ),
-  );
-
-  getWalletTransactions$ = createEffect(() =>
-    this.actions$.pipe(
-      ofType(actions.setSelectedWallet),
-      map(({ wallet }) => actions.getTransactions({ walletID: wallet.ID })),
     ),
   );
 

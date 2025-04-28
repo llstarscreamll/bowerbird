@@ -1,6 +1,6 @@
 import { initFlowbite } from 'flowbite';
 
-import { tap } from 'rxjs';
+import { Observable, filter, take, tap } from 'rxjs';
 
 import { Store } from '@ngrx/store';
 
@@ -11,6 +11,7 @@ import { RouterModule } from '@angular/router';
 import { getUser } from '@app/ngrx/auth';
 import * as finance from '@app/ngrx/finance';
 import { FlowbiteService } from '@app/services/flowbite.service';
+import { Wallet } from '@app/types';
 import { environment } from '@env/environment';
 
 @Component({
@@ -18,22 +19,26 @@ import { environment } from '@env/environment';
   selector: 'app-dashboard-page',
   templateUrl: './dashboard.page.html',
 })
-export class DashboardPageComponent implements AfterViewInit {
+export class DashboardPageComponent implements AfterViewInit, OnInit {
   private store = inject(Store);
   private flowbite = inject(FlowbiteService);
 
   user$ = this.store.select(getUser);
-  selectedWallet$ = this.store
-    .select(finance.getSelectedWallet)
-    .pipe(tap((w) => (this.selectedWalletID = w?.ID || '')));
+  selectedWallet$!: Observable<Wallet | null>;
   transactions$ = this.store.select(finance.getTransactions);
 
   selectedWalletID: string = '';
-  walletMenuIsOpen = false;
   apiUrl = environment.apiBaseUrl;
+
+  ngOnInit(): void {
+    this.selectedWallet$ = this.store
+      .select(finance.getSelectedWallet)
+      .pipe(tap((w) => (this.selectedWalletID = w?.ID || '')));
+  }
 
   ngAfterViewInit(): void {
     this.flowbite.load(() => initFlowbite());
+    this.store.dispatch(finance.actions.getTransactions({ walletID: this.selectedWalletID }));
   }
 
   syncWalletTransactionsWithEmails() {
