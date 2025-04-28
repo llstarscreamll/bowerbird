@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/microsoft"
 	"google.golang.org/api/gmail/v1"
 )
 
@@ -24,7 +24,7 @@ func (g OutlookProvider) SearchByDateRangeAndSenders(ctx context.Context, tokens
 	var result []domain.MailMessage
 
 	url := fmt.Sprintf(
-		"https://graph.microsoft.com/v1.0/me/messages?$filter=from/emailAddress/address eq '%s' AND receivedDateTime ge %s&$top=2",
+		"https://graph.microsoft.com/v1.0/me/messages?$filter=from/emailAddress/address eq '%s' AND receivedDateTime ge %s&$top=100",
 		strings.Join(senders, "' OR from/emailAddress/address eq '"),
 		startDate.Format(time.RFC3339),
 	)
@@ -39,7 +39,7 @@ func (g OutlookProvider) SearchByDateRangeAndSenders(ctx context.Context, tokens
 			return nil, err
 		}
 
-		slices.Concat(result, messages)
+		result = slices.Concat(result, messages)
 
 		url = nextLink
 	}
@@ -76,7 +76,8 @@ func (g OutlookProvider) getMessages(ctx context.Context, url string, tokens dom
 
 	for _, message := range response.Value {
 		result = append(result, domain.MailMessage{
-			ID:         message.ID,
+			ID:         g.ulid.New(),
+			ExternalID: message.ID,
 			From:       message.From.EmailAddress.Address,
 			To:         message.ToRecipients[0].EmailAddress.Address,
 			Subject:    message.Subject,
@@ -112,7 +113,7 @@ type messagesResponse struct {
 			Content     string `json:"content"`
 			ContentType string `json:"contentType"`
 		} `json:"body"`
-		HasAttachments       time.Time `json:"hasAttachments"`
+		HasAttachments       bool      `json:"hasAttachments"`
 		IsRead               bool      `json:"isRead"`
 		ReceivedDateTime     time.Time `json:"receivedDateTime"`
 		CreatedDateTime      time.Time `json:"createdDateTime"`
@@ -127,7 +128,7 @@ func NewOutlookProvider(clientID, clientSecret, redirectUrl string, ulid commonD
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		RedirectURL:  redirectUrl,
-		Endpoint:     google.Endpoint,
+		Endpoint:     microsoft.AzureADEndpoint(""),
 		Scopes:       []string{gmail.GmailReadonlyScope},
 	}
 
