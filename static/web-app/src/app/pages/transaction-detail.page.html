@@ -23,10 +23,16 @@
     </div>
 
     <p class="text-sm text-gray-500">{{ transaction.processedAt | date:'mediumDate' }}</p>
-    <p class="text-md mt-4">{{ transaction.systemDescription }}</p>
 
-    <div class="mt-6 flex items-center gap-2 text-sm text-gray-400">
-      <div class="text-left w-1/2"></div>
+    <p class="mt-4">{{ transaction.systemDescription }}</p>
+
+    <div class="mt-7 flex items-center gap-2 text-sm text-gray-400">
+      <div class="text-left w-1/2">
+        <ng-container [ngSwitch]="transaction.origin">
+          <span *ngSwitchCase="'nu-bank-email'" class="bg-purple-500 text-white px-2 py-1 rounded-md">Nu Bank</span>
+          <span *ngSwitchDefault class="bg-green-500 text-white px-2 py-1 rounded-md">Cash</span>
+        </ng-container>
+      </div>
       <div class="text-right w-1/2">{{ transaction.userName }}</div>
     </div>
   </div>
