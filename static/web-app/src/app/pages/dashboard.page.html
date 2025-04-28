@@ -12,11 +12,7 @@
     </svg>
   </button>
 
-  <div class="grow">
-    <button (click)="syncWalletTransactionsWithEmails()" class="pl-4 text-sm text-gray-700" type="button">
-      Sync now
-    </button>
-  </div>
+  <div class="grow"></div>
 
   <div *ngIf="user$ | async">
     <img
@@ -45,6 +41,15 @@
         class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
         >Sync with Outlook</a
       >
+    </li>
+    <li>
+      <button
+        (click)="syncWalletTransactionsWithEmails()"
+        class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+        type="button"
+      >
+        Sync now
+      </button>
     </li>
   </ul>
 </div>
