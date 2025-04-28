@@ -6,6 +6,7 @@ import { Store } from '@ngrx/store';
 
 import { CommonModule } from '@angular/common';
 import { AfterViewInit, Component, OnInit, inject } from '@angular/core';
+import { RouterModule } from '@angular/router';
 
 import { getUser } from '@app/ngrx/auth';
 import * as finance from '@app/ngrx/finance';
@@ -13,7 +14,7 @@ import { FlowbiteService } from '@app/services/flowbite.service';
 import { environment } from '@env/environment';
 
 @Component({
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule],
   selector: 'app-dashboard-page',
   templateUrl: './dashboard.page.html',
 })

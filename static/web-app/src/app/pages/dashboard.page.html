@@ -62,7 +62,7 @@
       *ngFor="let t of transactions$ | async"
       class="flex flex-row justify-between items-center gap-2 shadow rounded-lg py-4 px-2 text-sm"
     >
-      <div class="font-light">{{ t.systemDescription }}</div>
+      <a [routerLink]="['/transaction', t.ID]" class="font-light">{{ t.systemDescription }}</a>
       <div>
         <div
           [ngClass]="{'text-red-500': t.type === 'expense', 'text-green-600': t.type !== 'expense'}"
