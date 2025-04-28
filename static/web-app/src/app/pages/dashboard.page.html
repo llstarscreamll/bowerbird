@@ -60,8 +60,21 @@
   <div class="flex flex-col gap-3 my-5">
     <div *ngFor="let t of transactions$ | async" class="shadow rounded-lg py-3 px-3 text-sm bg-white">
       <div class="flex flex-row justify-between items-center gap-2">
-        <div class="text-left mt-2">
-          <a [routerLink]="['/wallets', (selectedWallet$ | async)?.ID, 'transactions', t.ID]" class="font-light">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3rem', 'color': t.categoryColor}">
+            {{ t.categoryIcon || 'help' }}
+          </span>
+        </div>
+
+        <div class="text-left mt-2 flex-grow">
+          <a
+            [routerLink]="['/wallets', (selectedWallet$ | async)?.ID, 'transactions', t.ID]"
+            class="block font-semibold"
+          >
+            {{ t.categoryName || 'Sin categoría' }}
+          </a>
+
+          <a [routerLink]="['/wallets', (selectedWallet$ | async)?.ID, 'transactions', t.ID]" class="text-xs font-light">
             {{ t.systemDescription }}
           </a>
 

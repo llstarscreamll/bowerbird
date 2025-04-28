@@ -46,10 +46,25 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 func (r *PgxTransactionRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Transaction, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, wallet_id, user_id, origin, reference, "type", amount, user_description, system_description, processed_at, created_at
-		FROM transactions
-		WHERE wallet_id = $1
-		ORDER BY processed_at DESC
+		`SELECT t.id,
+				t.wallet_id,
+		 		t.user_id,
+		 		t.origin,
+		 		t.reference,
+		 		t."type",
+		 		t.amount,
+		 		t.user_description,
+		 		t.system_description,
+		 		t.processed_at,
+		 		t.created_at,
+		 		COALESCE(c.id, '') as category_id,
+		 		COALESCE(c.name, '') as category_name,
+		 		COALESCE(c.color, '') as category_color,
+				COALESCE(c.icon, '') as category_icon
+		FROM transactions t
+		LEFT JOIN categories c ON t.category_id = c.id
+		WHERE t.wallet_id = $1
+		ORDER BY t.processed_at DESC
 		LIMIT 100`,
 		walletID,
 	)
@@ -64,7 +79,21 @@ func (r *PgxTransactionRepository) FindByWalletID(ctx context.Context, walletID 
 	for rows.Next() {
 		t := domain.Transaction{}
 
-		err := rows.Scan(&t.ID, &t.WalletID, &t.UserID, &t.Origin, &t.Reference, &t.Type, &t.Amount, &t.UserDescription, &t.SystemDescription, &t.ProcessedAt, &t.CreatedAt)
+		err := rows.Scan(&t.ID,
+			&t.WalletID,
+			&t.UserID,
+			&t.Origin,
+			&t.Reference,
+			&t.Type,
+			&t.Amount,
+			&t.UserDescription,
+			&t.SystemDescription,
+			&t.ProcessedAt,
+			&t.CreatedAt,
+			&t.CategoryID,
+			&t.CategoryName,
+			&t.CategoryColor,
+			&t.CategoryIcon)
 		if err != nil {
 			return nil, err
 		}
