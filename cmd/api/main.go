@@ -34,7 +34,7 @@ func main() {
 	mailCredentialRepo := authInfra.NewPgxMailCredentialRepository(db)
 	walletRepo := authInfra.NewPgxWalletRepository(db)
 	transactionRepo := authInfra.NewPgxTransactionRepository(db)
-
+	categoryRepo := authInfra.NewPgxCategoryRepository(db)
 	googleAuth := *authInfra.NewGoogleAuthStrategy(
 		os.Getenv("GOOGLE_CLIENT_ID"),
 		os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -70,7 +70,7 @@ func main() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, authServerGateway, userRepo, sessionRepo, crypt, mailCredentialRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo)
+	authInfra.RegisterRoutes(mux, config, ulid, authServerGateway, userRepo, sessionRepo, crypt, mailCredentialRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, categoryRepo)
 
 	// Enable CORS
 	corsHandler := func(h http.Handler) http.Handler {

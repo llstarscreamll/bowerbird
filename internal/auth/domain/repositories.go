@@ -35,3 +35,7 @@ type TransactionRepository interface {
 	FindByWalletID(ctx context.Context, walletID string) ([]Transaction, error)
 	GetByWalletIDAndID(ctx context.Context, walletID, transactionID string) (Transaction, error)
 }
+
+type CategoryRepository interface {
+	FindByWalletID(ctx context.Context, walletID string) ([]Category, error)
+}

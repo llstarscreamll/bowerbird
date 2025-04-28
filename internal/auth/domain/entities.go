@@ -63,3 +63,10 @@ type Transaction struct {
 	ProcessedAt       time.Time `json:"processedAt"`
 	CreatedAt         time.Time `json:"createdAt"`
 }
+
+type Category struct {
+	ID       string `json:"ID"`
+	WalletID string `json:"walletID"`
+	Name     string `json:"name"`
+	Color    string `json:"color"`
+}

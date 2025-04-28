@@ -28,3 +28,9 @@ export type Transaction = {
   processedAt: string;
   createdAt: string;
 };
+
+export type Category = {
+  ID: string;
+  name: string;
+  color: string;
+};

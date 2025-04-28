@@ -10,7 +10,7 @@ import { Injectable, inject } from '@angular/core';
 
 import * as auth from '@app/ngrx/auth';
 import { WalletService } from '@app/services/wallet.service';
-import { Transaction, Wallet } from '@app/types';
+import { Category, Transaction, Wallet } from '@app/types';
 
 export enum Status {
   empty = '',
@@ -26,6 +26,7 @@ export interface State {
   transactions: Transaction[];
   error: HttpErrorResponse | null;
   transaction: Transaction | null;
+  categories: Category[];
 }
 
 export const initialState: State = {
@@ -35,6 +36,7 @@ export const initialState: State = {
   transactions: [],
   error: null,
   transaction: null,
+  categories: [],
 };
 
 export const actions = createActionGroup({
@@ -56,6 +58,10 @@ export const actions = createActionGroup({
     'get transaction ok': props<{ transaction: Transaction }>(),
     'get transaction error': props<{ error: HttpErrorResponse }>(),
     'set selected transaction': props<{ transaction: Transaction | null }>(),
+
+    'get categories': props<{ walletID: string }>(),
+    'get categories ok': props<{ categories: Category[] }>(),
+    'get categories error': props<{ error: HttpErrorResponse }>(),
   },
 });
 
@@ -65,18 +71,25 @@ export const reducer = createReducer(
   on(actions.getWalletsOk, (state, { wallets }) => ({ ...state, status: Status.ok, wallets })),
   on(actions.getWalletsError, (state, { error }) => ({ ...state, status: Status.error, error })),
   on(actions.setSelectedWallet, (state, { wallet }) => ({ ...state, selectedWallet: wallet })),
+
   on(actions.getTransactions, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionsOk, (state, { transactions }) => ({ ...state, transactions, status: Status.ok })),
+
   on(actions.getTransaction, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionOk, (state, { transaction }) => ({ ...state, transaction, status: Status.ok })),
   on(actions.getTransactionError, (state, { error }) => ({ ...state, error, status: Status.error })),
   on(actions.setSelectedTransaction, (state, { transaction }) => ({ ...state, transaction })),
+
+  on(actions.getCategories, (state) => ({ ...state, status: Status.loading })),
+  on(actions.getCategoriesOk, (state, { categories }) => ({ ...state, categories, status: Status.ok })),
+  on(actions.getCategoriesError, (state, { error }) => ({ ...state, error, status: Status.error })),
 );
 
 export const getFinanceState = createFeatureSelector<State>('finance');
 export const getSelectedWallet = createSelector(getFinanceState, (state: State) => state.selectedWallet);
 export const getTransactions = createSelector(getFinanceState, (state: State) => state.transactions);
 export const getTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
+export const getCategories = createSelector(getFinanceState, (state: State) => state.categories);
 
 @Injectable()
 export class Effects {
@@ -147,6 +160,18 @@ export class Effects {
         this.walletService.getTransaction(walletID, transactionID).pipe(
           map((transaction) => actions.getTransactionOk({ transaction })),
           catchError((error) => of(actions.getTransactionError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  getCategories$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.getCategories),
+      switchMap(({ walletID }) =>
+        this.walletService.getCategories(walletID).pipe(
+          map((categories) => actions.getCategoriesOk({ categories })),
+          catchError((error) => of(actions.getCategoriesError({ error }))),
         ),
       ),
     ),

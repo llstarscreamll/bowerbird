@@ -26,6 +26,50 @@
 
     <p class="mt-4">{{ transaction.systemDescription }}</p>
 
+    <button
+      id="selectedWalletDropdownButton"
+      type="button"
+      data-dropdown-toggle="active-wallet-dropdown"
+      class="cursor-pointer hover:bg-slate-50 border border-gray-300 focus:ring-4 focus:ring-pink-300 font-medium rounded text-sm px-4 py-2.5 mt-5 text-center inline-flex items-center"
+    >
+      Sin categoría
+      <svg
+        class="w-2.5 h-2.5 ms-3"
+        aria-hidden="true"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 10 6"
+      >
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
+      </svg>
+    </button>
+
+    <div
+      id="active-wallet-dropdown"
+      class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 dark:bg-gray-700 text-left"
+    >
+      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="selectedWalletDropdownButton">
+        <li *ngFor="let category of categories$ | async">
+          <a
+            [style.color]="category.color"
+            href="#"
+            class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+          >
+            {{ category.name }}
+          </a>
+        </li>
+      </ul>
+
+      <div class="py-2">
+        <a
+          [routerLink]="['/wallets', walletID, 'categories', 'create']"
+          class="block text-sm px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+        >
+          Crear categoría
+        </a>
+      </div>
+    </div>
+
     <div class="mt-7 flex items-center gap-2 text-sm text-gray-400">
       <div class="text-left w-1/2">
         <ng-container [ngSwitch]="transaction.origin">

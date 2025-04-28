@@ -31,6 +31,7 @@ func RegisterRoutes(
 	mailMessageRepo domain.MailMessageRepository,
 	walletRepo domain.WalletRepository,
 	transactionRepo domain.TransactionRepository,
+	categoryRepo domain.CategoryRepository,
 ) {
 	mux.HandleFunc("GET /api/v1/auth/user", authMiddleware(getUserProfileHandler(), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/auth/google/login", googleLoginHandler(config, ulid, sessionRepo, authGateway))
@@ -46,6 +47,8 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
+
+	mux.HandleFunc("GET /api/v1/wallets/{walletID}/categories", authMiddleware(searchWalletCategoriesHandler(walletRepo, categoryRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -630,5 +633,47 @@ func getTransactionHandler(walletRepo domain.WalletRepository, transactionRepo d
 		}
 
 		fmt.Fprintf(w, `{"data":%s}`, transactionJSON)
+	}
+}
+
+func searchWalletCategoriesHandler(walletRepo domain.WalletRepository, categoryRepo domain.CategoryRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		if walletID == "" {
+			log.Printf("Error getting walletID from path params")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Wallet ID is not valid")
+			return
+		}
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		userWallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		walletBelongsToUser := slices.ContainsFunc(userWallets, func(w domain.UserWallet) bool {
+			return w.ID == walletID
+		})
+
+		if !walletBelongsToUser {
+			log.Printf("Error wallet does not belong to user")
+		}
+
+		categories, err := categoryRepo.FindByWalletID(r.Context(), walletID)
+		if err != nil {
+			log.Printf("Error getting categories from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting categories from storage -> "+err.Error())
+			return
+		}
+
+		categoriesJSON, err := json.Marshal(categories)
+		if err != nil {
+			log.Printf("Error encoding categories to JSON: %s", err.Error())
+		}
+
+		fmt.Fprintf(w, `{"data":%s}`, categoriesJSON)
 	}
 }

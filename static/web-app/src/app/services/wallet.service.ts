@@ -3,7 +3,7 @@ import { map } from 'rxjs/operators';
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-import { Transaction, User, Wallet } from '@app/types';
+import { Category, Transaction, User, Wallet } from '@app/types';
 import { environment } from '@env/environment';
 
 @Injectable({
@@ -26,6 +26,12 @@ export class WalletService {
   getTransaction(walletID: string, transactionID: string) {
     return this.httpClient
       .get<{ data: Transaction }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/${transactionID}`)
+      .pipe(map((r) => r.data));
+  }
+
+  getCategories(walletID: string) {
+    return this.httpClient
+      .get<{ data: Category[] }>(`${this.apiUrl}/v1/wallets/${walletID}/categories`)
       .pipe(map((r) => r.data));
   }
 
