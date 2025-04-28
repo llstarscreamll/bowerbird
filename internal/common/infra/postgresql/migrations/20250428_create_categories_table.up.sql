@@ -3,6 +3,7 @@ CREATE TABLE categories (
     wallet_id VARCHAR(26) NOT NULL,
     name VARCHAR(100) NOT NULL,
     color VARCHAR(7) NOT NULL,
+    icon VARCHAR(100) NOT NULL,
     created_by_id VARCHAR(26) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

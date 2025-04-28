@@ -69,4 +69,5 @@ type Category struct {
 	WalletID string `json:"walletID"`
 	Name     string `json:"name"`
 	Color    string `json:"color"`
+	Icon     string `json:"icon"`
 }
