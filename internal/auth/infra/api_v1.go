@@ -157,7 +157,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 
 		// if the user does not exists, then create the default wallet to him
 		if id == user.ID {
-			err := walletRepo.Create(r.Context(), domain.UserWallet{ID: ulid.New(), UserID: id, Name: "Main", Role: "owner", JoinedAt: time.Now(), CreatedAt: time.Now()})
+			err := walletRepo.Create(r.Context(), domain.UserWallet{ID: ulid.New(), UserID: id, Name: "My wallet", Role: "owner", JoinedAt: time.Now(), CreatedAt: time.Now()})
 
 			if err != nil {
 				log.Printf("Error creating default wallet for user: %s", err.Error())
