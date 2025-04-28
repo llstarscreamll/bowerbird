@@ -1,5 +1,5 @@
 import { of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { createActionGroup, createReducer, emptyProps, on, props } from '@ngrx/store';
@@ -7,6 +7,7 @@ import { createFeatureSelector, createSelector } from '@ngrx/store';
 
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 
 import * as auth from '@app/ngrx/auth';
 import { WalletService } from '@app/services/wallet.service';
@@ -62,6 +63,10 @@ export const actions = createActionGroup({
     'get categories': props<{ walletID: string }>(),
     'get categories ok': props<{ categories: Category[] }>(),
     'get categories error': props<{ error: HttpErrorResponse }>(),
+
+    'create category': props<{ walletID: string; category: Category }>(),
+    'create category ok': props<{ response: string }>(),
+    'create category error': props<{ error: HttpErrorResponse }>(),
   },
 });
 
@@ -83,6 +88,10 @@ export const reducer = createReducer(
   on(actions.getCategories, (state) => ({ ...state, status: Status.loading })),
   on(actions.getCategoriesOk, (state, { categories }) => ({ ...state, categories, status: Status.ok })),
   on(actions.getCategoriesError, (state, { error }) => ({ ...state, error, status: Status.error })),
+
+  on(actions.createCategory, (state) => ({ ...state, status: Status.loading })),
+  on(actions.createCategoryOk, (state) => ({ ...state, status: Status.ok })),
+  on(actions.createCategoryError, (state, { error }) => ({ ...state, error, status: Status.error })),
 );
 
 export const getFinanceState = createFeatureSelector<State>('finance');
@@ -93,6 +102,7 @@ export const getCategories = createSelector(getFinanceState, (state: State) => s
 
 @Injectable()
 export class Effects {
+  private router = inject(Router);
   private actions$ = inject(Actions);
   private walletService = inject(WalletService);
 
@@ -175,5 +185,28 @@ export class Effects {
         ),
       ),
     ),
+  );
+
+  createCategory$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.createCategory),
+      switchMap(({ walletID, category }) =>
+        this.walletService.createCategory(walletID, category).pipe(
+          map((response) => actions.createCategoryOk({ response })),
+          catchError((error) => of(actions.createCategoryError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  createCategorySuccess$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        ofType(actions.createCategoryOk),
+        tap(() => {
+          this.router.navigate(['/dashboard']);
+        }),
+      ),
+    { dispatch: false },
   );
 }

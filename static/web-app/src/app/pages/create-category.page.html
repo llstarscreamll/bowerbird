@@ -12,3 +12,97 @@
   </a>
   <h1 class="text-xl font-bold">Crear categoría</h1>
 </div>
+
+<div class="px-5">
+  <div class="bg-white rounded-lg shadow py-4 px-4">
+    <form [formGroup]="categoryForm" (ngSubmit)="createCategory()">
+      <div class="mb-8 mt-2">
+        <label for="name" class="block mb-2 text-sm font-medium text-center text-gray-900">Elige un ícono</label>
+
+        <div class="text-center">
+          <button
+            id="dropdownSearchButton"
+            data-dropdown-toggle="dropdownSearch"
+            data-dropdown-placement="bottom"
+            class="focus:ring-4 focus:outline-none focus:ring-blue-300 border-2 rounded-lg text-lg px-5 py-3.5 text-center inline-flex items-center"
+            [ngStyle]="{
+              'border-color': categoryForm.get('icon')?.value,
+              'color': categoryForm.get('color')?.value
+            }"
+            type="button"
+          >
+            <span class="material-symbols-outlined"> {{ categoryForm.get('icon')?.value }} </span>
+          </button>
+        </div>
+
+        <div id="dropdownSearch" class="z-10 hidden bg-white rounded-lg shadow-sm w-5/6 dark:bg-gray-700">
+          <div class="p-3">
+            <label for="input-group-search" class="sr-only">Search</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+                <svg
+                  class="w-4 h-4 text-gray-500 dark:text-gray-400"
+                  aria-hidden="true"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="text"
+                id="input-group-search"
+                class="block w-full p-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                placeholder="Buscar ícono"
+                (input)="searchIcon($event)"
+              />
+            </div>
+
+            <div class="grid grid-cols-4 gap-3 mt-4">
+              <div *ngFor="let icon of filteredIcons" class="bg-gray-50 rounded-lg p-4 text-center">
+                <span class="material-symbols-outlined"> {{ icon.name }} </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6">
+        <label for="name" class="block mb-2 text-sm font-medium text-gray-900">Nombre</label>
+        <input
+          type="text"
+          id="name"
+          formControlName="name"
+          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+          placeholder="Ej: Comida, Transporte, etc."
+          required
+        />
+      </div>
+
+      <div class="mb-6">
+        <label for="color" class="block mb-2 text-sm font-medium text-gray-900">Color</label>
+        <input
+          type="color"
+          id="color"
+          formControlName="color"
+          class="bg-gray-50 border border-gray-300 text-gray-900 h-10 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full"
+          required
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full px-5 py-2.5 text-center"
+      >
+        Crear categoría
+      </button>
+    </form>
+  </div>
+</div>

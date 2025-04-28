@@ -33,4 +33,5 @@ export type Category = {
   ID: string;
   name: string;
   color: string;
+  icon: string;
 };

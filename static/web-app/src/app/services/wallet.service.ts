@@ -40,4 +40,10 @@ export class WalletService {
       .post<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/sync-from-mail`, {})
       .pipe(map((r) => r.data));
   }
+
+  createCategory(walletID: string, category: Category) {
+    return this.httpClient
+      .post<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/categories`, category)
+      .pipe(map((r) => r.data));
+  }
 }

@@ -38,4 +38,5 @@ type TransactionRepository interface {
 
 type CategoryRepository interface {
 	FindByWalletID(ctx context.Context, walletID string) ([]Category, error)
+	Create(ctx context.Context, category Category) error
 }

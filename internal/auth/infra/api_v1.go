@@ -49,6 +49,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/categories", authMiddleware(searchWalletCategoriesHandler(walletRepo, categoryRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /api/v1/wallets/{walletID}/categories", authMiddleware(createCategoryHandler(ulid, walletRepo, categoryRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -675,5 +676,55 @@ func searchWalletCategoriesHandler(walletRepo domain.WalletRepository, categoryR
 		}
 
 		fmt.Fprintf(w, `{"data":%s}`, categoriesJSON)
+	}
+}
+
+func createCategoryHandler(ulid commonDomain.ULIDGenerator, walletRepo domain.WalletRepository, categoryRepo domain.CategoryRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		if walletID == "" {
+			log.Printf("Error getting walletID from path params")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Wallet ID is not valid")
+			return
+		}
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		userWallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
+		}
+
+		walletBelongsToUser := slices.ContainsFunc(userWallets, func(w domain.UserWallet) bool {
+			return w.ID == walletID
+		})
+
+		if !walletBelongsToUser {
+			log.Printf("Error wallet does not belong to user")
+		}
+
+		var category domain.Category
+		err = json.NewDecoder(r.Body).Decode(&category)
+		if err != nil {
+			log.Printf("Error decoding category from JSON: %s", err.Error())
+		}
+
+		category.ID = ulid.New()
+		category.WalletID = walletID
+		category.CreatedAt = time.Now()
+		category.CreatedByID = authUser.ID
+
+		err = categoryRepo.Create(r.Context(), category)
+		if err != nil {
+			log.Printf("Error creating category: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error creating category -> "+err.Error())
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":"ok"}`)
 	}
 }

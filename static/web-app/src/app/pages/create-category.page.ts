@@ -1,12 +1,67 @@
+import { initFlowbite } from 'flowbite';
+
+import { Store } from '@ngrx/store';
+
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { AfterViewInit, Component, inject } from '@angular/core';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, RouterModule } from '@angular/router';
+
+import { actions } from '@app/ngrx/finance';
+import { FlowbiteService } from '@app/services/flowbite.service';
+import { Category } from '@app/types';
 
 @Component({
   selector: 'app-create-category',
   templateUrl: './create-category.page.html',
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule],
 })
-export class CreateCategoryPage {
-  constructor() {}
+export class CreateCategoryPage implements AfterViewInit {
+  private store = inject(Store);
+  private fb = inject(FormBuilder);
+  private route = inject(ActivatedRoute);
+  private flowbite = inject(FlowbiteService);
+
+  walletID = this.route.snapshot.params['walletID'];
+
+  categoryForm = this.fb.group({
+    name: ['', Validators.required],
+    icon: ['help', Validators.required],
+    color: ['#000000', Validators.required],
+  });
+
+  icons: { name: string; popularity: number; tags: string[] }[] = [];
+  filteredIcons: { name: string; popularity: number; tags: string[] }[] = [];
+  async ngOnInit() {
+    this.icons = await fetch('/icons.json')
+      .then((res) => res.json())
+      .then((icons) => icons.sort((a: any, b: any) => b.popularity - a.popularity))
+      .then((icons) => (this.filteredIcons = icons));
+  }
+
+  ngAfterViewInit() {
+    this.flowbite.load(() => initFlowbite());
+  }
+
+  searchIcon(event: Event) {
+    const searchValue = (event.target as HTMLInputElement).value;
+    this.filteredIcons = this.icons.filter(
+      (icon) =>
+        icon.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+        icon.tags.some((tag) => tag.toLowerCase().includes(searchValue.toLowerCase())),
+    );
+  }
+
+  createCategory() {
+    if (!this.categoryForm.valid) {
+      return;
+    }
+
+    this.store.dispatch(
+      actions.createCategory({
+        walletID: this.walletID,
+        category: this.categoryForm.value as Category,
+      }),
+    );
+  }
 }

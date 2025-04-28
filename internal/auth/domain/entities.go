@@ -65,9 +65,11 @@ type Transaction struct {
 }
 
 type Category struct {
-	ID       string `json:"ID"`
-	WalletID string `json:"walletID"`
-	Name     string `json:"name"`
-	Color    string `json:"color"`
-	Icon     string `json:"icon"`
+	ID          string    `json:"ID"`
+	WalletID    string    `json:"walletID"`
+	Name        string    `json:"name"`
+	Color       string    `json:"color"`
+	Icon        string    `json:"icon"`
+	CreatedByID string    `json:"createdByID"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
