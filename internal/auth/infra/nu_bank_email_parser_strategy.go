@@ -52,7 +52,7 @@ func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []doma
 
 	return slices.DeleteFunc([]domain.Transaction{
 		{
-			Origin:            "email",
+			Origin:            "nu-bank-email",
 			Reference:         emailMessage.ExternalID,
 			Amount:            transferAmount,
 			Type:              transactionType,
@@ -60,7 +60,7 @@ func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []doma
 			ProcessedAt:       emailMessage.ReceivedAt,
 		},
 		{
-			Origin:            "email",
+			Origin:            "nu-bank-email",
 			Reference:         emailMessage.ExternalID + "_tax",
 			Amount:            transferTaxAmount,
 			Type:              transactionType,
