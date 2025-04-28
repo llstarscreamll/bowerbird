@@ -1,6 +1,6 @@
 import { initFlowbite } from 'flowbite';
 
-import { Observable, filter, take, tap } from 'rxjs';
+import { Observable, filter, take, takeLast, tap } from 'rxjs';
 
 import { Store } from '@ngrx/store';
 
@@ -31,14 +31,16 @@ export class DashboardPageComponent implements AfterViewInit, OnInit {
   apiUrl = environment.apiBaseUrl;
 
   ngOnInit(): void {
-    this.selectedWallet$ = this.store
-      .select(finance.getSelectedWallet)
-      .pipe(tap((w) => (this.selectedWalletID = w?.ID || '')));
+    this.selectedWallet$ = this.store.select(finance.getSelectedWallet).pipe(
+      filter((w): w is Wallet => w !== null),
+      take(1),
+      tap((w) => (this.selectedWalletID = w.ID)),
+      tap(() => this.store.dispatch(finance.actions.getTransactions({ walletID: this.selectedWalletID }))),
+    );
   }
 
   ngAfterViewInit(): void {
     this.flowbite.load(() => initFlowbite());
-    this.store.dispatch(finance.actions.getTransactions({ walletID: this.selectedWalletID }));
   }
 
   syncWalletTransactionsWithEmails() {

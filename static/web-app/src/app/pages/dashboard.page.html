@@ -30,14 +30,14 @@
   <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="selectedWalletDropdownButton">
     <li>
       <a
-        [href]="apiUrl + '/v1/auth/google-mail/login?wallet_id=' + (selectedWallet$ | async)?.ID"
+        [href]="apiUrl + '/v1/auth/google-mail/login?wallet_id=' + selectedWalletID"
         class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
         >Sync with Gmail</a
       >
     </li>
     <li>
       <a
-        [href]="apiUrl + '/v1/auth/microsoft/login?wallet_id=' + (selectedWallet$ | async)?.ID"
+        [href]="apiUrl + '/v1/auth/microsoft/login?wallet_id=' + selectedWalletID"
         class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
         >Sync with Outlook</a
       >
@@ -58,7 +58,7 @@
   <h2 class="font-semibold">Últimas transacciones</h2>
 
   <div class="flex flex-col gap-3 my-5">
-    <div *ngFor="let t of transactions$ | async" class="shadow rounded-lg py-3 px-3 text-sm bg-white">
+    <div *ngFor="let t of (transactions$ | async)" class="shadow rounded-lg py-3 px-3 text-sm bg-white">
       <div class="flex flex-row justify-between items-center gap-2">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3rem', 'color': t.categoryColor}">
@@ -67,14 +67,11 @@
         </div>
 
         <div class="text-left mt-2 flex-grow">
-          <a
-            [routerLink]="['/wallets', (selectedWallet$ | async)?.ID, 'transactions', t.ID]"
-            class="block font-semibold"
-          >
+          <a [routerLink]="['/wallets', selectedWalletID, 'transactions', t.ID]" class="block font-semibold">
             {{ t.categoryName || 'Sin categoría' }}
           </a>
 
-          <a [routerLink]="['/wallets', (selectedWallet$ | async)?.ID, 'transactions', t.ID]" class="text-xs font-light">
+          <a [routerLink]="['/wallets', selectedWalletID, 'transactions', t.ID]" class="text-xs font-light">
             {{ t.systemDescription }}
           </a>
 
