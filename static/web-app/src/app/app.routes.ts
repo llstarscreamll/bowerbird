@@ -14,4 +14,8 @@ export const routes: Routes = [
     path: 'wallets/:walletID/transactions/:transactionID',
     loadComponent: () => import('./pages/transaction-detail.page').then((m) => m.TransactionDetailPage),
   },
+  {
+    path: 'wallets/:walletID/categories/create',
+    loadComponent: () => import('./pages/create-category.page').then((m) => m.CreateCategoryPage),
+  },
 ];
