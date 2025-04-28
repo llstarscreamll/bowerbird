@@ -1,9 +1,9 @@
-import { initFlowbite } from 'flowbite';
+import { Dropdown, initFlowbite } from 'flowbite';
 
 import { Store } from '@ngrx/store';
 
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 
@@ -22,16 +22,19 @@ export class CreateCategoryPage implements AfterViewInit {
   private route = inject(ActivatedRoute);
   private flowbite = inject(FlowbiteService);
 
-  walletID = this.route.snapshot.params['walletID'];
-
+  @ViewChild('dropdownSearch') dropdownSearch!: ElementRef;
+  @ViewChild('dropdownSearchButton') dropdownSearchButton!: ElementRef;
+  iconsDropdown: Dropdown | null = null;
   categoryForm = this.fb.group({
     name: ['', Validators.required],
     icon: ['help', Validators.required],
     color: ['#000000', Validators.required],
   });
 
+  walletID = this.route.snapshot.params['walletID'];
   icons: { name: string; popularity: number; tags: string[] }[] = [];
   filteredIcons: { name: string; popularity: number; tags: string[] }[] = [];
+
   async ngOnInit() {
     this.icons = await fetch('/icons.json')
       .then((res) => res.json())
@@ -41,6 +44,7 @@ export class CreateCategoryPage implements AfterViewInit {
 
   ngAfterViewInit() {
     this.flowbite.load(() => initFlowbite());
+    this.iconsDropdown = new Dropdown(this.dropdownSearch.nativeElement, this.dropdownSearchButton.nativeElement);
   }
 
   searchIcon(event: Event) {
@@ -50,6 +54,12 @@ export class CreateCategoryPage implements AfterViewInit {
         icon.name.toLowerCase().includes(searchValue.toLowerCase()) ||
         icon.tags.some((tag) => tag.toLowerCase().includes(searchValue.toLowerCase())),
     );
+  }
+
+  selectIcon(icon: { name: string; popularity: number; tags: string[] }) {
+    this.categoryForm.patchValue({ icon: icon.name });
+    this.iconsDropdown?.hide();
+    this.dropdownSearchButton.nativeElement.focus();
   }
 
   createCategory() {

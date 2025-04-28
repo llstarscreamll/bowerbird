@@ -15,12 +15,13 @@
 
 <div class="px-5">
   <div class="bg-white rounded-lg shadow py-4 px-4">
-    <form [formGroup]="categoryForm" (ngSubmit)="createCategory()">
+    <form [formGroup]="categoryForm" (ngSubmit)="createCategory()" autocomplete="off">
       <div class="mb-8 mt-2">
         <label for="name" class="block mb-2 text-sm font-medium text-center text-gray-900">Elige un ícono</label>
 
         <div class="text-center">
           <button
+            #dropdownSearchButton
             id="dropdownSearchButton"
             data-dropdown-toggle="dropdownSearch"
             data-dropdown-placement="bottom"
@@ -35,7 +36,11 @@
           </button>
         </div>
 
-        <div id="dropdownSearch" class="z-10 hidden bg-white rounded-lg shadow-sm w-5/6 dark:bg-gray-700">
+        <div
+          #dropdownSearch
+          id="dropdownSearch"
+          class="z-10 hidden bg-white rounded-lg shadow-sm w-5/6 dark:bg-gray-700"
+        >
           <div class="p-3">
             <label for="input-group-search" class="sr-only">Search</label>
             <div class="relative">
@@ -66,9 +71,14 @@
             </div>
 
             <div class="grid grid-cols-4 gap-3 mt-4">
-              <div *ngFor="let icon of filteredIcons" class="bg-gray-50 rounded-lg p-4 text-center">
+              <button
+                *ngFor="let icon of filteredIcons"
+                class="bg-gray-50 rounded-lg p-4 text-center"
+                (click)="selectIcon(icon)"
+                type="button"
+              >
                 <span class="material-symbols-outlined"> {{ icon.name }} </span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
