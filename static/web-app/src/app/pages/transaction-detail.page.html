@@ -27,9 +27,9 @@
     <p class="mt-4">{{ transaction.systemDescription }}</p>
 
     <button
-      id="selectedWalletDropdownButton"
+      id="categoryDropdownButton"
       type="button"
-      data-dropdown-toggle="active-wallet-dropdown"
+      data-dropdown-toggle="category-dropdown"
       class="cursor-pointer hover:bg-slate-50 border border-gray-300 focus:ring-4 focus:ring-pink-300 font-medium rounded text-sm px-4 py-2.5 mt-5 text-center inline-flex items-center"
     >
       Sin categoría
@@ -45,10 +45,10 @@
     </button>
 
     <div
-      id="active-wallet-dropdown"
+      id="category-dropdown"
       class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 dark:bg-gray-700 text-left"
     >
-      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="selectedWalletDropdownButton">
+      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="categoryDropdownButton">
         <li *ngFor="let category of categories$ | async">
           <a
             [style.color]="category.color"
