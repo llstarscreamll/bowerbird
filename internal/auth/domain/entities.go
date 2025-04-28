@@ -53,6 +53,7 @@ type Transaction struct {
 	ID                string    `json:"ID"`
 	WalletID          string    `json:"walletID"`
 	UserID            string    `json:"userID"`
+	UserName          string    `json:"userName"`
 	Origin            string    `json:"origin"`
 	Reference         string    `json:"reference"`
 	Type              string    `json:"type"`

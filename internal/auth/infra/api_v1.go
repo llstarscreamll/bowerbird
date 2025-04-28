@@ -45,6 +45,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchWalletTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -577,5 +578,57 @@ func searchWalletTransactionsHandler(walletRepo domain.WalletRepository, transac
 		}
 
 		fmt.Fprintf(w, `{"data":%s}`, transactionsJSON)
+	}
+}
+
+func getTransactionHandler(walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		transactionID := r.PathValue("transactionID")
+
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		userWallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
+		}
+
+		walletBelongsToUser := slices.ContainsFunc(userWallets, func(w domain.UserWallet) bool {
+			return w.ID == walletID
+		})
+
+		if !walletBelongsToUser {
+			log.Printf("Error wallet does not belong to user")
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, `{"errors":[{"status":"403","title":"Forbidden","detail":%q}]}`, "Wallet does not belong to user")
+			return
+		}
+
+		transaction, err := transactionRepo.GetByWalletIDAndID(r.Context(), walletID, transactionID)
+		if err != nil {
+			log.Printf("Error getting transaction from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting transaction from storage -> "+err.Error())
+			return
+		}
+
+		if transaction.ID == "" {
+			log.Printf("Transaction not found")
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, `{"errors":[{"status":"404","title":"Not found","detail":%q}]}`, "Transaction not found")
+			return
+		}
+
+		transactionJSON, err := json.Marshal(transaction)
+		if err != nil {
+			log.Printf("Error encoding transaction to JSON: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error encoding transaction to JSON"}]}`)
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":%s}`, transactionJSON)
 	}
 }

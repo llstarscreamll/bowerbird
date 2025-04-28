@@ -2,7 +2,7 @@ import { of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { createAction, createActionGroup, createReducer, emptyProps, on, props } from '@ngrx/store';
+import { createActionGroup, createReducer, emptyProps, on, props } from '@ngrx/store';
 import { createFeatureSelector, createSelector } from '@ngrx/store';
 
 import { HttpErrorResponse } from '@angular/common/http';
@@ -25,6 +25,7 @@ export interface State {
   selectedWallet: Wallet | null;
   transactions: Transaction[];
   error: HttpErrorResponse | null;
+  transaction: Transaction | null;
 }
 
 export const initialState: State = {
@@ -33,6 +34,7 @@ export const initialState: State = {
   selectedWallet: null,
   transactions: [],
   error: null,
+  transaction: null,
 };
 
 export const actions = createActionGroup({
@@ -49,6 +51,11 @@ export const actions = createActionGroup({
     'get transactions': props<{ walletID: string }>(),
     'get transactions ok': props<{ transactions: any[] }>(),
     'get transactions error': props<{ error: HttpErrorResponse }>(),
+
+    'get transaction': props<{ walletID: string; transactionID: string }>(),
+    'get transaction ok': props<{ transaction: Transaction }>(),
+    'get transaction error': props<{ error: HttpErrorResponse }>(),
+    'set selected transaction': props<{ transaction: Transaction | null }>(),
   },
 });
 
@@ -60,11 +67,16 @@ export const reducer = createReducer(
   on(actions.setSelectedWallet, (state, { wallet }) => ({ ...state, selectedWallet: wallet })),
   on(actions.getTransactions, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionsOk, (state, { transactions }) => ({ ...state, transactions, status: Status.ok })),
+  on(actions.getTransaction, (state) => ({ ...state, status: Status.loading })),
+  on(actions.getTransactionOk, (state, { transaction }) => ({ ...state, transaction, status: Status.ok })),
+  on(actions.getTransactionError, (state, { error }) => ({ ...state, error, status: Status.error })),
+  on(actions.setSelectedTransaction, (state, { transaction }) => ({ ...state, transaction })),
 );
 
 export const getFinanceState = createFeatureSelector<State>('finance');
 export const getSelectedWallet = createSelector(getFinanceState, (state: State) => state.selectedWallet);
 export const getTransactions = createSelector(getFinanceState, (state: State) => state.transactions);
+export const getTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
 
 @Injectable()
 export class Effects {
@@ -123,6 +135,18 @@ export class Effects {
         this.walletService.syncTransactionsFromEmail(walletID).pipe(
           map(() => actions.getTransactions({ walletID })),
           catchError((error) => of(actions.getTransactionsError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  getTransaction$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.getTransaction),
+      switchMap(({ walletID, transactionID }) =>
+        this.walletService.getTransaction(walletID, transactionID).pipe(
+          map((transaction) => actions.getTransactionOk({ transaction })),
+          catchError((error) => of(actions.getTransactionError({ error }))),
         ),
       ),
     ),

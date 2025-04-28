@@ -11,7 +11,7 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/dashboard.page').then((m) => m.DashboardPageComponent),
   },
   {
-    path: 'transaction/:id',
+    path: 'wallets/:walletID/transactions/:transactionID',
     loadComponent: () => import('./pages/transaction-detail.page').then((m) => m.TransactionDetailPage),
   },
 ];

@@ -75,6 +75,37 @@ func (r *PgxTransactionRepository) FindByWalletID(ctx context.Context, walletID 
 	return transactions, nil
 }
 
+func (r *PgxTransactionRepository) GetByWalletIDAndID(ctx context.Context, walletID, transactionID string) (domain.Transaction, error) {
+	row := r.pool.QueryRow(
+		ctx,
+		`SELECT transactions.id,
+				transactions.wallet_id,
+				transactions.user_id,
+				CONCAT(users.first_name, ' ', users.last_name) as name,
+				transactions.origin,
+				transactions.reference,
+				transactions."type",
+				transactions.amount,
+				transactions.user_description,
+				transactions.system_description,
+				transactions.processed_at,
+				transactions.created_at
+		FROM transactions
+		INNER JOIN users ON transactions.user_id = users.id
+		WHERE transactions.wallet_id = $1 AND transactions.id = $2`,
+		walletID, transactionID,
+	)
+
+	var t domain.Transaction
+	err := row.Scan(&t.ID, &t.WalletID, &t.UserID, &t.UserName, &t.Origin, &t.Reference, &t.Type, &t.Amount, &t.UserDescription, &t.SystemDescription, &t.ProcessedAt, &t.CreatedAt)
+
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+
+	return t, nil
+}
+
 func NewPgxTransactionRepository(pool *pgxpool.Pool) *PgxTransactionRepository {
 	return &PgxTransactionRepository{pool: pool}
 }

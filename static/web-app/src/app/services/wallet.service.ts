@@ -23,6 +23,12 @@ export class WalletService {
       .pipe(map((r) => r.data.map((t) => ({ ...t, amount: Math.abs(t.amount) }))));
   }
 
+  getTransaction(walletID: string, transactionID: string) {
+    return this.httpClient
+      .get<{ data: Transaction }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/${transactionID}`)
+      .pipe(map((r) => r.data));
+  }
+
   syncTransactionsFromEmail(walletID: string) {
     return this.httpClient
       .post<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/sync-from-mail`, {})

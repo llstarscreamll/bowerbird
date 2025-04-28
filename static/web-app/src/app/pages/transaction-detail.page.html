@@ -1,1 +1,33 @@
-<h1>Transaction Detail</h1>
+<div class="flex items-center gap-4 px-5 py-6">
+  <a routerLink="/dashboard" class="text-gray-500 hover:text-gray-900 cursor-pointer">
+    <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+      <path
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M13 5H1m0 0 4 4M1 5l4-4"
+      />
+    </svg>
+  </a>
+  <h1 class="text-xl font-bold">Detalle de transacción</h1>
+</div>
+
+<div class="px-5" *ngIf="transaction$ | async as transaction">
+  <div class="bg-white rounded-lg shadow py-3 px-4 text-center">
+    <div
+      [ngClass]="{'text-rose-500': transaction.type === 'expense', 'text-emerald-500': transaction.type !== 'expense'}"
+      class="text-3xl font-bold"
+    >
+      {{ transaction.amount | number }}
+    </div>
+
+    <p class="text-sm text-gray-500">{{ transaction.processedAt | date:'mediumDate' }}</p>
+    <p class="text-md mt-4">{{ transaction.systemDescription }}</p>
+
+    <div class="mt-6 flex items-center gap-2 text-sm text-gray-400">
+      <div class="text-left w-1/2"></div>
+      <div class="text-right w-1/2">{{ transaction.userName }}</div>
+    </div>
+  </div>
+</div>

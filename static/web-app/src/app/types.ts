@@ -17,6 +17,7 @@ export type Transaction = {
   ID: string;
   walletID: string;
   userID: string;
+  userName: string;
   origin: string;
   reference: string;
   type: string;
