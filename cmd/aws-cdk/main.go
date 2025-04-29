@@ -82,9 +82,67 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		EnforceSSL:        jsii.Bool(true),
 	})
 
-	s3Deploy.NewBucketDeployment(stack, jsii.String("SPADeployment"), &s3Deploy.BucketDeploymentProps{
+	// Deploy HTML files with no cache
+	s3Deploy.NewBucketDeployment(stack, jsii.String("HTMLDeployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
+		CacheControl: &[]s3Deploy.CacheControl{
+			s3Deploy.CacheControl_FromString(jsii.String("no-cache, no-store, must-revalidate")),
+		},
+		Exclude: &[]*string{
+			jsii.String("*.js"),
+			jsii.String("*.css"),
+			jsii.String("*.png"),
+			jsii.String("*.jpg"),
+			jsii.String("*.jpeg"),
+			jsii.String("*.gif"),
+			jsii.String("*.svg"),
+			jsii.String("*.ico"),
+			jsii.String("*.woff"),
+			jsii.String("*.woff2"),
+			jsii.String("*.ttf"),
+			jsii.String("*.eot"),
+			jsii.String("*.json"),
+			jsii.String("*.webmanifest"),
+		},
+	})
+
+	// Deploy static assets with short cache (1 hour)
+	s3Deploy.NewBucketDeployment(stack, jsii.String("StaticAssetsDeployment"), &s3Deploy.BucketDeploymentProps{
+		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		DestinationBucket: webappBucket,
+		CacheControl: &[]s3Deploy.CacheControl{
+			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=3600")),
+		},
+		Include: &[]*string{
+			jsii.String("*.js"),
+			jsii.String("*.css"),
+			jsii.String("*.png"),
+			jsii.String("*.jpg"),
+			jsii.String("*.jpeg"),
+			jsii.String("*.gif"),
+			jsii.String("*.svg"),
+			jsii.String("*.ico"),
+			jsii.String("*.woff"),
+			jsii.String("*.woff2"),
+			jsii.String("*.ttf"),
+			jsii.String("*.eot"),
+			jsii.String("*.json"),
+			jsii.String("*.webmanifest"),
+		},
+	})
+
+	// Deploy service worker with longer cache (1 week)
+	s3Deploy.NewBucketDeployment(stack, jsii.String("ServiceWorkerDeployment"), &s3Deploy.BucketDeploymentProps{
+		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		DestinationBucket: webappBucket,
+		CacheControl: &[]s3Deploy.CacheControl{
+			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=604800")),
+		},
+		Include: &[]*string{
+			jsii.String("ngsw.json"),
+			jsii.String("worker-basic.min.js"),
+		},
 	})
 
 	originAccessIdentity := cloudfront.NewOriginAccessIdentity(stack, jsii.String("OAI"), &cloudfront.OriginAccessIdentityProps{})
@@ -101,6 +159,7 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			ViewerProtocolPolicy: cloudfront.ViewerProtocolPolicy_REDIRECT_TO_HTTPS,
 			AllowedMethods:       cloudfront.AllowedMethods_ALLOW_GET_HEAD_OPTIONS(),
 			CachedMethods:        cloudfront.CachedMethods_CACHE_GET_HEAD_OPTIONS(),
+			CachePolicy:          cloudfront.CachePolicy_CACHING_OPTIMIZED(),
 		},
 		ErrorResponses: &[]*cloudfront.ErrorResponse{
 			{
