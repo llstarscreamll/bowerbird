@@ -23,31 +23,24 @@
   </div>
 </div>
 
-<div
-  id="active-wallet-dropdown"
-  class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44 dark:bg-gray-700"
->
-  <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="selectedWalletDropdownButton">
+<div id="active-wallet-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44">
+  <ul class="py-2 text-sm text-gray-700" aria-labelledby="selectedWalletDropdownButton">
     <li>
       <a
         [href]="apiUrl + '/v1/auth/google-mail/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+        class="block px-4 py-2 hover:bg-gray-100"
         >Sync with Gmail</a
       >
     </li>
     <li>
       <a
         [href]="apiUrl + '/v1/auth/microsoft/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+        class="block px-4 py-2 hover:bg-gray-100"
         >Sync with Outlook</a
       >
     </li>
     <li>
-      <button
-        (click)="syncWalletTransactionsWithEmails()"
-        class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-        type="button"
-      >
+      <button (click)="syncWalletTransactionsWithEmails()" class="block px-4 py-2 hover:bg-gray-100" type="button">
         Sync now
       </button>
     </li>

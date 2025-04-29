@@ -44,14 +44,14 @@
     <div
       #categoryDropdown
       id="category-dropdown"
-      class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 dark:bg-gray-700 text-left"
+      class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 text-left"
     >
-      <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="categoryDropdownButton">
+      <ul class="py-2 text-sm text-gray-700" aria-labelledby="categoryDropdownButton">
         <li *ngFor="let category of categories$ | async">
           <button
             type="button"
             (click)="updateCategory(transaction, category.ID)"
-            class="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white flex items-center w-full"
+            class="cursor-pointer px-4 py-2 hover:bg-gray-100 flex items-center w-full"
           >
             <span class="material-symbols-outlined"> {{ category.icon }} </span>
             <div class="ml-2">{{ category.name }}</div>
@@ -62,7 +62,7 @@
       <div class="py-2">
         <a
           [routerLink]="['/wallets', walletID, 'categories', 'create']"
-          class="text-sm px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white flex items-center"
+          class="text-sm px-4 py-2 hover:bg-gray-100 flex items-center"
         >
           <span class="material-symbols-outlined"> add </span>
           <span class="ml-2"> Crear categoría </span>
