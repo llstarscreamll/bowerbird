@@ -89,21 +89,8 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		CacheControl: &[]s3Deploy.CacheControl{
 			s3Deploy.CacheControl_FromString(jsii.String("no-cache, no-store, must-revalidate")),
 		},
-		Exclude: &[]*string{
-			jsii.String("*.js"),
-			jsii.String("*.css"),
-			jsii.String("*.png"),
-			jsii.String("*.jpg"),
-			jsii.String("*.jpeg"),
-			jsii.String("*.gif"),
-			jsii.String("*.svg"),
-			jsii.String("*.ico"),
-			jsii.String("*.woff"),
-			jsii.String("*.woff2"),
-			jsii.String("*.ttf"),
-			jsii.String("*.eot"),
-			jsii.String("*.json"),
-			jsii.String("*.webmanifest"),
+		Include: &[]*string{
+			jsii.String("*.html"),
 		},
 	})
 
@@ -129,6 +116,10 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			jsii.String("*.eot"),
 			jsii.String("*.json"),
 			jsii.String("*.webmanifest"),
+		},
+		Metadata: &map[string]*string{
+			"*.js":  jsii.String("application/javascript"),
+			"*.css": jsii.String("text/css"),
 		},
 	})
 
