@@ -174,7 +174,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 		}
 
 		user.ID = id
-		sessionExpirationDate := time.Now().Add(time.Hour * 2)
+		sessionExpirationDate := time.Now().Add(time.Hour * 24)
 		sessionID, err := ulid.NewFromDate(sessionExpirationDate)
 		if err != nil {
 			log.Printf("Error generating session ID: %s", err.Error())
