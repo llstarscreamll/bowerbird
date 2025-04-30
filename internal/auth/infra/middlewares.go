@@ -6,6 +6,7 @@ import (
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	"log"
 	"net/http"
+	"time"
 )
 
 func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, userRepo domain.UserRepository) http.HandlerFunc {
@@ -38,6 +39,13 @@ func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, use
 			log.Printf("Session ID does not exists")
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprintf(w, `{"errors":[{"status":"401","title":"Unauthorized","detail":"Session ID does not exists"}]}`)
+			return
+		}
+
+		if session.ExpiresAt.Before(time.Now()) {
+			log.Println("Session expired")
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprintf(w, `{"errors":[{"status":"401","title":"Unauthorized","detail":"Session expired"}]}`)
 			return
 		}
 
