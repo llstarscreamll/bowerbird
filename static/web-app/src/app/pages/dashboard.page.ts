@@ -31,9 +31,10 @@ export class DashboardPageComponent implements AfterViewInit, OnInit {
   apiUrl = environment.apiBaseUrl;
 
   ngOnInit(): void {
+    this.store.dispatch(finance.actions.getWallets());
+
     this.selectedWallet$ = this.store.select(finance.getSelectedWallet).pipe(
       filter((w): w is Wallet => w !== null),
-      take(1),
       tap((w) => (this.selectedWalletID = w.ID)),
       tap(() => this.store.dispatch(finance.actions.getTransactions({ walletID: this.selectedWalletID }))),
     );

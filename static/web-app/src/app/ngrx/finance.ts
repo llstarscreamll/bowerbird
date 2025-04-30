@@ -114,13 +114,6 @@ export class Effects {
   private actions$ = inject(Actions);
   private walletService = inject(WalletService);
 
-  getWalletsAfterGettingUserSucceed$ = createEffect(() =>
-    this.actions$.pipe(
-      ofType(auth.actions.getUserOk),
-      map(() => actions.getWallets()),
-    ),
-  );
-
   getWallets$ = createEffect(() =>
     this.actions$.pipe(
       ofType(actions.getWallets),
