@@ -25,14 +25,13 @@
             id="dropdownSearchButton"
             data-dropdown-toggle="dropdownSearch"
             data-dropdown-placement="bottom"
-            class="focus:ring-4 focus:outline-none focus:ring-blue-300 border-2 rounded-lg text-lg px-5 py-3.5 text-center inline-flex items-center"
-            [ngStyle]="{
-              'border-color': categoryForm.get('icon')?.value,
-              'color': categoryForm.get('color')?.value
-            }"
+            class="focus:ring-4 focus:outline-none focus:ring-pink-300 border-2 rounded-lg text-lg px-5 py-3.5 text-center text-white inline-flex items-center"
+            [ngStyle]="{'background-color': categoryForm.get('color')?.value}"
             type="button"
           >
-            <span class="material-symbols-outlined"> {{ categoryForm.get('icon')?.value }} </span>
+            <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem'}">
+              {{ categoryForm.get('icon')?.value }}
+            </span>
           </button>
         </div>
 

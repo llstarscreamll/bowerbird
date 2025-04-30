@@ -20,10 +20,13 @@
       id="categoryDropdownButton"
       type="button"
       data-dropdown-toggle="category-dropdown"
-      class="cursor-pointer focus:ring-4 focus:ring-pink-300 font-medium text-sm px-4 py-2.5 -mt-16 m-auto flex flex-col items-center gap-2"
+      class="cursor-pointer focus:ring-4 focus:ring-pink-300 font-medium text-sm -mt-16 m-auto flex flex-col items-center gap-2"
     >
-      <div class="rounded-full bg-white h-20 w-20 shadow-md flex items-center justify-center">
-        <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem', 'color': transaction.categoryColor}">
+      <div
+        [ngStyle]="{'background-color': transaction.categoryColor || '#9e9e9e'}"
+        class="rounded-full text-white p-5 shadow-md flex items-center justify-center"
+      >
+        <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem'}">
           {{ transaction.categoryIcon || 'help' }}
         </span>
       </div>
@@ -31,44 +34,14 @@
     </button>
 
     <div
-      [ngClass]="{'text-rose-500': transaction.type === 'expense', 'text-emerald-500': transaction.type !== 'expense'}"
-      class="text-4xl font-bold"
+      [ngClass]="{'text-rose-400': transaction.type === 'expense', 'text-emerald-400': transaction.type !== 'expense'}"
+      class="text-4xl font-bold my-6"
     >
       {{ transaction.amount | number }}
     </div>
 
-    <p class="text-sm text-gray-500">{{ transaction.processedAt | date:'mediumDate' }}</p>
-
-    <p class="mt-4">{{ transaction.systemDescription }}</p>
-
-    <div
-      #categoryDropdown
-      id="category-dropdown"
-      class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 text-left"
-    >
-      <ul class="py-2 text-sm text-gray-700" aria-labelledby="categoryDropdownButton">
-        <li *ngFor="let category of categories$ | async">
-          <button
-            type="button"
-            (click)="updateCategory(transaction, category.ID)"
-            class="cursor-pointer px-4 py-2 hover:bg-gray-100 flex items-center w-full"
-          >
-            <span class="material-symbols-outlined"> {{ category.icon }} </span>
-            <div class="ml-2">{{ category.name }}</div>
-          </button>
-        </li>
-      </ul>
-
-      <div class="py-2">
-        <a
-          [routerLink]="['/wallets', walletID, 'categories', 'create']"
-          class="text-sm px-4 py-2 hover:bg-gray-100 flex items-center"
-        >
-          <span class="material-symbols-outlined"> add </span>
-          <span class="ml-2"> Crear categoría </span>
-        </a>
-      </div>
-    </div>
+    <p>{{ transaction.systemDescription }}</p>
+    <p class="text-sm text-gray-400">{{ transaction.processedAt | date:'mediumDate' }}</p>
 
     <div class="mt-7 flex items-center gap-2 text-sm text-gray-400">
       <div class="text-left w-1/2">
@@ -78,6 +51,35 @@
         </ng-container>
       </div>
       <div class="text-right w-1/2">{{ transaction.userName }}</div>
+    </div>
+  </div>
+
+  <div
+    #categoryDropdown
+    id="category-dropdown"
+    class="z-10 hidden bg-white divide-y divide-gray-200 rounded-lg shadow-sm w-44 text-left"
+  >
+    <ul class="py-2 text-sm text-gray-700" aria-labelledby="categoryDropdownButton">
+      <li *ngFor="let category of categories$ | async">
+        <button
+          type="button"
+          (click)="updateCategory(transaction, category.ID)"
+          class="cursor-pointer px-4 py-2 hover:bg-gray-100 flex items-center w-full"
+        >
+          <span class="material-symbols-outlined"> {{ category.icon }} </span>
+          <div class="ml-2">{{ category.name }}</div>
+        </button>
+      </li>
+    </ul>
+
+    <div class="py-2">
+      <a
+        [routerLink]="['/wallets', walletID, 'categories', 'create']"
+        class="text-sm px-4 py-2 hover:bg-gray-100 flex items-center"
+      >
+        <span class="material-symbols-outlined"> add </span>
+        <span class="ml-2"> Crear categoría </span>
+      </a>
     </div>
   </div>
 </div>
