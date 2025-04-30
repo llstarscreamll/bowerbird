@@ -29,7 +29,7 @@ export class CreateCategoryPage implements AfterViewInit {
   categoryForm = this.fb.group({
     name: ['', Validators.required],
     icon: ['help', Validators.required],
-    color: ['#000000', Validators.required],
+    color: ['#fb64b6', Validators.required],
   });
 
   walletID = this.route.snapshot.params['walletID'];
