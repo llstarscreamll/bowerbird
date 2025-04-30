@@ -1,5 +1,5 @@
 import { fromEvent, of } from 'rxjs';
-import { catchError, filter, map, switchMap } from 'rxjs/operators';
+import { catchError, filter, map, switchMap, tap } from 'rxjs/operators';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import {
@@ -75,7 +75,8 @@ export class Effects {
   private router = inject(Router);
   private actions$ = inject(Actions);
   private authService = inject(AuthService);
-  private pageVisibility = fromEvent(document, 'visibilitychange');
+  private windowFocus$ = fromEvent(window, 'focus');
+  private tabFocus$ = fromEvent(document, 'visibilitychange');
 
   getUser$ = createEffect(() =>
     this.actions$.pipe(
@@ -99,8 +100,15 @@ export class Effects {
     { dispatch: false },
   );
 
-  getUserOnPageVisible$ = createEffect(() =>
-    this.pageVisibility.pipe(
+  getUserOnTabFocus$ = createEffect(() =>
+    this.tabFocus$.pipe(
+      filter((e: any) => e.target.visibilityState === 'visible'),
+      map(() => actions.getUser()),
+    ),
+  );
+
+  getUserOnWindowFocus$ = createEffect(() =>
+    this.windowFocus$.pipe(
       filter(() => document.visibilityState === 'visible'),
       map(() => actions.getUser()),
     ),
