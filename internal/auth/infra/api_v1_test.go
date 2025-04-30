@@ -20,22 +20,27 @@ var bgContextType = mock.AnythingOfType(fmt.Sprintf("%T", context.Background()))
 func TestGoogleLogin(t *testing.T) {
 	mux := http.NewServeMux()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/v1/auth/google/login", nil)
+	r := httptest.NewRequest("GET", "/api/v1/auth/google/login", nil)
 
-	ulidMock := neverCalledMockUlid(t)
+	ulidMock := new(MockULID)
+	ulidMock.On("NewFromDate", mock.Anything).Return("01JGCA8BBB00000000000000U1", nil)
+
+	sessionRepoMock := new(MockSessionRepository)
+	sessionRepoMock.On("Save", bgContextType, "googleOAuth-01JGCA8BBB00000000000000U1", "ABC-123", mock.Anything).Return(nil)
+
+	authServerGatewayMock := new(MockAuthServerGateway)
+	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/api/v1/auth/google/callback", []string{}, "googleOAuth-01JGCA8BBB00000000000000U1").Return("https://some-google.com/auth/login", nil)
+
 	cryptMock := neverCalledMockCrypt(t)
 	userRepoMock := neverCalledMockUserRepository(t)
 	mailGatewayMock := neverCalledMockMailGateway(t)
-	sessionRepoMock := neverCalledMockSessionRepository(t)
+	categoryRepoMock := neverCalledMockCategoryRepository(t)
 	walletRepoMock := neverCalledMockMockWalletRepository(t)
 	mailMessageRepo := neverCalledMockMailMessageRepository(t)
 	transactionRepoMock := neverCalledMockTransactionRepository(t)
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 
-	authServerGatewayMock := new(MockAuthServerGateway)
-	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/v1/auth/google/callback", []string{}).Return("https://some-google.com/auth/login", nil)
-
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -54,6 +59,7 @@ func TestGoogleLogin(t *testing.T) {
 	mailSecretRepoMock.AssertExpectations(t)
 	transactionRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
+	categoryRepoMock.AssertExpectations(t)
 }
 
 func TestGoogleLoginCallback(t *testing.T) {
@@ -70,7 +76,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 	}{
 		{
 			"should return 302 when callback succeeds",
-			"GET", "/v1/auth/google/callback?code=123",
+			"GET", "/api/v1/auth/google/callback?code=123",
 			func(t *testing.T) *MockULID {
 				m := new(MockULID)
 				m.On("New").Return("01JGCA8BBB00000000000000U1").Once()
@@ -109,7 +115,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 		{
 			"should return 400 when auth code is empty",
 			"GET",
-			"/v1/auth/google/callback?code=",
+			"/api/v1/auth/google/callback?code=",
 			neverCalledMockUlid,
 			neverCalledMockAuthServerGateway,
 			neverCalledMockUserRepository,
@@ -120,7 +126,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 		{
 			"should return 500 when user info can't be retrieved",
 			"GET",
-			"/v1/auth/google/callback?code=123",
+			"/api/v1/auth/google/callback?code=123",
 			neverCalledMockUlid,
 			func(t *testing.T) *MockAuthServerGateway {
 				m := new(MockAuthServerGateway)
@@ -136,7 +142,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 		{
 			"should return 500 when user info can't be saved",
 			"GET",
-			"/v1/auth/google/callback?code=123",
+			"/api/v1/auth/google/callback?code=123",
 			func(t *testing.T) *MockULID {
 				m := new(MockULID)
 				m.On("New").Return("01JGCA8BBB00000000000000U1").Once()
@@ -160,7 +166,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 		{
 			"should return 500 when session ID can't be generated",
 			"GET",
-			"/v1/auth/google/callback?code=123",
+			"/api/v1/auth/google/callback?code=123",
 			func(t *testing.T) *MockULID {
 				m := new(MockULID)
 				m.On("New").Return("01JGCA8BBB00000000000000U1").Once()
@@ -185,7 +191,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 		{
 			"should return 500 when session can't be saved",
 			"GET",
-			"/v1/auth/google/callback?code=123",
+			"/api/v1/auth/google/callback?code=123",
 			func(t *testing.T) *MockULID {
 				m := new(MockULID)
 				m.On("New").Return("01JGCA8BBB00000000000000U1").Once()
@@ -229,8 +235,9 @@ func TestGoogleLoginCallback(t *testing.T) {
 			mailMessageRepo := neverCalledMockMailMessageRepository(t)
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
 			mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
+			categoryRepoMock := neverCalledMockCategoryRepository(t)
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -253,6 +260,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			mailSecretRepoMock.AssertExpectations(t)
 			walletRepoMock.AssertExpectations(t)
 			transactionRepoMock.AssertExpectations(t)
+			categoryRepoMock.AssertExpectations(t)
 		})
 	}
 }
@@ -260,7 +268,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 func TestGMailLogin(t *testing.T) {
 	mux := http.NewServeMux()
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/v1/auth/google-mail/login", nil)
+	r := httptest.NewRequest("GET", "/api/v1/auth/google-mail/login", nil)
 	r.AddCookie(&http.Cookie{
 		Name:     "session_token",
 		Value:    "ABC-S3SS10N",
@@ -280,11 +288,12 @@ func TestGMailLogin(t *testing.T) {
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 	walletRepoMock := neverCalledMockMockWalletRepository(t)
 	transactionRepoMock := neverCalledMockTransactionRepository(t)
+	categoryRepoMock := neverCalledMockCategoryRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
-	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
+	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/api/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
 
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -303,6 +312,7 @@ func TestGMailLogin(t *testing.T) {
 	mailSecretRepoMock.AssertExpectations(t)
 	transactionRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
+	categoryRepoMock.AssertExpectations(t)
 }
 
 func TestGMailLoginCallback(t *testing.T) {
@@ -322,7 +332,7 @@ func TestGMailLoginCallback(t *testing.T) {
 	}{
 		{
 			"should save access and refresh tokens as encrypted values in storage",
-			"GET", "/v1/auth/google-mail/callback?code=some-auth-code",
+			"GET", "/api/v1/auth/google-mail/callback?code=some-auth-code",
 			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
 			func(t *testing.T) *MockSessionRepository {
 				m := new(MockSessionRepository)
@@ -363,7 +373,7 @@ func TestGMailLoginCallback(t *testing.T) {
 		},
 		{
 			"should return 401 whe session ID does not exists",
-			"GET", "/v1/auth/google-mail/callback?code=some-auth-code",
+			"GET", "/api/v1/auth/google-mail/callback?code=some-auth-code",
 			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
 			func(t *testing.T) *MockSessionRepository {
 				m := new(MockSessionRepository)
@@ -380,7 +390,7 @@ func TestGMailLoginCallback(t *testing.T) {
 		},
 		{
 			"should return 500 whe user ID is not found",
-			"GET", "/v1/auth/google-mail/callback?code=some-auth-code",
+			"GET", "/api/v1/auth/google-mail/callback?code=some-auth-code",
 			map[string]string{"Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure"},
 			func(t *testing.T) *MockSessionRepository {
 				m := new(MockSessionRepository)
@@ -413,7 +423,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			mailMessageRepo := neverCalledMockMailMessageRepository(t)
 			walletRepoMock := neverCalledMockMockWalletRepository(t)
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
-
+			categoryRepoMock := neverCalledMockCategoryRepository(t)
 			mux := http.NewServeMux()
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(tc.verb, tc.endpoint, nil)
@@ -422,7 +432,7 @@ func TestGMailLoginCallback(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -445,6 +455,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			transactionRepoMock.AssertExpectations(t)
 			authServerGatewayMock.AssertExpectations(t)
 			mailCredentialRepoMock.AssertExpectations(t)
+			categoryRepoMock.AssertExpectations(t)
 		})
 	}
 }
@@ -562,6 +573,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 			mailCredentialRepoMock := tc.mailCredentialRepoMock(t)
 			walletRepoMock := neverCalledMockMockWalletRepository(t)
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
+			categoryRepoMock := neverCalledMockCategoryRepository(t)
 
 			mux := http.NewServeMux()
 			w := httptest.NewRecorder()
@@ -571,7 +583,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepoMock, walletRepoMock, transactionRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepoMock, walletRepoMock, transactionRepoMock, categoryRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -594,6 +606,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 			mailMessageRepoMock.AssertExpectations(t)
 			transactionRepoMock.AssertExpectations(t)
 			mailCredentialRepoMock.AssertExpectations(t)
+			categoryRepoMock.AssertExpectations(t)
 		})
 	}
 }

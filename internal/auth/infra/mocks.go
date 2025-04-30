@@ -90,9 +90,9 @@ func (m *MockSessionRepository) Delete(ctx context.Context, sessionID string) er
 	return args.Error(0)
 }
 
-func (m *MockSessionRepository) GetByID(ctx context.Context, ID string) (string, error) {
+func (m *MockSessionRepository) GetByID(ctx context.Context, ID string) (domain.Session, error) {
 	args := m.Called(ctx, ID)
-	return args.String(0), args.Error(1)
+	return args.Get(0).(domain.Session), args.Error(1)
 }
 
 type MockCrypt struct {
@@ -144,6 +144,16 @@ type MockTransactionRepository struct {
 	mock.Mock
 }
 
+// GetByWalletIDAndID implements domain.TransactionRepository.
+func (m *MockTransactionRepository) GetByWalletIDAndID(ctx context.Context, walletID string, transactionID string) (domain.Transaction, error) {
+	panic("unimplemented")
+}
+
+// Update implements domain.TransactionRepository.
+func (m *MockTransactionRepository) Update(ctx context.Context, transaction domain.Transaction) error {
+	panic("unimplemented")
+}
+
 func (m *MockTransactionRepository) UpsertMany(ctx context.Context, transactions []domain.Transaction) error {
 	args := m.Called(ctx, transactions)
 	return args.Error(0)
@@ -152,6 +162,20 @@ func (m *MockTransactionRepository) UpsertMany(ctx context.Context, transactions
 func (m *MockTransactionRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Transaction, error) {
 	args := m.Called(ctx, walletID)
 	return args.Get(0).([]domain.Transaction), args.Error(1)
+}
+
+type MockCategoryRepository struct {
+	mock.Mock
+}
+
+func (m *MockCategoryRepository) Create(ctx context.Context, category domain.Category) error {
+	args := m.Called(ctx, category)
+	return args.Error(0)
+}
+
+func (m *MockCategoryRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Category, error) {
+	args := m.Called(ctx, walletID)
+	return args.Get(0).([]domain.Category), args.Error(1)
 }
 
 func neverCalledMockUlid(t *testing.T) *MockULID {
@@ -204,6 +228,12 @@ func neverCalledMockMailMessageRepository(t *testing.T) *MockMailMessageReposito
 
 func neverCalledMockTransactionRepository(t *testing.T) *MockTransactionRepository {
 	m := new(MockTransactionRepository)
+	m.AssertNotCalled(t, "New")
+	return m
+}
+
+func neverCalledMockCategoryRepository(t *testing.T) *MockCategoryRepository {
+	m := new(MockCategoryRepository)
 	m.AssertNotCalled(t, "New")
 	return m
 }
