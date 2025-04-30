@@ -1,5 +1,5 @@
-import { of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { fromEvent, of } from 'rxjs';
+import { catchError, filter, map, switchMap } from 'rxjs/operators';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import {
@@ -14,6 +14,7 @@ import {
 
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { AuthService } from '@app/services/auth.service';
 import { User } from '@app/types';
@@ -70,10 +71,11 @@ const getAuthState = createFeatureSelector<State>('auth');
 export const getLoggedIn = createSelector(getAuthState, (s) => s.status === Status.loggedIn);
 export const getUser = createSelector(getAuthState, (s) => s.user);
 
-@Injectable()
 export class Effects {
+  private router = inject(Router);
   private actions$ = inject(Actions);
   private authService = inject(AuthService);
+  private pageVisibility = fromEvent(document, 'visibilitychange');
 
   getUser$ = createEffect(() =>
     this.actions$.pipe(
@@ -84,6 +86,23 @@ export class Effects {
           catchError((error) => of(actions.getUserError({ error }))),
         ),
       ),
+    ),
+  );
+
+  getUserError$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        ofType(actions.getUserError),
+        filter(({ error }) => error.status === 401),
+        map(() => this.router.navigate(['/'])),
+      ),
+    { dispatch: false },
+  );
+
+  getUserOnPageVisible$ = createEffect(() =>
+    this.pageVisibility.pipe(
+      filter(() => document.visibilityState === 'visible'),
+      map(() => actions.getUser()),
     ),
   );
 }
