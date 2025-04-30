@@ -105,7 +105,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		userID, err := sessionRepo.GetByID(r.Context(), state)
+		session, err := sessionRepo.GetByID(r.Context(), state)
 		if err != nil {
 			log.Printf("Error getting state from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -113,7 +113,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			return
 		}
 
-		if userID == "" || userID != "ABC-123" {
+		if session.UserID == "" || session.UserID != "ABC-123" {
 			log.Printf("State was not found in session storage or is mismatched with auth user ID: " + state)
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"State miss match"}]}`)
@@ -326,7 +326,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		userID, err := sessionRepo.GetByID(r.Context(), state)
+		session, err := sessionRepo.GetByID(r.Context(), state)
 		if err != nil {
 			log.Printf("Error getting state from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -334,7 +334,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		if userID == "" || userID != authUser.ID {
+		if session.UserID == "" || session.UserID != authUser.ID {
 			log.Printf("State was not found in session storage or is mismatched with auth user ID: " + state)
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":"State miss match"}]}`)

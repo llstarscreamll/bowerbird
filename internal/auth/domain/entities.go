@@ -77,3 +77,9 @@ type Category struct {
 	CreatedByID string    `json:"createdByID"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
+
+type Session struct {
+	ID        string    `json:"ID"`
+	UserID    string    `json:"userID"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}

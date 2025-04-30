@@ -25,21 +25,23 @@ func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, use
 			return
 		}
 
-		userID, err := sessionRepo.GetByID(r.Context(), sessionIDCookie.Value)
+		session, err := sessionRepo.GetByID(r.Context(), sessionIDCookie.Value)
+
 		if err != nil {
 			log.Printf("Error getting session data from storage: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error getting session data from storage"}]}`)
 			return
 		}
-		if userID == "" {
+
+		if session.ID == "" {
 			log.Printf("Session ID does not exists")
 			w.WriteHeader(http.StatusUnauthorized)
 			fmt.Fprintf(w, `{"errors":[{"status":"401","title":"Unauthorized","detail":"Session ID does not exists"}]}`)
 			return
 		}
 
-		user, err := userRepo.GetByID(r.Context(), userID)
+		user, err := userRepo.GetByID(r.Context(), session.UserID)
 		if err != nil {
 			log.Printf("Error getting auth user from storage: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -47,7 +49,7 @@ func authMiddleware(next http.Handler, sessionRepo domain.SessionRepository, use
 			return
 		}
 		if user.ID == "" {
-			log.Printf("Error getting auth user from storage, user %s not found", userID)
+			log.Printf("Error getting auth user from storage, user %s not found", session)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error getting auth user from storage, user not found"}]}`)
 			return

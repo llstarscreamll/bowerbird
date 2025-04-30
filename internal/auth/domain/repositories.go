@@ -12,7 +12,7 @@ type UserRepository interface {
 
 type SessionRepository interface {
 	Save(ctx context.Context, userID, sessionID string, expirationDate time.Time) error
-	GetByID(ctx context.Context, ID string) (string, error)
+	GetByID(ctx context.Context, ID string) (Session, error)
 	Delete(ctx context.Context, sessionID string) error
 }
 

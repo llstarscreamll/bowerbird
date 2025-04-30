@@ -7,6 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"llstarscreamll/bowerbird/internal/auth/domain"
 )
 
 type PgxSessionRepository struct {
@@ -22,21 +24,21 @@ func (r *PgxSessionRepository) Save(ctx context.Context, sessionID, userID strin
 	return nil
 }
 
-func (r *PgxSessionRepository) GetByID(ctx context.Context, ID string) (string, error) {
-	var userID string
+func (r *PgxSessionRepository) GetByID(ctx context.Context, ID string) (domain.Session, error) {
+	var session domain.Session
 
 	row := r.pool.QueryRow(
 		ctx,
-		`SELECT user_id FROM sessions WHERE id = $1`,
+		`SELECT id, user_id, expires_at FROM sessions WHERE id = $1`,
 		ID,
 	)
 
-	err := row.Scan(&userID)
+	err := row.Scan(&session.ID, &session.UserID, &session.ExpiresAt)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", err
+		return domain.Session{}, err
 	}
 
-	return userID, nil
+	return session, nil
 }
 
 func (r *PgxSessionRepository) Delete(ctx context.Context, sessionID string) error {
