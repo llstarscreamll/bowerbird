@@ -30,6 +30,7 @@ BOWERBIRD=true \
 AWS_ACCESS_KEY_ID=some-access \
 AWS_SECRET_ACCESS_KEY=some-secret \
 AWS_DEFAULT_REGION=us-east-1 \
+APP_DOMAIN_NAME="bowerbird.local"
 make deploy
 ```
 

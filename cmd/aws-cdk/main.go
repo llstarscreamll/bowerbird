@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
@@ -66,10 +67,6 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		StageName:              jsii.String("prod"),
 		AutoDeploy:             jsii.Bool(true),
 		DetailedMetricsEnabled: jsii.Bool(true),
-	})
-
-	hostedZone := route53.HostedZone_FromLookup(stack, jsii.String("HostedZone"), &route53.HostedZoneProviderProps{
-		DomainName: jsii.String("money-path.co"),
 	})
 
 	certificate := certManager.Certificate_FromCertificateArn(stack, jsii.String("AcmCertificate"), jsii.String("arn:aws:acm:us-east-1:336301087573:certificate/048e55de-9012-4c68-ad1e-6eb5d05478df"))
@@ -179,6 +176,17 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 				ResponseHeadersPolicy: cloudfront.ResponseHeadersPolicy_CORS_ALLOW_ALL_ORIGINS_AND_SECURITY_HEADERS(),
 			},
 		},
+	})
+
+	domainName := os.Getenv("APP_DOMAIN_NAME")
+
+	if domainName == "" {
+		fmt.Println("Omitting Route53 setup for local development")
+		return stack
+	}
+
+	hostedZone := route53.HostedZone_FromLookup(stack, jsii.String("HostedZone"), &route53.HostedZoneProviderProps{
+		DomainName: jsii.String(domainName),
 	})
 
 	route53.NewARecord(stack, jsii.String("CloudFrontAliasRecord"), &route53.ARecordProps{
