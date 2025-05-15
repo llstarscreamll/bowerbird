@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
@@ -138,8 +137,10 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		OriginAccessIdentity: originAccessIdentity,
 	})
 
+	domainName := os.Getenv("APP_DOMAIN_NAME")
+
 	distribution := cloudfront.NewDistribution(stack, jsii.String("CDN"), &cloudfront.DistributionProps{
-		DomainNames:       &[]*string{jsii.String("money-path.co")},
+		DomainNames:       &[]*string{jsii.String(domainName)},
 		Certificate:       certificate,
 		DefaultRootObject: jsii.String("index.html"),
 		DefaultBehavior: &cloudfront.BehaviorOptions{
@@ -177,13 +178,6 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			},
 		},
 	})
-
-	domainName := os.Getenv("APP_DOMAIN_NAME")
-
-	if domainName == "" {
-		fmt.Println("Omitting Route53 setup for local development")
-		return stack
-	}
 
 	hostedZone := route53.HostedZone_FromLookup(stack, jsii.String("HostedZone"), &route53.HostedZoneProviderProps{
 		DomainName: jsii.String(domainName),
