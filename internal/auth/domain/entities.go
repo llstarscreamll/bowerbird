@@ -30,16 +30,23 @@ type MailCredential struct {
 }
 
 type MailMessage struct {
-	ID         string
-	ExternalID string
-	UserID     string
-	From       string
-	To         string
-	Subject    string
-	Body       string
-	ReceivedAt time.Time
+	ID          string
+	ExternalID  string
+	UserID      string
+	From        string
+	To          string
+	Subject     string
+	Body        string
+	Attachments []MailAttachment
+	ReceivedAt  time.Time
 }
 
+type MailAttachment struct {
+	Name        string
+	ContentType string
+	Content     string
+	Password    string
+}
 type UserWallet struct {
 	ID        string    `json:"ID"`
 	UserID    string    `json:"userID,omitempty"`

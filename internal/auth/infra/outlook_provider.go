@@ -75,22 +75,95 @@ func (g OutlookProvider) getMessages(ctx context.Context, url string, tokens dom
 	}
 
 	for _, message := range response.Value {
+		attachments := []domain.MailAttachment{}
+
+		if message.HasAttachments {
+			attachments, err = g.getAttachments(ctx, message.ID, tokens)
+
+			fmt.Printf("%d attachments found for message %s\n", len(attachments), message.ID)
+
+			if err != nil {
+				fmt.Printf("error getting attachments: %s\n", err)
+			}
+		}
+
 		result = append(result, domain.MailMessage{
-			ID:         g.ulid.New(),
-			ExternalID: message.ID,
-			From:       message.From.EmailAddress.Address,
-			To:         message.ToRecipients[0].EmailAddress.Address,
-			Subject:    message.Subject,
-			Body:       message.Body.Content,
-			ReceivedAt: message.ReceivedDateTime,
+			ID:          g.ulid.New(),
+			ExternalID:  message.ID,
+			From:        message.From.EmailAddress.Address,
+			To:          message.ToRecipients[0].EmailAddress.Address,
+			Subject:     message.Subject,
+			Body:        message.Body.Content,
+			ReceivedAt:  message.ReceivedDateTime,
+			Attachments: attachments,
 		})
 	}
 
 	return result, response.NextLink, nil
 }
 
+func (g OutlookProvider) getAttachments(ctx context.Context, messageID string, tokens domain.Tokens) ([]domain.MailAttachment, error) {
+	httpClient := g.config.Client(ctx, &oauth2.Token{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		Expiry:       tokens.ExpiresAt,
+	})
+
+	resp, err := httpClient.Get(fmt.Sprintf("https://graph.microsoft.com/v1.0/me/messages/%s/attachments", messageID))
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Printf("failed to get outlook attachments: %s", resp.Status)
+		return nil, fmt.Errorf("failed to get outlook attachments: %s", resp.Status)
+	}
+
+	var response attachmentsResponse
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	result := []domain.MailAttachment{}
+
+	for _, attachment := range response.Value {
+		if !strings.HasPrefix(attachment.ContentType, "application/pdf") {
+			continue
+		}
+
+		if attachment.ContentBytes == "" {
+			continue
+		}
+
+		result = append(result, domain.MailAttachment{
+			Name:        attachment.Name,
+			ContentType: attachment.ContentType,
+			Content:     attachment.ContentBytes,
+			Password:    attachment.ContentBytes,
+		})
+	}
+
+	return result, nil
+}
+
 func (g OutlookProvider) Name() string {
 	return "microsoft"
+}
+
+type attachmentsResponse struct {
+	Value []struct {
+		ID              string `json:"id"`
+		Name            string `json:"name"`
+		ContentType     string `json:"contentType"`
+		Size            int    `json:"size"`
+		IsInline        bool   `json:"isInline"`
+		ContentId       string `json:"contentId"`
+		ContentLocation string `json:"contentLocation"`
+		ContentBytes    string `json:"contentBytes"`
+	} `json:"value"`
 }
 
 type messagesResponse struct {
