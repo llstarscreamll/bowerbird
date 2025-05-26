@@ -276,8 +276,6 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 
 	defer os.Remove(tmpFile.Name())
 
-	fmt.Printf("PDF: %s\n", tmpFile.Name())
-
 	pdfBytes, err := base64.StdEncoding.DecodeString(attachment.Content)
 	if err != nil {
 		log.Printf("Error decoding PDF content: %v", err)
@@ -297,10 +295,8 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 		return ""
 	}
 
-	// defer os.Remove(tsvFile.Name())
+	defer os.Remove(tsvFile.Name())
 	tsvFile.Close()
-
-	fmt.Printf("tsvFile: %s\n", tsvFile.Name())
 
 	stdErr := &bytes.Buffer{}
 	stdOut := &bytes.Buffer{}
@@ -440,8 +436,10 @@ func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsvText string) []doma
 
 	transactions = append(transactions, domain.Transaction{
 		SystemDescription: "Rendimientos NuBank",
+		Type:              "income",
 		Amount:            float32(totalAccountReturns),
 		ProcessedAt:       time.Date(statementYear, time.Month(statementMonth), statementLastDay, 23, 59, 59, 0, time.UTC),
+		CreatedAt:         time.Now(),
 	})
 
 	return transactions
@@ -457,6 +455,7 @@ func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, state
 		log.Printf("Error parsing date: %v\ntBlock:\n%s", err, rawTBlock)
 	}
 
+	transactionType := "expense"
 	has4x1000 := strings.Contains(cleanTBlock, "4x1000")
 	amountsMatches := regexp.MustCompile(`[\+|\-]\$[\d|\.|,]+`).FindAllString(cleanTBlock, -1)
 	amountString := amountsMatches[0]
@@ -466,6 +465,10 @@ func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, state
 	if has4x1000 {
 		taxAmountString = amountsMatches[1]
 		description = strings.Join(lines[2:len(lines)-5], " ")
+	}
+
+	if strings.Contains(amountString, "+$") {
+		transactionType = "income"
 	}
 
 	amountString = strings.ReplaceAll(amountString, "$", "")
@@ -489,13 +492,15 @@ func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, state
 
 	return slices.DeleteFunc([]domain.Transaction{
 		{
-			Amount:            float32(amount),
 			SystemDescription: description,
+			Type:              transactionType,
+			Amount:            float32(amount),
 			ProcessedAt:       date,
 		},
 		{
-			Amount:            float32(taxAmount),
 			SystemDescription: "4x1.000",
+			Type:              "expense",
+			Amount:            float32(taxAmount),
 			ProcessedAt:       date,
 		},
 	}, func(t domain.Transaction) bool {

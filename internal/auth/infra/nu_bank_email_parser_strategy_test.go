@@ -5,6 +5,7 @@ import (
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	"log"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -49,6 +50,12 @@ func TestNuAccountStatement(t *testing.T) {
 	result := strategy.Parse(input)
 
 	assert.Equal(t, 112, len(result), "transactions count")
+
+	incomes := slices.DeleteFunc(result, func(t domain.Transaction) bool {
+		return t.Type == "expense"
+	})
+	assert.Equal(t, 3, len(incomes), "incomes count")
+	assert.Equal(t, 109, len(result)-len(incomes), "expenses count")
 }
 
 func initSampleData() {
