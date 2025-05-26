@@ -324,11 +324,21 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 
 func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsvText string) []domain.Transaction {
 	transactions := []domain.Transaction{}
+	totalAccountReturns := float64(0)
 
 	statementYearString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d{4})\n`).FindStringSubmatch(tsvText)[1]
 	statementYear, err := strconv.Atoi(statementYearString)
 	if err != nil {
 		log.Printf("Error parsing statement year: %v", err)
+	}
+
+	statementMonthString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\w{3})\n`).FindStringSubmatch(tsvText)[1]
+	statementMonth := s.parseMonth(statementMonthString)
+
+	statementLastDayString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsvText)[1]
+	statementLastDay, err := strconv.Atoi(statementLastDayString)
+	if err != nil {
+		log.Printf("Error parsing statement last day: %v", err)
 	}
 
 	pages := regexp.MustCompile(`(?m)^.+\t###PAGE###$`).Split(tsvText, -1)
@@ -397,6 +407,18 @@ func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsvText string) []doma
 
 		page = strings.Join(lines, "\n")
 
+		totalAccountReturnsMatches := regexp.MustCompile(`(?m)^.+\tRendimiento\n.+\ttotal\n(?:.+\n){3}.+(\+\$[\d\.,]+)`).FindStringSubmatch(page)
+		if len(totalAccountReturnsMatches) > 1 {
+			totalAccountReturnsString := totalAccountReturnsMatches[1]
+			totalAccountReturnsString = strings.ReplaceAll(totalAccountReturnsString, "$", "")
+			totalAccountReturnsString = strings.ReplaceAll(totalAccountReturnsString, ".", "")
+			totalAccountReturnsString = strings.ReplaceAll(totalAccountReturnsString, ",", ".")
+			totalAccountReturns, err = strconv.ParseFloat(totalAccountReturnsString, 32)
+			if err != nil {
+				log.Printf("Error parsing total account returns: %v", err)
+			}
+		}
+
 		// clean account profit info
 		page = regexp.MustCompile(`(?m)^.+\tRendimiento\n.+\ttotal\n\n(?:.+\n){4}`).ReplaceAllString(page, "")
 
@@ -415,6 +437,12 @@ func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsvText string) []doma
 		}
 
 	}
+
+	transactions = append(transactions, domain.Transaction{
+		SystemDescription: "Rendimientos NuBank",
+		Amount:            float32(totalAccountReturns),
+		ProcessedAt:       time.Date(statementYear, time.Month(statementMonth), statementLastDay, 23, 59, 59, 0, time.UTC),
+	})
 
 	return transactions
 }

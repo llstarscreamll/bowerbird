@@ -48,7 +48,7 @@ func TestNuAccountStatement(t *testing.T) {
 	strategy := &NuBankEmailParserStrategy{}
 	result := strategy.Parse(input)
 
-	assert.Equal(t, 111, len(result), "transactions count")
+	assert.Equal(t, 112, len(result), "transactions count")
 }
 
 func initSampleData() {
