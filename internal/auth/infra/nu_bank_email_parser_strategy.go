@@ -23,7 +23,7 @@ var transferToNuBank = "el dinero que enviaste ya está del otro lado"
 var creditCardStatement = "extracto de tu tarjeta"
 var savingAccountStatement = "extracto de tu cuenta"
 
-func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []domain.Transaction {
+func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage, passwords []string) []domain.Transaction {
 	messageSubject := strings.ToLower(emailMessage.Subject)
 	plainTextMessage := s.cleanUpHTML(emailMessage.Body)
 	plainTextMessage = s.extractPlainText(plainTextMessage)
@@ -57,7 +57,7 @@ func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage) []doma
 		transferTaxAmount = s.getPaymentTaxAmount(plainTextMessage)
 	}
 
-	transactionsFromAttachments := s.getFromAttachments(emailMessage.Attachments)
+	transactionsFromAttachments := s.getFromAttachments(emailMessage.Attachments, passwords)
 	transactionsFromEmailBody := []domain.Transaction{
 		{
 			Origin:            "nu-bank-email",
@@ -247,7 +247,7 @@ func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string
 	return desc
 }
 
-func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailAttachment) []domain.Transaction {
+func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailAttachment, passwords []string) []domain.Transaction {
 	transactions := make([]domain.Transaction, 0)
 
 	for _, attachment := range attachments {
@@ -255,8 +255,9 @@ func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailA
 			continue
 		}
 
-		tsv := s.parsePDFToTsv(attachment)
+		tsv := s.parsePDFToTsv(attachment, passwords)
 		if tsv == "" {
+			fmt.Println("Can't parse PDF to TSV")
 			continue
 		}
 
@@ -274,7 +275,7 @@ func (s NuBankEmailParserStrategy) tsvIsBankStatement(tsv string) bool {
 	return len(matches) > 0
 }
 
-func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachment) string {
+func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachment, passwords []string) string {
 	tmpFile, err := os.CreateTemp("/tmp", "*.pdf")
 
 	if err != nil {
@@ -306,15 +307,17 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 	defer os.Remove(tsvFile.Name())
 	tsvFile.Close()
 
-	stdErr := &bytes.Buffer{}
-	stdOut := &bytes.Buffer{}
-	cmd := exec.Command("pdftotext", "-tsv", tmpFile.Name(), tsvFile.Name(), "-upw", "1057581292")
-	cmd.Stdout = stdOut
-	cmd.Stderr = stdErr
+	for _, password := range passwords {
+		stdErr := &bytes.Buffer{}
+		stdOut := &bytes.Buffer{}
+		cmd := exec.Command("pdftotext", "-tsv", tmpFile.Name(), tsvFile.Name(), "-upw", password)
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
 
-	if err := cmd.Run(); err != nil {
-		log.Printf("Error parsing PDF: %v, %s", err, stdErr.String())
-		return ""
+		if err := cmd.Run(); err != nil {
+			log.Printf("Error parsing PDF: %v, %s", err, stdErr.String())
+			continue
+		}
 	}
 
 	textBytes, err := os.ReadFile(tsvFile.Name())

@@ -21,7 +21,7 @@ func TestNuToNuTransfer(t *testing.T) {
 	input := nuTransferToNuEmailMessage
 
 	strategy := &NuBankEmailParserStrategy{}
-	result := strategy.Parse(input)
+	result := strategy.Parse(input, []string{})
 
 	expectedDate := input.ReceivedAt
 	assert.Equal(t, 2, len(result), "should return 2 transactions")
@@ -41,13 +41,13 @@ func TestNuToNuTransfer(t *testing.T) {
 	assert.Equal(t, expectedDate, result[1].ProcessedAt)
 }
 
-func TestNuAccountStatement(t *testing.T) {
+func TestShouldReturnTransactionsFromNuAccountStatement(t *testing.T) {
 	initSampleData()
 
 	input := nuAccountStatementEmailMessage
 
 	strategy := &NuBankEmailParserStrategy{}
-	result := strategy.Parse(input)
+	result := strategy.Parse(input, []string{"bad-password", "1057581292"})
 
 	assert.Equal(t, 112, len(result), "transactions count")
 
@@ -56,6 +56,28 @@ func TestNuAccountStatement(t *testing.T) {
 	})
 	assert.Equal(t, 3, len(incomes), "incomes count")
 	assert.Equal(t, 109, len(result)-len(incomes), "expenses count")
+}
+
+func TestShouldReturnNoTransactionsFromNuAccountStatementIfPasswordsAreEmpty(t *testing.T) {
+	initSampleData()
+
+	input := nuAccountStatementEmailMessage
+
+	strategy := &NuBankEmailParserStrategy{}
+	result := strategy.Parse(input, []string{})
+
+	assert.Equal(t, 0, len(result), "transactions count")
+}
+
+func TestShouldReturnNoTransactionsFromNuAccountStatementIfPasswordsAreWrong(t *testing.T) {
+	initSampleData()
+
+	input := nuAccountStatementEmailMessage
+
+	strategy := &NuBankEmailParserStrategy{}
+	result := strategy.Parse(input, []string{"bad-password", "another-bad-password"})
+
+	assert.Equal(t, 0, len(result), "transactions count")
 }
 
 func initSampleData() {
