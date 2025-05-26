@@ -248,22 +248,30 @@ func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string
 }
 
 func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailAttachment) []domain.Transaction {
-	transactions := []domain.Transaction{}
+	transactions := make([]domain.Transaction, 0)
 
 	for _, attachment := range attachments {
 		if !strings.HasPrefix(attachment.ContentType, "application/pdf") {
 			continue
 		}
 
-		tsvText := s.parsePDFToTsv(attachment)
-		if tsvText == "" {
+		tsv := s.parsePDFToTsv(attachment)
+		if tsv == "" {
 			continue
 		}
 
-		transactions = append(transactions, s.parseTsvToTransactions(tsvText)...)
+		if s.tsvIsBankStatement(tsv) {
+			transactions = append(transactions, s.parseTsvToTransactions(tsv)...)
+		}
+
 	}
 
 	return transactions
+}
+
+func (s NuBankEmailParserStrategy) tsvIsBankStatement(tsv string) bool {
+	matches := regexp.MustCompile(`(?m)^.+\tHola\,(?:\n.+){4}\tLlegó\n.+\ttu\n.+\textracto`).FindStringSubmatch(tsv)
+	return len(matches) > 0
 }
 
 func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachment) string {
@@ -318,26 +326,26 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 	return string(textBytes)
 }
 
-func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsvText string) []domain.Transaction {
-	transactions := []domain.Transaction{}
+func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsv string) []domain.Transaction {
+	transactions := make([]domain.Transaction, 0)
 	totalAccountReturns := float64(0)
 
-	statementYearString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d{4})\n`).FindStringSubmatch(tsvText)[1]
+	statementYearString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d{4})\n`).FindStringSubmatch(tsv)[1]
 	statementYear, err := strconv.Atoi(statementYearString)
 	if err != nil {
 		log.Printf("Error parsing statement year: %v", err)
 	}
 
-	statementMonthString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\w{3})\n`).FindStringSubmatch(tsvText)[1]
+	statementMonthString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\w{3})\n`).FindStringSubmatch(tsv)[1]
 	statementMonth := s.parseMonth(statementMonthString)
 
-	statementLastDayString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsvText)[1]
+	statementLastDayString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsv)[1]
 	statementLastDay, err := strconv.Atoi(statementLastDayString)
 	if err != nil {
 		log.Printf("Error parsing statement last day: %v", err)
 	}
 
-	pages := regexp.MustCompile(`(?m)^.+\t###PAGE###$`).Split(tsvText, -1)
+	pages := regexp.MustCompile(`(?m)^.+\t###PAGE###$`).Split(tsv, -1)
 	for i, page := range pages[2:] {
 		// remove NuBank interest info
 		page = regexp.MustCompile(`(?m)^.+FLOW###\n(?:.+\n){11}.+\tdiario.\n`).ReplaceAllString(page, "")
