@@ -52,6 +52,8 @@ func RegisterRoutes(
 
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/categories", authMiddleware(searchWalletCategoriesHandler(walletRepo, categoryRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/categories", authMiddleware(createCategoryHandler(ulid, walletRepo, categoryRepo), sessionRepo, userRepo))
+
+	mux.HandleFunc("PUT /api/v1/file-passwords", authMiddleware(updateFilePasswordHandler(filePasswordRepo), sessionRepo, userRepo))
 }
 
 func getUserProfileHandler() http.HandlerFunc {
@@ -781,6 +783,33 @@ func updateTransaction(walletRepo domain.WalletRepository, transactionRepo domai
 			log.Printf("Error updating transaction: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error updating transaction -> "+err.Error())
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":"ok"}`)
+	}
+}
+
+func updateFilePasswordHandler(filePasswordRepo domain.FilePasswordRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
+		var requestBody struct {
+			Passwords []string `json:"passwords"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&requestBody)
+		if err != nil {
+			log.Printf("Error decoding passwords from JSON: %s", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Request body is not valid -> "+err.Error())
+			return
+		}
+
+		err = filePasswordRepo.Upsert(r.Context(), authUser.ID, requestBody.Passwords)
+		if err != nil {
+			log.Printf("Error upserting file passwords: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error upserting file passwords -> "+err.Error())
 			return
 		}
 

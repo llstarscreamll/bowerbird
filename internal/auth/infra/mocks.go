@@ -185,6 +185,11 @@ func (m *MockFilePasswordRepository) GetByUserID(ctx context.Context, userID str
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockFilePasswordRepository) Upsert(ctx context.Context, userID string, passwords []string) error {
+	args := m.Called(ctx, userID, passwords)
+	return args.Error(0)
+}
+
 func neverCalledMockFilePasswordRepository(t *testing.T) *MockFilePasswordRepository {
 	m := new(MockFilePasswordRepository)
 	m.AssertNotCalled(t, "GetByUserID")

@@ -44,4 +44,5 @@ type CategoryRepository interface {
 
 type FilePasswordRepository interface {
 	GetByUserID(ctx context.Context, userID string) ([]string, error)
+	Upsert(ctx context.Context, userID string, passwords []string) error
 }
