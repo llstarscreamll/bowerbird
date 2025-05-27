@@ -276,8 +276,9 @@ func (s NuBankEmailParserStrategy) parseFromAttachments(attachments []domain.Mai
 }
 
 func (s NuBankEmailParserStrategy) tsvIsBankStatement(tsv string) bool {
-	matches := regexp.MustCompile(`(?m)^.+\tHola\,(?:\n.+){4}\tLlegó\n.+\ttu\n.+\textracto`).FindStringSubmatch(tsv)
-	return len(matches) > 0
+	m1 := regexp.MustCompile(`(?m)^.+\tHola\,(?:\n.+){4}\tLlegó\n.+\ttu\n.+\textracto`).FindStringSubmatch(tsv)
+	m2 := regexp.MustCompile(`(?m)^.+\tNu\n.+\tPlaca\n`).FindStringSubmatch(tsv)
+	return len(m1) > 0 && len(m2) > 0
 }
 
 func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachment, passwords []string) string {
