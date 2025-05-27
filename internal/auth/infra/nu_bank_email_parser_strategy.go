@@ -21,68 +21,74 @@ var payment = " con cuenta nu"
 var transferToExternalBank = "tu dinero ya va en camino"
 var transferToNuBank = "el dinero que enviaste ya está del otro lado"
 var creditCardStatement = "extracto de tu tarjeta"
-var savingAccountStatement = "extracto de tu cuenta"
+var savingsAccountStatement = "extracto de tu cuenta"
 
-func (s NuBankEmailParserStrategy) Parse(emailMessage domain.MailMessage, passwords []string) []domain.Transaction {
-	messageSubject := strings.ToLower(emailMessage.Subject)
-	plainTextMessage := s.cleanUpHTML(emailMessage.Body)
-	plainTextMessage = s.extractPlainText(plainTextMessage)
+func (s NuBankEmailParserStrategy) Parse(mail domain.MailMessage, passwords []string) []domain.Transaction {
 
-	subjects := []string{payment, transferToNuBank, transferToExternalBank, creditCardStatement, savingAccountStatement}
-	if !slices.ContainsFunc(subjects, func(s string) bool {
-		return strings.Contains(strings.ToLower(messageSubject), strings.ToLower(s))
-	}) {
-		return []domain.Transaction{}
-	}
-
-	description := ""
-	transactionType := "expense"
-	transferAmount := float32(0)
-	transferTaxAmount := float32(0)
-
-	transferAmount = s.getTransferAmount(plainTextMessage)
-	transferTaxAmount = s.getTransferTaxAmount(plainTextMessage)
-
-	if strings.Contains(messageSubject, transferToNuBank) {
-		description = s.getNuTransferDescription(plainTextMessage)
-	}
-
-	if strings.Contains(messageSubject, transferToExternalBank) {
-		description = s.getExternalBankTransferDescription(plainTextMessage)
-	}
-
-	if strings.Contains(messageSubject, payment) {
-		description = s.getPaymentDescription(plainTextMessage)
-		transferAmount = s.getPaymentAmount(plainTextMessage)
-		transferTaxAmount = s.getPaymentTaxAmount(plainTextMessage)
-	}
-
-	transactionsFromAttachments := s.getFromAttachments(emailMessage.Attachments, passwords)
-	transactionsFromEmailBody := []domain.Transaction{
-		{
-			Origin:            "nu-bank-email",
-			Reference:         emailMessage.ExternalID,
-			Amount:            transferAmount,
-			Type:              transactionType,
-			SystemDescription: description,
-			ProcessedAt:       emailMessage.ReceivedAt,
-		},
-		{
-			Origin:            "nu-bank-email",
-			Reference:         emailMessage.ExternalID + "_tax",
-			Amount:            transferTaxAmount,
-			Type:              transactionType,
-			SystemDescription: "4x1.000",
-			ProcessedAt:       emailMessage.ReceivedAt,
-		},
-	}
+	transactionsFromEmailBody := s.parseFromMailBody(mail)
+	transactionsFromAttachments := s.parseFromAttachments(mail.Attachments, passwords)
 
 	return slices.DeleteFunc(append(transactionsFromEmailBody, transactionsFromAttachments...), func(t domain.Transaction) bool {
 		return t.Amount == 0
 	})
 }
 
-func (s NuBankEmailParserStrategy) cleanUpHTML(html string) string {
+func (s NuBankEmailParserStrategy) parseFromMailBody(mail domain.MailMessage) []domain.Transaction {
+	messageSubject := strings.ToLower(mail.Subject)
+
+	subjects := []string{payment, transferToNuBank, transferToExternalBank, creditCardStatement, savingsAccountStatement}
+	if !slices.ContainsFunc(subjects, func(s string) bool {
+		return strings.Contains(strings.ToLower(messageSubject), strings.ToLower(s))
+	}) {
+		return []domain.Transaction{}
+	}
+
+	plainTextMail := s.cleanUpMailHTML(mail.Body)
+	plainTextMail = s.extractPlainTextFromMailHTML(plainTextMail)
+
+	description := ""
+	transactionType := "expense"
+	transferAmount := float32(0)
+	transferTaxAmount := float32(0)
+
+	transferAmount = s.getTransferAmountFromPlainTextMail(plainTextMail)
+	transferTaxAmount = s.getTransferTaxAmountFromPlainTextMail(plainTextMail)
+
+	if strings.Contains(messageSubject, transferToNuBank) {
+		description = s.getNuTransferDescriptionFromPlainTextMail(plainTextMail)
+	}
+
+	if strings.Contains(messageSubject, transferToExternalBank) {
+		description = s.getExternalBankTransferDescriptionFromPlainTextMail(plainTextMail)
+	}
+
+	if strings.Contains(messageSubject, payment) {
+		description = s.getPaymentDescriptionFromPlainTextMail(plainTextMail)
+		transferAmount = s.getPaymentAmountFromPlainTextMail(plainTextMail)
+		transferTaxAmount = s.getPaymentTaxAmountFromPlainTextMail(plainTextMail)
+	}
+
+	return []domain.Transaction{
+		{
+			Origin:            "nu-bank-email",
+			Reference:         mail.ExternalID,
+			Amount:            transferAmount,
+			Type:              transactionType,
+			SystemDescription: description,
+			ProcessedAt:       mail.ReceivedAt,
+		},
+		{
+			Origin:            "nu-bank-email",
+			Reference:         mail.ExternalID + "_tax",
+			Amount:            transferTaxAmount,
+			Type:              transactionType,
+			SystemDescription: "4x1.000",
+			ProcessedAt:       mail.ReceivedAt,
+		},
+	}
+}
+
+func (s NuBankEmailParserStrategy) cleanUpMailHTML(html string) string {
 	reOfficeDocSettings := regexp.MustCompile(`<o:OfficeDocumentSettings[\s\S]*?</o:OfficeDocumentSettings>`)
 	html = reOfficeDocSettings.ReplaceAllString(html, "")
 
@@ -101,7 +107,7 @@ func (s NuBankEmailParserStrategy) cleanUpHTML(html string) string {
 	return html
 }
 
-func (s NuBankEmailParserStrategy) extractPlainText(html string) string {
+func (s NuBankEmailParserStrategy) extractPlainTextFromMailHTML(html string) string {
 	re := regexp.MustCompile(`<.*?>`)
 	html = re.ReplaceAllString(html, "")
 
@@ -111,7 +117,7 @@ func (s NuBankEmailParserStrategy) extractPlainText(html string) string {
 	return html
 }
 
-func (s NuBankEmailParserStrategy) getTransferAmount(plainTextMessage string) float32 {
+func (s NuBankEmailParserStrategy) getTransferAmountFromPlainTextMail(plainTextMessage string) float32 {
 	amount := float32(0)
 	reAmount := regexp.MustCompile(`Monto\n\$([\d\.,]+)\n`)
 	matches := reAmount.FindStringSubmatch(plainTextMessage)
@@ -134,7 +140,7 @@ func (s NuBankEmailParserStrategy) getTransferAmount(plainTextMessage string) fl
 	return -amount
 }
 
-func (s NuBankEmailParserStrategy) getPaymentAmount(plainTextMessage string) float32 {
+func (s NuBankEmailParserStrategy) getPaymentAmountFromPlainTextMail(plainTextMessage string) float32 {
 	amount := float32(0)
 	reAmount := regexp.MustCompile(`La cantidad de:\n\$([\d\.,]+)\n`)
 	matches := reAmount.FindStringSubmatch(plainTextMessage)
@@ -157,7 +163,7 @@ func (s NuBankEmailParserStrategy) getPaymentAmount(plainTextMessage string) flo
 	return -amount
 }
 
-func (s NuBankEmailParserStrategy) getTransferTaxAmount(plainTextMessage string) float32 {
+func (s NuBankEmailParserStrategy) getTransferTaxAmountFromPlainTextMail(plainTextMessage string) float32 {
 	amount := float32(0)
 	reAmount := regexp.MustCompile(`Impuesto del 4x1\.000\n\$([\d\.,]+)\n`)
 	matches := reAmount.FindStringSubmatch(plainTextMessage)
@@ -180,7 +186,7 @@ func (s NuBankEmailParserStrategy) getTransferTaxAmount(plainTextMessage string)
 	return -amount
 }
 
-func (s NuBankEmailParserStrategy) getPaymentTaxAmount(plainTextMessage string) float32 {
+func (s NuBankEmailParserStrategy) getPaymentTaxAmountFromPlainTextMail(plainTextMessage string) float32 {
 	amount := float32(0)
 	reAmount := regexp.MustCompile(`Más el impuesto del 4xmil de:\n\$([\d\.,]+)\n`)
 	matches := reAmount.FindStringSubmatch(plainTextMessage)
@@ -203,7 +209,7 @@ func (s NuBankEmailParserStrategy) getPaymentTaxAmount(plainTextMessage string) 
 	return -amount
 }
 
-func (s NuBankEmailParserStrategy) getNuTransferDescription(plainTextMessage string) string {
+func (s NuBankEmailParserStrategy) getNuTransferDescriptionFromPlainTextMail(plainTextMessage string) string {
 	desc := ""
 	reReceiver := regexp.MustCompile(`Recibe\n(.+) Nu`)
 	matches := reReceiver.FindStringSubmatch(plainTextMessage)
@@ -216,7 +222,7 @@ func (s NuBankEmailParserStrategy) getNuTransferDescription(plainTextMessage str
 	return desc
 }
 
-func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextMessage string) string {
+func (s NuBankEmailParserStrategy) getExternalBankTransferDescriptionFromPlainTextMail(plainTextMessage string) string {
 	desc := ""
 	reReceiver := regexp.MustCompile(`Recibe\n(.+)\n`)
 	reBank := regexp.MustCompile(`Banco\n(.+)\n`)
@@ -235,7 +241,7 @@ func (s NuBankEmailParserStrategy) getExternalBankTransferDescription(plainTextM
 	return desc
 }
 
-func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string) string {
+func (s NuBankEmailParserStrategy) getPaymentDescriptionFromPlainTextMail(plainTextMessage string) string {
 	desc := ""
 	reReceiver := regexp.MustCompile(`Pagaste en:\n(.+)\n`)
 	receiverMatches := reReceiver.FindStringSubmatch(plainTextMessage)
@@ -247,7 +253,7 @@ func (s NuBankEmailParserStrategy) getPaymentDescription(plainTextMessage string
 	return desc
 }
 
-func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailAttachment, passwords []string) []domain.Transaction {
+func (s NuBankEmailParserStrategy) parseFromAttachments(attachments []domain.MailAttachment, passwords []string) []domain.Transaction {
 	transactions := make([]domain.Transaction, 0)
 
 	for _, attachment := range attachments {
@@ -262,9 +268,8 @@ func (s NuBankEmailParserStrategy) getFromAttachments(attachments []domain.MailA
 		}
 
 		if s.tsvIsBankStatement(tsv) {
-			transactions = append(transactions, s.parseTsvToTransactions(tsv)...)
+			transactions = append(transactions, s.parseFromBankStatementTsv(tsv)...)
 		}
-
 	}
 
 	return transactions
@@ -329,7 +334,7 @@ func (s NuBankEmailParserStrategy) parsePDFToTsv(attachment domain.MailAttachmen
 	return string(textBytes)
 }
 
-func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsv string) []domain.Transaction {
+func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domain.Transaction {
 	transactions := make([]domain.Transaction, 0)
 	totalAccountReturns := float64(0)
 
@@ -429,20 +434,19 @@ func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsv string) []domain.T
 		// clean account profit info
 		page = regexp.MustCompile(`(?m)^.+\tRendimiento\n.+\ttotal\n\n(?:.+\n){4}`).ReplaceAllString(page, "")
 
-		transactionMainBlocks := regexp.MustCompile(`(?m)^.+\t68\.000000\t.+\t###FLOW###$`).Split(page, -1)
-		for _, tBlock := range transactionMainBlocks {
-			tBlock = regexp.MustCompile(`(?m)^.+\t###FLOW###\n`).ReplaceAllString(tBlock, "")
-			tBlock = regexp.MustCompile(`(?m)^.+\t###LINE###\n`).ReplaceAllString(tBlock, "")
-			tBlock = regexp.MustCompile(`(?m)\n\n`).ReplaceAllString(tBlock, "\n")
-			tBlock = strings.TrimSpace(tBlock)
+		tsvTransactions := regexp.MustCompile(`(?m)^.+\t68\.000000\t.+\t###FLOW###$`).Split(page, -1)
+		for _, tsvTransaction := range tsvTransactions {
+			tsvTransaction = regexp.MustCompile(`(?m)^.+\t###FLOW###\n`).ReplaceAllString(tsvTransaction, "")
+			tsvTransaction = regexp.MustCompile(`(?m)^.+\t###LINE###\n`).ReplaceAllString(tsvTransaction, "")
+			tsvTransaction = regexp.MustCompile(`(?m)\n\n`).ReplaceAllString(tsvTransaction, "\n")
+			tsvTransaction = strings.TrimSpace(tsvTransaction)
 
-			if tBlock == "" {
+			if tsvTransaction == "" {
 				continue
 			}
 
-			transactions = append(transactions, s.parseTransactionBlock(tBlock, statementYear)...)
+			transactions = append(transactions, s.parseTsvTransaction(tsvTransaction, statementYear)...)
 		}
-
 	}
 
 	transactions = append(transactions, domain.Transaction{
@@ -456,22 +460,22 @@ func (s NuBankEmailParserStrategy) parseTsvToTransactions(tsv string) []domain.T
 	return transactions
 }
 
-func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, statementYear int) []domain.Transaction {
-	cleanTBlock := regexp.MustCompile(`(?m)^.+\t(.+)\n`).ReplaceAllString(rawTBlock, "$1\n")
-	cleanTBlock = regexp.MustCompile(`(?m)^.+\t(.+)`).ReplaceAllString(cleanTBlock, "$1")
-	lines := strings.Split(cleanTBlock, "\n")
+func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, statementYear int) []domain.Transaction {
+	cleanTsv := regexp.MustCompile(`(?m)^.+\t(.+)\n`).ReplaceAllString(tsvTransaction, "$1\n")
+	cleanTsv = regexp.MustCompile(`(?m)^.+\t(.+)`).ReplaceAllString(cleanTsv, "$1")
+	lines := strings.Split(cleanTsv, "\n")
 
 	date, err := time.Parse("02 1 2006", fmt.Sprintf("%s %d %d", lines[0], s.parseMonth(lines[1]), statementYear))
 	if err != nil {
-		log.Printf("Error parsing date: %v\ntBlock:\n%s", err, rawTBlock)
+		log.Printf("Error parsing date: %v\ntBlock:\n%s", err, tsvTransaction)
 	}
 
-	transactionType := "expense"
-	has4x1000 := strings.Contains(cleanTBlock, "4x1000")
-	amountsMatches := regexp.MustCompile(`[\+|\-]\$[\d|\.|,]+`).FindAllString(cleanTBlock, -1)
-	amountString := amountsMatches[0]
-	taxAmountString := "0"
+	has4x1000 := strings.Contains(cleanTsv, "4x1000")
 	description := strings.Join(lines[2:len(lines)-1], " ")
+	taxAmountString := "0"
+	transactionType := "expense"
+	amountsMatches := regexp.MustCompile(`[\+|\-]\$[\d|\.|,]+`).FindAllString(cleanTsv, -1)
+	amountString := amountsMatches[0]
 
 	if has4x1000 {
 		taxAmountString = amountsMatches[1]
@@ -498,10 +502,10 @@ func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, state
 
 	taxAmount, err := strconv.ParseFloat(taxAmountString, 32)
 	if err != nil {
-		log.Printf("Error parsing tax amount: %v\ntBlock:\n%s", err, rawTBlock)
+		log.Printf("Error parsing tax amount: %v\ntBlock:\n%s", err, tsvTransaction)
 	}
 
-	return slices.DeleteFunc([]domain.Transaction{
+	return []domain.Transaction{
 		{
 			SystemDescription: description,
 			Type:              transactionType,
@@ -514,9 +518,7 @@ func (s NuBankEmailParserStrategy) parseTransactionBlock(rawTBlock string, state
 			Amount:            float32(taxAmount),
 			ProcessedAt:       date,
 		},
-	}, func(t domain.Transaction) bool {
-		return t.Amount == 0
-	})
+	}
 }
 
 func (s NuBankEmailParserStrategy) parseMonth(monthName string) int {

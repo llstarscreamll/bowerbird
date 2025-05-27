@@ -488,7 +488,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 					parserStrategy = &NuBankEmailParserStrategy{}
 				}
 
-				t := parserStrategy.Parse(m)
+				t := parserStrategy.Parse(m, []string{})
 				transactions = append(transactions, t...)
 			}
 
