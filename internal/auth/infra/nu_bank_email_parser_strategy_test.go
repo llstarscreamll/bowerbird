@@ -15,7 +15,7 @@ import (
 var nuTransferToNuEmailMessage domain.MailMessage
 var nuAccountStatementEmailMessage domain.MailMessage
 
-func TestNuToNuTransfer(t *testing.T) {
+func TestNuToNuTransferEmail(t *testing.T) {
 	initSampleData()
 
 	input := nuTransferToNuEmailMessage
@@ -41,7 +41,7 @@ func TestNuToNuTransfer(t *testing.T) {
 	assert.Equal(t, expectedDate, result[1].ProcessedAt)
 }
 
-func TestShouldReturnTransactionsFromNuAccountStatement(t *testing.T) {
+func TestShouldReturnTransactionsFromAccountStatement(t *testing.T) {
 	initSampleData()
 
 	input := nuAccountStatementEmailMessage
@@ -58,7 +58,7 @@ func TestShouldReturnTransactionsFromNuAccountStatement(t *testing.T) {
 	assert.Equal(t, 109, len(result)-len(incomes), "expenses count")
 }
 
-func TestShouldReturnNoTransactionsFromNuAccountStatementIfPasswordsAreEmpty(t *testing.T) {
+func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvided(t *testing.T) {
 	initSampleData()
 
 	input := nuAccountStatementEmailMessage
@@ -69,7 +69,7 @@ func TestShouldReturnNoTransactionsFromNuAccountStatementIfPasswordsAreEmpty(t *
 	assert.Equal(t, 0, len(result), "transactions count")
 }
 
-func TestShouldReturnNoTransactionsFromNuAccountStatementIfPasswordsAreWrong(t *testing.T) {
+func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreWrong(t *testing.T) {
 	initSampleData()
 
 	input := nuAccountStatementEmailMessage
