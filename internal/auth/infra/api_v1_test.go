@@ -39,8 +39,9 @@ func TestGoogleLogin(t *testing.T) {
 	mailMessageRepo := neverCalledMockMailMessageRepository(t)
 	transactionRepoMock := neverCalledMockTransactionRepository(t)
 	mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
+	filePasswordRepoMock := neverCalledMockFilePasswordRepository(t)
 
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock, filePasswordRepoMock)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -60,6 +61,7 @@ func TestGoogleLogin(t *testing.T) {
 	transactionRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
 	categoryRepoMock.AssertExpectations(t)
+	filePasswordRepoMock.AssertExpectations(t)
 }
 
 func TestGoogleLoginCallback(t *testing.T) {
@@ -236,8 +238,9 @@ func TestGoogleLoginCallback(t *testing.T) {
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
 			mailSecretRepoMock := neverCalledMockMailCredentialRepository(t)
 			categoryRepoMock := neverCalledMockCategoryRepository(t)
+			filePasswordRepoMock := neverCalledMockFilePasswordRepository(t)
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock, filePasswordRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -261,6 +264,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			walletRepoMock.AssertExpectations(t)
 			transactionRepoMock.AssertExpectations(t)
 			categoryRepoMock.AssertExpectations(t)
+			filePasswordRepoMock.AssertExpectations(t)
 		})
 	}
 }
@@ -289,11 +293,12 @@ func TestGMailLogin(t *testing.T) {
 	walletRepoMock := neverCalledMockMockWalletRepository(t)
 	transactionRepoMock := neverCalledMockTransactionRepository(t)
 	categoryRepoMock := neverCalledMockCategoryRepository(t)
+	filePasswordRepoMock := neverCalledMockFilePasswordRepository(t)
 
 	authServerGatewayMock := new(MockAuthServerGateway)
 	authServerGatewayMock.On("GetLoginUrl", "google", config.ApiUrl+"/api/v1/auth/google-mail/callback", []string{"https://www.googleapis.com/auth/gmail.readonly"}).Return("https://some-google.com/auth/login", nil)
 
-	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
+	RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailSecretRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock, filePasswordRepoMock)
 	mux.ServeHTTP(w, r)
 
 	response := w.Result()
@@ -313,6 +318,7 @@ func TestGMailLogin(t *testing.T) {
 	transactionRepoMock.AssertExpectations(t)
 	authServerGatewayMock.AssertExpectations(t)
 	categoryRepoMock.AssertExpectations(t)
+	filePasswordRepoMock.AssertExpectations(t)
 }
 
 func TestGMailLoginCallback(t *testing.T) {
@@ -424,6 +430,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			walletRepoMock := neverCalledMockMockWalletRepository(t)
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
 			categoryRepoMock := neverCalledMockCategoryRepository(t)
+			filePasswordRepoMock := neverCalledMockFilePasswordRepository(t)
 			mux := http.NewServeMux()
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(tc.verb, tc.endpoint, nil)
@@ -432,7 +439,7 @@ func TestGMailLoginCallback(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authServerGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepo, walletRepoMock, transactionRepoMock, categoryRepoMock, filePasswordRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -574,6 +581,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 			walletRepoMock := neverCalledMockMockWalletRepository(t)
 			transactionRepoMock := neverCalledMockTransactionRepository(t)
 			categoryRepoMock := neverCalledMockCategoryRepository(t)
+			filePasswordRepoMock := neverCalledMockFilePasswordRepository(t)
 
 			mux := http.NewServeMux()
 			w := httptest.NewRecorder()
@@ -583,7 +591,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 				r.Header.Add(k, v)
 			}
 
-			RegisterRoutes(mux, config, ulidMock, authGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepoMock, walletRepoMock, transactionRepoMock, categoryRepoMock)
+			RegisterRoutes(mux, config, ulidMock, authGatewayMock, userRepoMock, sessionRepoMock, cryptMock, mailCredentialRepoMock, mailGatewayMock, mailMessageRepoMock, walletRepoMock, transactionRepoMock, categoryRepoMock, filePasswordRepoMock)
 			mux.ServeHTTP(w, r)
 
 			response := w.Result()
@@ -607,6 +615,7 @@ func TestSyncTransactionsFromEmails(t *testing.T) {
 			transactionRepoMock.AssertExpectations(t)
 			mailCredentialRepoMock.AssertExpectations(t)
 			categoryRepoMock.AssertExpectations(t)
+			filePasswordRepoMock.AssertExpectations(t)
 		})
 	}
 }

@@ -41,3 +41,7 @@ type CategoryRepository interface {
 	FindByWalletID(ctx context.Context, walletID string) ([]Category, error)
 	Create(ctx context.Context, category Category) error
 }
+
+type FilePasswordRepository interface {
+	GetByUserID(ctx context.Context, userID string) ([]string, error)
+}

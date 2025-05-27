@@ -144,12 +144,10 @@ type MockTransactionRepository struct {
 	mock.Mock
 }
 
-// GetByWalletIDAndID implements domain.TransactionRepository.
 func (m *MockTransactionRepository) GetByWalletIDAndID(ctx context.Context, walletID string, transactionID string) (domain.Transaction, error) {
 	panic("unimplemented")
 }
 
-// Update implements domain.TransactionRepository.
 func (m *MockTransactionRepository) Update(ctx context.Context, transaction domain.Transaction) error {
 	panic("unimplemented")
 }
@@ -176,6 +174,21 @@ func (m *MockCategoryRepository) Create(ctx context.Context, category domain.Cat
 func (m *MockCategoryRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Category, error) {
 	args := m.Called(ctx, walletID)
 	return args.Get(0).([]domain.Category), args.Error(1)
+}
+
+type MockFilePasswordRepository struct {
+	mock.Mock
+}
+
+func (m *MockFilePasswordRepository) GetByUserID(ctx context.Context, userID string) ([]string, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func neverCalledMockFilePasswordRepository(t *testing.T) *MockFilePasswordRepository {
+	m := new(MockFilePasswordRepository)
+	m.AssertNotCalled(t, "GetByUserID")
+	return m
 }
 
 func neverCalledMockUlid(t *testing.T) *MockULID {

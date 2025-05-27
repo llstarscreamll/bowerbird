@@ -32,6 +32,7 @@ func RegisterRoutes(
 	walletRepo domain.WalletRepository,
 	transactionRepo domain.TransactionRepository,
 	categoryRepo domain.CategoryRepository,
+	filePasswordRepo domain.FilePasswordRepository,
 ) {
 	mux.HandleFunc("GET /api/v1/auth/user", authMiddleware(getUserProfileHandler(), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/auth/google/login", googleLoginHandler(config, ulid, sessionRepo, authGateway))
@@ -45,7 +46,7 @@ func RegisterRoutes(
 
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
-	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-email", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("PATCH /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(updateTransaction(walletRepo, transactionRepo), sessionRepo, userRepo))
 
@@ -397,7 +398,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 	}
 }
 
-func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
+func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository, filePasswordRepo domain.FilePasswordRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		walletID := r.PathValue("walletID")
 		if walletID == "" {
@@ -428,6 +429,14 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			log.Printf("Error getting mail credentials from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting mail credentials from storage -> "+err.Error())
+			return
+		}
+
+		filePasswords, err := filePasswordRepo.GetByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting file passwords from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting file passwords from storage -> "+err.Error())
 			return
 		}
 
@@ -488,7 +497,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 					parserStrategy = &NuBankEmailParserStrategy{}
 				}
 
-				t := parserStrategy.Parse(m, []string{})
+				t := parserStrategy.Parse(m, filePasswords)
 				transactions = append(transactions, t...)
 			}
 

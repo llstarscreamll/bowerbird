@@ -155,6 +155,7 @@ func setUpAPIServer() {
 	walletRepo := authInfra.NewPgxWalletRepository(db)
 	transactionRepo := authInfra.NewPgxTransactionRepository(db)
 	categoryRepo := authInfra.NewPgxCategoryRepository(db)
+	filePasswordRepo := authInfra.NewPgxFilePasswordRepository(db, crypt)
 	fmt.Println("Repositories initialized")
 
 	googleAuth := *authInfra.NewGoogleAuthStrategy(
@@ -199,7 +200,22 @@ func setUpAPIServer() {
 		fmt.Fprint(w, `{"data": "Welcome to API V1"}`)
 	})
 
-	authInfra.RegisterRoutes(mux, config, ulid, authServerGateway, userRepo, sessionRepo, crypt, mailCredentialRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, categoryRepo)
+	authInfra.RegisterRoutes(
+		mux,
+		config,
+		ulid,
+		authServerGateway,
+		userRepo,
+		sessionRepo,
+		crypt,
+		mailCredentialRepo,
+		mailGateway,
+		mailMessageRepo,
+		walletRepo,
+		transactionRepo,
+		categoryRepo,
+		filePasswordRepo,
+	)
 
 	// Enable CORS
 	corsHandler := func(h http.Handler) http.Handler {
