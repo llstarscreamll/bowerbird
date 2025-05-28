@@ -41,7 +41,7 @@ func TestNuToNuTransferEmail(t *testing.T) {
 	assert.Equal(t, expectedDate, result[1].ProcessedAt)
 }
 
-func TestShouldReturnTransactionsFromAccountStatement(t *testing.T) {
+func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
 	initSampleData()
 
 	input := nuAccountStatementEmailMessage
@@ -51,11 +51,16 @@ func TestShouldReturnTransactionsFromAccountStatement(t *testing.T) {
 
 	assert.Equal(t, 112, len(result), "transactions count")
 
-	incomes := slices.DeleteFunc(result, func(t domain.Transaction) bool {
+	incomes := slices.DeleteFunc(slices.Clone(result), func(t domain.Transaction) bool {
 		return t.Type == "expense"
 	})
 	assert.Equal(t, 3, len(incomes), "incomes count")
 	assert.Equal(t, 109, len(result)-len(incomes), "expenses count")
+
+	tax4xMil := slices.DeleteFunc(slices.Clone(result), func(t domain.Transaction) bool {
+		return t.SystemDescription != "4x1.000"
+	})
+	assert.Equal(t, 49, len(tax4xMil), "4x1.000 taxes count")
 }
 
 func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvided(t *testing.T) {
