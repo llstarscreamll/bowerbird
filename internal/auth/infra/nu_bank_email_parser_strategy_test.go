@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,14 +27,14 @@ func TestNuToNuTransferEmail(t *testing.T) {
 	expectedDate := input.ReceivedAt
 	assert.Equal(t, 2, len(result), "should return 2 transactions")
 
-	assert.Equal(t, "nu-bank-email", result[0].Origin)
+	assert.Equal(t, "nu/savings", result[0].Origin)
 	assert.Equal(t, "expense", result[0].Type)
 	assert.Equal(t, float32(-300000), result[0].Amount)
 	assert.Equal(t, "", result[0].UserDescription)
 	assert.Equal(t, "Envío a Diana E.", result[0].SystemDescription)
 	assert.Equal(t, expectedDate, result[0].ProcessedAt)
 
-	assert.Equal(t, "nu-bank-email", result[1].Origin)
+	assert.Equal(t, "nu/savings", result[1].Origin)
 	assert.Equal(t, "expense", result[1].Type)
 	assert.Equal(t, float32(-1200), result[1].Amount)
 	assert.Equal(t, "", result[1].UserDescription)
@@ -61,6 +62,26 @@ func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
 		return t.SystemDescription != "4x1.000"
 	})
 	assert.Equal(t, 49, len(tax4xMil), "4x1.000 taxes count")
+
+	// validate transactions uniqueness by checking transactions with the same date, same receiver and same amount
+	t1 := result[10]
+	t2 := result[11]
+	assert.Equal(t, t1.Amount, t2.Amount)
+	assert.Equal(t, t1.SystemDescription, t2.SystemDescription) // receiver
+	assert.Equal(t, t1.ProcessedAt, t2.ProcessedAt)
+	assert.Equal(t, t1.UniquenessCount, 0, "uniqueness count for t1")
+	assert.Equal(t, t2.UniquenessCount, 1, "uniqueness count for t2")
+
+	apr25Transactions := slices.DeleteFunc(slices.Clone(result), func(t domain.Transaction) bool {
+		return !strings.Contains(t.SystemDescription, "GRACE CAROLINA")
+	})
+
+	assert.Equal(t, 5, len(apr25Transactions), "abr25 transactions to Carolina count")
+	assert.Equal(t, 0, apr25Transactions[0].UniquenessCount, "uniqueness validation for Carolina transaction 0")
+	assert.Equal(t, 1, apr25Transactions[1].UniquenessCount, "uniqueness validation for Carolina transaction 1")
+	assert.Equal(t, 2, apr25Transactions[2].UniquenessCount, "uniqueness validation for Carolina transaction 2")
+	assert.Equal(t, 3, apr25Transactions[3].UniquenessCount, "uniqueness validation for Carolina transaction 3")
+	assert.Equal(t, 4, apr25Transactions[4].UniquenessCount, "uniqueness validation for Carolina transaction 4")
 }
 
 func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvided(t *testing.T) {

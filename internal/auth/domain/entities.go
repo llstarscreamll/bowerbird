@@ -1,6 +1,8 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 type User struct {
 	ID         string `json:"id"`
@@ -71,6 +73,7 @@ type Transaction struct {
 	Amount            float32   `json:"amount"`
 	UserDescription   string    `json:"userDescription"`
 	SystemDescription string    `json:"systemDescription"`
+	UniquenessCount   int       `json:"uniquenessCount"`
 	ProcessedAt       time.Time `json:"processedAt"`
 	CreatedAt         time.Time `json:"createdAt"`
 }

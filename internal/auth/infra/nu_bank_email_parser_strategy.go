@@ -70,7 +70,7 @@ func (s NuBankEmailParserStrategy) parseFromMailBody(mail domain.MailMessage) []
 
 	return []domain.Transaction{
 		{
-			Origin:            "nu-bank-email",
+			Origin:            "nu/savings",
 			Reference:         mail.ExternalID,
 			Amount:            transferAmount,
 			Type:              transactionType,
@@ -78,7 +78,7 @@ func (s NuBankEmailParserStrategy) parseFromMailBody(mail domain.MailMessage) []
 			ProcessedAt:       mail.ReceivedAt,
 		},
 		{
-			Origin:            "nu-bank-email",
+			Origin:            "nu/savings",
 			Reference:         mail.ExternalID + "_tax",
 			Amount:            transferTaxAmount,
 			Type:              transactionType,
@@ -446,7 +446,27 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 				continue
 			}
 
-			transactions = append(transactions, s.parseTsvTransaction(tsvTransaction, statementYear)...)
+			parsedTransactions := s.parseTsvTransaction(tsvTransaction, statementYear)
+
+			// this is a uniqueness mechanism for transactions that happens in
+			// the same day, to same receiver/sender and same amount, when
+			// the same transaction is repeated in the same day, we need to
+			// increment the uniqueness count to avoid duplicate transactions,
+			// example:
+			// 20250528/Nu/savings/JohnDoe/-15/0 -> last digit 0 is the uniqueness count
+			// 20250528/Nu/savings/JohnDoe/-15/1 -> last digit 1 is the uniqueness count
+			// 20250528/Nu/savings/JohnDoe/-15/2 -> last digit 2 is the uniqueness count
+			for i, t1 := range parsedTransactions {
+				for _, t2 := range transactions {
+					t1UniqueString := fmt.Sprintf("%s/%s/%f", t1.ProcessedAt.Format("20060102"), t1.SystemDescription, t1.Amount)
+					t2UniqueString := fmt.Sprintf("%s/%s/%f", t2.ProcessedAt.Format("20060102"), t2.SystemDescription, t2.Amount)
+					if t1UniqueString == t2UniqueString {
+						parsedTransactions[i].UniquenessCount = t2.UniquenessCount + 1
+					}
+				}
+			}
+
+			transactions = append(transactions, parsedTransactions...)
 		}
 	}
 
@@ -511,12 +531,14 @@ func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, st
 			SystemDescription: description,
 			Type:              transactionType,
 			Amount:            float32(amount),
+			Origin:            "nu/savings",
 			ProcessedAt:       date,
 		},
 		{
 			SystemDescription: "4x1.000",
 			Type:              "expense",
 			Amount:            float32(taxAmount),
+			Origin:            "nu/savings",
 			ProcessedAt:       date,
 		},
 	}
