@@ -472,6 +472,7 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 
 	transactions = append(transactions, domain.Transaction{
 		SystemDescription: "Rendimientos NuBank",
+		Origin:            "nu/savings",
 		Type:              "income",
 		Amount:            float32(totalAccountReturns),
 		ProcessedAt:       time.Date(statementYear, time.Month(statementMonth), statementLastDay, 23, 59, 59, 0, time.UTC),
