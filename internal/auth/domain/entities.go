@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -68,7 +70,6 @@ type Transaction struct {
 	CategoryIcon      string    `json:"categoryIcon"`
 	UserName          string    `json:"userName"`
 	Origin            string    `json:"origin"`
-	Reference         string    `json:"reference"`
 	Type              string    `json:"type"`
 	Amount            float32   `json:"amount"`
 	UserDescription   string    `json:"userDescription"`
@@ -76,6 +77,10 @@ type Transaction struct {
 	UniquenessCount   int       `json:"uniquenessCount"`
 	ProcessedAt       time.Time `json:"processedAt"`
 	CreatedAt         time.Time `json:"createdAt"`
+}
+
+func (t *Transaction) Reference() string {
+	return fmt.Sprintf("%s/%s/%s/%f/%d", t.ProcessedAt.Format("20060102"), t.Origin, strings.ToLower(t.SystemDescription), t.Amount, t.UniquenessCount)
 }
 
 type Category struct {

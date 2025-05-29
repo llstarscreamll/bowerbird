@@ -24,7 +24,7 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 
 	for i, v := range transactions {
 		placeHolders = append(placeHolders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*11+1, i*11+2, i*11+3, i*11+4, i*11+5, i*11+6, i*11+7, i*11+8, i*11+9, i*11+10, i*11+11))
-		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Reference, v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt)
+		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Reference(), v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt)
 	}
 
 	query := fmt.Sprintf(`
@@ -83,7 +83,6 @@ func (r *PgxTransactionRepository) FindByWalletID(ctx context.Context, walletID 
 			&t.WalletID,
 			&t.UserID,
 			&t.Origin,
-			&t.Reference,
 			&t.Type,
 			&t.Amount,
 			&t.UserDescription,
@@ -136,7 +135,6 @@ func (r *PgxTransactionRepository) GetByWalletIDAndID(ctx context.Context, walle
 		&t.UserID,
 		&t.UserName,
 		&t.Origin,
-		&t.Reference,
 		&t.Type,
 		&t.Amount,
 		&t.UserDescription,

@@ -71,7 +71,6 @@ func (s NuBankEmailParserStrategy) parseFromMailBody(mail domain.MailMessage) []
 	return []domain.Transaction{
 		{
 			Origin:            "nu/savings",
-			Reference:         mail.ExternalID,
 			Amount:            transferAmount,
 			Type:              transactionType,
 			SystemDescription: description,
@@ -79,7 +78,6 @@ func (s NuBankEmailParserStrategy) parseFromMailBody(mail domain.MailMessage) []
 		},
 		{
 			Origin:            "nu/savings",
-			Reference:         mail.ExternalID + "_tax",
 			Amount:            transferTaxAmount,
 			Type:              transactionType,
 			SystemDescription: "4x1.000",
