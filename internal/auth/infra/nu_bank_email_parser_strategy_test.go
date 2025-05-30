@@ -31,7 +31,7 @@ func TestNuToNuTransferEmail(t *testing.T) {
 	assert.Equal(t, "expense", result[0].Type)
 	assert.Equal(t, float32(-300000), result[0].Amount)
 	assert.Equal(t, "", result[0].UserDescription)
-	assert.Equal(t, "Envío a Diana E.", result[0].SystemDescription)
+	assert.Equal(t, "Diana E.", result[0].SystemDescription)
 	assert.Equal(t, expectedDate, result[0].ProcessedAt)
 
 	assert.Equal(t, "nu/savings", result[1].Origin)
@@ -89,6 +89,13 @@ func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
 	assert.Equal(t, 2, apr25Transactions[2].UniquenessCount, "uniqueness validation for Carolina transaction 2")
 	assert.Equal(t, 3, apr25Transactions[3].UniquenessCount, "uniqueness validation for Carolina transaction 3")
 	assert.Equal(t, 4, apr25Transactions[4].UniquenessCount, "uniqueness validation for Carolina transaction 4")
+
+	// validate certain scenario about description cleaning
+	t1 = slices.DeleteFunc(slices.Clone(result), func(t domain.Transaction) bool {
+		return !strings.Contains(t.SystemDescription, "TECNIPAGOS")
+	})[0]
+
+	assert.Equal(t, "TECNIPAGOS SA", t1.SystemDescription)
 }
 
 func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvided(t *testing.T) {

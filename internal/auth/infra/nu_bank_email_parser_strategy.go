@@ -214,7 +214,7 @@ func (s NuBankEmailParserStrategy) getNuTransferDescriptionFromPlainTextMail(pla
 
 	if len(matches) > 1 {
 		match := matches[1]
-		desc = "Envío a " + match
+		desc = match
 	}
 
 	return desc
@@ -431,7 +431,7 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 		}
 
 		// clean account profit info
-		page = regexp.MustCompile(`(?m)^.+\tRendimiento\n.+\ttotal\n\n(?:.+\n){4}`).ReplaceAllString(page, "")
+		page = regexp.MustCompile(`(?m)^.+\tRendimiento\n.+\ttotal(?:\n.+){4}`).ReplaceAllString(page, "")
 
 		tsvTransactions := regexp.MustCompile(`(?m)^.+\t68\.000000\t.+\t###FLOW###$`).Split(page, -1)
 		for _, tsvTransaction := range tsvTransactions {
@@ -512,8 +512,13 @@ func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, st
 	taxAmountString = strings.ReplaceAll(taxAmountString, "$", "")
 	taxAmountString = strings.ReplaceAll(taxAmountString, ".", "")
 	taxAmountString = strings.ReplaceAll(taxAmountString, ",", ".")
-	description = strings.ReplaceAll(description, "Enviaste", "Envío")
+	description = strings.ReplaceAll(description, "Enviaste a ", "")
+	description = strings.ReplaceAll(description, "Recibiste de ", "")
 	description = strings.ReplaceAll(description, "S A", "SA")
+
+	if strings.Contains(description, "TECNIPAGOS") {
+		fmt.Printf("tsv:\n%s\ndescription: %s\n", tsvTransaction, description)
+	}
 
 	amount, err := strconv.ParseFloat(amountString, 32)
 	if err != nil {
