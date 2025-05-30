@@ -63,6 +63,13 @@ func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
 	})
 	assert.Equal(t, 49, len(tax4xMil), "4x1.000 taxes count")
 
+	returns := result[len(result)-1]
+	assert.Equal(t, "nu/savings", returns.Origin)
+	assert.Equal(t, "income", returns.Type)
+	assert.Equal(t, float32(183737.67), returns.Amount)
+	assert.Equal(t, "Rendimientos NuBank", returns.SystemDescription)
+	assert.Equal(t, time.Date(2025, 4, 30, 23, 59, 59, 0, time.UTC), returns.ProcessedAt)
+
 	// validate transactions uniqueness by checking transactions with the same date, same receiver and same amount
 	t1 := result[10]
 	t2 := result[11]

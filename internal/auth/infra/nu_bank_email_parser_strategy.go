@@ -346,7 +346,7 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 	statementMonthString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\w{3})\n`).FindStringSubmatch(tsv)[1]
 	statementMonth := s.parseMonth(statementMonthString)
 
-	statementLastDayString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsv)[1]
+	statementLastDayString := regexp.MustCompile(`(?m)-\n^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsv)[1]
 	statementLastDay, err := strconv.Atoi(statementLastDayString)
 	if err != nil {
 		log.Printf("Error parsing statement last day: %v", err)
