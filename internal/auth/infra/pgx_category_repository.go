@@ -14,7 +14,7 @@ type PgxCategoryRepository struct {
 func (r *PgxCategoryRepository) FindByWalletID(ctx context.Context, walletID string) ([]domain.Category, error) {
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, name, color, icon
+		`SELECT id, name, color, icon, patterns
 		FROM categories 
 		WHERE wallet_id = $1`,
 		walletID,
@@ -30,7 +30,7 @@ func (r *PgxCategoryRepository) FindByWalletID(ctx context.Context, walletID str
 	for rows.Next() {
 		c := domain.Category{}
 
-		err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Icon)
+		err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.Icon, &c.Patterns)
 		if err != nil {
 			return nil, err
 		}

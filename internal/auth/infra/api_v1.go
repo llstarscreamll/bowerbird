@@ -17,6 +17,7 @@ import (
 type contextKey string
 
 const userContextKey contextKey = "user"
+const emptyULID = "00000000000000000000000000"
 
 func RegisterRoutes(
 	mux *http.ServeMux,
@@ -46,7 +47,7 @@ func RegisterRoutes(
 
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
-	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo), sessionRepo, userRepo))
+	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo, categoryRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("PATCH /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(updateTransaction(walletRepo, transactionRepo), sessionRepo, userRepo))
 
@@ -400,7 +401,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 	}
 }
 
-func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository, filePasswordRepo domain.FilePasswordRepository) http.HandlerFunc {
+func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository, filePasswordRepo domain.FilePasswordRepository, categoryRepo domain.CategoryRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		walletID := r.PathValue("walletID")
 		if walletID == "" {
@@ -508,6 +509,29 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				transactions[i].UserID = c.UserID
 				transactions[i].WalletID = c.WalletID
 				transactions[i].CreatedAt = time.Now()
+			}
+
+			if len(transactions) > 0 {
+				categories, err := categoryRepo.FindByWalletID(r.Context(), walletID)
+				if err != nil {
+					log.Printf("Error getting categories from storage: %s", err.Error())
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting categories from storage -> "+err.Error())
+					return
+				}
+
+				// match categories to transactions by patterns
+				for i, t := range transactions {
+					for _, c := range categories {
+						for _, p := range c.Patterns {
+							if strings.Contains(strings.ToLower(t.SystemDescription), strings.ToLower(p)) {
+								transactions[i].CategoryID = c.ID
+								transactions[i].CategorySetterID = emptyULID
+								break
+							}
+						}
+					}
+				}
 			}
 
 			err = transactionRepo.UpsertMany(r.Context(), transactions)

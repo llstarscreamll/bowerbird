@@ -80,8 +80,6 @@ func (g OutlookProvider) getMessages(ctx context.Context, url string, tokens dom
 		if message.HasAttachments {
 			attachments, err = g.getAttachments(ctx, message.ID, tokens)
 
-			fmt.Printf("%d attachments found for message %s\n", len(attachments), message.ID)
-
 			if err != nil {
 				fmt.Printf("error getting attachments: %s\n", err)
 			}

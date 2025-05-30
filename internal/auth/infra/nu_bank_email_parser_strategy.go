@@ -516,10 +516,6 @@ func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, st
 	description = strings.ReplaceAll(description, "Recibiste de ", "")
 	description = strings.ReplaceAll(description, "S A", "SA")
 
-	if strings.Contains(description, "TECNIPAGOS") {
-		fmt.Printf("tsv:\n%s\ndescription: %s\n", tsvTransaction, description)
-	}
-
 	amount, err := strconv.ParseFloat(amountString, 32)
 	if err != nil {
 		log.Printf("Error parsing amount: %v", err)

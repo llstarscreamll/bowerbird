@@ -66,6 +66,7 @@ type Transaction struct {
 	WalletID          string    `json:"walletID"`
 	UserID            string    `json:"userID"`
 	CategoryID        string    `json:"categoryID"`
+	CategorySetterID  string    `json:"categorySetterID"`
 	CategoryName      string    `json:"categoryName"`
 	CategoryColor     string    `json:"categoryColor"`
 	CategoryIcon      string    `json:"categoryIcon"`
@@ -93,6 +94,7 @@ type Category struct {
 	Name        string    `json:"name"`
 	Color       string    `json:"color"`
 	Icon        string    `json:"icon"`
+	Patterns    []string  `json:"patterns"`
 	CreatedByID string    `json:"createdByID"`
 	CreatedAt   time.Time `json:"createdAt"`
 }
