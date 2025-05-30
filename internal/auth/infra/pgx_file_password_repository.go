@@ -2,10 +2,12 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,7 +26,7 @@ func (r PgxFilePasswordRepository) GetByUserID(ctx context.Context, userID strin
 	)
 
 	var encryptedPasswords string
-	if err := row.Scan(&encryptedPasswords); err != nil {
+	if err := row.Scan(&encryptedPasswords); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return passwords, err
 	}
 
