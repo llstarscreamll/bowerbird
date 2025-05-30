@@ -23,7 +23,7 @@
       class="cursor-pointer focus:ring-4 focus:ring-pink-300 font-medium text-sm -mt-16 m-auto flex flex-col items-center gap-2"
     >
       <div
-        [ngStyle]="{'background-color': transaction.categoryColor || '#9e9e9e'}"
+        [ngStyle]="{'background-color': transaction.categoryColor || '#E2E2E2'}"
         class="rounded-full text-white p-5 shadow-md flex items-center justify-center"
       >
         <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem'}">
@@ -46,7 +46,7 @@
     <div class="mt-7 flex items-center gap-2 text-sm text-gray-400">
       <div class="text-left w-1/2">
         <ng-container [ngSwitch]="transaction.origin">
-          <span *ngSwitchCase="'nu-bank-email'" class="bg-purple-500 text-white px-2 py-1 rounded-md">Nu Bank</span>
+          <span *ngSwitchCase="'nu/savings'" class="bg-purple-500 text-white px-2 py-1 rounded-md">Nu Bank</span>
           <span *ngSwitchDefault class="bg-green-500 text-white px-2 py-1 rounded-md">Cash</span>
         </ng-container>
       </div>
