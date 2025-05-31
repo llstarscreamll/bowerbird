@@ -9,6 +9,7 @@ import (
 	certManager "github.com/aws/aws-cdk-go/awscdk/v2/awscertificatemanager"
 	cloudfront "github.com/aws/aws-cdk-go/awscdk/v2/awscloudfront"
 	cloudfrontOrigins "github.com/aws/aws-cdk-go/awscdk/v2/awscloudfrontorigins"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecrassets"
 	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	route53 "github.com/aws/aws-cdk-go/awscdk/v2/awsroute53"
 	route53Targets "github.com/aws/aws-cdk-go/awscdk/v2/awsroute53targets"
@@ -23,6 +24,8 @@ type CdkGoStackProps struct {
 	cdk.StackProps
 }
 
+var appName = "bowerbird"
+
 func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) cdk.Stack {
 	var sProps cdk.StackProps
 	if props != nil {
@@ -34,19 +37,28 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		ParameterName: jsii.String("prod-bowerbird-backend"),
 	})
 
-	lambdaFn := lambda.NewFunction(stack, jsii.String("GoServer"), &lambda.FunctionProps{
-		FunctionName: jsii.String("API"),
-		Runtime:      lambda.Runtime_PROVIDED_AL2023(),
-		Handler:      jsii.String("api-server"),
-		Code:         lambda.Code_FromAsset(jsii.String("dist/api-server.zip"), nil),
+	lambdaFn := lambda.NewDockerImageFunction(stack, jsii.String(appName+"-api"), &lambda.DockerImageFunctionProps{
+		FunctionName: jsii.String(appName + "-api"),
+		Code: lambda.DockerImageCode_FromImageAsset(jsii.String("."), &lambda.AssetImageCodeProps{
+			File:     jsii.String("cmd/lambda-api/Dockerfile"),
+			Platform: awsecrassets.Platform_LINUX_ARM64(),
+			BuildArgs: &map[string]*string{
+				"--progress":   jsii.String("plain"),
+				"--no-cache":   jsii.String("true"),
+				"--provenance": jsii.String("false"),
+			},
+		}),
 		Architecture: lambda.Architecture_ARM_64(),
+		Timeout:      cdk.Duration_Seconds(jsii.Number(28)),
 		Environment: &map[string]*string{
 			"PARAMETER_STORE_KEY_NAME": secrets.ParameterName(),
 		},
 	})
 
-	httpApi := apiGatewayV2.NewHttpApi(stack, jsii.String("HttpApi"), &apiGatewayV2.HttpApiProps{
-		ApiName:            jsii.String("BowerbirdApi"),
+	secrets.GrantRead(lambdaFn)
+
+	httpApi := apiGatewayV2.NewHttpApi(stack, jsii.String(appName+"http-api"), &apiGatewayV2.HttpApiProps{
+		ApiName:            jsii.String(appName + "-api"),
 		CreateDefaultStage: jsii.Bool(false),
 	})
 
@@ -68,10 +80,10 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		DetailedMetricsEnabled: jsii.Bool(true),
 	})
 
-	certificate := certManager.Certificate_FromCertificateArn(stack, jsii.String("AcmCertificate"), jsii.String("arn:aws:acm:us-east-1:336301087573:certificate/048e55de-9012-4c68-ad1e-6eb5d05478df"))
+	certificate := certManager.Certificate_FromCertificateArn(stack, jsii.String(appName+"-acm-certificate"), jsii.String("arn:aws:acm:us-east-1:336301087573:certificate/048e55de-9012-4c68-ad1e-6eb5d05478df"))
 
-	webappBucket := s3.NewBucket(stack, jsii.String("SPAHostingBucket"), &s3.BucketProps{
-		BucketName:        jsii.String("money-path-webapp"),
+	webappBucket := s3.NewBucket(stack, jsii.String(appName+"-webapp-bucket"), &s3.BucketProps{
+		BucketName:        jsii.String(appName + "-webapp"),
 		RemovalPolicy:     cdk.RemovalPolicy_DESTROY,
 		AutoDeleteObjects: jsii.Bool(true),
 		PublicReadAccess:  jsii.Bool(false),
@@ -79,7 +91,7 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 	})
 
 	// Deploy HTML files with no cache
-	s3Deploy.NewBucketDeployment(stack, jsii.String("HTMLDeployment"), &s3Deploy.BucketDeploymentProps{
+	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-html-deployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
 		CacheControl: &[]s3Deploy.CacheControl{
@@ -91,7 +103,7 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 	})
 
 	// Deploy static assets with short cache (1 hour)
-	s3Deploy.NewBucketDeployment(stack, jsii.String("StaticAssetsDeployment"), &s3Deploy.BucketDeploymentProps{
+	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-static-assets-deployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
 		CacheControl: &[]s3Deploy.CacheControl{
@@ -120,7 +132,7 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 	})
 
 	// Deploy service worker with longer cache (1 week)
-	s3Deploy.NewBucketDeployment(stack, jsii.String("ServiceWorkerDeployment"), &s3Deploy.BucketDeploymentProps{
+	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-service-worker-deployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
 		CacheControl: &[]s3Deploy.CacheControl{
@@ -132,14 +144,14 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		},
 	})
 
-	originAccessIdentity := cloudfront.NewOriginAccessIdentity(stack, jsii.String("OAI"), &cloudfront.OriginAccessIdentityProps{})
+	originAccessIdentity := cloudfront.NewOriginAccessIdentity(stack, jsii.String(appName+"-origin-access-identity"), &cloudfront.OriginAccessIdentityProps{})
 	s3Origin := cloudfrontOrigins.NewS3Origin(webappBucket, &cloudfrontOrigins.S3OriginProps{
 		OriginAccessIdentity: originAccessIdentity,
 	})
 
 	domainName := os.Getenv("APP_DOMAIN_NAME")
 
-	distribution := cloudfront.NewDistribution(stack, jsii.String("CDN"), &cloudfront.DistributionProps{
+	distribution := cloudfront.NewDistribution(stack, jsii.String(appName+"-cdn"), &cloudfront.DistributionProps{
 		DomainNames:       &[]*string{jsii.String(domainName)},
 		Certificate:       certificate,
 		DefaultRootObject: jsii.String("index.html"),
@@ -179,18 +191,16 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		},
 	})
 
-	hostedZone := route53.HostedZone_FromLookup(stack, jsii.String("HostedZone"), &route53.HostedZoneProviderProps{
+	hostedZone := route53.HostedZone_FromLookup(stack, jsii.String(appName+"-hosted-zone"), &route53.HostedZoneProviderProps{
 		DomainName: jsii.String(domainName),
 	})
 
-	route53.NewARecord(stack, jsii.String("CloudFrontAliasRecord"), &route53.ARecordProps{
+	route53.NewARecord(stack, jsii.String(appName+"-cloudfront-alias-record"), &route53.ARecordProps{
 		Zone:       hostedZone,
 		Target:     route53.RecordTarget_FromAlias(route53Targets.NewCloudFrontTarget(distribution)),
 		RecordName: jsii.String(""), // apex domain
 		Ttl:        cdk.Duration_Seconds(jsii.Number(300)),
 	})
-
-	secrets.GrantRead(lambdaFn)
 
 	return stack
 }
@@ -200,9 +210,11 @@ func main() {
 
 	app := cdk.NewApp(nil)
 
-	NewCdkStack(app, "BowerbirdApp", &CdkGoStackProps{
+	NewCdkStack(app, appName+"-app", &CdkGoStackProps{
 		cdk.StackProps{
-			Env: env(),
+			Env:         env(),
+			StackName:   jsii.String(appName + "-app"),
+			Description: jsii.String("Bowerbird App, finance assistant"),
 		},
 	})
 

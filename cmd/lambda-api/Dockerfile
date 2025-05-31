@@ -1,10 +1,36 @@
-FROM golang:1.24-alpine
+# Multi-stage build
+FROM golang:1.24-alpine AS builder
 
-RUN apk add zip
+# Install build dependencies
+RUN apk add --no-cache git
 
-WORKDIR /app
+# Set work directory
+WORKDIR /build
 
-RUN mkdir -p dist
+# Copy source code from the build context root
+COPY . .
 
-CMD GOARCH=arm64 GOOS=linux go build -C cmd/lambda-api -o ../../dist/bootstrap -tags netgo \
-    && zip -j /app/dist/api-server.zip /app/dist/bootstrap
+RUN pwd
+RUN ls -la
+
+# Build the binary
+RUN GOOS=linux GOARCH=arm64 go build -C cmd/lambda-api -o bootstrap -tags lambda.norpc
+
+RUN ls -la
+RUN ls -la cmd/lambda-api
+
+# Final stage - use AWS Lambda base image
+FROM alpine:3
+
+# Install poppler-utils
+RUN apk add --no-cache poppler-utils
+
+# Copy the binary from builder stage and make it executable
+COPY --from=builder /build/cmd/lambda-api/bootstrap /main
+RUN chmod +x /main
+
+RUN pwd
+RUN ls -la
+
+# Set the CMD to the handler
+ENTRYPOINT [ "/main" ]

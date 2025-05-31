@@ -20,6 +20,6 @@ build-spa:
 	@docker compose up --quiet-pull build-spa
 
 # Deploy
-deploy: build-api build-spa
+deploy: build-spa
 	@echo "Deploying project $(APP_DOMAIN_NAME)..."
 	@docker compose up --remove-orphans --quiet-pull deploy

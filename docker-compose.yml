@@ -27,6 +27,7 @@ services:
       - .:/app
       - ~/.npm:/root/.npm
       - $GOPATH/pkg/mod:/go/pkg/mod
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}

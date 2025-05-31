@@ -1,6 +1,6 @@
 FROM node:22-alpine
 
-RUN apk add --no-cache curl git
+RUN apk add --no-cache curl git docker
 
 RUN curl -fsSL https://go.dev/dl/go1.24.2.linux-amd64.tar.gz | tar -C /usr/local -xz && \
     ln -s /usr/local/go/bin/go /usr/bin/go
