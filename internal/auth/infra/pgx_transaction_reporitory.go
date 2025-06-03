@@ -24,15 +24,19 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 
 	for i, v := range transactions {
 		placeHolders = append(placeHolders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*13+1, i*13+2, i*13+3, i*13+4, i*13+5, i*13+6, i*13+7, i*13+8, i*13+9, i*13+10, i*13+11, i*13+12, i*13+13))
+
 		var categoryID interface{} = v.CategoryID
 		if v.CategoryID == "" {
 			categoryID = nil
 		}
-		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Reference(), v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt, categoryID, v.CategorySetterID)
-	}
 
-	fmt.Printf("placeHolders count: %d\n", len(placeHolders))
-	fmt.Printf("values count: %d\n", len(values))
+		var categorySetterID interface{} = v.CategorySetterID
+		if v.CategorySetterID == "" {
+			categorySetterID = nil
+		}
+
+		values = append(values, v.ID, v.WalletID, v.UserID, v.Origin, v.Reference(), v.Type, v.Amount, v.UserDescription, v.SystemDescription, v.ProcessedAt, v.CreatedAt, categoryID, categorySetterID)
+	}
 
 	query := fmt.Sprintf(`
 	INSERT INTO transactions (id, wallet_id, user_id, origin, reference, "type", amount, user_description, system_description, processed_at, created_at, category_id, category_setter_id)
@@ -40,11 +44,11 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	ON CONFLICT (wallet_id, reference) DO UPDATE
 	SET system_description = EXCLUDED.system_description, origin = EXCLUDED.origin,
 		category_id = CASE 
-			WHEN transactions.category_setter_id = '00000000000000000000000000' THEN EXCLUDED.category_id 
+			WHEN transactions.category_setter_id IN ('00000000000000000000000000', '', NULL) THEN EXCLUDED.category_id 
 			ELSE transactions.category_id
 		END,
 		category_setter_id = CASE
-			WHEN transactions.category_setter_id = '00000000000000000000000000' THEN EXCLUDED.category_setter_id
+			WHEN transactions.category_setter_id IN ('00000000000000000000000000', '', NULL) THEN EXCLUDED.category_setter_id
 			ELSE transactions.category_setter_id
 		END
 	`, strings.Join(placeHolders, ", "))
