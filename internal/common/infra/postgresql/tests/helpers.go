@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,23 +56,33 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 		log.Fatal(err)
 	}
 
-	results, err := pgx.CollectRows(dbRows, pgx.RowToMap)
+	actualRows, err := pgx.CollectRows(dbRows, pgx.RowToMap)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	assert.Equal(t, len(expectedRecords), len(results), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(results))
+	assert.Equal(t, len(expectedRecords), len(actualRows), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(actualRows))
 
 	for _, expected := range expectedRecords {
 		expectedRecordFound := false
-		for _, result := range results {
+		columnsNotFount := make(map[string]interface{})
 
+		for _, actualRow := range actualRows {
 			equalColumns := 0
-			for k := range expected {
-				fmt.Printf("Comparing DB column %s: %v, %v\n", k, expected[k], result[k])
+			columnsNotFount = make(map[string]interface{})
 
-				expectedTime, ok1 := expected[k].(time.Time)
-				resultTime, ok2 := result[k].(time.Time)
+			fmt.Printf("Comparing DB rows:\n%#v\n%#v\n", expected, actualRow)
+
+			for expectedColumnName := range expected {
+
+				_, ok := actualRow[expectedColumnName]
+				if !ok {
+					columnsNotFount[expectedColumnName] = expected[expectedColumnName]
+					continue
+				}
+
+				expectedTime, ok1 := expected[expectedColumnName].(time.Time)
+				resultTime, ok2 := actualRow[expectedColumnName].(time.Time)
 				if ok1 && ok2 {
 					if expectedTime.Equal(resultTime) {
 						equalColumns++
@@ -79,16 +90,33 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 					}
 				}
 
-				if expected[k] == result[k] {
-					equalColumns++
+				expectedFloat, ok1 := expected[expectedColumnName].(float64)
+				if ok1 {
+					actualFloat, ok := actualRow[expectedColumnName].(pgtype.Numeric)
+					if ok {
+						float, _ := actualFloat.Float64Value()
+						if expectedFloat == float.Float64 {
+							equalColumns++
+							continue
+						}
+					}
 				}
+
+				if expected[expectedColumnName] == actualRow[expectedColumnName] {
+					equalColumns++
+					continue
+				}
+
+				columnsNotFount[expectedColumnName] = expected[expectedColumnName]
 			}
 
 			expectedRecordFound = equalColumns == len(slices.Collect(maps.Keys(expected)))
 			if expectedRecordFound {
+				columnsNotFount = make(map[string]interface{})
 				break
 			}
 		}
-		assert.True(t, expectedRecordFound, "Expected row not found in database: %v", expected)
+
+		assert.True(t, expectedRecordFound, "Expected row not found in DB, here is what was expected:\n%#v\nHere is what was found:\n%#v\nConflicting columns:\n%#v", expected, actualRows, columnsNotFount)
 	}
 }
