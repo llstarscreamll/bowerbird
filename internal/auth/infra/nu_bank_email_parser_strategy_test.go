@@ -14,7 +14,8 @@ import (
 )
 
 var nuTransferToNuEmailMessage domain.MailMessage
-var nuAccountStatementEmailMessage domain.MailMessage
+var nuAccountStatementIEmailMessage domain.MailMessage
+var nuAccountStatementIIEmailMessage domain.MailMessage
 
 func TestNuToNuTransferEmail(t *testing.T) {
 	initSampleData()
@@ -42,10 +43,11 @@ func TestNuToNuTransferEmail(t *testing.T) {
 	assert.Equal(t, expectedDate, result[1].ProcessedAt)
 }
 
-func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
+// This is the most extensive test for getting transactions from the account statement PDF.
+func TestShouldReturnTransactionsFromAccountStatementEmailI(t *testing.T) {
 	initSampleData()
 
-	input := nuAccountStatementEmailMessage
+	input := nuAccountStatementIEmailMessage
 
 	strategy := &NuBankEmailParserStrategy{}
 	result := strategy.Parse(input, []string{"bad-password", "1057581292"})
@@ -98,10 +100,26 @@ func TestShouldReturnTransactionsFromAccountStatementEmail(t *testing.T) {
 	assert.Equal(t, "TECNIPAGOS SA", t1.SystemDescription)
 }
 
+func TestShouldReturnTransactionsFromAccountStatementEmailII(t *testing.T) {
+	initSampleData()
+
+	input := nuAccountStatementIIEmailMessage
+
+	strategy := &NuBankEmailParserStrategy{}
+	result := strategy.Parse(input, []string{"1057581292"})
+
+	assert.Equal(t, 40, len(result), "transactions count")
+
+	tax4xMil := slices.DeleteFunc(slices.Clone(result), func(t domain.Transaction) bool {
+		return t.SystemDescription != "4x1.000"
+	})
+	assert.Equal(t, 0, len(tax4xMil), "4x1.000 taxes count")
+}
+
 func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvided(t *testing.T) {
 	initSampleData()
 
-	input := nuAccountStatementEmailMessage
+	input := nuAccountStatementIEmailMessage
 
 	strategy := &NuBankEmailParserStrategy{}
 	result := strategy.Parse(input, []string{})
@@ -112,7 +130,7 @@ func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreNotProvid
 func TestShouldReturnNoTransactionsFromAccountStatementWhenPasswordsAreWrong(t *testing.T) {
 	initSampleData()
 
-	input := nuAccountStatementEmailMessage
+	input := nuAccountStatementIEmailMessage
 
 	strategy := &NuBankEmailParserStrategy{}
 	result := strategy.Parse(input, []string{"bad-password", "another-bad-password"})
@@ -138,17 +156,17 @@ func initSampleData() {
 		ReceivedAt:  time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 
-	html, err = os.ReadFile("../testdata/nu_savings_account_statement_mail.html")
+	html, err = os.ReadFile("../testdata/nu_savings_account_statement_mail_I.html")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	pdf, err := os.ReadFile("../testdata/nu_savings_account_statement.pdf")
+	pdf, err := os.ReadFile("../testdata/nu_savings_account_statement_I.pdf")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	nuAccountStatementEmailMessage = domain.MailMessage{
+	nuAccountStatementIEmailMessage = domain.MailMessage{
 		ID:         "email-id-02",
 		ExternalID: "email-external-id-02",
 		UserID:     "user-id-02",
@@ -157,6 +175,34 @@ func initSampleData() {
 		Subject:    "El extracto de tu cuenta Nu ya está aquí",
 		Body:       string(html),
 		ReceivedAt: time.Date(2025, 3, 3, 0, 0, 0, 0, time.UTC),
+		Attachments: []domain.MailAttachment{
+			{
+				Name:        "CuentaNu_YAC292_2025-04.pdf",
+				Content:     base64.StdEncoding.EncodeToString(pdf),
+				ContentType: "application/pdf",
+			},
+		},
+	}
+
+	pdf, err = os.ReadFile("../testdata/nu_savings_account_statement_II.pdf")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	html, err = os.ReadFile("../testdata/nu_savings_account_statement_mail_II.html")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	nuAccountStatementIIEmailMessage = domain.MailMessage{
+		ID:         "email-id-03",
+		ExternalID: "email-external-id-03",
+		UserID:     "user-id-03",
+		From:       "nu@nu.com.co",
+		To:         "jhon.doe@gmail.com",
+		Subject:    "El extracto de tu cuenta Nu ya está aquí",
+		Body:       string(html),
+		ReceivedAt: time.Date(2025, 6, 3, 0, 0, 0, 0, time.UTC),
 		Attachments: []domain.MailAttachment{
 			{
 				Name:        "CuentaNu_YAC292_2025-04.pdf",

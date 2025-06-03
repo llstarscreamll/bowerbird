@@ -337,16 +337,16 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 	transactions := make([]domain.Transaction, 0)
 	totalAccountReturns := float64(0)
 
-	statementYearString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\d{4})\n`).FindStringSubmatch(tsv)[1]
+	statementYearString := regexp.MustCompile(`(?m)^.+\t21\.38.+\t(\d{4})\n`).FindStringSubmatch(tsv)[1]
 	statementYear, err := strconv.Atoi(statementYearString)
 	if err != nil {
 		log.Printf("Error parsing statement year: %v", err)
 	}
 
-	statementMonthString := regexp.MustCompile(`(?m)^.+\t288\.06.+\t(\w{3})\n`).FindStringSubmatch(tsv)[1]
+	statementMonthString := regexp.MustCompile(`(?m)^.+\t(\w{3})\n.+\t21\.38.+\t\d{4}\n`).FindStringSubmatch(tsv)[1]
 	statementMonth := s.parseMonth(statementMonthString)
 
-	statementLastDayString := regexp.MustCompile(`(?m)-\n^.+\t288\.06.+\t(\d+)\n`).FindStringSubmatch(tsv)[1]
+	statementLastDayString := regexp.MustCompile(`(?m)-\n^.+\t2\t.+\t(\d+)\n`).FindStringSubmatch(tsv)[1]
 	statementLastDay, err := strconv.Atoi(statementLastDayString)
 	if err != nil {
 		log.Printf("Error parsing statement last day: %v", err)
