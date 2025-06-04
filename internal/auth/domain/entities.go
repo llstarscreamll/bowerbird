@@ -85,6 +85,10 @@ func (t *Transaction) Reference() string {
 	desc := strings.ToLower(t.SystemDescription)
 	desc = regexp.MustCompile(` \([\w|\d]+\)$`).ReplaceAllString(desc, "")
 
+	if len(desc) > 32 {
+		desc = desc[:32]
+	}
+
 	return fmt.Sprintf("%s/%s/%s/%f/%d", t.ProcessedAt.Format("20060102"), t.Origin, desc, t.Amount, t.UniquenessCount)
 }
 
