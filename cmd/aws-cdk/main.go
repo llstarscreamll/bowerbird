@@ -43,8 +43,8 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			File:     jsii.String("cmd/lambda-api/Dockerfile"),
 			Platform: awsecrassets.Platform_LINUX_ARM64(),
 			BuildArgs: &map[string]*string{
-				"--progress":   jsii.String("plain"),
-				"--no-cache":   jsii.String("true"),
+				"--progress": jsii.String("plain"),
+				// "--no-cache":   jsii.String("true"),
 				"--provenance": jsii.String("false"),
 			},
 		}),
@@ -88,60 +88,6 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		AutoDeleteObjects: jsii.Bool(true),
 		PublicReadAccess:  jsii.Bool(false),
 		EnforceSSL:        jsii.Bool(true),
-	})
-
-	// Deploy HTML files with no cache
-	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-html-deployment"), &s3Deploy.BucketDeploymentProps{
-		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
-		DestinationBucket: webappBucket,
-		CacheControl: &[]s3Deploy.CacheControl{
-			s3Deploy.CacheControl_FromString(jsii.String("no-cache, no-store, must-revalidate")),
-		},
-		Include: &[]*string{
-			jsii.String("*.html"),
-		},
-	})
-
-	// Deploy static assets with short cache (1 hour)
-	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-static-assets-deployment"), &s3Deploy.BucketDeploymentProps{
-		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
-		DestinationBucket: webappBucket,
-		CacheControl: &[]s3Deploy.CacheControl{
-			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=3600")),
-		},
-		Include: &[]*string{
-			jsii.String("*.js"),
-			jsii.String("*.css"),
-			jsii.String("*.png"),
-			jsii.String("*.jpg"),
-			jsii.String("*.jpeg"),
-			jsii.String("*.gif"),
-			jsii.String("*.svg"),
-			jsii.String("*.ico"),
-			jsii.String("*.woff"),
-			jsii.String("*.woff2"),
-			jsii.String("*.ttf"),
-			jsii.String("*.eot"),
-			jsii.String("*.json"),
-			jsii.String("*.webmanifest"),
-		},
-		Metadata: &map[string]*string{
-			"*.js":  jsii.String("application/javascript"),
-			"*.css": jsii.String("text/css"),
-		},
-	})
-
-	// Deploy service worker with longer cache (1 week)
-	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-service-worker-deployment"), &s3Deploy.BucketDeploymentProps{
-		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
-		DestinationBucket: webappBucket,
-		CacheControl: &[]s3Deploy.CacheControl{
-			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=604800")),
-		},
-		Include: &[]*string{
-			jsii.String("ngsw.json"),
-			jsii.String("worker-basic.min.js"),
-		},
 	})
 
 	originAccessIdentity := cloudfront.NewOriginAccessIdentity(stack, jsii.String(appName+"-origin-access-identity"), &cloudfront.OriginAccessIdentityProps{})
@@ -200,6 +146,51 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		Target:     route53.RecordTarget_FromAlias(route53Targets.NewCloudFrontTarget(distribution)),
 		RecordName: jsii.String(""), // apex domain
 		Ttl:        cdk.Duration_Seconds(jsii.Number(300)),
+	})
+
+	// Deploy HTML files with no cache
+	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-html-deployment"), &s3Deploy.BucketDeploymentProps{
+		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		DestinationBucket: webappBucket,
+		Prune:             jsii.Bool(false),
+		Distribution:      distribution,
+		DistributionPaths: &[]*string{jsii.String("/*.html")},
+		CacheControl: &[]s3Deploy.CacheControl{
+			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=60")),
+		},
+		Include: &[]*string{
+			jsii.String("*.html"),
+		},
+	})
+
+	// Deploy static assets with short cache (1 hour)
+	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-static-assets-deployment"), &s3Deploy.BucketDeploymentProps{
+		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		DestinationBucket: webappBucket,
+		Prune:             jsii.Bool(false),
+		CacheControl: &[]s3Deploy.CacheControl{
+			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=3600")),
+		},
+		Include: &[]*string{
+			jsii.String("*.js"),
+			jsii.String("*.css"),
+			jsii.String("*.png"),
+			jsii.String("*.jpg"),
+			jsii.String("*.jpeg"),
+			jsii.String("*.gif"),
+			jsii.String("*.svg"),
+			jsii.String("*.ico"),
+			jsii.String("*.woff"),
+			jsii.String("*.woff2"),
+			jsii.String("*.ttf"),
+			jsii.String("*.eot"),
+			jsii.String("*.json"),
+			jsii.String("*.webmanifest"),
+		},
+		Metadata: &map[string]*string{
+			"*.js":  jsii.String("application/javascript"),
+			"*.css": jsii.String("text/css"),
+		},
 	})
 
 	return stack
