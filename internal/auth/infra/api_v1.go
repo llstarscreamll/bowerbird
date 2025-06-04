@@ -18,6 +18,7 @@ type contextKey string
 
 const userContextKey contextKey = "user"
 const emptyULID = "00000000000000000000000000"
+const sessionExpirationTime = time.Hour * 72
 
 func RegisterRoutes(
 	mux *http.ServeMux,
@@ -179,7 +180,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 		}
 
 		user.ID = id
-		sessionExpirationDate := time.Now().Add(time.Hour * 24)
+		sessionExpirationDate := time.Now().Add(sessionExpirationTime)
 		sessionID, err := ulid.NewFromDate(sessionExpirationDate)
 		if err != nil {
 			log.Printf("Error generating session ID: %s", err.Error())
