@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpsertManyShouldReturnNilWhenDataPersistedIsOk(t *testing.T) {
+var currentTime = time.Now()
+
+func TestUpsertManyShouldPersistManyRecordsAtOnce(t *testing.T) {
 	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
 	defer db.Close()
 	tests.CleanUpTables(db, []string{"transactions"})
@@ -73,6 +75,245 @@ func TestUpsertManyShouldReturnNilWhenDataPersistedIsOk(t *testing.T) {
 			"user_description":   "",
 			"category_id":        nil,
 			"category_setter_id": nil,
+		},
+	})
+}
+
+func TestUpsertManyShouldUpdateCategoryAndCategorySetterWhenCategorySetterOnStorageIsNull(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	tests.WriteScenarioRows(db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"reference":          currentTime.Format("20060102") + "/test/test system description/-10.000000/0",
+			"category_id":        nil,
+			"category_setter_id": nil,
+			"processed_at":       currentTime,
+		},
+	})
+
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"reference":          currentTime.Format("20060102") + "/test/test system description/-10.000000/0",
+			"category_id":        nil,
+			"category_setter_id": nil,
+		},
+	})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			CategoryID:        "000000000000000000000000C1",
+			CategorySetterID:  "00000000000000000000000000",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"category_id":        "000000000000000000000000C1",
+			"category_setter_id": "00000000000000000000000000",
+		},
+	})
+}
+
+func TestUpsertManyShouldUpdateCategoryAndCategorySetterWhenCategorySetterOnStorageIsEmptyString(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	tests.WriteScenarioRows(db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"reference":          currentTime.Format("20060102") + "/test/test system description/-10.000000/0",
+			"category_id":        "",
+			"category_setter_id": "",
+			"processed_at":       currentTime,
+		},
+	})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			CategoryID:        "000000000000000000000000C1",
+			CategorySetterID:  "00000000000000000000000000",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"category_id":        "000000000000000000000000C1",
+			"category_setter_id": "00000000000000000000000000",
+		},
+	})
+}
+
+func TestUpsertManyShouldUpdateCategoryAndCategorySetterWhenCategorySetterOnStorageIsEmptyUlid(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	tests.WriteScenarioRows(db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"reference":          currentTime.Format("20060102") + "/test/test system description/-10.000000/0",
+			"category_id":        "",
+			"category_setter_id": "00000000000000000000000000",
+			"processed_at":       currentTime,
+		},
+	})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			CategoryID:        "000000000000000000000000C1",
+			CategorySetterID:  "00000000000000000000000000",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"category_id":        "000000000000000000000000C1",
+			"category_setter_id": "00000000000000000000000000",
+		},
+	})
+}
+
+func TestUpsertManyShouldNotUpdateCategoryAndCategorySetterWhenCategorySetterOnStorageIsANonEmptyUlid(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	tests.WriteScenarioRows(db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"reference":          currentTime.Format("20060102") + "/test/test system description/-10.000000/0",
+			"category_id":        "000000000000000000000000C1",
+			"category_setter_id": "000000000000000000000000U1",
+			"processed_at":       currentTime,
+		},
+	})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			CategoryID:        "000000000000000000000000C2",
+			CategorySetterID:  "00000000000000000000000000",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"category_id":        "000000000000000000000000C1",
+			"category_setter_id": "000000000000000000000000U1",
 		},
 	})
 }

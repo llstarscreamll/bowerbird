@@ -61,7 +61,7 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 		log.Fatal(err)
 	}
 
-	assert.Equal(t, len(expectedRecords), len(actualRows), "Mismatched database rows count, expected %d, got %d", len(expectedRecords), len(actualRows))
+	assert.Equal(t, len(expectedRecords), len(actualRows), "Mismatched database rows count, expected %d, got %d. These rows where found:\n%#v", len(expectedRecords), len(actualRows), actualRows)
 
 	for _, expected := range expectedRecords {
 		expectedRecordFound := false
@@ -71,7 +71,7 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 			equalColumns := 0
 			columnsNotFount = make(map[string]interface{})
 
-			fmt.Printf("Comparing DB rows:\n%#v\n%#v\n", expected, actualRow)
+			fmt.Printf("Comparing DB rows:\n%#v\n%#v\n\n", expected, actualRow)
 
 			for expectedColumnName := range expected {
 
@@ -117,6 +117,6 @@ func AssertDatabaseHasRows(t *testing.T, db *pgxpool.Pool, tableName string, exp
 			}
 		}
 
-		assert.True(t, expectedRecordFound, "Expected row not found in DB, here is what was expected:\n%#v\nHere is what was found:\n%#v\nConflicting columns:\n%#v", expected, actualRows, columnsNotFount)
+		assert.True(t, expectedRecordFound, "Expected row not found in DB, here is what was expected:\n%#v\n\nHere is what was found:\n%#v\n\nConflicting columns:\n%#v", expected, actualRows, columnsNotFount)
 	}
 }
