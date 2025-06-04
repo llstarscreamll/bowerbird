@@ -317,3 +317,49 @@ func TestUpsertManyShouldNotUpdateCategoryAndCategorySetterWhenCategorySetterOnS
 		},
 	})
 }
+
+func TestUpsertManyShouldUpdateSystemDescriptionWhenTheNewOneIsLongerThanTheOldOne(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	tests.WriteScenarioRows(db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "COMPANIA DE SERVICIOS PUBLICOS DE",
+			"reference":          currentTime.Format("20060102") + "/test/compania de servicios publicos de/-10.000000/0",
+			"processed_at":       currentTime,
+		},
+	})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			SystemDescription: "COMPANIA DE SERVICIOS PUBLICOS DE SOGAMOSO",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"system_description": "COMPANIA DE SERVICIOS PUBLICOS DE SOGAMOSO",
+		},
+	})
+}

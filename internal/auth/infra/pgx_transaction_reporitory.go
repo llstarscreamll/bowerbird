@@ -42,8 +42,11 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 	INSERT INTO transactions (id, wallet_id, user_id, origin, reference, "type", amount, user_description, system_description, processed_at, created_at, category_id, category_setter_id)
 	VALUES %s
 	ON CONFLICT (wallet_id, reference) DO UPDATE
-	SET system_description = EXCLUDED.system_description,
-		origin = EXCLUDED.origin,
+	SET origin = EXCLUDED.origin,
+		system_description = CASE
+			WHEN EXCLUDED.system_description > transactions.system_description THEN EXCLUDED.system_description
+			ELSE transactions.system_description
+		END,
 		category_id = CASE 
 			WHEN transactions.category_setter_id IS NULL OR transactions.category_setter_id = '' OR transactions.category_setter_id = '00000000000000000000000000'
 			THEN EXCLUDED.category_id
