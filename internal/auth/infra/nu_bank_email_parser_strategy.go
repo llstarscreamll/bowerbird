@@ -384,7 +384,6 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 			columnsB := strings.Split(b, "\t")
 
 			if len(columnsA) != 12 || len(columnsB) != 12 {
-				fmt.Printf("Lengths does not match:\n%s\n%s\n", a, b)
 				return 0
 			}
 
