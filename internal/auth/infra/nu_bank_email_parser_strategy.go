@@ -513,9 +513,10 @@ func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, st
 	taxAmountString = strings.ReplaceAll(taxAmountString, ".", "")
 	taxAmountString = strings.ReplaceAll(taxAmountString, ",", ".")
 	description = strings.ReplaceAll(description, "Enviaste a ", "")
-	description = strings.ReplaceAll(description, "Pago a ?", "")
+	description = strings.ReplaceAll(description, "Pago a", "")
 	description = strings.ReplaceAll(description, "Recibiste de ", "")
 	description = strings.ReplaceAll(description, "S A", "SA")
+	description = strings.TrimSpace(description)
 
 	amount, err := strconv.ParseFloat(amountString, 32)
 	if err != nil {
