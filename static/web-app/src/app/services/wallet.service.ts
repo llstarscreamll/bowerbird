@@ -52,4 +52,15 @@ export class WalletService {
       .patch<{ data: string }>(`${this.apiUrl}/v1/wallets/${walletID}/transactions/${transactionID}`, transaction)
       .pipe(map((r) => r.data));
   }
+
+  getMetrics(walletID: string, from: Date, to: Date) {
+    return this.httpClient
+      .get<{
+        data: {
+          totalIncome: number;
+          totalExpense: number;
+        };
+      }>(`${this.apiUrl}/v1/wallets/${walletID}/metrics?from=${from.toISOString()}&to=${to.toISOString()}`)
+      .pipe(map((r) => r.data));
+  }
 }

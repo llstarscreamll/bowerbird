@@ -46,6 +46,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets/{walletID}/metrics", authMiddleware(getMetricsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo, categoryRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
@@ -838,5 +839,51 @@ func updateFilePasswordHandler(filePasswordRepo domain.FilePasswordRepository) h
 		}
 
 		fmt.Fprintf(w, `{"data":"ok"}`)
+	}
+}
+
+func getMetricsHandler(walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		walletID := r.PathValue("walletID")
+		if walletID == "" {
+			log.Printf("Error getting walletID from path params")
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Wallet ID is not valid")
+			return
+		}
+
+		from, err := time.Parse(time.RFC3339, r.URL.Query().Get("from"))
+		if err != nil {
+			log.Printf("Error parsing from date: %s", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "From date is not valid")
+			return
+		}
+
+		to, err := time.Parse(time.RFC3339, r.URL.Query().Get("to"))
+		if err != nil {
+			log.Printf("Error parsing to date: %s", err.Error())
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "To date is not valid")
+			return
+		}
+
+		metrics, err := transactionRepo.GetMetrics(r.Context(), walletID, from, to)
+		if err != nil {
+			log.Printf("Error getting metrics: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting metrics -> "+err.Error())
+			return
+		}
+
+		metricsJSON, err := json.Marshal(metrics)
+		if err != nil {
+			log.Printf("Error encoding metrics to JSON: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error encoding metrics to JSON"}]}`)
+			return
+		}
+
+		fmt.Fprintf(w, `{"data":%s}`, metricsJSON)
 	}
 }

@@ -25,8 +25,10 @@ export class DashboardPageComponent implements AfterViewInit, OnInit {
 
   user$ = this.store.select(getUser);
   selectedWallet$!: Observable<Wallet | null>;
+  metrics$ = this.store.select(finance.getMetrics);
   transactions$ = this.store.select(finance.getTransactions);
 
+  currentDate = new Date();
   selectedWalletID: string = '';
   apiUrl = environment.apiBaseUrl;
 
@@ -37,6 +39,15 @@ export class DashboardPageComponent implements AfterViewInit, OnInit {
       filter((w): w is Wallet => w !== null),
       tap((w) => (this.selectedWalletID = w.ID)),
       tap(() => this.store.dispatch(finance.actions.getTransactions({ walletID: this.selectedWalletID }))),
+      tap(() =>
+        this.store.dispatch(
+          finance.actions.getMetrics({
+            walletID: this.selectedWalletID,
+            from: new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), 1),
+            to: new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 0),
+          }),
+        ),
+      ),
     );
   }
 

@@ -25,6 +25,7 @@ export interface State {
   wallets: Wallet[];
   selectedWallet: Wallet | null;
   transactions: Transaction[];
+  metrics: any;
   error: HttpErrorResponse | null;
   transaction: Transaction | null;
   categories: Category[];
@@ -35,6 +36,7 @@ export const initialState: State = {
   wallets: [],
   selectedWallet: null,
   transactions: [],
+  metrics: null,
   error: null,
   transaction: null,
   categories: [],
@@ -50,6 +52,10 @@ export const actions = createActionGroup({
     'set selected wallet': props<{ wallet: Wallet }>(),
 
     'sync transactions from email': props<{ walletID: string }>(),
+
+    'get metrics': props<{ walletID: string, from: Date, to: Date }>(),
+    'get metrics ok': props<{ metrics: any }>(),
+    'get metrics error': props<{ error: HttpErrorResponse }>(),
 
     'get transactions': props<{ walletID: string }>(),
     'get transactions ok': props<{ transactions: Transaction[] }>(),
@@ -84,6 +90,10 @@ export const reducer = createReducer(
   on(actions.getTransactions, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionsOk, (state, { transactions }) => ({ ...state, transactions, status: Status.ok })),
 
+  on(actions.getMetrics, (state) => ({ ...state, status: Status.loading })),
+  on(actions.getMetricsOk, (state, { metrics }) => ({ ...state, metrics, status: Status.ok })),
+  on(actions.getMetricsError, (state, { error }) => ({ ...state, error, status: Status.error })),
+
   on(actions.getTransaction, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionOk, (state, { transaction }) => ({ ...state, transaction, status: Status.ok })),
   on(actions.getTransactionError, (state, { error }) => ({ ...state, error, status: Status.error })),
@@ -107,6 +117,7 @@ export const getSelectedWallet = createSelector(getFinanceState, (state: State) 
 export const getTransactions = createSelector(getFinanceState, (state: State) => state.transactions);
 export const getSelectedTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
 export const getCategories = createSelector(getFinanceState, (state: State) => state.categories);
+export const getMetrics = createSelector(getFinanceState, (state: State) => state.metrics);
 
 @Injectable()
 export class Effects {
@@ -220,6 +231,18 @@ export class Effects {
     this.actions$.pipe(
       ofType(actions.updateTransactionOk),
       map(({ walletID, transactionID }) => actions.getTransaction({ walletID, transactionID })),
+    ),
+  );
+
+  getMetrics$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.getMetrics),
+      switchMap(({ walletID, from, to }) =>
+        this.walletService.getMetrics(walletID, from, to).pipe(
+          map((metrics) => actions.getMetricsOk({ metrics })),
+          catchError((error) => of(actions.getMetricsError({ error }))),
+        ),
+      ),
     ),
   );
 }

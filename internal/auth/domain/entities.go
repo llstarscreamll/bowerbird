@@ -110,3 +110,10 @@ type Session struct {
 	UserID    string    `json:"userID"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
+
+type Metrics struct {
+	TotalIncome  float32   `json:"totalIncome"`
+	TotalExpense float32   `json:"totalExpense"`
+	From         time.Time `json:"from"`
+	To           time.Time `json:"to"`
+}
