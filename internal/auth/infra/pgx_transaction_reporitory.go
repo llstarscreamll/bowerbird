@@ -19,10 +19,24 @@ func (r *PgxTransactionRepository) UpsertMany(ctx context.Context, transactions 
 		return nil
 	}
 
-	placeHolders := make([]string, 0, len(transactions))
-	values := make([]interface{}, 0, len(transactions)*11)
+	seen := make(map[string]domain.Transaction)
+	deduped := make([]domain.Transaction, 0)
 
-	for i, v := range transactions {
+	for _, t := range transactions {
+		key := t.WalletID + "|" + t.Reference()
+		if _, exists := seen[key]; !exists {
+			seen[key] = t
+		}
+	}
+
+	for _, t := range seen {
+		deduped = append(deduped, t)
+	}
+
+	placeHolders := make([]string, 0, len(deduped))
+	values := make([]interface{}, 0, len(deduped)*13)
+
+	for i, v := range deduped {
 		placeHolders = append(placeHolders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", i*13+1, i*13+2, i*13+3, i*13+4, i*13+5, i*13+6, i*13+7, i*13+8, i*13+9, i*13+10, i*13+11, i*13+12, i*13+13))
 
 		var categoryID interface{} = v.CategoryID

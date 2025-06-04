@@ -363,3 +363,54 @@ func TestUpsertManyShouldUpdateSystemDescriptionWhenTheNewOneIsLongerThanTheOldO
 		},
 	})
 }
+
+func TestUpsertManyShouldRemoveDuplicates(t *testing.T) {
+	db := postgresql.CreatePgxConnectionPool(context.Background(), "postgres://johan:@localhost:5432/bowerbird_test?sslmode=disable")
+	defer db.Close()
+	tests.CleanUpTables(db, []string{"transactions"})
+
+	input := []domain.Transaction{
+		{
+			ID:                "000000000000000000000000T1",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+		{
+			ID:                "000000000000000000000000T2",
+			WalletID:          "000000000000000000000000W1",
+			UserID:            "000000000000000000000000U1",
+			Origin:            "test",
+			Type:              "expense",
+			Amount:            -10.00,
+			UserDescription:   "",
+			SystemDescription: "test system description",
+			ProcessedAt:       currentTime,
+			CreatedAt:         currentTime,
+		},
+	}
+
+	repo := NewPgxTransactionRepository(db)
+	err := repo.UpsertMany(context.Background(), input)
+
+	assert.NoError(t, err)
+	tests.AssertDatabaseHasRows(t, db, "transactions", []map[string]any{
+		{
+			"id":                 "000000000000000000000000T1",
+			"wallet_id":          "000000000000000000000000W1",
+			"user_id":            "000000000000000000000000U1",
+			"origin":             "test",
+			"type":               "expense",
+			"amount":             -10.00,
+			"user_description":   "",
+			"system_description": "test system description",
+			"processed_at":       currentTime,
+		},
+	})
+}
