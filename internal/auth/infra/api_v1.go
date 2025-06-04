@@ -844,11 +844,31 @@ func updateFilePasswordHandler(filePasswordRepo domain.FilePasswordRepository) h
 
 func getMetricsHandler(walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		authUser := r.Context().Value(userContextKey).(domain.User)
 		walletID := r.PathValue("walletID")
 		if walletID == "" {
 			log.Printf("Error getting walletID from path params")
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, `{"errors":[{"status":"400","title":"Bad request","detail":%q}]}`, "Wallet ID is not valid")
+			return
+		}
+
+		wallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+		if err != nil {
+			log.Printf("Error getting wallets from storage: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
+		}
+
+		walletBelongsToUser := slices.ContainsFunc(wallets, func(w domain.UserWallet) bool {
+			return w.ID == walletID
+		})
+
+		if !walletBelongsToUser {
+			log.Printf("Error wallet does not belong to user")
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, `{"errors":[{"status":"403","title":"Forbidden","detail":%q}]}`, "Wallet does not belong to user")
 			return
 		}
 
