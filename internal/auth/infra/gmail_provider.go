@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,7 +29,6 @@ func (g GMailProvider) SearchByDateRangeAndSenders(ctx context.Context, tokens d
 	token, err := tokenSource.Token()
 
 	if err != nil {
-		fmt.Println("Here!!")
 		return nil, err
 	}
 
@@ -101,7 +101,7 @@ func (g GMailProvider) getMessageDetail(mail *gmail.Service, messageID string) (
 		}
 
 		if strings.ToLower(h.Name) == "date" {
-			h.Value = strings.TrimSuffix(h.Value, " (COT)") // date has format: Wed, 29 Jan 2025 15:20:41 -0500 (COT)
+			h.Value = regexp.MustCompile(` \(\w+\)`).ReplaceAllString(h.Value, "")
 			date, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", h.Value)
 			if err != nil {
 				return domain.MailMessage{}, err
