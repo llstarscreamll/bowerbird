@@ -419,6 +419,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			log.Printf("Error getting wallets from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting wallets from storage -> "+err.Error())
+			return
 		}
 
 		if !slices.ContainsFunc(userWallets, func(w domain.UserWallet) bool {
@@ -427,6 +428,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			log.Printf("Error wallet does not belong to user")
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, `{"errors":[{"status":"403","title":"Forbidden","detail":%q}]}`, "Wallet does not belong to user")
+			return
 		}
 
 		mailCredentials, err := mailSecretRepo.FindByWalletID(r.Context(), walletID)
