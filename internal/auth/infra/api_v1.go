@@ -802,6 +802,7 @@ func updateTransaction(walletRepo domain.WalletRepository, transactionRepo domai
 
 		transaction.ID = transactionID
 		transaction.WalletID = walletID
+		transaction.CategorySetterID = authUser.ID
 
 		err = transactionRepo.Update(r.Context(), transaction)
 		if err != nil {
