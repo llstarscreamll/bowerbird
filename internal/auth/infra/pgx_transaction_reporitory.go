@@ -177,8 +177,8 @@ func (r *PgxTransactionRepository) GetByWalletIDAndID(ctx context.Context, walle
 func (r *PgxTransactionRepository) Update(ctx context.Context, transaction domain.Transaction) error {
 	_, err := r.pool.Exec(
 		ctx,
-		`UPDATE transactions SET category_id = $1 WHERE id = $2 AND wallet_id = $3`,
-		transaction.CategoryID, transaction.ID, transaction.WalletID,
+		`UPDATE transactions SET category_id = $1, category_setter_id = $2 WHERE id = $3 AND wallet_id = $4`,
+		transaction.CategoryID, transaction.CategorySetterID, transaction.ID, transaction.WalletID,
 	)
 
 	return err
