@@ -486,6 +486,10 @@ func (s NuBankEmailParserStrategy) parseTsvTransaction(tsvTransaction string, st
 	lines := strings.Split(cleanTsv, "\n")
 
 	date, err := time.Parse("02 1 2006", fmt.Sprintf("%s %d %d", lines[0], s.parseMonth(lines[1]), statementYear))
+	date = date.Add(time.Hour * 23)
+	date = date.Add(time.Minute * 59)
+	date = date.Add(time.Second * 59)
+
 	if err != nil {
 		log.Printf("Error parsing date: %v\ntBlock:\n%s", err, tsvTransaction)
 	}

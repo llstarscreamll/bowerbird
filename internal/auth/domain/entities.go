@@ -89,7 +89,9 @@ func (t *Transaction) Reference() string {
 		desc = desc[:33]
 	}
 
-	return fmt.Sprintf("%s/%s/%s/%f/%d", t.ProcessedAt.Format("20060102"), t.Origin, desc, t.Amount, t.UniquenessCount)
+	date := t.ProcessedAt.In(time.FixedZone("UTC-5", -5*60*60)).Format("20060102")
+
+	return fmt.Sprintf("%s/%s/%s/%f/%d", date, t.Origin, desc, t.Amount, t.UniquenessCount)
 }
 
 type Category struct {

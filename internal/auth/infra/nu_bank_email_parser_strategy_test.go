@@ -34,6 +34,7 @@ func TestNuToNuTransferEmail(t *testing.T) {
 	assert.Equal(t, "", result[0].UserDescription)
 	assert.Equal(t, "Diana E.", result[0].SystemDescription)
 	assert.Equal(t, expectedDate, result[0].ProcessedAt)
+	assert.Equal(t, "20201231/nu/savings/diana e./-300000.000000/0", result[0].Reference())
 
 	assert.Equal(t, "nu/savings", result[1].Origin)
 	assert.Equal(t, "expense", result[1].Type)
@@ -153,7 +154,7 @@ func initSampleData() {
 		To:          "jhon.doe@gmail.com",
 		Body:        string(html),
 		Attachments: []domain.MailAttachment{},
-		ReceivedAt:  time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC),
+		ReceivedAt:  time.Date(2021, 1, 1, 0, 30, 0, 0, time.UTC),
 	}
 
 	html, err = os.ReadFile("../testdata/nu_savings_account_statement_mail_I.html")
