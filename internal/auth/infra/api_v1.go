@@ -365,8 +365,6 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		fmt.Printf("%s provider tokens: %+v \n", provider, tokens)
-
 		encryptedAccessToken, err := crypt.EncryptString(tokens.AccessToken)
 		if err != nil {
 			log.Printf("Error securing access token: %s", err.Error())
