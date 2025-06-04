@@ -162,6 +162,11 @@ func (m *MockTransactionRepository) FindByWalletID(ctx context.Context, walletID
 	return args.Get(0).([]domain.Transaction), args.Error(1)
 }
 
+func (m *MockTransactionRepository) GetMetrics(ctx context.Context, walletID string, from, to time.Time) (domain.Metrics, error) {
+	args := m.Called(ctx, walletID, from, to)
+	return args.Get(0).(domain.Metrics), args.Error(1)
+}
+
 type MockCategoryRepository struct {
 	mock.Mock
 }
