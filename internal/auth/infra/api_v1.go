@@ -12,6 +12,8 @@ import (
 
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type contextKey string
@@ -24,6 +26,7 @@ func RegisterRoutes(
 	mux *http.ServeMux,
 	config commonDomain.AppConfig,
 	ulid commonDomain.ULIDGenerator,
+	db *pgxpool.Pool,
 	authGateway domain.AuthServerGateway,
 	userRepo domain.UserRepository,
 	sessionRepo domain.SessionRepository,
@@ -46,7 +49,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/auth/microsoft/login", authMiddleware(outlookLoginHandler("microsoft", config, ulid, authGateway, sessionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
-	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(walletRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(db), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/metrics", authMiddleware(getMetricsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo, categoryRepo), sessionRepo, userRepo))
@@ -545,10 +548,34 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 	}
 }
 
-func searchWalletsHandler(walletRepo domain.WalletRepository) http.HandlerFunc {
+func searchWalletsHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authUser := r.Context().Value(userContextKey).(domain.User)
-		wallets, err := walletRepo.FindByUserID(r.Context(), authUser.ID)
+
+		type walletResource struct {
+			ID             string `json:"ID"`
+			Name           string `json:"name"`
+			Role           string `json:"role"`
+			SyncFromEmails []struct {
+				Email string `json:"email"`
+			} `json:"syncFromEmails"`
+		}
+
+		type response struct {
+			Data []walletResource `json:"data"`
+		}
+
+		rows, err := db.Query(r.Context(), `
+			SELECT wallets.id,
+				wallets.name,
+				user_has_wallets.role,
+				COALESCE(JSON_AGG(JSON_BUILD_OBJECT('email', mail_credentials.mail_address)), '[]') AS sync_from_emails
+			FROM wallets
+					JOIN user_has_wallets ON wallets.id = user_has_wallets.wallet_id
+					LEFT JOIN mail_credentials ON wallets.id = mail_credentials.wallet_id
+			WHERE user_has_wallets.user_id = $1
+			GROUP BY wallets.id, user_has_wallets.role;
+		`, authUser.ID)
 		if err != nil {
 			log.Printf("Error getting wallets from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -556,15 +583,30 @@ func searchWalletsHandler(walletRepo domain.WalletRepository) http.HandlerFunc {
 			return
 		}
 
-		walletsJSON, err := json.Marshal(wallets)
+		resp := new(response)
+
+		for rows.Next() {
+			var resource walletResource
+			err := rows.Scan(&resource.ID, &resource.Name, &resource.Role, &resource.SyncFromEmails)
+			if err != nil {
+				log.Printf("Error scanning wallet: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error scanning wallet -> "+err.Error())
+				return
+			}
+
+			resp.Data = append(resp.Data, resource)
+		}
+
+		respJson, err := json.Marshal(resp)
 		if err != nil {
-			log.Printf("Error encoding wallets to JSON: %s", err.Error())
+			log.Printf("Error encoding data to JSON: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error encoding wallets to JSON"}]}`)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":"Error encoding data to JSON"}]}`)
 			return
 		}
 
-		fmt.Fprintf(w, `{"data":%s}`, walletsJSON)
+		fmt.Fprint(w, string(respJson))
 	}
 }
 

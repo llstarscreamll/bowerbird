@@ -4,7 +4,7 @@
     type="button"
     data-dropdown-toggle="active-wallet-dropdown"
     data-dropdown-placement="bottom-start"
-    class="cursor-pointer hover:bg-slate-50 border border-gray-300 focus:ring-4 focus:outline-none focus:ring-pink-300 font-medium rounded text-sm px-4 py-2.5 text-center inline-flex items-center"
+    class="cursor-pointer hover:bg-slate-50 border border-slate-200 focus:ring-4 focus:outline-none focus:ring-pink-400 font-medium rounded text-sm px-4 py-2.5 text-center inline-flex items-center text-slate-600"
   >
     {{ (selectedWallet$ | async)?.name }}
     <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
@@ -23,26 +23,21 @@
   </div>
 </div>
 
-<div id="active-wallet-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44">
-  <ul class="py-2 text-sm text-gray-700" aria-labelledby="selectedWalletDropdownButton">
+<div id="active-wallet-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-48">
+  <ul class="py-2 text-sm text-slate-600" aria-labelledby="selectedWalletDropdownButton">
     <li>
       <a
         [href]="apiUrl + '/v1/auth/google-mail/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-2 hover:bg-gray-100"
-        >Sync with Gmail</a
+        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-pink-400"
+        >Sincronizar con Gmail</a
       >
     </li>
     <li>
       <a
         [href]="apiUrl + '/v1/auth/microsoft/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-2 hover:bg-gray-100"
-        >Sync with Outlook</a
+        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-pink-400"
+        >Sincronizar con Outlook</a
       >
-    </li>
-    <li>
-      <button (click)="syncWalletTransactionsWithEmails()" class="block px-4 py-2 hover:bg-gray-100" type="button">
-        Sync now
-      </button>
     </li>
   </ul>
 </div>
@@ -64,8 +59,19 @@
   </div>
 </div>
 
-<div class="px-3">
-  <h2 class="block my-7 font-semibold">Últimas transacciones</h2>
+<div class="px-3 mt-8">
+  <div class="flex items-center align-middle gap-3">
+    <h2 class="block font-semibold">Últimas transacciones</h2>
+    <div class="grow"></div>
+    <button
+      *ngIf="(selectedWallet$ | async)?.syncFromEmails?.length"
+      (click)="syncWalletTransactionsWithEmails()"
+      class="hover:bg-gray-100 px-2 py-1 flex items-center justify-center rounded-lg border border-slate-200 focus:outline-none focus:ring-4 focus:ring-pink-400 cursor-pointer"
+      type="button"
+    >
+      <span class="material-symbols-outlined text-slate-600" style="font-size: 1.3rem"> sync </span>
+    </button>
+  </div>
 
   <div
     *ngIf="!(transactions$ | async) || (transactions$ | async)?.length === 0"
@@ -79,7 +85,7 @@
       <div class="flex flex-row justify-between items-center gap-3">
         <a
           [routerLink]="['/wallets', selectedWalletID, 'transactions', t.ID]"
-          [ngStyle]="{'background-color': t.categoryColor || '#cad5e2'}"
+          [ngStyle]="{'background-color': t.categoryColor || '#dde5f0'}"
           class="flex items-center gap-2 rounded-full p-3"
         >
           <span class="material-symbols-outlined text-white" [ngStyle]="{'font-size': '2rem'}">

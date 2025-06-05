@@ -204,6 +204,7 @@ func setUpAPIServer() {
 		mux,
 		config,
 		ulid,
+		db,
 		authServerGateway,
 		userRepo,
 		sessionRepo,

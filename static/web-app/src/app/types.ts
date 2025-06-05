@@ -11,6 +11,9 @@ export type Wallet = {
   name: string;
   role: string;
   joinedAt: Date;
+  syncFromEmails: {
+    email: string;
+  }[];
 };
 
 export type Transaction = {

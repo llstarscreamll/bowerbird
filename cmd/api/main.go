@@ -75,6 +75,7 @@ func main() {
 		mux,
 		config,
 		ulid,
+		db,
 		authServerGateway,
 		userRepo,
 		sessionRepo,

@@ -1,11 +1,11 @@
 import { initFlowbite } from 'flowbite';
 
-import { Observable, filter, take, takeLast, tap } from 'rxjs';
+import { Observable, filter, tap } from 'rxjs';
 
 import { Store } from '@ngrx/store';
 
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 import { getUser } from '@app/ngrx/auth';
@@ -19,7 +19,7 @@ import { environment } from '@env/environment';
   selector: 'app-dashboard-page',
   templateUrl: './dashboard.page.html',
 })
-export class DashboardPageComponent implements AfterViewInit, OnInit {
+export class DashboardPageComponent implements OnInit {
   private store = inject(Store);
   private flowbite = inject(FlowbiteService);
 
@@ -48,11 +48,8 @@ export class DashboardPageComponent implements AfterViewInit, OnInit {
           }),
         ),
       ),
+      tap(() => this.flowbite.load(() => initFlowbite())),
     );
-  }
-
-  ngAfterViewInit(): void {
-    this.flowbite.load(() => initFlowbite());
   }
 
   syncWalletTransactionsWithEmails() {
