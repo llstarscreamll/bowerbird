@@ -539,8 +539,9 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
-			fmt.Fprintf(w, `{"data":"ok"}`)
 		}
+
+		fmt.Fprintf(w, `{"data":"ok"}`)
 	}
 }
 
