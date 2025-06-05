@@ -10,6 +10,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 import * as auth from '@app/ngrx/auth';
+import { UserService } from '@app/services/user.service';
 import { WalletService } from '@app/services/wallet.service';
 import { Category, Transaction, Wallet } from '@app/types';
 
@@ -53,7 +54,7 @@ export const actions = createActionGroup({
 
     'sync transactions from email': props<{ walletID: string }>(),
 
-    'get metrics': props<{ walletID: string, from: Date, to: Date }>(),
+    'get metrics': props<{ walletID: string; from: Date; to: Date }>(),
     'get metrics ok': props<{ metrics: any }>(),
     'get metrics error': props<{ error: HttpErrorResponse }>(),
 
@@ -77,6 +78,10 @@ export const actions = createActionGroup({
     'update transaction': props<{ walletID: string; transactionID: string; transaction: Transaction }>(),
     'update transaction ok': props<{ walletID: string; transactionID: string }>(),
     'update transaction error': props<{ error: HttpErrorResponse }>(),
+
+    'set file passwords': props<{ passwords: string[] }>(),
+    'set file passwords ok': emptyProps(),
+    'set file passwords error': props<{ error: HttpErrorResponse }>(),
   },
 });
 
@@ -123,6 +128,7 @@ export const getMetrics = createSelector(getFinanceState, (state: State) => stat
 export class Effects {
   private router = inject(Router);
   private actions$ = inject(Actions);
+  private userService = inject(UserService);
   private walletService = inject(WalletService);
 
   getWallets$ = createEffect(() =>
@@ -204,17 +210,6 @@ export class Effects {
     ),
   );
 
-  createCategorySuccess$ = createEffect(
-    () =>
-      this.actions$.pipe(
-        ofType(actions.createCategoryOk),
-        tap(() => {
-          this.router.navigate(['/dashboard']);
-        }),
-      ),
-    { dispatch: false },
-  );
-
   updateTransaction$ = createEffect(() =>
     this.actions$.pipe(
       ofType(actions.updateTransaction),
@@ -244,5 +239,28 @@ export class Effects {
         ),
       ),
     ),
+  );
+
+  setFilePasswords$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(actions.setFilePasswords),
+      switchMap(({ passwords }) =>
+        this.userService.setFilePasswords(passwords).pipe(
+          map(() => actions.setFilePasswordsOk()),
+          catchError((error) => of(actions.setFilePasswordsError({ error }))),
+        ),
+      ),
+    ),
+  );
+
+  createCategorySuccess$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        ofType(actions.createCategoryOk, actions.setFilePasswordsOk),
+        tap(() => {
+          this.router.navigate(['/dashboard']);
+        }),
+      ),
+    { dispatch: false },
   );
 }

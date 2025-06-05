@@ -18,4 +18,8 @@ export const routes: Routes = [
     path: 'wallets/:walletID/categories/create',
     loadComponent: () => import('./pages/create-category.page').then((m) => m.CreateCategoryPage),
   },
+  {
+    path: 'file-passwords',
+    loadComponent: () => import('./pages/file-passwords.page').then((m) => m.FilePasswordsPageComponent),
+  },
 ];

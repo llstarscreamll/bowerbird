@@ -4,7 +4,7 @@
     type="button"
     data-dropdown-toggle="active-wallet-dropdown"
     data-dropdown-placement="bottom-start"
-    class="cursor-pointer hover:bg-slate-50 border border-slate-200 focus:ring-4 focus:outline-none focus:ring-pink-400 font-medium rounded text-sm px-4 py-2.5 text-center inline-flex items-center text-slate-600"
+    class="cursor-pointer hover:bg-slate-50 border border-slate-200 focus:ring-4 focus:outline-none focus:ring-purple-400 font-medium rounded text-sm px-4 py-2.5 text-center inline-flex items-center text-slate-600"
   >
     {{ (selectedWallet$ | async)?.name }}
     <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
@@ -23,20 +23,27 @@
   </div>
 </div>
 
-<div id="active-wallet-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-48">
+<div id="active-wallet-dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-56">
   <ul class="py-2 text-sm text-slate-600" aria-labelledby="selectedWalletDropdownButton">
     <li>
       <a
         [href]="apiUrl + '/v1/auth/google-mail/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-pink-400"
+        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-purple-400"
         >Sincronizar con Gmail</a
       >
     </li>
     <li>
       <a
         [href]="apiUrl + '/v1/auth/microsoft/login?wallet_id=' + selectedWalletID"
-        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-pink-400"
+        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-purple-400"
         >Sincronizar con Outlook</a
+      >
+    </li>
+    <li *ngIf="(selectedWallet$ | async)?.syncFromEmails?.length">
+      <a
+        routerLink="/file-passwords"
+        class="block px-4 py-3 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-purple-400"
+        >Contraseñas de extractos</a
       >
     </li>
   </ul>
@@ -66,7 +73,7 @@
     <button
       *ngIf="(selectedWallet$ | async)?.syncFromEmails?.length"
       (click)="syncWalletTransactionsWithEmails()"
-      class="hover:bg-gray-100 px-2 py-1 flex items-center justify-center rounded-lg border border-slate-200 focus:outline-none focus:ring-4 focus:ring-pink-400 cursor-pointer"
+      class="hover:bg-gray-100 px-2 py-1 flex items-center justify-center rounded-lg border border-slate-200 focus:outline-none focus:ring-4 focus:ring-purple-400 cursor-pointer"
       type="button"
     >
       <span class="material-symbols-outlined text-slate-600" style="font-size: 1.3rem"> sync </span>

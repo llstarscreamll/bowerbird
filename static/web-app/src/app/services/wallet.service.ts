@@ -10,8 +10,8 @@ import { environment } from '@env/environment';
   providedIn: 'root',
 })
 export class WalletService {
-  httpClient = inject(HttpClient);
-  apiUrl = environment.apiBaseUrl;
+  private httpClient = inject(HttpClient);
+  private apiUrl = environment.apiBaseUrl;
 
   search() {
     return this.httpClient.get<{ data: Wallet[] }>(`${this.apiUrl}/v1/wallets`).pipe(map((r) => r.data));
