@@ -25,6 +25,7 @@ export class DashboardPageComponent implements OnInit {
 
   user$ = this.store.select(getUser);
   selectedWallet$!: Observable<Wallet | null>;
+  loading$ = this.store.select(finance.getLoading);
   metrics$ = this.store.select(finance.getMetrics);
   transactions$ = this.store.select(finance.getTransactions);
 

@@ -1,5 +1,5 @@
 import { of } from 'rxjs';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, mergeMap, switchMap, tap } from 'rxjs/operators';
 
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { createActionGroup, createReducer, emptyProps, on, props } from '@ngrx/store';
@@ -53,6 +53,8 @@ export const actions = createActionGroup({
     'set selected wallet': props<{ wallet: Wallet }>(),
 
     'sync transactions from email': props<{ walletID: string }>(),
+    'sync transactions from email ok': emptyProps(),
+    'sync transactions from email error': props<{ error: HttpErrorResponse }>(),
 
     'get metrics': props<{ walletID: string; from: Date; to: Date }>(),
     'get metrics ok': props<{ metrics: any }>(),
@@ -94,6 +96,11 @@ export const reducer = createReducer(
 
   on(actions.getTransactions, (state) => ({ ...state, status: Status.loading })),
   on(actions.getTransactionsOk, (state, { transactions }) => ({ ...state, transactions, status: Status.ok })),
+  on(actions.getTransactionsError, (state, { error }) => ({ ...state, error, status: Status.error })),
+
+  on(actions.syncTransactionsFromEmail, (state) => ({ ...state, status: Status.loading })),
+  on(actions.syncTransactionsFromEmailOk, (state) => ({ ...state, status: Status.ok })),
+  on(actions.syncTransactionsFromEmailError, (state, { error }) => ({ ...state, error, status: Status.error })),
 
   on(actions.getMetrics, (state) => ({ ...state, status: Status.loading })),
   on(actions.getMetricsOk, (state, { metrics }) => ({ ...state, metrics, status: Status.ok })),
@@ -123,6 +130,7 @@ export const getTransactions = createSelector(getFinanceState, (state: State) =>
 export const getSelectedTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
 export const getCategories = createSelector(getFinanceState, (state: State) => state.categories);
 export const getMetrics = createSelector(getFinanceState, (state: State) => state.metrics);
+export const getLoading = createSelector(getFinanceState, (state: State) => state.status === Status.loading);
 
 @Injectable()
 export class Effects {
@@ -167,8 +175,8 @@ export class Effects {
       ofType(actions.syncTransactionsFromEmail),
       switchMap(({ walletID }) =>
         this.walletService.syncTransactionsFromEmail(walletID).pipe(
-          map(() => actions.getTransactions({ walletID })),
-          catchError((error) => of(actions.getTransactionsError({ error }))),
+          mergeMap(() => [actions.syncTransactionsFromEmailOk(), actions.getTransactions({ walletID })]),
+          catchError((error) => of(actions.syncTransactionsFromEmailError({ error }))),
         ),
       ),
     ),
