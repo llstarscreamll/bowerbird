@@ -41,7 +41,7 @@
     </div>
 
     <p>{{ transaction.systemDescription }}</p>
-    <p class="text-sm text-gray-400">{{ transaction.processedAt | date:'mediumDate' }}</p>
+    <p class="text-sm text-gray-400">{{ transaction.processedAt | date: 'EEEE, d MMMM, yyyy' }}</p>
 
     <div class="mt-7 flex items-center gap-2 text-sm text-gray-400">
       <div class="text-left w-1/2">
