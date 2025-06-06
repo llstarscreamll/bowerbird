@@ -66,10 +66,9 @@
   </div>
 </div>
 
-<div class="flex items-center justify-center mt-2 min-h-5 mb-0">
+<div class="flex items-center justify-center mt-2 mb-0" [ngClass]="{'opacity-0': !(isLoading$ | async)}">
   <div
     class="px-5 py-1 text-xs font-medium leading-none text-center text-purple-800 bg-purple-200 rounded-full animate-pulse"
-    [ngClass]="{'hidden': !(loading$ | async)}"
   >
     Cargando...
   </div>
