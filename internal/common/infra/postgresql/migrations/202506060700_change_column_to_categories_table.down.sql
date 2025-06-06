@@ -1,0 +1,2 @@
+ALTER TABLE categories
+ALTER COLUMN color TYPE VARCHAR(7);

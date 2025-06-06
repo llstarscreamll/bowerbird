@@ -100,8 +100,8 @@
       <div class="flex flex-row justify-between items-center gap-3">
         <a
           [routerLink]="['/wallets', selectedWalletID, 'transactions', t.ID]"
-          [ngStyle]="{'background-color': t.categoryColor || '#dde5f0'}"
           class="flex items-center gap-2 rounded-full p-3"
+          [ngClass]="t.categoryColor || 'bg-slate-200'"
         >
           <span class="material-symbols-outlined text-white" [ngStyle]="{'font-size': '2rem'}">
             {{ t.categoryIcon || 'help' }}

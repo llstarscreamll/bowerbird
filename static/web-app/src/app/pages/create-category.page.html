@@ -26,7 +26,7 @@
             data-dropdown-toggle="dropdownSearch"
             data-dropdown-placement="bottom"
             class="rounded-full text-white p-5 shadow-md inline-flex items-center justify-center"
-            [ngStyle]="{'background-color': categoryForm.get('color')?.value}"
+            [ngClass]="categoryForm.get('color')?.value"
             type="button"
           >
             <span class="material-symbols-outlined" [ngStyle]="{'font-size': '3.5rem'}">
@@ -91,15 +91,120 @@
         />
       </div>
 
-      <div class="mb-6">
-        <label for="color" class="block mb-2 text-sm font-medium">Color</label>
-        <input
-          type="color"
-          id="color"
-          formControlName="color"
-          class="bg-gray-50 border border-gray-300 h-10 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full"
-          required
-        />
+      <div class="mb-8">
+        <label class="block mb-2 text-sm font-medium">Color</label>
+
+        <div class="flex flex-col gap-4">
+          <div *ngFor="let color of colors">
+            <div class="flex flex-row gap-5 items-center justify-center">
+              <div *ngFor="let shade of colorShades">
+                <label>
+                  <input type="radio" formControlName="color" [value]="'bg-' + color + '-' + shade" class="hidden" />
+                  <div
+                    class="w-10 h-10 rounded-full"
+                    [ngClass]="{
+                    'bg-red-300': color + shade === 'red300',
+                    'bg-red-400': color + shade === 'red400',
+                    'bg-red-500': color + shade === 'red500',
+                    'bg-red-600': color + shade === 'red600',
+                    'bg-red-700': color + shade === 'red700',
+                    'bg-orange-300': color + shade === 'orange300',
+                    'bg-orange-400': color + shade === 'orange400',
+                    'bg-orange-500': color + shade === 'orange500',
+                    'bg-orange-600': color + shade === 'orange600',
+                    'bg-orange-700': color + shade === 'orange700',
+                    'bg-amber-300': color + shade === 'amber300',
+                    'bg-amber-400': color + shade === 'amber400',
+                    'bg-amber-500': color + shade === 'amber500',
+                    'bg-amber-600': color + shade === 'amber600',
+                    'bg-amber-700': color + shade === 'amber700',
+                    'bg-yellow-300': color + shade === 'yellow300',
+                    'bg-yellow-400': color + shade === 'yellow400',
+                    'bg-yellow-500': color + shade === 'yellow500',
+                    'bg-yellow-600': color + shade === 'yellow600',
+                    'bg-yellow-700': color + shade === 'yellow700',
+                    'bg-lime-300': color + shade === 'lime300',
+                    'bg-lime-400': color + shade === 'lime400',
+                    'bg-lime-500': color + shade === 'lime500',
+                    'bg-lime-600': color + shade === 'lime600',
+                    'bg-lime-700': color + shade === 'lime700',
+                    'bg-green-300': color + shade === 'green300',
+                    'bg-green-400': color + shade === 'green400',
+                    'bg-green-500': color + shade === 'green500',
+                    'bg-green-600': color + shade === 'green600',
+                    'bg-green-700': color + shade === 'green700',
+                    'bg-emerald-300': color + shade === 'emerald300',
+                    'bg-emerald-400': color + shade === 'emerald400',
+                    'bg-emerald-500': color + shade === 'emerald500',
+                    'bg-emerald-600': color + shade === 'emerald600',
+                    'bg-emerald-700': color + shade === 'emerald700',
+                    'bg-teal-300': color + shade === 'teal300',
+                    'bg-teal-400': color + shade === 'teal400',
+                    'bg-teal-500': color + shade === 'teal500',
+                    'bg-teal-600': color + shade === 'teal600',
+                    'bg-teal-700': color + shade === 'teal700',
+                    'bg-cyan-300': color + shade === 'cyan300',
+                    'bg-cyan-400': color + shade === 'cyan400',
+                    'bg-cyan-500': color + shade === 'cyan500',
+                    'bg-cyan-600': color + shade === 'cyan600',
+                    'bg-cyan-700': color + shade === 'cyan700',
+                    'bg-sky-300': color + shade === 'sky300',
+                    'bg-sky-400': color + shade === 'sky400',
+                    'bg-sky-500': color + shade === 'sky500',
+                    'bg-sky-600': color + shade === 'sky600',
+                    'bg-sky-700': color + shade === 'sky700',
+                    'bg-blue-300': color + shade === 'blue300',
+                    'bg-blue-400': color + shade === 'blue400',
+                    'bg-blue-500': color + shade === 'blue500',
+                    'bg-blue-600': color + shade === 'blue600',
+                    'bg-blue-700': color + shade === 'blue700',
+                    'bg-indigo-300': color + shade === 'indigo300',
+                    'bg-indigo-400': color + shade === 'indigo400',
+                    'bg-indigo-500': color + shade === 'indigo500',
+                    'bg-indigo-600': color + shade === 'indigo600',
+                    'bg-indigo-700': color + shade === 'indigo700',
+                    'bg-violet-300': color + shade === 'violet300',
+                    'bg-violet-400': color + shade === 'violet400',
+                    'bg-violet-500': color + shade === 'violet500',
+                    'bg-violet-600': color + shade === 'violet600',
+                    'bg-violet-700': color + shade === 'violet700',
+                    'bg-purple-300': color + shade === 'purple300',
+                    'bg-purple-400': color + shade === 'purple400',
+                    'bg-purple-500': color + shade === 'purple500',
+                    'bg-purple-600': color + shade === 'purple600',
+                    'bg-purple-700': color + shade === 'purple700',
+                    'bg-fuchsia-300': color + shade === 'fuchsia300',
+                    'bg-fuchsia-400': color + shade === 'fuchsia400',
+                    'bg-fuchsia-500': color + shade === 'fuchsia500',
+                    'bg-fuchsia-600': color + shade === 'fuchsia600',
+                    'bg-fuchsia-700': color + shade === 'fuchsia700',
+                    'bg-pink-300': color + shade === 'pink300',
+                    'bg-pink-400': color + shade === 'pink400',
+                    'bg-pink-500': color + shade === 'pink500',
+                    'bg-pink-600': color + shade === 'pink600',
+                    'bg-pink-700': color + shade === 'pink700',
+                    'bg-rose-300': color + shade === 'rose300',
+                    'bg-rose-400': color + shade === 'rose400',
+                    'bg-rose-500': color + shade === 'rose500',
+                    'bg-rose-600': color + shade === 'rose600',
+                    'bg-rose-700': color + shade === 'rose700',
+                    'bg-slate-300': color + shade === 'slate300',
+                    'bg-slate-400': color + shade === 'slate400',
+                    'bg-slate-500': color + shade === 'slate500',
+                    'bg-slate-600': color + shade === 'slate600',
+                    'bg-slate-700': color + shade === 'slate700',
+                    'bg-stone-300': color + shade === 'stone300',
+                    'bg-stone-400': color + shade === 'stone400',
+                    'bg-stone-500': color + shade === 'stone500',
+                    'bg-stone-600': color + shade === 'stone600',
+                    'bg-stone-700': color + shade === 'stone700',
+                  }"
+                  ></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <button

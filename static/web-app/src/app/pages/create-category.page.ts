@@ -26,26 +26,63 @@ export class CreateCategoryPage implements AfterViewInit {
   @ViewChild('dropdownSearchButton') dropdownSearchButton!: ElementRef;
 
   iconsDropdown: Dropdown | null = null;
-  categoryForm = this.fb.group({
-    name: ['', Validators.required],
-    icon: ['help', Validators.required],
-    color: ['#fb64b6', Validators.required],
-  });
-
   walletID = this.route.snapshot.params['walletID'];
   icons: { name: string; popularity: number; tags: string[] }[] = [];
   filteredIcons: { name: string; popularity: number; tags: string[] }[] = [];
+  colorShades = [300, 400, 500, 600, 700];
+  colors = [
+    'red',
+    'orange',
+    'amber',
+    'yellow',
+    'lime',
+    'green',
+    'emerald',
+    'teal',
+    'cyan',
+    'sky',
+    'blue',
+    'indigo',
+    'violet',
+    'purple',
+    'fuchsia',
+    'pink',
+    'rose',
+    'slate',
+    'stone',
+  ];
+
+  categoryForm = this.fb.group({
+    name: ['', Validators.required],
+    icon: ['help', Validators.required],
+    color: [this.generateRandomColor(), Validators.required],
+  });
 
   async ngOnInit() {
     this.icons = await fetch('/icons.json')
       .then((res) => res.json())
       .then((icons) => icons.sort((a: any, b: any) => b.popularity - a.popularity))
-      .then((icons) => (this.filteredIcons = icons));
+      .then((icons) => (this.filteredIcons = icons))
+      .then((icons) => {
+        this.selectRandomIcon();
+        return icons;
+      });
   }
 
   ngAfterViewInit() {
     this.flowbite.load(() => initFlowbite());
     this.iconsDropdown = new Dropdown(this.dropdownSearch.nativeElement, this.dropdownSearchButton.nativeElement);
+  }
+
+  generateRandomColor(): string {
+    const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+    const shade = this.colorShades[Math.floor(Math.random() * this.colorShades.length)];
+    return `bg-${color}-${shade}`;
+  }
+
+  selectRandomIcon() {
+    const randomIcon = this.filteredIcons[Math.floor(Math.random() * this.filteredIcons.length)];
+    this.categoryForm.patchValue({ icon: randomIcon.name });
   }
 
   searchIcon(event: Event) {

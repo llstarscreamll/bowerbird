@@ -130,7 +130,7 @@ export const getTransactions = createSelector(getFinanceState, (state: State) =>
 export const getSelectedTransaction = createSelector(getFinanceState, (state: State) => state.transaction);
 export const getCategories = createSelector(getFinanceState, (state: State) => state.categories);
 export const getMetrics = createSelector(getFinanceState, (state: State) => state.metrics);
-export const getLoading = createSelector(getFinanceState, (state: State) => state.status === Status.loading);
+export const getIsLoading = createSelector(getFinanceState, (state: State) => state.status === Status.loading);
 
 @Injectable()
 export class Effects {
