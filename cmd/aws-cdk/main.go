@@ -148,22 +148,21 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		Ttl:        cdk.Duration_Seconds(jsii.Number(300)),
 	})
 
-	// Deploy HTML files with no cache
 	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-html-deployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
 		Prune:             jsii.Bool(false),
 		Distribution:      distribution,
-		DistributionPaths: &[]*string{jsii.String("/*.html")},
+		DistributionPaths: &[]*string{jsii.String("/*.html"), jsii.String("/ngsw.json")},
 		CacheControl: &[]s3Deploy.CacheControl{
 			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=60")),
 		},
 		Include: &[]*string{
 			jsii.String("*.html"),
+			jsii.String("ngsw.json"),
 		},
 	})
 
-	// Deploy static assets with short cache (1 hour)
 	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-static-assets-deployment"), &s3Deploy.BucketDeploymentProps{
 		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
 		DestinationBucket: webappBucket,
