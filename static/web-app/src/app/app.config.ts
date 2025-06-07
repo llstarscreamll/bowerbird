@@ -2,7 +2,7 @@ import { provideEffects } from '@ngrx/effects';
 import { provideStore } from '@ngrx/store';
 
 import { HTTP_INTERCEPTORS, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { ApplicationConfig, LOCALE_ID, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, LOCALE_ID, provideZoneChangeDetection, isDevMode } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { routes } from '@app/app.routes';
@@ -10,6 +10,7 @@ import { metaReducers, reducers } from '@app/ngrx';
 import { Effects as AuthEffects } from '@app/ngrx/auth';
 import { Effects as FinanceEffects } from '@app/ngrx/finance';
 import { WithCredentialInterceptor } from '@app/with-credential.interceptor';
+import { provideServiceWorker } from '@angular/service-worker';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -23,6 +24,9 @@ export const appConfig: ApplicationConfig = {
       useClass: WithCredentialInterceptor,
       multi: true,
     },
-    { provide: LOCALE_ID, useValue: 'es-CO' },
+    { provide: LOCALE_ID, useValue: 'es-CO' }, provideServiceWorker('ngsw-worker.js', {
+            enabled: !isDevMode(),
+            registrationStrategy: 'registerWhenStable:30000'
+          }),
   ],
 };
