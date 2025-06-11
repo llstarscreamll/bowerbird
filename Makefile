@@ -22,4 +22,4 @@ build-spa:
 # Deploy
 deploy: build-spa
 	@echo "Deploying project $(APP_DOMAIN_NAME)..."
-	@docker compose up --remove-orphans --quiet-pull deploy
+	@DOCKER_BUILDKIT=1 BUILDX_NO_DEFAULT_ATTESTATIONS=1 docker compose up --remove-orphans --quiet-pull deploy

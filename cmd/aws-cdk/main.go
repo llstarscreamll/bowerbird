@@ -14,6 +14,7 @@ import (
 	route53 "github.com/aws/aws-cdk-go/awscdk/v2/awsroute53"
 	route53Targets "github.com/aws/aws-cdk-go/awscdk/v2/awsroute53targets"
 	s3 "github.com/aws/aws-cdk-go/awscdk/v2/awss3"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awss3assets"
 	s3Deploy "github.com/aws/aws-cdk-go/awscdk/v2/awss3deployment"
 	parameterStore "github.com/aws/aws-cdk-go/awscdk/v2/awsssm"
 	"github.com/aws/constructs-go/constructs/v10"
@@ -43,9 +44,9 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 			File:     jsii.String("cmd/lambda-api/Dockerfile"),
 			Platform: awsecrassets.Platform_LINUX_ARM64(),
 			BuildArgs: &map[string]*string{
-				"--progress": jsii.String("plain"),
-				// "--no-cache":   jsii.String("true"),
+				"--progress":   jsii.String("plain"),
 				"--provenance": jsii.String("false"),
+				"--sbom":       jsii.String("false"),
 			},
 		}),
 		Architecture: lambda.Architecture_ARM_64(),
@@ -148,48 +149,60 @@ func NewCdkStack(scope constructs.Construct, id string, props *CdkGoStackProps) 
 		Ttl:        cdk.Duration_Seconds(jsii.Number(300)),
 	})
 
+	filesWithShortCache := &[]*string{
+		jsii.String("*.html"),
+		jsii.String("ngsw.json"),
+		jsii.String("ngsw-worker.js"),
+		jsii.String("*.webmanifest"),
+	}
+
+	filesWithLongCache := &[]*string{
+		jsii.String("chunk-*.js"),
+		jsii.String("main-*.js"),
+		jsii.String("polyfills-*.js"),
+		jsii.String("safety-worker.js"),
+		jsii.String("worker-basic.min.js"),
+		jsii.String("*.css"),
+		jsii.String("*.png"),
+		jsii.String("*.jpg"),
+		jsii.String("*.jpeg"),
+		jsii.String("*.gif"),
+		jsii.String("*.svg"),
+		jsii.String("*.ico"),
+		jsii.String("*.woff"),
+		jsii.String("*.woff2"),
+		jsii.String("*.ttf"),
+		jsii.String("*.eot"),
+		jsii.String("icons.json"),
+		jsii.String("*.webmanifest"),
+	}
+
 	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-html-deployment"), &s3Deploy.BucketDeploymentProps{
-		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		Sources: &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), &awss3assets.AssetOptions{
+			Exclude: filesWithLongCache,
+		})},
 		DestinationBucket: webappBucket,
 		Prune:             jsii.Bool(false),
 		Distribution:      distribution,
-		DistributionPaths: &[]*string{jsii.String("/*.html"), jsii.String("/ngsw.json")},
 		CacheControl: &[]s3Deploy.CacheControl{
 			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=60")),
 		},
-		Include: &[]*string{
-			jsii.String("*.html"),
-			jsii.String("ngsw.json"),
+		Exclude: &[]*string{
+			jsii.String("*"),
 		},
+		Include: filesWithShortCache,
 	})
 
 	s3Deploy.NewBucketDeployment(stack, jsii.String(appName+"-static-assets-deployment"), &s3Deploy.BucketDeploymentProps{
-		Sources:           &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), nil)},
+		Sources: &[]s3Deploy.ISource{s3Deploy.Source_Asset(jsii.String("static/web-app/dist/bowerbird/browser"), &awss3assets.AssetOptions{
+			Exclude: filesWithShortCache,
+		})},
 		DestinationBucket: webappBucket,
 		Prune:             jsii.Bool(false),
 		CacheControl: &[]s3Deploy.CacheControl{
 			s3Deploy.CacheControl_FromString(jsii.String("public, max-age=3600")),
 		},
-		Include: &[]*string{
-			jsii.String("*.js"),
-			jsii.String("*.css"),
-			jsii.String("*.png"),
-			jsii.String("*.jpg"),
-			jsii.String("*.jpeg"),
-			jsii.String("*.gif"),
-			jsii.String("*.svg"),
-			jsii.String("*.ico"),
-			jsii.String("*.woff"),
-			jsii.String("*.woff2"),
-			jsii.String("*.ttf"),
-			jsii.String("*.eot"),
-			jsii.String("*.json"),
-			jsii.String("*.webmanifest"),
-		},
-		Metadata: &map[string]*string{
-			"*.js":  jsii.String("application/javascript"),
-			"*.css": jsii.String("text/css"),
-		},
+		Include: filesWithLongCache,
 	})
 
 	return stack
