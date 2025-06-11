@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -200,28 +199,6 @@ func (r *PgxTransactionRepository) Update(ctx context.Context, transaction domai
 	)
 
 	return err
-}
-
-func (r *PgxTransactionRepository) GetMetrics(ctx context.Context, walletID string, from, to time.Time) (domain.Metrics, error) {
-	row := r.pool.QueryRow(
-		ctx,
-		`SELECT SUM(CASE WHEN "type" = 'income' THEN amount ELSE 0 END) as total_income,
-				SUM(CASE WHEN "type" = 'expense' THEN amount ELSE 0 END) as total_expense
-		FROM transactions
-		WHERE wallet_id = $1 AND processed_at BETWEEN $2 AND $3`,
-		walletID, from, to,
-	)
-
-	var metrics domain.Metrics
-	err := row.Scan(&metrics.TotalIncome, &metrics.TotalExpense)
-	if err != nil {
-		return domain.Metrics{}, err
-	}
-
-	metrics.From = from
-	metrics.To = to
-
-	return metrics, nil
 }
 
 func NewPgxTransactionRepository(pool *pgxpool.Pool) *PgxTransactionRepository {

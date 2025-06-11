@@ -13,6 +13,7 @@ import (
 	"llstarscreamll/bowerbird/internal/auth/domain"
 	commonDomain "llstarscreamll/bowerbird/internal/common/domain"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -50,7 +51,7 @@ func RegisterRoutes(
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", authMiddleware(mailLoginCallbackHandler("microsoft", config, ulid, sessionRepo, authGateway, crypt, mailSecretRepo), sessionRepo, userRepo))
 
 	mux.HandleFunc("GET /api/v1/wallets", authMiddleware(searchWalletsHandler(db), sessionRepo, userRepo))
-	mux.HandleFunc("GET /api/v1/wallets/{walletID}/metrics", authMiddleware(getMetricsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
+	mux.HandleFunc("GET /api/v1/wallets/{walletID}/metrics", authMiddleware(getMetricsHandler(db, walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions", authMiddleware(searchTransactionsHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
 	mux.HandleFunc("POST /api/v1/wallets/{walletID}/transactions/sync-from-mail", authMiddleware(syncTransactionsFromEmailHandler(ulid, crypt, mailSecretRepo, mailGateway, mailMessageRepo, walletRepo, transactionRepo, filePasswordRepo, categoryRepo), sessionRepo, userRepo))
 	mux.HandleFunc("GET /api/v1/wallets/{walletID}/transactions/{transactionID}", authMiddleware(getTransactionHandler(walletRepo, transactionRepo), sessionRepo, userRepo))
@@ -881,10 +882,11 @@ func updateFilePasswordHandler(filePasswordRepo domain.FilePasswordRepository) h
 	}
 }
 
-func getMetricsHandler(walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
+func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authUser := r.Context().Value(userContextKey).(domain.User)
 		walletID := r.PathValue("walletID")
+
 		if walletID == "" {
 			log.Printf("Error getting walletID from path params")
 			w.WriteHeader(http.StatusBadRequest)
@@ -927,15 +929,50 @@ func getMetricsHandler(walletRepo domain.WalletRepository, transactionRepo domai
 			return
 		}
 
-		metrics, err := transactionRepo.GetMetrics(r.Context(), walletID, from, to)
+		type metricsResponse struct {
+			WalletID           string `json:"walletID"`
+			ExpensesByCategory []struct {
+				CategoryName string  `json:"categoryName"`
+				Total        float32 `json:"total"`
+				Color        string  `json:"color"`
+			} `json:"expensesByCategory"`
+			TotalIncome  float32   `json:"totalIncome"`
+			TotalExpense float32   `json:"totalExpense"`
+			From         time.Time `json:"from"`
+			To           time.Time `json:"to"`
+		}
+
+		resp := struct {
+			Data metricsResponse `json:"data"`
+		}{
+			Data: metricsResponse{
+				WalletID: walletID,
+				From:     from,
+				To:       to,
+			},
+		}
+
+		batch := &pgx.Batch{}
+		batch.Queue(`
+			SELECT SUM(CASE WHEN "type" = 'income' THEN amount ELSE 0 END) as total_income,
+				   SUM(CASE WHEN "type" = 'expense' THEN amount ELSE 0 END) as total_expense
+			FROM transactions
+			WHERE wallet_id = $1 AND processed_at BETWEEN $2 AND $3`,
+			walletID, from, to)
+
+		batchResults := db.SendBatch(r.Context(), batch)
+		defer batchResults.Close()
+
+		row := batchResults.QueryRow()
+		err = row.Scan(&resp.Data.TotalIncome, &resp.Data.TotalExpense)
 		if err != nil {
-			log.Printf("Error getting metrics: %s", err.Error())
+			log.Printf("Error getting total income and expense: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting metrics -> "+err.Error())
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting total income and expense -> "+err.Error())
 			return
 		}
 
-		metricsJSON, err := json.Marshal(metrics)
+		respJson, err := json.Marshal(resp)
 		if err != nil {
 			log.Printf("Error encoding metrics to JSON: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -943,6 +980,6 @@ func getMetricsHandler(walletRepo domain.WalletRepository, transactionRepo domai
 			return
 		}
 
-		fmt.Fprintf(w, `{"data":%s}`, metricsJSON)
+		fmt.Fprint(w, string(respJson))
 	}
 }

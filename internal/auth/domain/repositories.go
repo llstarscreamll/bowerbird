@@ -35,7 +35,6 @@ type TransactionRepository interface {
 	FindByWalletID(ctx context.Context, walletID string) ([]Transaction, error)
 	GetByWalletIDAndID(ctx context.Context, walletID, transactionID string) (Transaction, error)
 	Update(ctx context.Context, transaction Transaction) error
-	GetMetrics(ctx context.Context, walletID string, from, to time.Time) (Metrics, error)
 }
 
 type CategoryRepository interface {
