@@ -1,6 +1,6 @@
 {
-  "name": "bowerbird",
-  "short_name": "bowerbird",
+  "name": "Money Path",
+  "short_name": "MoneyPath",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
