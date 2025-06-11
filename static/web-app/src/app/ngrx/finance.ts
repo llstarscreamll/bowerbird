@@ -21,12 +21,25 @@ export enum Status {
   error = 'error',
 }
 
+export type WalletMetrics = {
+  walletID: string;
+  from: string;
+  to: string;
+  totalIncome: number;
+  totalExpense: number;
+  expensesByCategory: {
+    categoryName: string;
+    total: number;
+    color: string;
+  }[];
+};
+
 export interface State {
   status: Status;
   wallets: Wallet[];
   selectedWallet: Wallet | null;
   transactions: Transaction[];
-  metrics: any;
+  metrics: WalletMetrics | null;
   error: HttpErrorResponse | null;
   transaction: Transaction | null;
   categories: Category[];

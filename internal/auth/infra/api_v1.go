@@ -953,12 +953,25 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 		}
 
 		batch := &pgx.Batch{}
+
+		// total income and expense
 		batch.Queue(`
 			SELECT SUM(CASE WHEN "type" = 'income' THEN amount ELSE 0 END) as total_income,
 				   SUM(CASE WHEN "type" = 'expense' THEN amount ELSE 0 END) as total_expense
 			FROM transactions
 			WHERE wallet_id = $1 AND processed_at BETWEEN $2 AND $3`,
 			walletID, from, to)
+
+		// expenses by category
+		batch.Queue(`
+			SELECT c.name, c.color, SUM(t.amount)
+			FROM categories c
+					JOIN transactions t ON t.category_id = c.id
+			WHERE t.wallet_id = $1
+				AND t.processed_at BETWEEN $2 AND $3
+				AND t.amount < 0
+			GROUP BY c.name, c.color
+		`, walletID, from, to)
 
 		batchResults := db.SendBatch(r.Context(), batch)
 		defer batchResults.Close()
@@ -971,6 +984,34 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting total income and expense -> "+err.Error())
 			return
 		}
+
+		rows, err := batchResults.Query()
+		if err != nil {
+			log.Printf("Error getting expenses by category: %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting expenses by category -> "+err.Error())
+			return
+		}
+
+		for rows.Next() {
+			var categoryName, categoryColor string
+			var total float32
+			err = rows.Scan(&categoryName, &categoryColor, &total)
+			if err != nil {
+				log.Printf("Error getting expenses by category: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting expenses by category -> "+err.Error())
+				return
+			}
+
+			resp.Data.ExpensesByCategory = append(resp.Data.ExpensesByCategory, struct {
+				CategoryName string  `json:"categoryName"`
+				Total        float32 `json:"total"`
+				Color        string  `json:"color"`
+			}{categoryName, total, categoryColor})
+		}
+
+		rows.Close()
 
 		respJson, err := json.Marshal(resp)
 		if err != nil {

@@ -50,6 +50,17 @@
 </div>
 
 <div class="mx-3 mt-6 px-4 py-3 border border-slate-200 rounded-lg">
+  <div class="px-3 text-center text-slate-400 font-light text-sm">
+    <div>{{ currentDate | date: 'MMMM yyyy' }}</div>
+  </div>
+
+  <div
+    *ngIf="expensesChartOptions.series[0].data?.length"
+    echarts
+    [options]="expensesChartOptions"
+    class="w-full h-42 block my-5"
+  ></div>
+
   <div class="flex flex-row gap-3">
     <div class="w-1/2 text-center">
       <div class="font-light text-slate-400">Ingresos</div>
@@ -59,10 +70,6 @@
       <div class="font-light text-slate-400">Gastos</div>
       <div class="font-medium text-rose-500">${{ (metrics$ | async )?.totalExpense | number }}</div>
     </div>
-  </div>
-
-  <div class="px-3 mt-2 text-center text-slate-400 font-light text-sm">
-    <div>{{ currentDate | date: 'MMMM yyyy' }}</div>
   </div>
 </div>
 
