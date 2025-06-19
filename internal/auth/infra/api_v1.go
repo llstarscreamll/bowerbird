@@ -473,11 +473,20 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				[]string{"nu@nu.com.co"},
 			)
 
-			if err != nil {
-				log.Printf("Error getting mails from provider "+c.MailProvider+": %s", err.Error())
+			if err != nil && !strings.Contains(err.Error(), "Token has been expired or revoked") {
+				log.Printf("Error getting mails from "+c.MailAddress+" ("+c.MailProvider+")"+": %s", err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting mails from provider "+c.MailProvider+" -> "+err.Error())
+				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error getting mails from "+c.MailAddress+" ("+c.MailProvider+") -> "+err.Error())
 				return
+			}
+
+			if err != nil && strings.Contains(err.Error(), "Token has been expired or revoked") {
+				log.Printf("Token has been expired or revoked for " + c.MailAddress + " (" + c.MailProvider + "), deleting mail credential")
+				err = mailSecretRepo.Delete(r.Context(), c.ID)
+				if err != nil {
+					log.Printf("Error deleting expired or revoked mail credential from storage: %s", err.Error())
+				}
+				continue
 			}
 
 			for i := range mailMessages {

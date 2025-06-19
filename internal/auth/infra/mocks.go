@@ -124,6 +124,11 @@ func (m *MockMailCredentialRepository) FindByWalletID(ctx context.Context, walle
 	return args.Get(0).([]domain.MailCredential), args.Error(1)
 }
 
+func (m *MockMailCredentialRepository) Delete(ctx context.Context, ID string) error {
+	args := m.Called(ctx, ID)
+	return args.Error(0)
+}
+
 type MockWalletRepository struct {
 	mock.Mock
 }

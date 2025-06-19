@@ -55,6 +55,15 @@ func (r *PgxMailCredentialRepository) FindByWalletID(ctx context.Context, wallet
 	return credentials, nil
 }
 
+func (r *PgxMailCredentialRepository) Delete(ctx context.Context, ID string) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM mail_credentials WHERE id = $1`, ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewPgxMailCredentialRepository(pool *pgxpool.Pool) *PgxMailCredentialRepository {
 	return &PgxMailCredentialRepository{pool}
 }

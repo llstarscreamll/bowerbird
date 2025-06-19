@@ -19,6 +19,7 @@ type SessionRepository interface {
 type MailCredentialRepository interface {
 	Save(ctx context.Context, ID, userID, walletID, mailProvider, mailAddress, accessToken, refreshToken string, expiresAt time.Time) error
 	FindByWalletID(ctx context.Context, userID string) ([]MailCredential, error)
+	Delete(ctx context.Context, ID string) error
 }
 
 type MailMessageRepository interface {
