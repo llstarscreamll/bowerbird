@@ -955,9 +955,16 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 			Data metricsResponse `json:"data"`
 		}{
 			Data: metricsResponse{
-				WalletID: walletID,
-				From:     from,
-				To:       to,
+				WalletID:     walletID,
+				From:         from,
+				To:           to,
+				TotalIncome:  0,
+				TotalExpense: 0,
+				ExpensesByCategory: make([]struct {
+					CategoryName string  `json:"categoryName"`
+					Total        float32 `json:"total"`
+					Color        string  `json:"color"`
+				}, 0),
 			},
 		}
 
@@ -965,8 +972,8 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 
 		// total income and expense
 		batch.Queue(`
-			SELECT SUM(CASE WHEN "type" = 'income' THEN amount ELSE 0 END) as total_income,
-				   SUM(CASE WHEN "type" = 'expense' THEN amount ELSE 0 END) as total_expense
+			SELECT COALESCE(SUM(CASE WHEN "type" = 'income' THEN amount ELSE 0 END), 0) as total_income,
+				   COALESCE(SUM(CASE WHEN "type" = 'expense' THEN amount ELSE 0 END), 0) as total_expense
 			FROM transactions
 			WHERE wallet_id = $1 AND processed_at BETWEEN $2 AND $3`,
 			walletID, from, to)
@@ -985,6 +992,7 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 		batchResults := db.SendBatch(r.Context(), batch)
 		defer batchResults.Close()
 
+		// total income and expense
 		row := batchResults.QueryRow()
 		err = row.Scan(&resp.Data.TotalIncome, &resp.Data.TotalExpense)
 		if err != nil {
@@ -994,6 +1002,7 @@ func getMetricsHandler(db *pgxpool.Pool, walletRepo domain.WalletRepository, tra
 			return
 		}
 
+		// expenses by category
 		rows, err := batchResults.Query()
 		if err != nil {
 			log.Printf("Error getting expenses by category: %s", err.Error())

@@ -187,7 +187,7 @@ export class DashboardPageComponent implements OnInit {
       filter((m) => m !== null),
       tap(
         (m) =>
-          (this.expensesChartOptions['series'][0]['data'] = m?.expensesByCategory.map((c) => ({
+          (this.expensesChartOptions['series'][0]['data'] = m.expensesByCategory.map((c) => ({
             value: Math.abs(c.total),
             name: c.categoryName,
             itemStyle: { color: colors[c.color as keyof typeof colors] || 'gray' },
