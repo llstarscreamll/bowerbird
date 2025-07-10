@@ -1,0 +1,2 @@
+ALTER TABLE mail_credentials
+ADD COLUMN last_read_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();

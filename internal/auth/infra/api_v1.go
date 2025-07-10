@@ -403,7 +403,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 	}
 }
 
-func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailSecretRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository, filePasswordRepo domain.FilePasswordRepository, categoryRepo domain.CategoryRepository) http.HandlerFunc {
+func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt commonDomain.Crypt, mailCredentialRepo domain.MailCredentialRepository, mailGateway domain.MailGateway, mailMessageRepo domain.MailMessageRepository, walletRepo domain.WalletRepository, transactionRepo domain.TransactionRepository, filePasswordRepo domain.FilePasswordRepository, categoryRepo domain.CategoryRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		walletID := r.PathValue("walletID")
 		if walletID == "" {
@@ -431,7 +431,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 			return
 		}
 
-		mailCredentials, err := mailSecretRepo.FindByWalletID(r.Context(), walletID)
+		mailCredentials, err := mailCredentialRepo.FindByWalletID(r.Context(), walletID)
 		if err != nil {
 			log.Printf("Error getting mail credentials from storage: %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
@@ -464,12 +464,12 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				return
 			}
 
-			startOfMonth := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+			fromDate := c.LastReadAt.Add(-time.Hour * 48) // 2 days before last read date
 			mailMessages, err := mailGateway.SearchFromDateAndSenders(
 				r.Context(),
 				c.MailProvider,
 				domain.Tokens{AccessToken: decryptedAccessToken, RefreshToken: decryptedRefreshToken, ExpiresAt: c.ExpiresAt},
-				startOfMonth,
+				fromDate,
 				[]string{"nu@nu.com.co"},
 			)
 
@@ -482,7 +482,7 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 
 			if err != nil && strings.Contains(err.Error(), "Token has been expired or revoked") {
 				log.Printf("Token has been expired or revoked for " + c.MailAddress + " (" + c.MailProvider + "), deleting mail credential")
-				err = mailSecretRepo.Delete(r.Context(), c.ID)
+				err = mailCredentialRepo.Delete(r.Context(), c.ID)
 				if err != nil {
 					log.Printf("Error deleting expired or revoked mail credential from storage: %s", err.Error())
 				}
@@ -501,6 +501,8 @@ func syncTransactionsFromEmailHandler(ulid commonDomain.ULIDGenerator, crypt com
 				fmt.Fprintf(w, `{"errors":[{"status":"500","title":"Internal server error","detail":%q}]}`, "Error persisting mails on storage -> "+err.Error())
 				return
 			}
+
+			mailCredentialRepo.UpdateLastReadAt(r.Context(), c.ID, time.Now())
 
 			transactions := make([]domain.Transaction, 0, len(mailMessages))
 			for _, m := range mailMessages {

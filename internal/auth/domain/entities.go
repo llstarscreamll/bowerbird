@@ -31,6 +31,7 @@ type MailCredential struct {
 	AccessToken  string
 	RefreshToken string
 	ExpiresAt    time.Time
+	LastReadAt   time.Time
 	CreatedAt    time.Time
 }
 

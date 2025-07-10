@@ -31,7 +31,7 @@ func (r *PgxMailCredentialRepository) FindByWalletID(ctx context.Context, wallet
 
 	rows, err := r.pool.Query(
 		ctx,
-		`SELECT id, wallet_id, user_id, mail_provider, mail_address, access_token, refresh_token, expires_at
+		`SELECT id, wallet_id, user_id, mail_provider, mail_address, access_token, refresh_token, expires_at, last_read_at
 		FROM mail_credentials
 		WHERE wallet_id = $1`,
 		walletID,
@@ -44,7 +44,7 @@ func (r *PgxMailCredentialRepository) FindByWalletID(ctx context.Context, wallet
 	for rows.Next() {
 		credential := domain.MailCredential{}
 
-		err := rows.Scan(&credential.ID, &credential.WalletID, &credential.UserID, &credential.MailProvider, &credential.MailAddress, &credential.AccessToken, &credential.RefreshToken, &credential.ExpiresAt)
+		err := rows.Scan(&credential.ID, &credential.WalletID, &credential.UserID, &credential.MailProvider, &credential.MailAddress, &credential.AccessToken, &credential.RefreshToken, &credential.ExpiresAt, &credential.LastReadAt)
 		if err != nil {
 			return nil, err
 		}
@@ -53,6 +53,15 @@ func (r *PgxMailCredentialRepository) FindByWalletID(ctx context.Context, wallet
 	}
 
 	return credentials, nil
+}
+
+func (r *PgxMailCredentialRepository) UpdateLastReadAt(ctx context.Context, ID string, lastReadAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `UPDATE mail_credentials SET last_read_at = $1 WHERE id = $2`, lastReadAt, ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *PgxMailCredentialRepository) Delete(ctx context.Context, ID string) error {
