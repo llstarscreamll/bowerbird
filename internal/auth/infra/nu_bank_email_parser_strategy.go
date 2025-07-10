@@ -354,6 +354,10 @@ func (s NuBankEmailParserStrategy) parseFromBankStatementTsv(tsv string) []domai
 
 	pages := regexp.MustCompile(`(?m)^.+\t###PAGE###$`).Split(tsv, -1)
 	for i, page := range pages[2:] {
+		if !regexp.MustCompile(`(?m)^.+\tMovimientos$`).MatchString(page) {
+			continue
+		}
+
 		// remove NuBank interest info
 		page = regexp.MustCompile(`(?m)^.+FLOW###\n(?:.+\n){11}.+\tdiario.\n`).ReplaceAllString(page, "")
 		page = regexp.MustCompile(`(?m)^.+FLOW###\n.+\n.+\n.+rendimientos\n.+\n.+\n.+\n.+diario\n`).ReplaceAllString(page, "")
