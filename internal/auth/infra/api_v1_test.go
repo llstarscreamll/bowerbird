@@ -110,7 +110,7 @@ func TestGoogleLoginCallback(t *testing.T) {
 			},
 			http.StatusFound,
 			map[string]string{
-				"Location":   config.WebUrl + "/dashboard",
+				"Location":   config.SpaUrl + "/dashboard",
 				"Set-Cookie": "session_token=01JGCA8BBB00000000000000S1; Path=/; HttpOnly; Secure",
 			},
 		},
@@ -374,7 +374,7 @@ func TestGMailLoginCallback(t *testing.T) {
 			},
 			http.StatusFound,
 			map[string]string{
-				"Location": config.WebUrl + "/dashboard",
+				"Location": config.SpaUrl + "/dashboard",
 			},
 		},
 		{

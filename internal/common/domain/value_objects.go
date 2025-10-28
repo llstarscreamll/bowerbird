@@ -3,7 +3,7 @@ package domain
 type AppConfig struct {
 	IsProduction              bool   `json:"IS_PRODUCTION"`
 	ApiUrl                    string `json:"API_URL"`
-	WebUrl                    string `json:"WEB_URL"`
+	SpaUrl                    string `json:"WEB_URL"`
 	ServerPort                string `json:"SERVER_PORT"`
 	CryptSecret               string `json:"CRYPT_SECRET"`
 	GoogleClientID            string `json:"GOOGLE_CLIENT_ID"`

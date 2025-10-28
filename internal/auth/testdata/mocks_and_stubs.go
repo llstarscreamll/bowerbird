@@ -8,7 +8,7 @@ import (
 var Config = commonDomain.AppConfig{
 	ApiUrl:     "http://localhost:8080",
 	ServerPort: ":8080",
-	WebUrl:     "http://localhost:4200",
+	SpaUrl:     "http://localhost:4200",
 }
 
 var TestUser = domain.User{

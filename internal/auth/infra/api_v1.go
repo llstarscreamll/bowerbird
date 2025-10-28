@@ -209,7 +209,7 @@ func googleLoginCallbackHandler(config commonDomain.AppConfig, ulid commonDomain
 			Secure:   config.IsProduction,
 		})
 
-		http.Redirect(w, r, config.WebUrl+"/dashboard", http.StatusFound)
+		http.Redirect(w, r, config.SpaUrl+"/dashboard", http.StatusFound)
 	}
 }
 
@@ -399,7 +399,7 @@ func mailLoginCallbackHandler(provider string, config commonDomain.AppConfig, ul
 			return
 		}
 
-		http.Redirect(w, r, config.WebUrl+"/dashboard", http.StatusFound)
+		http.Redirect(w, r, config.SpaUrl+"/dashboard", http.StatusFound)
 	}
 }
 
