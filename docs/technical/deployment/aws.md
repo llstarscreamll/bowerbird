@@ -27,7 +27,7 @@ pnpm exec cdk deploy --all --require-approval never
 
 - `AWS_REGION` debe ser `us-east-1` (validado en `packages/infra/bin/infra.ts`).
 - `packages/infra/.env` es obligatorio.
-- El stack espera build web en `apps/web/dist/web/browser`.
+- El stack espera build web en `apps/pwa/dist/web/browser`.
 
 ## CloudFront + estrategia de cache SPA/PWA
 

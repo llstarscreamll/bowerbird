@@ -15,7 +15,7 @@ Servicios emulados actualmente:
 
 - LocalStack vive en `docker-compose.yml` y expone `http://localhost:4566`.
 - La inicialización de recursos se hace automáticamente al arrancar con:
-  `apps/api/scripts/init-localstack.sh`.
+  `apps/backend/scripts/init-localstack.sh`.
 - El backend local usa `AWS_ENDPOINT_URL` para apuntar al endpoint local.
 
 ## Recursos inicializados automáticamente

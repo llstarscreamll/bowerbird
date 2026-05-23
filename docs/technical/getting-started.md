@@ -31,8 +31,8 @@ mise x -- pnpm run dev
 
 ### API local
 
-1. Copiar `apps/api/.env.example` a `apps/api/.env`.
-2. Copiar `apps/api/secrets.example.json` a `apps/api/secrets.json`.
+1. Copiar `apps/backend/.env.example` a `apps/backend/.env`.
+2. Copiar `apps/backend/secrets.example.json` a `apps/backend/secrets.json`.
 3. Revisar y ajustar los valores locales.
 
 **¿Cuándo usar `.env` y cuándo `secrets.json`?**
@@ -61,7 +61,7 @@ Usa **`secrets.json`** para cualquier clave secreta, cadena de conexión o recur
 4. Exportar variables si vas a ejecutar comandos directos de Go:
 
 ```bash
-export $(grep -v '^#' apps/api/.env | xargs)
+export $(grep -v '^#' apps/backend/.env | xargs)
 ```
 
 Variables clave en `.env` para emulación AWS local:
@@ -97,9 +97,9 @@ Esto levanta:
 - API Go con live reload (`air -c .air.toml`) en `http://localhost:8080`
 - Angular dev server en `http://localhost:4200`
 
-La web usa `apps/web/proxy.conf.json` para enrutar `/api/*` hacia `http://localhost:8080`.
+La web usa `apps/pwa/proxy.conf.json` para enrutar `/api/*` hacia `http://localhost:8080`.
 
-LocalStack inicializa automáticamente recursos con `apps/api/scripts/init-localstack.sh` al arrancar Docker.
+LocalStack inicializa automáticamente recursos con `apps/backend/scripts/init-localstack.sh` al arrancar Docker.
 
 ## Comandos principales
 
