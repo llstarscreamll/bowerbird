@@ -1,0 +1,25 @@
+{
+  "name": "@turno/infra",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "deploy": "cdk deploy --all --require-approval never",
+    "synth": "cdk synth"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.196.0",
+    "constructs": "^10.4.2",
+    "dotenv": "^16.4.5",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@aws-cdk/aws-lambda-go-alpha": "^2.196.0-alpha.0",
+    "aws-cdk": "^2.1012.0",
+    "esbuild": "^0.25.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

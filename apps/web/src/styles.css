@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #f2f6f9;
+  --surface-card: #ffffff;
+  --ink: #153047;
+  --accent: #0ea5a4;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 20% 10%, #d6f1ff, var(--surface) 45%),
+    radial-gradient(circle at 85% 90%, #ccfbf1, var(--surface) 25%);
+  color: var(--ink);
+  min-height: 100vh;
+}
