@@ -1,44 +1,47 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: turno-postgres
+    container_name: bowerbird-postgres
     environment:
-      POSTGRES_USER: turno
-      POSTGRES_PASSWORD: turno
-      POSTGRES_DB: turno
+      POSTGRES_USER: bowerbird
+      POSTGRES_PASSWORD: bowerbird
+      POSTGRES_DB: bowerbird
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U turno -d turno"]
+      test: ['CMD-SHELL', 'pg_isready -U bowerbird -d bowerbird']
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: turno-redis
+    container_name: bowerbird-redis
     ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+      - '6379:6379'
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis_data:/data
 
-  minio:
-    image: minio/minio:latest
-    container_name: turno-minio
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: bowerbird-localstack
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+      SERVICES: s3,sqs,ssm,events
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      DEBUG: 1
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '4566:4566'
     volumes:
-      - minio_data:/data
+      - localstack_data:/var/lib/localstack
+      - ./apps/api/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
+      - ./apps/api/secrets.json:/tmp/local-secrets.json:ro
 
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  localstack_data:

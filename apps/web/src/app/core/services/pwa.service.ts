@@ -74,9 +74,12 @@ export class PwaService {
 
     const stableSubscription = stable$.subscribe(() => {
       void this.swUpdate?.checkForUpdate();
-      const intervalId = this.document.defaultView?.setInterval(() => {
-        void this.swUpdate?.checkForUpdate();
-      }, 6 * 60 * 60 * 1000);
+      const intervalId = this.document.defaultView?.setInterval(
+        () => {
+          void this.swUpdate?.checkForUpdate();
+        },
+        6 * 60 * 60 * 1000,
+      );
 
       this.destroyRef.onDestroy(() => {
         if (intervalId) {

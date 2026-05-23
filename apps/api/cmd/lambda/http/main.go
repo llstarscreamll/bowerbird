@@ -3,11 +3,23 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/money-path/bowerbird/apps/api/internal/platform/config"
 )
+
+var cfg config.Config
+
+func init() {
+	var err error
+	cfg, err = config.Load(context.Background())
+	if err != nil {
+		log.Fatalf("failed to load config at boot: %v", err)
+	}
+}
 
 func handler(_ context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	if request.RawPath == "/health" || request.RawPath == "/api/health" {

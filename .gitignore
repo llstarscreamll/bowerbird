@@ -1,15 +1,32 @@
+# Dependencias y Builds
 node_modules/
 .pnpm-store/
 .turbo/
 dist/
-coverage/
 cdk.out/
-.DS_Store
-.env
+coverage/
+apps/api/bin/
+apps/api/tmp/
 apps/web/.angular/
 apps/web/.turbo/
 apps/web/dist/
 apps/web/coverage/
 apps/web/node_modules/
 packages/infra/node_modules/
-apps/api/bin/
+
+# Entornos y Secretos
+.env
+.env.*
+!.env.example
+secrets.json
+secrets.*.json
+!secrets.example.json
+.mise.local.toml
+
+# Tooling e IDEs
+.agents/
+.cursor/
+.codegraph/
+.DS_Store
+.vscode/
+.idea/

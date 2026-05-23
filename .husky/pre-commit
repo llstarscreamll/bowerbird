@@ -1,0 +1,7 @@
+pnpm lint-staged
+pnpm run lint
+
+if command -v codegraph &> /dev/null; then
+  echo "Syncing CodeGraph index..."
+  codegraph init -i || true
+fi

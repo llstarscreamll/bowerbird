@@ -1,21 +1,30 @@
 {
-  "name": "turno-monorepo",
+  "name": "bowerbird-monorepo",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": "24.x"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm run infra:up && turbo run dev --parallel",
+    "dev": "pnpm run infra:up && turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
+    "format": "prettier \"**/*.{ts,tsx,md,mdx}\" --write",
+    "format:check": "prettier \"**/*.{ts,tsx,md,mdx}\" --check",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "deploy": "pnpm run build && turbo run deploy --filter=@turno/infra"
+    "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "prettier": "^3.6.2",
     "turbo": "^2.0.12"
   },
   "packageManager": "pnpm@10.16.1"

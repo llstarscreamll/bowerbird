@@ -1,9 +1,9 @@
 {
-  "name": "@turno/api",
+  "name": "@bowerbird/api",
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "[ -f .env ] && set -a && . ./.env && set +a; go run ./cmd/api",
+    "dev": "[ -f .env ] && set -a && . ./.env && set +a; air -c .air.toml",
     "build": "mkdir -p bin && go build -o bin/api ./cmd/api && go build -o bin/lambda-http ./cmd/lambda/http && go build -o bin/lambda-sqs ./cmd/lambda/sqs && go build -o bin/lambda-eventbridge ./cmd/lambda/eventbridge",
     "test": "go test ./...",
     "lint": "go vet ./..."

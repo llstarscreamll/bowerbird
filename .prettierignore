@@ -1,0 +1,13 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.agents/
+.cursor/
+cdk.out/
+dist/
+coverage/
+apps/api/bin/
+apps/api/tmp/
+apps/web/dist/
+apps/web/coverage/
+packages/infra/dist/

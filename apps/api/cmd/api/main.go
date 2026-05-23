@@ -9,30 +9,52 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/money-path/turno/apps/api/internal/config"
-	"github.com/money-path/turno/apps/api/internal/db"
-	"github.com/money-path/turno/apps/api/internal/handlers"
-	"github.com/money-path/turno/apps/api/internal/repository"
+	"github.com/money-path/bowerbird/apps/api/internal/health/application"
+	healthinfra "github.com/money-path/bowerbird/apps/api/internal/health/infrastructure"
+	healthhttp "github.com/money-path/bowerbird/apps/api/internal/health/presentation/http"
+	"github.com/money-path/bowerbird/apps/api/internal/platform/awsconfig"
+	"github.com/money-path/bowerbird/apps/api/internal/platform/config"
+	"github.com/money-path/bowerbird/apps/api/internal/platform/database"
+	"github.com/money-path/bowerbird/apps/api/internal/platform/events"
 )
 
 func main() {
-	cfg, err := config.Load()
+	ctxApp, cancelApp := context.WithCancel(context.Background())
+	defer cancelApp()
+
+	cfg, err := config.Load(ctxApp)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
 
-	ctx := context.Background()
-	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	pool, err := database.Connect(ctxApp, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("connect postgres: %v", err)
 	}
 	defer pool.Close()
 
-	healthRepo := repository.NewHealthRepository(pool)
-	httpHandler := handlers.NewHTTPHandler(healthRepo)
+	// Setup Health Context
+	healthRepo := healthinfra.NewPostgresRepository(pool)
+	healthUseCase := application.NewCheckHealthUseCase(healthRepo)
+	healthHandler := healthhttp.NewHandler(healthUseCase)
 
 	mux := http.NewServeMux()
-	httpHandler.Register(mux)
+	healthHandler.Register(mux)
+
+	// Setup Event Poller
+	eventHandler := events.NewEventHandler()
+
+	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
+		awsCfg, err := awsconfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
+		if err != nil {
+			log.Fatalf("load aws config: %v", err)
+		}
+
+		sqsClient := awsconfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)
+		poller := events.NewPoller(sqsClient, eventHandler, cfg.SQSQueueURL, cfg.EventBridgeQueueURL)
+		poller.Run(ctxApp)
+		log.Printf("local event loop enabled: sqs=%t eventbridge=%t", cfg.SQSQueueURL != "", cfg.EventBridgeQueueURL != "")
+	}
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -52,6 +74,7 @@ func main() {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 	<-shutdown
+	cancelApp()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

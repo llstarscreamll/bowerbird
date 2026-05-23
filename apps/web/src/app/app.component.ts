@@ -11,7 +11,7 @@ import { PwaService } from './core/services/pwa.service';
 
     @if (pwa.canInstall()) {
       <div class="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-cyan-200 bg-white p-4 shadow-lg">
-        <p class="text-sm font-semibold text-slate-900">Install Turno</p>
+        <p class="text-sm font-semibold text-slate-900">Install Bowerbird</p>
         <p class="mt-1 text-xs text-slate-600">Install the app for faster launch and offline access.</p>
         <button
           type="button"
@@ -37,7 +37,7 @@ import { PwaService } from './core/services/pwa.service';
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent {
   readonly pwa = inject(PwaService);

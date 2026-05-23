@@ -1,0 +1,4 @@
+{
+  "*.{ts,tsx,js,jsx,json,html,css,md,mdx,yaml,yml}": ["prettier --write"],
+  "*.go": ["gofmt -w"]
+}

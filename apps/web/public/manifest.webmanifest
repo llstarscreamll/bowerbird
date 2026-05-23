@@ -1,7 +1,7 @@
 {
-  "name": "Turno",
-  "short_name": "Turno",
-  "description": "Turno dashboard for operations and health checks.",
+  "name": "Bowerbird",
+  "short_name": "Bowerbird",
+  "description": "Bowerbird dashboard for operations and health checks.",
   "lang": "en",
   "start_url": "/",
   "scope": "/",
