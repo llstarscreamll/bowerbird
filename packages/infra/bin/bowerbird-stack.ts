@@ -59,7 +59,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const httpLambda = new GoFunction(this, 'ApiHttpLambda', {
       functionName: `${prefix}-api`,
-      entry: path.join(__dirname, '../../../apps/api/cmd/lambda/http'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/http'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       environment: {
@@ -70,7 +70,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const sqsLambda = new GoFunction(this, 'ApiSQSLambda', {
       functionName: `${prefix}-sqs-processor`,
-      entry: path.join(__dirname, '../../../apps/api/cmd/lambda/sqs'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/sqs'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       environment: {
@@ -80,7 +80,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const eventBridgeLambda = new GoFunction(this, 'ApiEventBridgeLambda', {
       functionName: `${prefix}-events-processor`,
-      entry: path.join(__dirname, '../../../apps/api/cmd/lambda/eventbridge'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/eventbridge'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       environment: {
@@ -203,7 +203,7 @@ export class BowerbirdStack extends cdk.Stack {
       ],
     });
 
-    const webBuildPath = path.join(__dirname, '../../../apps/web/dist/web/browser');
+    const webBuildPath = path.join(__dirname, '../../../apps/pwa/dist/pwa/browser');
 
     new s3deploy.BucketDeployment(this, 'WebStaticAssetsDeployment', {
       destinationBucket: websiteBucket,
