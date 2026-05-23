@@ -38,10 +38,25 @@ services:
       - '4566:4566'
     volumes:
       - localstack_data:/var/lib/localstack
-      - ./apps/api/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
-      - ./apps/api/secrets.json:/tmp/local-secrets.json:ro
+      - ./apps/backend/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
+      - ./apps/backend/secrets.json:/tmp/local-secrets.json:ro
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: bowerbird-caddy
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
 
 volumes:
   postgres_data:
   redis_data:
   localstack_data:
+  caddy_data:
+  caddy_config:

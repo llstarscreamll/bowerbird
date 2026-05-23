@@ -6,8 +6,8 @@ node_modules/
 cdk.out/
 dist/
 coverage/
-apps/api/bin/
-apps/api/tmp/
-apps/web/dist/
-apps/web/coverage/
+apps/backend/bin/
+apps/backend/tmp/
+apps/pwa/dist/
+apps/pwa/coverage/
 packages/infra/dist/

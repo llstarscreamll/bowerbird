@@ -5,13 +5,13 @@ node_modules/
 dist/
 cdk.out/
 coverage/
-apps/api/bin/
-apps/api/tmp/
-apps/web/.angular/
-apps/web/.turbo/
-apps/web/dist/
-apps/web/coverage/
-apps/web/node_modules/
+apps/backend/bin/
+apps/backend/tmp/
+apps/pwa/.angular/
+apps/pwa/.turbo/
+apps/pwa/dist/
+apps/pwa/coverage/
+apps/pwa/node_modules/
 packages/infra/node_modules/
 
 # Entornos y Secretos
