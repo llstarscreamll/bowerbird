@@ -5,6 +5,8 @@ import { AuthStore } from '../../../application/auth.store';
 import { FormsModule } from '@angular/forms';
 import { AuthHttpService } from '../../../infrastructure/auth.http.service';
 
+import { environment } from '../../../../../environments/environment';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -153,7 +155,7 @@ import { AuthHttpService } from '../../../infrastructure/auth.http.service';
 
             <!-- OAuth Buttons -->
             <div class="mt-6 grid grid-cols-2 gap-4">
-              <a href="http://api.bowerbird.dev/api/v1/auth/google/login" class="btn-secondary w-full gap-2">
+              <a [href]="apiUrl + '/api/v1/auth/google/login'" class="btn-secondary w-full gap-2">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z"
@@ -174,7 +176,7 @@ import { AuthHttpService } from '../../../infrastructure/auth.http.service';
                 </svg>
                 Google
               </a>
-              <a href="http://api.bowerbird.dev/api/v1/auth/microsoft/login" class="btn-secondary w-full gap-2">
+              <a [href]="apiUrl + '/api/v1/auth/microsoft/login'" class="btn-secondary w-full gap-2">
                 <svg class="h-5 w-5" viewBox="0 0 21 21" aria-hidden="true">
                   <path d="M10 0H0V10H10V0Z" fill="#F25022" />
                   <path d="M21 0H11V10H21V0Z" fill="#7FBA00" />
@@ -194,6 +196,8 @@ export class LoginComponent {
   readonly store = inject(AuthStore);
   private router = inject(Router);
   private authHttp = inject(AuthHttpService);
+
+  apiUrl = environment.apiUrl;
 
   email = '';
   password = '';

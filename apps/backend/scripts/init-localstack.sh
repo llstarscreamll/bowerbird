@@ -42,7 +42,11 @@ else
   "sqs_queue_url": "http://localhost:4566/000000000000/bowerbird-local-sqs",
   "eventbridge_queue_url": "http://localhost:4566/000000000000/bowerbird-local-eventbridge",
   "s3_bucket_name": "bowerbird-local-bucket",
-  "third_party_api_key": "dummy-api-key"
+  "third_party_api_key": "dummy-api-key",
+  "google_client_id": "dummy-google-client-id",
+  "google_client_secret": "dummy-google-client-secret",
+  "microsoft_client_id": "dummy-microsoft-client-id",
+  "microsoft_client_secret": "dummy-microsoft-client-secret"
 }
 EOF
 )

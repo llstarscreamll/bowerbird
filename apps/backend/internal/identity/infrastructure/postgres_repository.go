@@ -101,8 +101,8 @@ func (r *PostgresRepository) FindUserIdentityByProvider(ctx context.Context, use
 }
 
 func (r *PostgresRepository) CreateUserIdentity(ctx context.Context, identity *domain.UserIdentity) error {
-	query := `INSERT INTO user_identities (id, user_id, provider, provider_id, created_at) VALUES ($1, $2, $3, $4, $5)`
-	_, err := r.controlDB.Exec(ctx, query, identity.ID, identity.UserID, identity.Provider, identity.ProviderID, identity.CreatedAt)
+	query := `INSERT INTO user_identities (user_id, provider, provider_id, created_at) VALUES ($1, $2, $3, $4) RETURNING id`
+	err := r.controlDB.QueryRow(ctx, query, identity.UserID, identity.Provider, identity.ProviderID, identity.CreatedAt).Scan(&identity.ID)
 	if err != nil {
 		return fmt.Errorf("failed to create user identity: %w", err)
 	}

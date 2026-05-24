@@ -2,13 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AuthTokens, TenantMembership } from '../domain/auth.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AuthHttpService {
   private readonly http = inject(HttpClient);
-  // In a real app, API_URL would come from environment
-  private readonly baseUrl = 'http://api.bowerbird.dev/api/v1/auth';
-  private readonly identityUrl = 'http://api.bowerbird.dev/api/v1/identity';
+  private readonly baseUrl = `${environment.apiUrl}/api/v1/auth`;
+  private readonly identityUrl = `${environment.apiUrl}/api/v1/identity`;
 
   loginLocal(email: string, password: string): Observable<AuthTokens> {
     return this.http.post<AuthTokens>(`${this.baseUrl}/login-local`, { email, password });

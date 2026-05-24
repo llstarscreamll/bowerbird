@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://api.money-path.co',
+  apiUrl: 'https://api.bowerbird.com', // Replace with production URL
 };

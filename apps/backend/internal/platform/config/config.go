@@ -30,6 +30,8 @@ type Config struct {
 	GoogleClientSecret    string    `json:"google_client_secret"`
 	MicrosoftClientID     string    `json:"microsoft_client_id"`
 	MicrosoftClientSecret string    `json:"microsoft_client_secret"`
+	FrontendURL           string    `json:"frontend_url"`
+	BackendURL            string    `json:"backend_url"`
 	JWT                   JWTConfig `json:"-"`
 }
 
@@ -52,6 +54,8 @@ func Load(ctx context.Context) (Config, error) {
 		SSMParameterName:     getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets"),
 		EnableLocalEventLoop: getEnv("ENABLE_LOCAL_EVENT_LOOP", "true") == "true",
 		AllowedOrigins:       getEnv("ALLOWED_ORIGINS", "*"),
+		FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:4200"),
+		BackendURL:           getEnv("BACKEND_URL", "http://localhost:8080"),
 	}
 
 	// 2. Load AWS Config to fetch SSM

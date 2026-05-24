@@ -75,7 +75,7 @@ func main() {
 		googleConfig = &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
-			RedirectURL:  "http://localhost:8080/api/v1/auth/google/callback",
+			RedirectURL:  strings.TrimRight(cfg.BackendURL, "/") + "/api/v1/auth/google/callback",
 			Scopes:       []string{"email", "profile"},
 			Endpoint:     google.Endpoint,
 		}
@@ -86,18 +86,13 @@ func main() {
 		microsoftConfig = &oauth2.Config{
 			ClientID:     cfg.MicrosoftClientID,
 			ClientSecret: cfg.MicrosoftClientSecret,
-			RedirectURL:  "http://localhost:8080/api/v1/auth/microsoft/callback",
+			RedirectURL:  strings.TrimRight(cfg.BackendURL, "/") + "/api/v1/auth/microsoft/callback",
 			Scopes:       []string{"User.Read"},
 			Endpoint:     microsoft.AzureADEndpoint("common"),
 		}
 	}
 
-	frontendURL := "http://localhost:4200"
-	if cfg.AppEnv != "development" && cfg.AppEnv != "local" {
-		frontendURL = "https://app.bowerbird.com" // TODO: config this
-	}
-
-	authHandler := identityhttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, frontendURL)
+	authHandler := identityhttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, strings.TrimRight(cfg.FrontendURL, "/"))
 	authHandler.Register(mux, authMiddleware)
 
 	// Setup Organization Context

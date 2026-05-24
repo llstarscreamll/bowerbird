@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
     PRIMARY KEY (user_id, tenant_id)
 );
 
-CREATE INDEX idx_tenant_memberships_tenant_id ON tenant_memberships(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_memberships_tenant_id ON tenant_memberships(tenant_id);

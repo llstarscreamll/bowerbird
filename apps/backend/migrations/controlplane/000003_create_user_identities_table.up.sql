@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS user_identities (
     UNIQUE(provider, provider_id)
 );
 
-CREATE INDEX idx_user_identities_user_id ON user_identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id);

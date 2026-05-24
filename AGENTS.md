@@ -14,9 +14,9 @@
 
 This system uses a **Database-per-tenant** architecture with a central **Control Plane**.
 
-- **Control Plane DB:** Holds global identity (`users`, `user_identities`), the `tenants` catalog, and `tenant_memberships` (roles: OWNER, ADMIN, MEMBER). **No personal data** (names, avatars) is stored here.
-- **Tenant DBs:** Each organization gets its own physical PostgreSQL database (e.g. `tenant_acme`). Contains domain data and user _profiles_ (local `users` table with `first_name`, `last_name`, `avatar_url`).
-- **Migrations split:** Migrations MUST be placed in either `apps/backend/migrations/controlplane` or `apps/backend/migrations/tenant`. Never mix them.
+- **Control Plane DB:** Holds global identity (`users`, `user_identities`), the `tenants` catalog, and `tenant_memberships` (roles: OWNER, ADMIN, MEMBER). Contains base personal data (`first_name`, `last_name`, `picture_url`) from OAuth providers which is used to seed new tenant profiles. Employs soft-deletes (`deleted_at`) for obfuscation.
+- **Tenant DBs:** Each organization gets its own physical PostgreSQL database (e.g. `tenant_acme`). Contains domain data and user _profiles_ (local `users` table).
+- **Migrations split:** Migrations MUST be placed in either `apps/backend/migrations/controlplane` or `apps/backend/migrations/tenant`. Never mix them. Always use `IF NOT EXISTS` for indexes/tables to maintain idempotency. If migrations fail and get stuck in a "dirty" state, fix via `psql "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable" -c "UPDATE schema_migrations SET dirty = false;"`.
 - **Tenant Resolution:** The Angular frontend (`apps/pwa`) runs on a single domain (e.g. `app.bowerbird.com` / `app.bowerbird.dev`) and uses path-based routing (`/:tenant/dashboard`). It extracts the tenant slug from the URL path and sends it as the `X-Tenant-ID` header. The Go backend reads this header to route DB connections dynamically via `Registry`.
 - **Authentication Strategy:** Mixed session approach. Backend returns short-lived Access Tokens in the JSON body (stored in Angular memory/SignalStore to prevent XSS) and a long-lived Refresh Token in an `HttpOnly`, `Secure` cookie. Automatic refresh is handled by the `authInterceptor` in Angular.
 
@@ -43,7 +43,7 @@ This system uses a **Database-per-tenant** architecture with a central **Control
 - API environment separation: `.env` handles process/infra flags, `secrets.json` handles AWS SSM secrets (DB URLs, Queues, etc.).
 - API dev uses Air live reload via `apps/backend/.air.toml`. Air must be installed on host. The `apps/backend/package.json` dev script uses `exec air` to ensure graceful shutdown on `SIGINT` (prevents zombie port 8080 processes).
 - Local dependencies: Postgres (`5432`), Redis (`6379`), LocalStack (`4566`) from `docker-compose.yml`.
-- Local AWS resources (S3/SQS/EventBridge/SSM) are auto-created by `apps/backend/scripts/init-localstack.sh` reading from `secrets.json`.
+- Local AWS resources (S3/SQS/EventBridge/SSM) are auto-created by `apps/backend/scripts/init-localstack.sh` reading from `secrets.json`. If you add new keys to `secrets.json`, you must run `docker exec bowerbird-localstack /etc/localstack/init/ready.d/init-localstack.sh` to update SSM, and then touch `main.go` or restart `air` to reload the config in Go.
 
 ## Package boundaries and entrypoints
 
