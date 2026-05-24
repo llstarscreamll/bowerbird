@@ -1,7 +1,9 @@
 app.bowerbird.dev {
+	tls internal
 	reverse_proxy host.docker.internal:4200
 }
 
 api.bowerbird.dev {
+	tls internal
 	reverse_proxy host.docker.internal:8080
 }

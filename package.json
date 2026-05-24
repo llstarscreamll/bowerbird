@@ -11,7 +11,11 @@
   ],
   "scripts": {
     "dev": "pnpm run infra:up && turbo run dev",
+    "seed": "pnpm --filter @bowerbird/backend run seed",
     "build": "turbo run build",
+    "migrate:controlplane": "pnpm --filter @bowerbird/backend run migrate:controlplane",
+    "migrate:tenants": "pnpm --filter @bowerbird/backend run migrate:tenants",
+    "migrate:all": "pnpm --filter @bowerbird/backend run migrate:all",
     "test": "turbo run test",
     "lint": "turbo run lint",
     "format": "prettier \"**/*.{ts,tsx,md,mdx}\" --write",

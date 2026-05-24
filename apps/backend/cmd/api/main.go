@@ -12,10 +12,14 @@ import (
 	"github.com/money-path/bowerbird/apps/backend/internal/health/application"
 	healthinfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
 	healthhttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
+	orgapplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
+	orginfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
+	orghttp "github.com/money-path/bowerbird/apps/backend/internal/organization/presentation/http"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 )
 
 func main() {
@@ -41,6 +45,16 @@ func main() {
 	mux := http.NewServeMux()
 	healthHandler.Register(mux)
 
+	// Setup Organization Context
+	// Provide the root directory for migrations relative to the running binary (or use an env var)
+	orgRepo := orginfra.NewPostgresRepository(pool)
+	orgProvisioner := orginfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, "apps/backend/migrations/tenant")
+	orgUseCase := orgapplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
+	orgHandler := orghttp.NewHandler(orgUseCase)
+
+	// Register Routes
+	orgHandler.Register(mux)
+
 	// Setup Event Poller
 	eventHandler := events.NewEventHandler()
 
@@ -58,7 +72,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      withSecurityHeaders(withCORS(mux, cfg.AllowedOrigins)),
+		Handler:      withSecurityHeaders(withCORS(tenant.Middleware(mux), cfg.AllowedOrigins)),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  30 * time.Second,
@@ -98,7 +112,7 @@ func withCORS(next http.Handler, allowedOrigins string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigins)
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Tenant-ID")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == http.MethodOptions {

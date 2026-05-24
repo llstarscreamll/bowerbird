@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS role_permissions;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS permissions;
+
+ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'member';

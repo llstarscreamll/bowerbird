@@ -101,10 +101,11 @@ func (p Poller) pollEventBridge(ctx context.Context, queueURL string, handler fu
 
 func (p Poller) receiveMessages(ctx context.Context, queueURL string) ([]types.Message, error) {
 	output, err := p.client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-		QueueUrl:            &queueURL,
-		MaxNumberOfMessages: 10,
-		WaitTimeSeconds:     p.waitTimeSeconds,
-		VisibilityTimeout:   p.visibilityTimeoutSec,
+		QueueUrl:              &queueURL,
+		MaxNumberOfMessages:   10,
+		WaitTimeSeconds:       p.waitTimeSeconds,
+		VisibilityTimeout:     p.visibilityTimeoutSec,
+		MessageAttributeNames: []string{"All"},
 	})
 	if err != nil {
 		return nil, err
@@ -151,6 +152,16 @@ func toSQSRecords(messages []types.Message) []events.SQSMessage {
 		record.ReceiptHandle = ""
 		record.Attributes = map[string]string{}
 		record.MessageAttributes = map[string]events.SQSMessageAttribute{}
+		for k, v := range message.MessageAttributes {
+			val := ""
+			if v.StringValue != nil {
+				val = *v.StringValue
+			}
+			record.MessageAttributes[k] = events.SQSMessageAttribute{
+				StringValue: &val,
+				DataType:    *v.DataType,
+			}
+		}
 		record.Md5OfBody = ""
 		record.EventSource = "aws:sqs"
 		record.EventSourceARN = ""

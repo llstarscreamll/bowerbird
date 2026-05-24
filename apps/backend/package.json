@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "[ -f .env ] && set -a && . ./.env && set +a; air -c .air.toml",
-    "build": "mkdir -p bin && go build -o bin/api ./cmd/api && go build -o bin/lambda-http ./cmd/lambda/http && go build -o bin/lambda-sqs ./cmd/lambda/sqs && go build -o bin/lambda-eventbridge ./cmd/lambda/eventbridge",
+    "dev": "[ -f .env ] && set -a && . ./.env && set +a; exec air -c .air.toml",
+    "seed": "pnpm run build && [ -f ../../.env ] && set -a && . ../../.env && set +a; AWS_ENDPOINT_URL=http://localhost:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test ./bin/seed",
+    "build": "mkdir -p bin && go build -o bin/api ./cmd/api && go build -o bin/lambda-http ./cmd/lambda/http && go build -o bin/lambda-sqs ./cmd/lambda/sqs && go build -o bin/lambda-eventbridge ./cmd/lambda/eventbridge && go build -o bin/migrate ./cmd/migrate && go build -o bin/seed ./cmd/seed",
+    "migrate:controlplane": "pnpm run build && [ -f ../../.env ] && set -a && . ../../.env && set +a; AWS_ENDPOINT_URL=http://localhost:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test ./bin/migrate -target controlplane",
+    "migrate:tenants": "pnpm run build && [ -f ../../.env ] && set -a && . ../../.env && set +a; AWS_ENDPOINT_URL=http://localhost:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test ./bin/migrate -target tenants",
+    "migrate:all": "pnpm run build && [ -f ../../.env ] && set -a && . ../../.env && set +a; AWS_ENDPOINT_URL=http://localhost:4566 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test ./bin/migrate -target all",
     "test": "go test ./...",
     "lint": "go vet ./..."
   }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -12,26 +13,33 @@ import (
 )
 
 type Config struct {
-	Port                 string
-	AWSRegion            string
-	AWSEndpointURL       string
-	AWSAccessKeyID       string
-	AWSSecretAccessKey   string
-	SSMParameterName     string
-	EnableLocalEventLoop bool
-	AllowedOrigins       string
+	AppEnv               string    `json:"app_env"`
+	Port                 string    `json:"port"`
+	DatabaseURL          string    `json:"database_url"`
+	SQSQueueURL          string    `json:"sqs_queue_url"`
+	EventBridgeQueueURL  string    `json:"eventbridge_queue_url"`
+	S3BucketName         string    `json:"s3_bucket_name"`
+	AWSRegion            string    `json:"aws_region"`
+	AWSEndpointURL       string    `json:"aws_endpoint_url"`
+	AWSAccessKeyID       string    `json:"aws_access_key_id"`
+	AWSSecretAccessKey   string    `json:"aws_secret_access_key"`
+	SSMParameterName     string    `json:"ssm_parameter_name"`
+	EnableLocalEventLoop bool      `json:"enable_local_event_loop"`
+	AllowedOrigins       string    `json:"allowed_origins"`
+	JWT                  JWTConfig `json:"-"`
+}
 
-	// Loaded from SSM
-	DatabaseURL         string `json:"database_url"`
-	SQSQueueURL         string `json:"sqs_queue_url"`
-	EventBridgeQueueURL string `json:"eventbridge_queue_url"`
-	S3BucketName        string `json:"s3_bucket_name"`
-	ThirdPartyAPIKey    string `json:"third_party_api_key"`
+type JWTConfig struct {
+	AccessSecret  string
+	RefreshSecret string
+	AccessTTL     time.Duration
+	RefreshTTL    time.Duration
 }
 
 func Load(ctx context.Context) (Config, error) {
 	// 1. Load base env vars
 	cfg := Config{
+		AppEnv:               getEnv("APP_ENV", "development"),
 		Port:                 getEnv("PORT", "8080"),
 		AWSRegion:            getEnv("AWS_REGION", "us-east-1"),
 		AWSEndpointURL:       os.Getenv("AWS_ENDPOINT_URL"),
@@ -71,6 +79,31 @@ func Load(ctx context.Context) (Config, error) {
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required (from SSM or env)")
+	}
+
+	accessSecret := os.Getenv("JWT_ACCESS_SECRET")
+	if accessSecret == "" {
+		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
+			accessSecret = "local-dev-access-secret-do-not-use-in-prod"
+		} else {
+			return Config{}, fmt.Errorf("JWT_ACCESS_SECRET is required")
+		}
+	}
+
+	refreshSecret := os.Getenv("JWT_REFRESH_SECRET")
+	if refreshSecret == "" {
+		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
+			refreshSecret = "local-dev-refresh-secret-do-not-use-in-prod"
+		} else {
+			return Config{}, fmt.Errorf("JWT_REFRESH_SECRET is required")
+		}
+	}
+
+	cfg.JWT = JWTConfig{
+		AccessSecret:  accessSecret,
+		RefreshSecret: refreshSecret,
+		AccessTTL:     15 * time.Minute,
+		RefreshTTL:    7 * 24 * time.Hour,
 	}
 
 	return cfg, nil

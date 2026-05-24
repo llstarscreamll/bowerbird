@@ -28,17 +28,21 @@ export class BowerbirdStack extends cdk.Stack {
     const prefix = `${props.envName}-bowerbird`;
 
     const rootDomain = process.env.ROOT_DOMAIN ?? 'money-path.co';
-    const appSubdomain = process.env.APP_SUBDOMAIN ?? 'app';
     const apiSubdomain = process.env.API_SUBDOMAIN ?? 'api';
-    const appDomain = appSubdomain ? `${appSubdomain}.${rootDomain}` : rootDomain;
+    const appSubdomain = process.env.APP_SUBDOMAIN ?? 'app';
+
+    // For Multi-tenant PWA, we use a single app domain (e.g., app.bowerbird.dev)
+    const appDomain = `${appSubdomain}.${rootDomain}`;
     const apiDomain = `${apiSubdomain}.${rootDomain}`;
 
     const zone = route53.HostedZone.fromLookup(this, 'HostedZone', {
       domainName: rootDomain,
     });
 
+    // Cert covering root domain and the app domain
     const webCert = new acm.Certificate(this, 'WebCertificate', {
-      domainName: appDomain,
+      domainName: rootDomain,
+      subjectAlternativeNames: [appDomain],
       validation: acm.CertificateValidation.fromDns(zone),
     });
 
@@ -115,9 +119,10 @@ export class BowerbirdStack extends cdk.Stack {
     const httpApi = new apigwv2.HttpApi(this, 'BowerbirdHttpApi', {
       apiName: `${prefix}-http-api`,
       corsPreflight: {
-        allowHeaders: ['Content-Type', 'Authorization'],
+        allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
         allowMethods: [apigwv2.CorsHttpMethod.ANY],
-        allowOrigins: ['https://' + appDomain],
+        // Allow the app domain for CORS
+        allowOrigins: ['https://' + appDomain, 'https://' + rootDomain, 'http://localhost:4200'],
       },
       disableExecuteApiEndpoint: false,
     });
@@ -185,7 +190,7 @@ export class BowerbirdStack extends cdk.Stack {
         },
       },
       defaultRootObject: 'index.html',
-      domainNames: [appDomain],
+      domainNames: [rootDomain, appDomain],
       certificate: webCert,
       errorResponses: [
         {
@@ -232,17 +237,23 @@ export class BowerbirdStack extends cdk.Stack {
         s3deploy.CacheControl.fromString('s-maxage=300'),
       ],
       sources: [
-        s3deploy.Source.asset(path.join(webBuildPath, 'index.html')),
-        s3deploy.Source.asset(path.join(webBuildPath, 'ngsw.json')),
-        s3deploy.Source.asset(path.join(webBuildPath, 'ngsw-worker.js')),
-        s3deploy.Source.asset(path.join(webBuildPath, 'safety-worker.js')),
-        s3deploy.Source.asset(path.join(webBuildPath, 'manifest.webmanifest')),
+        s3deploy.Source.asset(webBuildPath, {
+          exclude: ['**', '!index.html', '!ngsw.json', '!ngsw-worker.js', '!safety-worker.js', '!manifest.webmanifest'],
+        }),
       ],
     });
 
-    new route53.ARecord(this, 'WebAliasRecord', {
+    // Route53 A record for the root domain
+    new route53.ARecord(this, 'WebRootAliasRecord', {
       zone,
-      recordName: appSubdomain || undefined,
+      recordName: rootDomain,
+      target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
+    });
+
+    // Route53 A record for the app domain
+    new route53.ARecord(this, 'WebAppAliasRecord', {
+      zone,
+      recordName: appSubdomain,
       target: route53.RecordTarget.fromAlias(new route53Targets.CloudFrontTarget(distribution)),
     });
 
