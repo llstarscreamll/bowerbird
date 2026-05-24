@@ -1,13 +1,15 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { AuthStore } from '../../../application/auth.store';
 import { TenantMembership } from '../../../domain/auth.model';
+import { OrganizationHttpService } from '../../../../organization/infrastructure/organization.http.service';
 
 @Component({
   selector: 'app-lobby',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div class="max-w-3xl mx-auto space-y-8">
@@ -30,10 +32,75 @@ import { TenantMembership } from '../../../domain/auth.model';
             class="px-6 py-5 border-b border-slate-200 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50"
           >
             <h3 class="text-base font-semibold leading-6 text-slate-900 dark:text-white">Your Organizations</h3>
-            <button (click)="createNewTenant()" class="btn-primary py-2 px-3 text-xs gap-1">
-              <span class="material-icons-outlined text-sm">add</span>
-              Create New
+            <button (click)="toggleCreateForm()" class="btn-primary py-2 px-3 text-xs gap-1">
+              <span class="material-icons-outlined text-sm">{{ showCreateForm ? 'close' : 'add' }}</span>
+              {{ showCreateForm ? 'Cancel' : 'Create New' }}
             </button>
+          </div>
+
+          <!-- Create Tenant Form -->
+          <div
+            *ngIf="showCreateForm"
+            class="p-6 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800/80"
+          >
+            <form (ngSubmit)="onCreateTenant()" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for="orgName" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
+                    Organization Name
+                  </label>
+                  <div class="mt-2">
+                    <input
+                      id="orgName"
+                      type="text"
+                      required
+                      [(ngModel)]="newOrgName"
+                      (ngModelChange)="onNameChange($event)"
+                      name="orgName"
+                      class="input-field"
+                      placeholder="Acme Corp"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label for="orgSlug" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
+                    Workspace URL / Slug
+                  </label>
+                  <div class="mt-2">
+                    <input
+                      id="orgSlug"
+                      type="text"
+                      required
+                      [(ngModel)]="newOrgSlug"
+                      name="orgSlug"
+                      class="input-field"
+                      placeholder="acme"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="createError" class="text-sm text-red-600 dark:text-red-400">
+                {{ createError }}
+              </div>
+
+              <div class="flex justify-end">
+                <button type="submit" [disabled]="isCreating" class="btn-primary py-2 px-4">
+                  <span *ngIf="!isCreating">Create Organization</span>
+                  <span *ngIf="isCreating" class="flex items-center gap-2">
+                    <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Creating...
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
 
           <!-- Loading State -->
@@ -119,6 +186,13 @@ import { TenantMembership } from '../../../domain/auth.model';
 export class LobbyComponent implements OnInit {
   readonly store = inject(AuthStore);
   private router = inject(Router);
+  private orgService = inject(OrganizationHttpService);
+
+  showCreateForm = false;
+  newOrgName = '';
+  newOrgSlug = '';
+  isCreating = false;
+  createError = '';
 
   ngOnInit() {
     if (!this.store.isAuthenticated()) {
@@ -132,8 +206,51 @@ export class LobbyComponent implements OnInit {
     this.router.navigate(['/', tenant.tenant_id, 'dashboard']);
   }
 
-  createNewTenant() {
-    alert('Create tenant feature to be implemented in UI');
+  toggleCreateForm() {
+    this.showCreateForm = !this.showCreateForm;
+    this.createError = '';
+    if (!this.showCreateForm) {
+      this.newOrgName = '';
+      this.newOrgSlug = '';
+    }
+  }
+
+  onNameChange(name: string) {
+    // Basic auto-slug generation based on name
+    if (!this.newOrgSlug || this.newOrgSlug === this.generateSlug(name.slice(0, -1))) {
+      this.newOrgSlug = this.generateSlug(name);
+    }
+  }
+
+  private generateSlug(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+  }
+
+  onCreateTenant() {
+    if (!this.newOrgName || !this.newOrgSlug) return;
+
+    this.isCreating = true;
+    this.createError = '';
+
+    this.orgService
+      .createOrganization({
+        name: this.newOrgName,
+        slug: this.newOrgSlug,
+      })
+      .subscribe({
+        next: () => {
+          this.isCreating = false;
+          this.toggleCreateForm();
+          this.store.loadTenants();
+        },
+        error: (err) => {
+          this.isCreating = false;
+          this.createError = err.error || 'Failed to create organization';
+        },
+      });
   }
 
   logout() {

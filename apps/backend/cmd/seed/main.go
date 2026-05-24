@@ -42,7 +42,7 @@ func main() {
 
 	if user == nil {
 		log.Println("Creating identity for admin@acme.com...")
-		user = domain.NewUser("", email)
+		user = domain.NewUser("", email, "Admin", "Acme", "")
 		if err := idRepo.CreateUser(ctx, user); err != nil {
 			log.Fatalf("Failed to create user: %v", err)
 		}

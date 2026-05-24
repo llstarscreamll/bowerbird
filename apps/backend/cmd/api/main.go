@@ -6,20 +6,28 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/health/application"
 	healthinfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
 	healthhttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
+	identityapp "github.com/money-path/bowerbird/apps/backend/internal/identity/application"
+	identityinfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
+	identityhttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
 	orgapplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
 	orginfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
 	orghttp "github.com/money-path/bowerbird/apps/backend/internal/organization/presentation/http"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/microsoft"
 )
 
 func main() {
@@ -37,6 +45,15 @@ func main() {
 	}
 	defer pool.Close()
 
+	// Parse base DB URL for tenant databases (e.g. replacing 'bowerbird' with '%s')
+	// Simplified assumption: the last path segment before ? is the db name.
+	baseDBURL := strings.Replace(cfg.DatabaseURL, "/bowerbird?", "/%s?", 1)
+	if baseDBURL == cfg.DatabaseURL {
+		baseDBURL = strings.Replace(cfg.DatabaseURL, "/bowerbird", "/%s", 1)
+	}
+	registry := database.NewRegistry(pool, baseDBURL)
+	defer registry.CloseAll()
+
 	// Setup Health Context
 	healthRepo := healthinfra.NewPostgresRepository(pool)
 	healthUseCase := application.NewCheckHealthUseCase(healthRepo)
@@ -44,6 +61,44 @@ func main() {
 
 	mux := http.NewServeMux()
 	healthHandler.Register(mux)
+
+	// Setup Auth & Identity
+	tokenGen := auth.NewTokenGenerator(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
+	authMiddleware := auth.Middleware(tokenGen)
+
+	identityRepo := identityinfra.NewPostgresRepository(pool, registry)
+	authService := identityapp.NewAuthService(identityRepo, tokenGen, cfg.AppEnv)
+	identityService := identityapp.NewIdentityService(identityRepo)
+
+	var googleConfig *oauth2.Config
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		googleConfig = &oauth2.Config{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+			RedirectURL:  "http://localhost:8080/api/v1/auth/google/callback",
+			Scopes:       []string{"email", "profile"},
+			Endpoint:     google.Endpoint,
+		}
+	}
+
+	var microsoftConfig *oauth2.Config
+	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
+		microsoftConfig = &oauth2.Config{
+			ClientID:     cfg.MicrosoftClientID,
+			ClientSecret: cfg.MicrosoftClientSecret,
+			RedirectURL:  "http://localhost:8080/api/v1/auth/microsoft/callback",
+			Scopes:       []string{"User.Read"},
+			Endpoint:     microsoft.AzureADEndpoint("common"),
+		}
+	}
+
+	frontendURL := "http://localhost:4200"
+	if cfg.AppEnv != "development" && cfg.AppEnv != "local" {
+		frontendURL = "https://app.bowerbird.com" // TODO: config this
+	}
+
+	authHandler := identityhttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, frontendURL)
+	authHandler.Register(mux, authMiddleware)
 
 	// Setup Organization Context
 	// Provide the root directory for migrations relative to the running binary (or use an env var)
@@ -53,7 +108,7 @@ func main() {
 	orgHandler := orghttp.NewHandler(orgUseCase)
 
 	// Register Routes
-	orgHandler.Register(mux)
+	orgHandler.Register(mux, authMiddleware)
 
 	// Setup Event Poller
 	eventHandler := events.NewEventHandler()

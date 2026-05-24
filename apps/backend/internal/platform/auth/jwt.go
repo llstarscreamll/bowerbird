@@ -36,18 +36,24 @@ func NewTokenGenerator(accessSecret, refreshSecret string, accessTTL, refreshTTL
 }
 
 type CustomClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	UserID     string `json:"user_id"`
+	Email      string `json:"email"`
+	FirstName  string `json:"first_name"`
+	LastName   string `json:"last_name"`
+	PictureURL string `json:"picture_url"`
 	jwt.RegisteredClaims
 }
 
-func (t *TokenGenerator) GenerateTokens(userID, email string) (*TokenPair, error) {
+func (t *TokenGenerator) GenerateTokens(userID, email, firstName, lastName, pictureURL string) (*TokenPair, error) {
 	now := time.Now()
 
 	// Access Token
 	accessClaims := CustomClaims{
-		UserID: userID,
-		Email:  email,
+		UserID:     userID,
+		Email:      email,
+		FirstName:  firstName,
+		LastName:   lastName,
+		PictureURL: pictureURL,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(t.accessTTL)),

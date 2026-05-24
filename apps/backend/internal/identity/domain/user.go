@@ -12,10 +12,14 @@ var (
 
 // User represents the identity in the Control Plane
 type User struct {
-	ID        string
-	Email     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         string
+	Email      string
+	FirstName  string
+	LastName   string
+	PictureURL string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
 }
 
 // UserIdentity represents a linked authentication provider for a user
@@ -42,6 +46,7 @@ type TenantMembership struct {
 	TenantID  string
 	Role      TenantMembershipRole
 	CreatedAt time.Time
+	DeletedAt *time.Time
 }
 
 // TenantUserProfile represents the user's data stored in the Tenant Database
@@ -54,16 +59,20 @@ type TenantUserProfile struct {
 	Status    string // active, inactive
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	DeletedAt *time.Time
 }
 
 // NewUser creates a new User
-func NewUser(id, email string) *User {
+func NewUser(id, email, firstName, lastName, pictureURL string) *User {
 	now := time.Now()
 	return &User{
-		ID:        id,
-		Email:     email,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         id,
+		Email:      email,
+		FirstName:  firstName,
+		LastName:   lastName,
+		PictureURL: pictureURL,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 }
 

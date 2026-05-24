@@ -7,17 +7,30 @@ import (
 
 	"github.com/money-path/bowerbird/apps/backend/internal/identity/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	"golang.org/x/oauth2"
 )
 
 type AuthHandler struct {
 	authService     *application.AuthService
 	identityService *application.IdentityService
+	googleConfig    *oauth2.Config
+	microsoftConfig *oauth2.Config
+	frontendURL     string
 }
 
-func NewAuthHandler(authService *application.AuthService, identityService *application.IdentityService) *AuthHandler {
+func NewAuthHandler(
+	authService *application.AuthService,
+	identityService *application.IdentityService,
+	googleConfig *oauth2.Config,
+	microsoftConfig *oauth2.Config,
+	frontendURL string,
+) *AuthHandler {
 	return &AuthHandler{
 		authService:     authService,
 		identityService: identityService,
+		googleConfig:    googleConfig,
+		microsoftConfig: microsoftConfig,
+		frontendURL:     frontendURL,
 	}
 }
 
@@ -139,19 +152,119 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) OAuthGoogleLogin(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented fully yet", http.StatusNotImplemented)
+	if h.googleConfig == nil {
+		http.Error(w, "google oauth not configured", http.StatusNotImplemented)
+		return
+	}
+	// Note: in a real app, generate a secure state and store it in a cookie
+	url := h.googleConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented fully yet", http.StatusNotImplemented)
+	if h.googleConfig == nil {
+		http.Error(w, "google oauth not configured", http.StatusNotImplemented)
+		return
+	}
+
+	state := r.FormValue("state")
+	if state != "state-token" {
+		http.Error(w, "invalid oauth state", http.StatusBadRequest)
+		return
+	}
+
+	code := r.FormValue("code")
+	token, err := h.googleConfig.Exchange(r.Context(), code)
+	if err != nil {
+		http.Error(w, "code exchange failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	client := h.googleConfig.Client(r.Context(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		http.Error(w, "failed getting user info: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var userInfo struct {
+		ID      string `json:"id"`
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		http.Error(w, "failed parsing user info: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "google", userInfo.ID, userInfo.Name, userInfo.Picture)
+	if err != nil {
+		http.Error(w, "oauth login failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.setRefreshTokenCookie(w, tokens.RefreshToken)
+
+	// Redirect to frontend with access token in fragment (or via a specific callback page)
+	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokens.AccessToken, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented fully yet", http.StatusNotImplemented)
+	if h.microsoftConfig == nil {
+		http.Error(w, "microsoft oauth not configured", http.StatusNotImplemented)
+		return
+	}
+	url := h.microsoftConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented fully yet", http.StatusNotImplemented)
+	if h.microsoftConfig == nil {
+		http.Error(w, "microsoft oauth not configured", http.StatusNotImplemented)
+		return
+	}
+
+	state := r.FormValue("state")
+	if state != "state-token" {
+		http.Error(w, "invalid oauth state", http.StatusBadRequest)
+		return
+	}
+
+	code := r.FormValue("code")
+	token, err := h.microsoftConfig.Exchange(r.Context(), code)
+	if err != nil {
+		http.Error(w, "code exchange failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	client := h.microsoftConfig.Client(r.Context(), token)
+	resp, err := client.Get("https://graph.microsoft.com/v1.0/me")
+	if err != nil {
+		http.Error(w, "failed getting user info: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var userInfo struct {
+		ID    string `json:"id"`
+		Email string `json:"userPrincipalName"`
+		Name  string `json:"displayName"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		http.Error(w, "failed parsing user info: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "microsoft", userInfo.ID, userInfo.Name, "")
+	if err != nil {
+		http.Error(w, "oauth login failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.setRefreshTokenCookie(w, tokens.RefreshToken)
+	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokens.AccessToken, http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) ListUserTenants(w http.ResponseWriter, r *http.Request) {

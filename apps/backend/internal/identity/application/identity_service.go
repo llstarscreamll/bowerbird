@@ -37,24 +37,38 @@ func (s *IdentityService) ListUserTenants(ctx context.Context, userID string) ([
 }
 
 func (s *IdentityService) LeaveTenant(ctx context.Context, userID, tenantID string) error {
-	// Remove from control plane
+	// Remove from control plane (soft delete)
 	err := s.repo.RemoveTenantMembership(ctx, userID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to leave tenant: %w", err)
 	}
 
-	// Wait, we also need to set status = 'inactive' in tenant DB
-	// but we don't know the DBName without querying the organization repo.
-	// This means IdentityService needs to know about Organization, or we do it via Event/Orchestrator.
-	// For simplicity right now, let's leave a TODO here.
+	// Update tenant DB
+	dbName, err := s.repo.GetTenantDBName(ctx, tenantID)
+	if err == nil && dbName != "" {
+		_ = s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID)
+	}
+
 	return nil
 }
 
 func (s *IdentityService) DeleteAccount(ctx context.Context, userID string) error {
-	// Obfuscate in control plane
-	// Soft delete sole-owner tenants
+	// Find all tenants user belongs to, so we can soft delete them from tenant DBs too
+	memberships, _ := s.repo.FindTenantMemberships(ctx, userID)
+
+	// Soft delete from control plane
+	err := s.repo.SoftDeleteUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete account: %w", err)
+	}
+
 	// Obfuscate in tenant DBs
-	// This requires cross-domain orchestration.
-	// Leaving a placeholder for now as per "not fully implemented yet".
-	return fmt.Errorf("delete account not implemented fully yet")
+	for _, m := range memberships {
+		dbName, err := s.repo.GetTenantDBName(ctx, m.TenantID)
+		if err == nil && dbName != "" {
+			_ = s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID)
+		}
+	}
+
+	return nil
 }

@@ -24,34 +24,46 @@ func NewPostgresRepository(controlDB *pgxpool.Pool, registry *database.Registry)
 }
 
 func (r *PostgresRepository) FindUserByEmail(ctx context.Context, email string) (*domain.User, error) {
-	query := `SELECT id, email, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, first_name, last_name, picture_url, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL`
 	var user domain.User
-	err := r.controlDB.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	var pictureURL *string
+	err := r.controlDB.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &pictureURL, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to find user by email: %w", err)
 	}
+	if pictureURL != nil {
+		user.PictureURL = *pictureURL
+	}
 	return &user, nil
 }
 
 func (r *PostgresRepository) FindUserByID(ctx context.Context, id string) (*domain.User, error) {
-	query := `SELECT id, email, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, first_name, last_name, picture_url, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL`
 	var user domain.User
-	err := r.controlDB.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+	var pictureURL *string
+	err := r.controlDB.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &pictureURL, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to find user by id: %w", err)
 	}
+	if pictureURL != nil {
+		user.PictureURL = *pictureURL
+	}
 	return &user, nil
 }
 
 func (r *PostgresRepository) CreateUser(ctx context.Context, user *domain.User) error {
-	query := `INSERT INTO users (email, created_at, updated_at) VALUES ($1, $2, $3) RETURNING id`
-	err := r.controlDB.QueryRow(ctx, query, user.Email, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
+	query := `INSERT INTO users (email, first_name, last_name, picture_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	var pictureURL *string
+	if user.PictureURL != "" {
+		pictureURL = &user.PictureURL
+	}
+	err := r.controlDB.QueryRow(ctx, query, user.Email, user.FirstName, user.LastName, pictureURL, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -98,7 +110,12 @@ func (r *PostgresRepository) CreateUserIdentity(ctx context.Context, identity *d
 }
 
 func (r *PostgresRepository) FindTenantMemberships(ctx context.Context, userID string) ([]*domain.TenantMembership, error) {
-	query := `SELECT user_id, tenant_id, role, created_at FROM tenant_memberships WHERE user_id = $1`
+	query := `
+		SELECT m.user_id, m.tenant_id, m.role, m.created_at, m.deleted_at 
+		FROM tenant_memberships m
+		JOIN tenants t ON m.tenant_id = t.id
+		WHERE m.user_id = $1 AND m.deleted_at IS NULL AND t.status = 'active'
+	`
 	rows, err := r.controlDB.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tenant memberships: %w", err)
@@ -108,7 +125,7 @@ func (r *PostgresRepository) FindTenantMemberships(ctx context.Context, userID s
 	var memberships []*domain.TenantMembership
 	for rows.Next() {
 		var m domain.TenantMembership
-		if err := rows.Scan(&m.UserID, &m.TenantID, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.UserID, &m.TenantID, &m.Role, &m.CreatedAt, &m.DeletedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan tenant membership: %w", err)
 		}
 		memberships = append(memberships, &m)
@@ -129,12 +146,49 @@ func (r *PostgresRepository) AddTenantMembership(ctx context.Context, membership
 }
 
 func (r *PostgresRepository) RemoveTenantMembership(ctx context.Context, userID, tenantID string) error {
-	query := `DELETE FROM tenant_memberships WHERE user_id = $1 AND tenant_id = $2`
+	query := `UPDATE tenant_memberships SET deleted_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND tenant_id = $2 AND deleted_at IS NULL`
 	_, err := r.controlDB.Exec(ctx, query, userID, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to remove tenant membership: %w", err)
 	}
 	return nil
+}
+
+func (r *PostgresRepository) SoftDeleteUser(ctx context.Context, userID string) error {
+	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', gen_random_uuid()), first_name = 'Deleted', last_name = 'User' WHERE id = $1 AND deleted_at IS NULL`
+	_, err := r.controlDB.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to soft delete user: %w", err)
+	}
+
+	// Also soft delete all memberships
+	memQuery := `UPDATE tenant_memberships SET deleted_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND deleted_at IS NULL`
+	_, err = r.controlDB.Exec(ctx, memQuery, userID)
+	return err
+}
+
+func (r *PostgresRepository) SoftDeleteTenantUserProfile(ctx context.Context, tenantDBName string, userID string) error {
+	pool, err := r.registry.GetPoolByDBName(ctx, tenantDBName)
+	if err != nil {
+		return fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', gen_random_uuid()), first_name = 'Deleted', last_name = 'User', status = 'inactive' WHERE id = $1 AND deleted_at IS NULL`
+	_, err = pool.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to soft delete tenant user profile: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) GetTenantDBName(ctx context.Context, tenantID string) (string, error) {
+	query := `SELECT db_name FROM tenants WHERE id = $1`
+	var dbName string
+	err := r.controlDB.QueryRow(ctx, query, tenantID).Scan(&dbName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get tenant db_name: %w", err)
+	}
+	return dbName, nil
 }
 
 // CreateTenantUserProfile inserts the profile into the tenant's database

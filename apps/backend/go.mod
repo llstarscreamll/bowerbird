@@ -13,9 +13,11 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.6.0
 	golang.org/x/crypto v0.52.0
+	golang.org/x/oauth2 v0.36.0
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.8.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.23 // indirect
@@ -31,5 +33,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )

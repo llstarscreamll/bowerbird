@@ -13,20 +13,24 @@ import (
 )
 
 type Config struct {
-	AppEnv               string    `json:"app_env"`
-	Port                 string    `json:"port"`
-	DatabaseURL          string    `json:"database_url"`
-	SQSQueueURL          string    `json:"sqs_queue_url"`
-	EventBridgeQueueURL  string    `json:"eventbridge_queue_url"`
-	S3BucketName         string    `json:"s3_bucket_name"`
-	AWSRegion            string    `json:"aws_region"`
-	AWSEndpointURL       string    `json:"aws_endpoint_url"`
-	AWSAccessKeyID       string    `json:"aws_access_key_id"`
-	AWSSecretAccessKey   string    `json:"aws_secret_access_key"`
-	SSMParameterName     string    `json:"ssm_parameter_name"`
-	EnableLocalEventLoop bool      `json:"enable_local_event_loop"`
-	AllowedOrigins       string    `json:"allowed_origins"`
-	JWT                  JWTConfig `json:"-"`
+	AppEnv                string    `json:"app_env"`
+	Port                  string    `json:"port"`
+	DatabaseURL           string    `json:"database_url"`
+	SQSQueueURL           string    `json:"sqs_queue_url"`
+	EventBridgeQueueURL   string    `json:"eventbridge_queue_url"`
+	S3BucketName          string    `json:"s3_bucket_name"`
+	AWSRegion             string    `json:"aws_region"`
+	AWSEndpointURL        string    `json:"aws_endpoint_url"`
+	AWSAccessKeyID        string    `json:"aws_access_key_id"`
+	AWSSecretAccessKey    string    `json:"aws_secret_access_key"`
+	SSMParameterName      string    `json:"ssm_parameter_name"`
+	EnableLocalEventLoop  bool      `json:"enable_local_event_loop"`
+	AllowedOrigins        string    `json:"allowed_origins"`
+	GoogleClientID        string    `json:"google_client_id"`
+	GoogleClientSecret    string    `json:"google_client_secret"`
+	MicrosoftClientID     string    `json:"microsoft_client_id"`
+	MicrosoftClientSecret string    `json:"microsoft_client_secret"`
+	JWT                   JWTConfig `json:"-"`
 }
 
 type JWTConfig struct {

@@ -13,4 +13,9 @@ export const routes: Routes = [
     path: 'lobby',
     loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
   },
+  {
+    path: 'auth/callback',
+    loadComponent: () =>
+      import('./auth/presentation/pages/callback/callback.component').then((c) => c.CallbackComponent),
+  },
 ];

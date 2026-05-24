@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/organization/application"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
 )
 
 type Handler struct {
@@ -17,14 +18,13 @@ func NewHandler(createUseCase *application.CreateOrganizationUseCase) *Handler {
 	}
 }
 
-func (h *Handler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/organizations", h.CreateOrganization)
+func (h *Handler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler) {
+	mux.Handle("POST /api/v1/organizations", authMiddleware(http.HandlerFunc(h.CreateOrganization)))
 }
 
 type CreateOrganizationRequest struct {
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	OwnerID string `json:"owner_id"` // Simulation of authenticated user ID for now
+	Name string `json:"name"`
+	Slug string `json:"slug"`
 }
 
 type CreateOrganizationResponse struct {
@@ -42,15 +42,24 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	cmd := application.CreateOrganizationCommand{
-		Name:    req.Name,
-		Slug:    req.Slug,
-		OwnerID: req.OwnerID,
+		Name:           req.Name,
+		Slug:           req.Slug,
+		OwnerID:        claims.UserID,
+		OwnerEmail:     claims.Email,
+		OwnerFirstName: claims.FirstName,
+		OwnerLastName:  claims.LastName,
+		OwnerAvatarURL: claims.PictureURL,
 	}
 
 	org, err := h.createUseCase.Execute(r.Context(), cmd)
 	if err != nil {
-		// Basic error mapping
 		if err == application.ErrSlugAlreadyExists {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return

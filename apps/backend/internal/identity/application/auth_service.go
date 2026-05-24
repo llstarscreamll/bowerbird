@@ -37,7 +37,7 @@ func (s *AuthService) RegisterLocal(ctx context.Context, email, password string)
 	}
 
 	// Create user
-	user := domain.NewUser("", email)
+	user := domain.NewUser("", email, "Local", "User", "")
 	err = s.repo.CreateUser(ctx, user)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (s *AuthService) RegisterLocal(ctx context.Context, email, password string)
 		return nil, err
 	}
 
-	return s.tokenGen.GenerateTokens(createdUser.ID, createdUser.Email)
+	return s.tokenGen.GenerateTokens(createdUser.ID, createdUser.Email, createdUser.FirstName, createdUser.LastName, createdUser.PictureURL)
 }
 
 // LoginLocal is only for local dev/e2e testing
@@ -85,12 +85,17 @@ func (s *AuthService) LoginLocal(ctx context.Context, email, password string) (*
 		return nil, errors.New("invalid credentials")
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email)
+	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
 }
 
 // OAuthLogin handles login or registration via OAuth provider
-func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerID string) (*auth.TokenPair, error) {
+func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerID, name, pictureURL string) (*auth.TokenPair, error) {
 	var user *domain.User
+
+	// Simple heuristic to split name (since providers often just give "displayName" or "name")
+	firstName := name
+	lastName := ""
+	// For production, you'd want a better heuristic or fetch family_name if available.
 
 	// Check if user exists by email (Account Linking)
 	existingUser, err := s.repo.FindUserByEmail(ctx, email)
@@ -116,7 +121,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerI
 		}
 	} else {
 		// Create new user
-		user = domain.NewUser("", email)
+		user = domain.NewUser("", email, firstName, lastName, pictureURL)
 		err = s.repo.CreateUser(ctx, user)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
@@ -134,7 +139,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerI
 		}
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email)
+	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
 }
 
 // RefreshToken validates a refresh token and issues a new pair
@@ -149,5 +154,5 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*a
 		return nil, err
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email)
+	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
 }

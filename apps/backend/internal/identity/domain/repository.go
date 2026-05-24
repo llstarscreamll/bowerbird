@@ -23,4 +23,9 @@ type Repository interface {
 	// Requires standard injection of the tenant's pgxpool
 	CreateTenantUserProfile(ctx context.Context, tenantDBName string, profile *TenantUserProfile) error
 	UpdateTenantUserProfile(ctx context.Context, tenantDBName string, profile *TenantUserProfile) error
+	SoftDeleteTenantUserProfile(ctx context.Context, tenantDBName string, userID string) error
+
+	// Administrative
+	SoftDeleteUser(ctx context.Context, userID string) error
+	GetTenantDBName(ctx context.Context, tenantID string) (string, error)
 }
