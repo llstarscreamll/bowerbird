@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthStore } from '../../../application/auth.store';
@@ -10,86 +10,178 @@ import { AuthHttpService } from '../../../infrastructure/auth.http.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-md w-full space-y-8">
-        <div>
-          <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+    <div class="flex min-h-screen flex-col items-center justify-center py-12 sm:px-6 lg:px-8">
+      <!-- Brand Logo / Header -->
+      <div class="sm:mx-auto sm:w-full sm:max-w-md text-center mb-8">
+        <div class="mx-auto h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+          <span class="material-icons-outlined text-white text-3xl">flight_takeoff</span>
         </div>
+        <h2 class="mt-6 text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
+          Sign in to your account
+        </h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Welcome back! Please enter your details.</p>
+      </div>
 
-        <!-- Local Login (Dev only) -->
-        <form class="mt-8 space-y-6" (ngSubmit)="onLocalLogin()">
-          <div class="rounded-md shadow-sm -space-y-px">
+      <!-- Main Login Card -->
+      <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="card space-y-6">
+          <form class="space-y-6" (ngSubmit)="onLocalLogin()">
+            <!-- Email -->
             <div>
-              <label for="email-address" class="sr-only">Email address</label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autocomplete="email"
-                required
-                [(ngModel)]="email"
-                class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-              />
+              <label for="email" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
+                Email address
+              </label>
+              <div class="mt-2">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  [(ngModel)]="email"
+                  class="input-field"
+                  placeholder="name@example.com"
+                />
+              </div>
             </div>
+
+            <!-- Password -->
             <div>
-              <label for="password" class="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autocomplete="current-password"
-                required
-                [(ngModel)]="password"
-                class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-              />
+              <label for="password" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
+                Password
+              </label>
+              <div class="mt-2">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  [(ngModel)]="password"
+                  class="input-field"
+                  placeholder="••••••••"
+                />
+              </div>
             </div>
-          </div>
 
-          <div class="flex items-center justify-between">
-            <div class="text-sm">
-              <span class="text-red-500" *ngIf="store.error()">{{ store.error() }}</span>
+            <!-- Remember me & Error -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="relative flex h-5 items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    class="peer appearance-none h-4 w-4 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 checked:border-indigo-600 dark:checked:border-indigo-500 checked:bg-indigo-600 dark:checked:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 dark:focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-colors"
+                  />
+                  <!-- Custom Checkbox SVG inside -->
+                  <svg
+                    class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"
+                    viewBox="0 0 14 10"
+                    fill="none"
+                  >
+                    <path
+                      d="M1 5L4.5 8.5L13 1"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </div>
+                <label for="remember-me" class="block text-sm leading-6 text-slate-600 dark:text-slate-400">
+                  Remember me
+                </label>
+              </div>
+
+              <div class="text-sm leading-6">
+                <a
+                  href="#"
+                  class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                >
+                  Forgot password?
+                </a>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              [disabled]="store.isLoading()"
-              class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            <!-- Error message -->
+            <div
+              *ngIf="store.error()"
+              class="rounded-md bg-red-50 dark:bg-red-500/10 p-4 border border-red-200 dark:border-red-500/20"
             >
-              <span *ngIf="!store.isLoading()">Sign in (Local)</span>
-              <span *ngIf="store.isLoading()">Signing in...</span>
-            </button>
-          </div>
-        </form>
-
-        <div class="mt-6">
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-gray-300"></div>
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <span class="material-icons-outlined text-red-400 dark:text-red-500 text-sm">error</span>
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-red-800 dark:text-red-400">{{ store.error() }}</h3>
+                </div>
+              </div>
             </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-gray-50 text-gray-500"> Or continue with </span>
-            </div>
-          </div>
 
-          <div class="mt-6 grid grid-cols-2 gap-3">
+            <!-- Submit -->
             <div>
-              <a
-                href="http://api.bowerbird.dev/api/v1/auth/google/login"
-                class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-              >
-                <span>Google</span>
+              <button type="submit" [disabled]="store.isLoading()" class="btn-primary w-full">
+                <span *ngIf="!store.isLoading()">Sign in</span>
+                <span *ngIf="store.isLoading()" class="flex items-center gap-2">
+                  <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Signing in...
+                </span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Divider -->
+          <div class="mt-8">
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                <div class="w-full border-t border-slate-200 dark:border-slate-700"></div>
+              </div>
+              <div class="relative flex justify-center">
+                <span class="bg-white dark:bg-slate-900 px-3 text-sm text-slate-500 dark:text-slate-400">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <!-- OAuth Buttons -->
+            <div class="mt-6 grid grid-cols-2 gap-4">
+              <a href="http://api.bowerbird.dev/api/v1/auth/google/login" class="btn-secondary w-full gap-2">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z"
+                    fill="#EA4335"
+                  />
+                  <path
+                    d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12.0004 24.0001C15.2404 24.0001 17.9654 22.935 19.9454 21.095L16.0804 18.095C15.0054 18.82 13.6204 19.245 12.0004 19.245C8.8704 19.245 6.21537 17.135 5.2654 14.29L1.27539 17.385C3.25539 21.31 7.3104 24.0001 12.0004 24.0001Z"
+                    fill="#34A853"
+                  />
+                </svg>
+                Google
               </a>
-            </div>
-            <div>
-              <a
-                href="http://api.bowerbird.dev/api/v1/auth/microsoft/login"
-                class="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-              >
-                <span>Microsoft</span>
+              <a href="http://api.bowerbird.dev/api/v1/auth/microsoft/login" class="btn-secondary w-full gap-2">
+                <svg class="h-5 w-5" viewBox="0 0 21 21" aria-hidden="true">
+                  <path d="M10 0H0V10H10V0Z" fill="#F25022" />
+                  <path d="M21 0H11V10H21V0Z" fill="#7FBA00" />
+                  <path d="M10 11H0V21H10V11Z" fill="#00A4EF" />
+                  <path d="M21 11H11V21H21V11Z" fill="#FFB900" />
+                </svg>
+                Microsoft
               </a>
             </div>
           </div>
@@ -107,7 +199,6 @@ export class LoginComponent {
   password = '';
 
   constructor() {
-    // If we have a token, go to lobby
     if (this.store.isAuthenticated()) {
       this.router.navigate(['/lobby']);
     }
@@ -115,12 +206,8 @@ export class LoginComponent {
 
   onLocalLogin() {
     if (this.email && this.password) {
-      // Small hack: instead of using rxMethod which we'd need to subscribe to,
-      // let's just do it directly or subscribe to a side effect.
-      // Since it's a SignalStore, the state updates automatically.
       this.store.loginLocal({ email: this.email, password: this.password });
 
-      // Navigate on next tick if authenticated
       setTimeout(() => {
         if (this.store.isAuthenticated()) {
           this.router.navigate(['/lobby']);

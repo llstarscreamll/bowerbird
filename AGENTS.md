@@ -55,6 +55,8 @@ This system uses a **Database-per-tenant** architecture with a central **Control
   - Strict Rules: `platform` never imports domains. Domains never import each other directly. `main.go` is the exclusive place for dependency injection.
 - `apps/pwa`
   - Angular 21 Zoneless standalone app (`apps/pwa/angular.json`, `apps/pwa/src/app/app.config.ts`).
+  - Uses Tailwind CSS v4. Configured via `@theme` in `apps/pwa/src/styles.css`.
+  - UI conventions: Professional SaaS aesthetic. Strict typographic hierarchy (Geist sans), spacious padding (`gap-6`, `p-6`), subtle borders (`border-slate-200`), dark mode built-in via `dark:` variants. Avoid generic UI; rely on custom utility classes defined in `styles.css` (`.card`, `.btn-primary`, `.input-field`).
   - Uses `@ngrx/signals` (SignalStore) for global state management. Avoid NgRx/Redux.
   - Tests use Vitest via `@angular/build:unit-test`.
   - Dev proxy uses local DNS (`Caddyfile` + `/etc/hosts`) mapping `app.bowerbird.dev` to `4200` and `api.bowerbird.dev` to `8080`.
