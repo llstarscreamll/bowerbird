@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/money-path/bowerbird/apps/backend/internal/organization/domain"
@@ -38,6 +39,12 @@ func (r *PostgresRepository) ExistsBySlug(ctx context.Context, slug string) (boo
 	query := `SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)`
 	err := r.pool.QueryRow(ctx, query, slug).Scan(&exists)
 	return exists, err
+}
+
+func (r *PostgresRepository) UpdateStatus(ctx context.Context, organizationID, status string) error {
+	query := `UPDATE tenants SET status = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.pool.Exec(ctx, query, status, time.Now().UTC(), organizationID)
+	return err
 }
 
 func (r *PostgresRepository) AddMembership(ctx context.Context, userID, tenantID, role string) error {

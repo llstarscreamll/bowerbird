@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -18,22 +19,26 @@ type Handler interface {
 }
 
 type Poller struct {
-	client               *sqs.Client
-	handler              Handler
-	sqsQueueURL          string
-	eventBridgeQueueURL  string
-	waitTimeSeconds      int32
-	visibilityTimeoutSec int32
+	client                *sqs.Client
+	handler               Handler
+	sqsQueueURL           string
+	eventBridgeQueueURL   string
+	waitTimeSeconds       int32
+	visibilityTimeoutSec  int32
+	failureBackoffBaseSec int32
+	failureBackoffMaxSec  int32
 }
 
 func NewPoller(client *sqs.Client, handler Handler, sqsQueueURL, eventBridgeQueueURL string) Poller {
 	return Poller{
-		client:               client,
-		handler:              handler,
-		sqsQueueURL:          sqsQueueURL,
-		eventBridgeQueueURL:  eventBridgeQueueURL,
-		waitTimeSeconds:      10,
-		visibilityTimeoutSec: 30,
+		client:                client,
+		handler:               handler,
+		sqsQueueURL:           sqsQueueURL,
+		eventBridgeQueueURL:   eventBridgeQueueURL,
+		waitTimeSeconds:       10,
+		visibilityTimeoutSec:  30,
+		failureBackoffBaseSec: 5,
+		failureBackoffMaxSec:  300,
 	}
 }
 
@@ -73,6 +78,9 @@ func (p Poller) pollSQS(ctx context.Context, queueURL string, handler func(conte
 		event := events.SQSEvent{Records: toSQSRecords(messages)}
 		if err := handler(ctx, event); err != nil {
 			log.Printf("sqs handler error (queue=%s): %v", queueURL, err)
+			if backoffErr := p.applyFailureBackoff(ctx, queueURL, messages); backoffErr != nil {
+				log.Printf("sqs backoff error (queue=%s): %v", queueURL, backoffErr)
+			}
 			continue
 		}
 
@@ -105,6 +113,7 @@ func (p Poller) receiveMessages(ctx context.Context, queueURL string) ([]types.M
 		MaxNumberOfMessages:   10,
 		WaitTimeSeconds:       p.waitTimeSeconds,
 		VisibilityTimeout:     p.visibilityTimeoutSec,
+		AttributeNames:        []types.QueueAttributeName{"All"},
 		MessageAttributeNames: []string{"All"},
 	})
 	if err != nil {
@@ -139,6 +148,34 @@ func (p Poller) deleteMessages(ctx context.Context, queueURL string, messages []
 	return err
 }
 
+func (p Poller) applyFailureBackoff(ctx context.Context, queueURL string, messages []types.Message) error {
+	entries := make([]types.ChangeMessageVisibilityBatchRequestEntry, 0, len(messages))
+	for _, message := range messages {
+		if message.MessageId == nil || message.ReceiptHandle == nil {
+			continue
+		}
+
+		receiveCount := parseReceiveCount(message.Attributes["ApproximateReceiveCount"])
+		visibility := p.backoffVisibilityTimeout(receiveCount)
+
+		entries = append(entries, types.ChangeMessageVisibilityBatchRequestEntry{
+			Id:                message.MessageId,
+			ReceiptHandle:     message.ReceiptHandle,
+			VisibilityTimeout: visibility,
+		})
+	}
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	_, err := p.client.ChangeMessageVisibilityBatch(ctx, &sqs.ChangeMessageVisibilityBatchInput{
+		QueueUrl: &queueURL,
+		Entries:  entries,
+	})
+	return err
+}
+
 func toSQSRecords(messages []types.Message) []events.SQSMessage {
 	records := make([]events.SQSMessage, 0, len(messages))
 	for _, message := range messages {
@@ -151,6 +188,9 @@ func toSQSRecords(messages []types.Message) []events.SQSMessage {
 		}
 		record.ReceiptHandle = ""
 		record.Attributes = map[string]string{}
+		for key, value := range message.Attributes {
+			record.Attributes[string(key)] = value
+		}
 		record.MessageAttributes = map[string]events.SQSMessageAttribute{}
 		for k, v := range message.MessageAttributes {
 			val := ""
@@ -170,4 +210,28 @@ func toSQSRecords(messages []types.Message) []events.SQSMessage {
 	}
 
 	return records
+}
+
+func parseReceiveCount(raw string) int32 {
+	if raw == "" {
+		return 1
+	}
+	v, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil || v <= 0 {
+		return 1
+	}
+	return int32(v)
+}
+
+func (p Poller) backoffVisibilityTimeout(receiveCount int32) int32 {
+	if receiveCount <= 1 {
+		return p.failureBackoffBaseSec
+	}
+
+	visibility := p.failureBackoffBaseSec << (receiveCount - 1)
+	if visibility > p.failureBackoffMaxSec {
+		return p.failureBackoffMaxSec
+	}
+
+	return visibility
 }

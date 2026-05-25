@@ -16,6 +16,9 @@ import (
 	identityapp "github.com/money-path/bowerbird/apps/backend/internal/identity/application"
 	identityinfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
 	identityhttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
+	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
+	invoicinginfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
+	invoicingevents "github.com/money-path/bowerbird/apps/backend/internal/invoicing/presentation/events"
 	orgapplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
 	orginfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
 	orghttp "github.com/money-path/bowerbird/apps/backend/internal/organization/presentation/http"
@@ -106,7 +109,10 @@ func main() {
 	orgHandler.Register(mux, authMiddleware)
 
 	// Setup Event Poller
-	eventHandler := events.NewEventHandler()
+	invoicingRouter := invoicinginfra.NewLogRouter()
+	invoicingUseCase := invoicingapp.NewProcessInboxEventUseCase(invoicingRouter)
+	inboxMessageSubscriber := invoicingevents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
+	eventHandler := events.NewEventHandler(inboxMessageSubscriber)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
 		awsCfg, err := awsconfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)

@@ -11,6 +11,12 @@ var (
 	ErrInvalidSlug = errors.New("invalid organization slug: must be alphanumeric and hyphens only")
 )
 
+const (
+	StatusProvisioning = "provisioning"
+	StatusActive       = "active"
+	StatusFailed       = "failed"
+)
+
 var slugRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 // Organization represents a tenant in the system.
@@ -39,7 +45,7 @@ func NewOrganization(name, slug string) (*Organization, error) {
 		Name:      strings.TrimSpace(name),
 		Slug:      slug,
 		DBName:    dbName,
-		Status:    "active",
+		Status:    StatusProvisioning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}, nil

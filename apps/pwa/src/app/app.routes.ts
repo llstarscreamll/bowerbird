@@ -17,4 +17,18 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
   },
+  {
+    path: ':tenantId/inbox/connections',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./inbox/presentation/pages/connections/inbox-connections.component').then(
+        (c) => c.InboxConnectionsComponent,
+      ),
+  },
+  {
+    path: ':tenantId/inbox/unified',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./inbox/presentation/pages/unified/unified-inbox.component').then((c) => c.UnifiedInboxComponent),
+  },
 ];

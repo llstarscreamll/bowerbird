@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/cor
 import { DatePipe, NgClass } from '@angular/common';
 import { Router } from '@angular/router';
 import { HealthStore } from '../../../application/health.store';
-import { AuthStore } from '../../../../auth/application/auth.store';
 
 @Component({
   selector: 'app-home',
@@ -155,7 +154,6 @@ import { AuthStore } from '../../../../auth/application/auth.store';
 })
 export class HomeComponent implements OnInit {
   readonly healthStore = inject(HealthStore);
-  private authStore = inject(AuthStore);
   private router = inject(Router);
 
   ngOnInit(): void {

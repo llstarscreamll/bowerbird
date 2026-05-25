@@ -99,10 +99,20 @@ export class BowerbirdStack extends cdk.Stack {
     secretsParam.grantRead(sqsLambda);
     secretsParam.grantRead(eventBridgeLambda);
 
+    const queueDLQ = new sqs.Queue(this, 'BowerbirdQueueDLQ', {
+      queueName: `${prefix}-queue-dlq`,
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
     const queue = new sqs.Queue(this, 'BowerbirdQueue', {
       queueName: `${prefix}-queue`,
       visibilityTimeout: cdk.Duration.seconds(30),
       encryption: sqs.QueueEncryption.SQS_MANAGED,
+      deadLetterQueue: {
+        queue: queueDLQ,
+        maxReceiveCount: 5,
+      },
     });
 
     sqsLambda.addEventSource(new lambdaEventSources.SqsEventSource(queue, { batchSize: 10 }));
@@ -271,5 +281,6 @@ export class BowerbirdStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WebUrl', { value: `https://${appDomain}` });
     new cdk.CfnOutput(this, 'ApiUrl', { value: `https://${apiDomain}` });
     new cdk.CfnOutput(this, 'QueueUrl', { value: queue.queueUrl });
+    new cdk.CfnOutput(this, 'QueueDLQUrl', { value: queueDLQ.queueUrl });
   }
 }

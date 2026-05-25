@@ -1,12 +1,11 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthStore } from '../../auth/application/auth.store';
-import { AuthHttpService } from '../../auth/infrastructure/auth.http.service';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { requiresCookieAuth } from './http-rules';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(AuthStore);
-  const authService = inject(AuthHttpService);
   const token = store.accessToken();
 
   let clonedReq = req;
@@ -21,7 +20,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   // Ensure withCredentials is true to send cookies for refresh endpoint automatically
   // but generally it's better to configure it specifically or globally.
-  if (req.url.includes('/refresh') || req.url.includes('/logout')) {
+  if (requiresCookieAuth(req.url)) {
     clonedReq = clonedReq.clone({
       withCredentials: true,
     });
@@ -31,13 +30,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error) => {
       // 401 Unauthorized - Try to refresh
       if (error.status === 401 && !req.url.includes('/refresh')) {
-        return authService.refreshToken().pipe(
-          switchMap((res) => {
-            store.setToken(res.access_token);
+        return store.refreshSession().pipe(
+          switchMap((refreshedToken) => {
+            if (!refreshedToken) {
+              store.clearToken();
+              return throwError(() => error);
+            }
+
             // Retry the original request with the new token
             const retryReq = req.clone({
               setHeaders: {
-                Authorization: `Bearer ${res.access_token}`,
+                Authorization: `Bearer ${refreshedToken}`,
               },
             });
             return next(retryReq);

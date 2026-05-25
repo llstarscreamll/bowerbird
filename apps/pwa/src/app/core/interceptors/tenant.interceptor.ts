@@ -1,8 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-
-const GLOBAL_ROUTES = new Set(['', 'login', 'lobby', 'workspaces', 'onboarding', 'profile']);
+import { GLOBAL_ROUTES } from './http-rules';
 
 export const tenantInterceptor: HttpInterceptorFn = (req, next) => {
   const document = inject(DOCUMENT);

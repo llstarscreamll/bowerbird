@@ -1,10 +1,9 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthStore } from '../../../application/auth.store';
+import { LobbyStore } from '../../../application/lobby.store';
 import { TenantMembership } from '../../../domain/auth.model';
-import { OrganizationHttpService } from '../../../../organization/infrastructure/organization.http.service';
 
 @Component({
   selector: 'app-lobby',
@@ -33,14 +32,14 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
           >
             <h3 class="text-sm font-medium leading-6 text-slate-900 dark:text-white">Tus Organizaciones</h3>
             <button (click)="toggleCreateForm()" class="btn-primary py-1.5 px-3 gap-2">
-              <span class="material-icons-outlined text-[18px]">{{ showCreateForm ? 'close' : 'add' }}</span>
-              <span>{{ showCreateForm ? 'Cancelar' : 'Crear nueva' }}</span>
+              <span class="material-icons-outlined text-[18px]">{{ showCreateForm() ? 'close' : 'add' }}</span>
+              <span>{{ showCreateForm() ? 'Cancelar' : 'Crear nueva' }}</span>
             </button>
           </div>
 
           <!-- Create Tenant Form -->
           <div
-            *ngIf="showCreateForm"
+            *ngIf="showCreateForm()"
             class="p-5 bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800/80"
           >
             <form (ngSubmit)="onCreateTenant()" class="space-y-4">
@@ -54,8 +53,8 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                       id="orgName"
                       type="text"
                       required
-                      [(ngModel)]="newOrgName"
-                      (ngModelChange)="onNameChange($event)"
+                      [ngModel]="newOrgName()"
+                      (ngModelChange)="onOrgNameInput($event)"
                       name="orgName"
                       class="input-field py-2"
                       placeholder="Acme Corp"
@@ -71,7 +70,8 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                       id="orgSlug"
                       type="text"
                       required
-                      [(ngModel)]="newOrgSlug"
+                      [ngModel]="newOrgSlug()"
+                      (ngModelChange)="setNewOrgSlug($event)"
                       name="orgSlug"
                       class="input-field py-2"
                       placeholder="acme"
@@ -80,14 +80,14 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                 </div>
               </div>
 
-              <div *ngIf="createError" class="text-sm text-red-600 dark:text-red-400">
-                {{ createError }}
+              <div *ngIf="createError()" class="text-sm text-red-600 dark:text-red-400">
+                {{ createError() }}
               </div>
 
               <div class="flex justify-end pt-2">
-                <button type="submit" [disabled]="isCreating" class="btn-primary py-2 px-4 shadow-sm text-sm">
-                  <span *ngIf="!isCreating">Crear Organización</span>
-                  <span *ngIf="isCreating" class="flex items-center gap-2">
+                <button type="submit" [disabled]="isCreating()" class="btn-primary py-2 px-4 shadow-sm text-sm">
+                  <span *ngIf="!isCreating()">Crear Organización</span>
+                  <span *ngIf="isCreating()" class="flex items-center gap-2">
                     <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path
@@ -157,6 +157,20 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                 </div>
 
                 <div class="flex items-center gap-4">
+                  <button
+                    class="btn-secondary px-2.5 py-1.5 text-xs"
+                    (click)="goToConnections($event, tenant)"
+                    type="button"
+                  >
+                    Correo
+                  </button>
+                  <button
+                    class="btn-secondary px-2.5 py-1.5 text-xs"
+                    (click)="goToUnifiedInbox($event, tenant)"
+                    type="button"
+                  >
+                    Bandeja
+                  </button>
                   <span
                     class="px-2 py-0.5 inline-flex text-[11px] font-medium rounded-md border"
                     [ngClass]="{
@@ -184,78 +198,58 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
 })
 export class LobbyComponent implements OnInit {
   readonly store = inject(AuthStore);
-  private router = inject(Router);
-  private orgService = inject(OrganizationHttpService);
+  private readonly lobbyStore = inject(LobbyStore);
 
-  showCreateForm = false;
-  newOrgName = '';
-  newOrgSlug = '';
-  isCreating = false;
-  createError = '';
+  readonly showCreateForm = this.lobbyStore.showCreateForm;
+  readonly newOrgName = this.lobbyStore.newOrgName;
+  readonly newOrgSlug = this.lobbyStore.newOrgSlug;
+  readonly isCreating = this.lobbyStore.isCreating;
+  readonly createError = this.lobbyStore.createError;
 
   ngOnInit() {
-    if (!this.store.isAuthenticated()) {
-      this.router.navigate(['/login']);
-      return;
-    }
-    this.store.loadTenants();
+    this.lobbyStore.init();
   }
 
   selectTenant(tenant: TenantMembership) {
-    this.router.navigate(['/', tenant.tenant_id, 'dashboard']);
+    this.lobbyStore.selectTenant(tenant);
+  }
+
+  goToConnections(event: MouseEvent, tenant: TenantMembership) {
+    event.stopPropagation();
+    this.lobbyStore.goToConnections(tenant);
+  }
+
+  goToUnifiedInbox(event: MouseEvent, tenant: TenantMembership) {
+    event.stopPropagation();
+    this.lobbyStore.goToUnifiedInbox(tenant);
   }
 
   toggleCreateForm() {
-    this.showCreateForm = !this.showCreateForm;
-    this.createError = '';
-    if (!this.showCreateForm) {
-      this.newOrgName = '';
-      this.newOrgSlug = '';
-    }
+    this.lobbyStore.toggleCreateForm();
   }
 
   onNameChange(name: string) {
-    // Basic auto-slug generation based on name
-    if (!this.newOrgSlug || this.newOrgSlug === this.generateSlug(name.slice(0, -1))) {
-      this.newOrgSlug = this.generateSlug(name);
-    }
+    this.lobbyStore.onNameChange(name);
   }
 
-  private generateSlug(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+  onOrgNameInput(name: string): void {
+    this.setNewOrgName(name);
+    this.onNameChange(name);
   }
 
   onCreateTenant() {
-    if (!this.newOrgName || !this.newOrgSlug) return;
-
-    this.isCreating = true;
-    this.createError = '';
-
-    this.orgService
-      .createOrganization({
-        name: this.newOrgName,
-        slug: this.newOrgSlug,
-      })
-      .subscribe({
-        next: () => {
-          this.isCreating = false;
-          this.toggleCreateForm();
-          this.store.loadTenants();
-        },
-        error: (err) => {
-          this.isCreating = false;
-          this.createError = err.error || 'Failed to create organization';
-        },
-      });
+    this.lobbyStore.createTenant();
   }
 
   logout() {
-    this.store.logout();
-    setTimeout(() => {
-      this.router.navigate(['/login']);
-    }, 500);
+    this.lobbyStore.logout();
+  }
+
+  setNewOrgName(name: string): void {
+    this.lobbyStore.setNewOrgName(name);
+  }
+
+  setNewOrgSlug(slug: string): void {
+    this.lobbyStore.setNewOrgSlug(slug);
   }
 }

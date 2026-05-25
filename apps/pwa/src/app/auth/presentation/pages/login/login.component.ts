@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthStore } from '../../../application/auth.store';
 import { FormsModule } from '@angular/forms';
-import { AuthHttpService } from '../../../infrastructure/auth.http.service';
 
 import { environment } from '../../../../../environments/environment';
 
@@ -189,7 +188,6 @@ import { environment } from '../../../../../environments/environment';
 export class LoginComponent {
   readonly store = inject(AuthStore);
   private router = inject(Router);
-  private authHttp = inject(AuthHttpService);
 
   apiUrl = environment.apiUrl;
 
@@ -204,13 +202,13 @@ export class LoginComponent {
 
   onLocalLogin() {
     if (this.email && this.password) {
-      this.store.loginLocal({ email: this.email, password: this.password });
-
-      setTimeout(() => {
-        if (this.store.isAuthenticated()) {
+      this.store.loginLocal({
+        email: this.email,
+        password: this.password,
+        onSuccess: () => {
           this.router.navigate(['/lobby']);
-        }
-      }, 500);
+        },
+      });
     }
   }
 }

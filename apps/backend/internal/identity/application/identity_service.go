@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/identity/domain"
@@ -45,8 +46,13 @@ func (s *IdentityService) LeaveTenant(ctx context.Context, userID, tenantID stri
 
 	// Update tenant DB
 	dbName, err := s.repo.GetTenantDBName(ctx, tenantID)
-	if err == nil && dbName != "" {
-		_ = s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID)
+	if err != nil {
+		return fmt.Errorf("left tenant in control plane but failed to resolve tenant db: %w", err)
+	}
+	if dbName != "" {
+		if err := s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID); err != nil {
+			return fmt.Errorf("left tenant in control plane but failed to update tenant profile: %w", err)
+		}
 	}
 
 	return nil
@@ -54,7 +60,7 @@ func (s *IdentityService) LeaveTenant(ctx context.Context, userID, tenantID stri
 
 func (s *IdentityService) DeleteAccount(ctx context.Context, userID string) error {
 	// Find all tenants user belongs to, so we can soft delete them from tenant DBs too
-	memberships, _ := s.repo.FindTenantMemberships(ctx, userID)
+	memberships, membershipsErr := s.repo.FindTenantMemberships(ctx, userID)
 
 	// Soft delete from control plane
 	err := s.repo.SoftDeleteUser(ctx, userID)
@@ -63,11 +69,24 @@ func (s *IdentityService) DeleteAccount(ctx context.Context, userID string) erro
 	}
 
 	// Obfuscate in tenant DBs
+	var syncErr error
+	if membershipsErr != nil {
+		syncErr = errors.Join(syncErr, fmt.Errorf("list tenant memberships for cleanup: %w", membershipsErr))
+	}
 	for _, m := range memberships {
 		dbName, err := s.repo.GetTenantDBName(ctx, m.TenantID)
-		if err == nil && dbName != "" {
-			_ = s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID)
+		if err != nil {
+			syncErr = errors.Join(syncErr, fmt.Errorf("resolve tenant db for %s: %w", m.TenantID, err))
+			continue
 		}
+		if dbName != "" {
+			if err := s.repo.SoftDeleteTenantUserProfile(ctx, dbName, userID); err != nil {
+				syncErr = errors.Join(syncErr, fmt.Errorf("soft delete tenant profile for %s: %w", m.TenantID, err))
+			}
+		}
+	}
+	if syncErr != nil {
+		return fmt.Errorf("account deleted in control plane with partial tenant profile cleanup: %w", syncErr)
 	}
 
 	return nil

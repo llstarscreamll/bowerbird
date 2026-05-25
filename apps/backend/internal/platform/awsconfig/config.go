@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfigv2 "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
@@ -30,5 +31,16 @@ func NewSQSClient(awsCfg aws.Config, endpointURL string) *sqs.Client {
 
 	return sqs.NewFromConfig(awsCfg, func(options *sqs.Options) {
 		options.BaseEndpoint = &endpointURL
+	})
+}
+
+func NewS3Client(awsCfg aws.Config, endpointURL string) *s3.Client {
+	if endpointURL == "" {
+		return s3.NewFromConfig(awsCfg)
+	}
+
+	return s3.NewFromConfig(awsCfg, func(options *s3.Options) {
+		options.BaseEndpoint = &endpointURL
+		options.UsePathStyle = true
 	})
 }
