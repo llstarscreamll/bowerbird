@@ -7,13 +7,12 @@ import { HEALTH_REPOSITORY } from './health/domain/health.repository';
 import { HealthHttpService } from './health/infrastructure/health.http.service';
 import { tenantInterceptor } from './core/interceptors/tenant.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
-import { requestIdInterceptor } from './core/interceptors/request-id.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([requestIdInterceptor, authInterceptor, tenantInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, tenantInterceptor])),
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpService },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
