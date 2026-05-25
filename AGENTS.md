@@ -1,71 +1,62 @@
 # AGENTS
 
-## Repo essentials
+## Toolchain and workspace
 
-- Use Mise for tool installation and version management (`.mise.toml`). Run `mise install` after clone.
-- Node.js runtime is pinned to `24.x` (`package.json` engines + `.nvmrc`).
-- Go runtime is pinned to `1.25.x` (`.mise.toml` + `apps/backend/go.mod`).
-- Package manager is `pnpm` (`packageManager: pnpm@10.16.1`). Prefer `pnpm` commands; do not switch to npm.
-- Monorepo layout is fixed by `pnpm-workspace.yaml`: `apps/*` and `packages/*`.
-- Task orchestration is through Turborepo (`turbo.json`). Root scripts are the source of truth.
-- CodeGraph is configured for codebase structural exploration. Run `codegraph init -i` if index is missing or out of date.
+- Use `mise install` after clone. Tool versions are pinned: Node `24`, Go `1.25`, pnpm `10.16.1` (`.mise.toml`, `.nvmrc`, `go.mod`, root `package.json`).
+- Use `pnpm` only. This monorepo is defined by `pnpm-workspace.yaml` (`apps/*`, `packages/*`) and orchestrated by Turbo (`turbo.json`).
 
-## Multi-Tenancy & Identity Architecture (CRITICAL)
+## High-value commands (root)
 
-This system uses a **Database-per-tenant** architecture with a central **Control Plane**.
+- `pnpm run dev` -> runs `infra:up` first (Docker) and then `turbo run dev`.
+- `pnpm run lint`, `pnpm run test`, `pnpm run build` (workspace-wide via Turbo).
+- `pnpm run migrate:controlplane | migrate:tenants | migrate:all` (delegates to `@bowerbird/backend`).
+- `pnpm run deploy` -> always builds first, then deploys only `@bowerbird/infra`.
+- Typical full verification before handoff: `pnpm run lint && pnpm run test && pnpm run build`.
 
-- **Control Plane DB:** Holds global identity (`users`, `user_identities`), the `tenants` catalog, and `tenant_memberships` (roles: OWNER, ADMIN, MEMBER). Contains base personal data (`first_name`, `last_name`, `picture_url`) from OAuth providers which is used to seed new tenant profiles. Employs soft-deletes (`deleted_at`) for obfuscation.
-- **Tenant DBs:** Each organization gets its own physical PostgreSQL database (e.g. `tenant_acme`). Contains domain data and user _profiles_ (local `users` table).
-- **Migrations split:** Migrations MUST be placed in either `apps/backend/migrations/controlplane` or `apps/backend/migrations/tenant`. Never mix them. Always use `IF NOT EXISTS` for indexes/tables to maintain idempotency. If migrations fail and get stuck in a "dirty" state, fix via `psql "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable" -c "UPDATE schema_migrations SET dirty = false;"`.
-- **Tenant Resolution:** The Angular frontend (`apps/pwa`) runs on a single domain (e.g. `app.bowerbird.com` / `app.bowerbird.dev`) and uses path-based routing (`/:tenant/dashboard`). It extracts the tenant slug from the URL path and sends it as the `X-Tenant-ID` header. The Go backend reads this header to route DB connections dynamically via `Registry`.
-- **Authentication Strategy:** Mixed session approach. Backend returns short-lived Access Tokens in the JSON body (stored in Angular memory/SignalStore to prevent XSS) and a long-lived Refresh Token in an `HttpOnly`, `Secure` cookie. Automatic refresh is handled by the `authInterceptor` in Angular.
+## Package-scoped commands
 
-## High-value commands
+- Backend: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
+- PWA: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
+- Infra: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy`.
 
-- Install deps: `pnpm install`
-- Full dev stack: `pnpm run dev` (starts Docker infra, API dev server, Angular dev server)
-- **Database Migrations**:
-  - `pnpm run migrate:all` (Migrates Control Plane, then iterates and migrates all active Tenant databases)
-  - `pnpm run migrate:controlplane` (Migrates only the central DB)
-  - `pnpm run migrate:tenants` (Migrates only the tenant DBs)
-- Format: `pnpm run format` (Prettier on TS/Markdown, etc.)
-- Full checks: `pnpm run lint && pnpm run test && pnpm run build`
-- Deploy (root): `pnpm run deploy` (runs build first, then `@bowerbird/infra` deploy)
+## Backend specifics (`apps/backend`)
 
-## Targeted package commands
+- Local dev entrypoint is `cmd/api/main.go`; migrations CLI is `cmd/migrate/main.go`; Lambda entrypoints are under `cmd/lambda/*`.
+- `pnpm --filter @bowerbird/backend dev` sources `apps/backend/.env` if present and runs `air -c .air.toml`.
+- Runtime config is hybrid: env vars for process flags, then secrets loaded from SSM (`internal/platform/config/config.go`). Local default SSM key is `/bowerbird/local/secrets`.
+- LocalStack init script (`apps/backend/scripts/init-localstack.sh`) seeds SQS, EventBridge, S3, and that SSM parameter from `apps/backend/secrets.json`.
+- If you change `apps/backend/secrets.json`, re-run init in the container: `docker exec bowerbird-localstack /etc/localstack/init/ready.d/init-localstack.sh`.
+- Migration folders are split and must stay split: `apps/backend/migrations/controlplane` and `apps/backend/migrations/tenant`.
 
-- API only: `pnpm --filter @bowerbird/backend dev|lint|test|build`
-- Web only: `pnpm --filter @bowerbird/pwa dev|lint|test|build`
-- Infra only: `pnpm --filter @bowerbird/infra lint|build|deploy|synth`
+## Frontend specifics (`apps/pwa`)
 
-## Runtime + setup gotchas
+- Angular standalone app (zoneless) with app wiring in `src/app/app.config.ts` and routes in `src/app/app.routes.ts`.
+- Dev server is `ng serve --host 0.0.0.0 --port 4200`; allowed host is `app.bowerbird.dev` (`angular.json`).
+- Tenant routing is path-based in the interceptor: first non-global URL segment becomes `X-Tenant-ID` (`tenant.interceptor.ts`).
+- Auth model is access token in SignalStore + refresh via cookie; `authInterceptor` auto-refreshes on `401` and retries requests.
+- Shared UI primitives live in `src/styles.css` (`.card`, `.input-field`, `.btn-primary`, `.btn-secondary`); keep style updates aligned there.
 
-- API environment separation: `.env` handles process/infra flags, `secrets.json` handles AWS SSM secrets (DB URLs, Queues, etc.).
-- API dev uses Air live reload via `apps/backend/.air.toml`. Air must be installed on host. The `apps/backend/package.json` dev script uses `exec air` to ensure graceful shutdown on `SIGINT` (prevents zombie port 8080 processes).
-- Local dependencies: Postgres (`5432`), Redis (`6379`), LocalStack (`4566`) from `docker-compose.yml`.
-- Local AWS resources (S3/SQS/EventBridge/SSM) are auto-created by `apps/backend/scripts/init-localstack.sh` reading from `secrets.json`. If you add new keys to `secrets.json`, you must run `docker exec bowerbird-localstack /etc/localstack/init/ready.d/init-localstack.sh` to update SSM, and then touch `main.go` or restart `air` to reload the config in Go.
+## Local infra and DNS
 
-## Package boundaries and entrypoints
+- `docker-compose.yml` starts Postgres (`5432`), Redis (`6379`), LocalStack (`4566`), and Caddy (`80/443`).
+- `Caddyfile` maps `app.bowerbird.dev -> :4200` and `api.bowerbird.dev -> :8080`.
+- For realistic cookie/routing behavior, use those domains locally (with `/etc/hosts` entries), not plain localhost.
 
-- `apps/backend`
-  - HTTP entrypoint: `cmd/api/main.go`. Custom CLI entrypoint: `cmd/migrate/main.go`. Lambda entrypoints: `cmd/lambda/*`.
-  - Asymmetric architecture:
-    - `internal/platform/`: Flat structure for technical adapters (AWS, DB `Registry` for multi-tenant pools, Config, Middlewares).
-    - `internal/<domain>/`: Strict Clean Architecture/DDD (domain, application, infrastructure, presentation).
-  - Strict Rules: `platform` never imports domains. Domains never import each other directly. `main.go` is the exclusive place for dependency injection.
-- `apps/pwa`
-  - Angular 21 Zoneless standalone app (`apps/pwa/angular.json`, `apps/pwa/src/app/app.config.ts`).
-  - Uses Tailwind CSS v4. Configured via `@theme` in `apps/pwa/src/styles.css`.
-  - UI conventions: Professional SaaS aesthetic. Strict typographic hierarchy (Geist sans), spacious padding (`gap-6`, `p-6`), subtle borders (`border-slate-200`), dark mode built-in via `dark:` variants. Avoid generic UI; rely on custom utility classes defined in `styles.css` (`.card`, `.btn-primary`, `.input-field`).
-  - Uses `@ngrx/signals` (SignalStore) for global state management. Avoid NgRx/Redux.
-  - Tests use Vitest via `@angular/build:unit-test`.
-  - Dev proxy uses local DNS (`Caddyfile` + `/etc/hosts`) mapping `app.bowerbird.dev` to `4200` and `api.bowerbird.dev` to `8080`.
-- `packages/infra`
-  - CDK app entrypoint: `packages/infra/bin/index.ts`
-  - Main stack: `packages/infra/bin/bowerbird-stack.ts` (Handles SSL certs and CloudFront CORS).
+## Infra deploy constraints (`packages/infra`)
 
-## Deploy-specific constraints
+- CDK entrypoint is `packages/infra/bin/index.ts`; it requires `packages/infra/.env`.
+- `ENV` and `AWS_ACCOUNT_ID` are mandatory; `AWS_REGION` must be `us-east-1` (enforced in code).
+- Web deploy reads static files from `apps/pwa/dist/pwa/browser`; build web before deploy.
+- `BucketDeployment` uses `prune: false` for both assets and entrypoints in `bowerbird-stack.ts`; do not flip casually.
 
-- `packages/infra/.env` is required (`AWS_ACCOUNT_ID`, domain vars, etc.).
-- Infra stack packages frontend from local build output: `apps/pwa/dist/pwa/browser`; run web/root build before deploy.
-- CloudFront/S3 deploy strategy intentionally keeps old hashed assets (`prune: false`). Do not change this casually.
+## Git hooks and formatting
+
+- Pre-commit hook runs: `pnpm lint-staged` -> `pnpm run lint` -> optional `codegraph sync` (`.husky/pre-commit`).
+- `lint-staged` formats staged files with Prettier and runs `gofmt` for `*.go` (`.lintstagedrc.json`).
+- Run `npm run format` (or `pnpm run format`) to format `.md`, `.ts`, and `.json` files manually.
+
+## Documentation and Specifications
+
+- **Product definitions**: `docs/product/` holds features and dictionary (Ubiquitous Language).
+- **Technical docs**: `docs/technical/` holds ADRs and architecture guidelines.
+- **Specifications for AI**: `.specs/features/` holds detailed requirements (`spec.md`, `design.md`). These are often written in Spanish to preserve domain fidelity for local accounting/tax concepts (e.g., DIAN, CUFE). Honor the language and do not translate localized domain terms to English.
