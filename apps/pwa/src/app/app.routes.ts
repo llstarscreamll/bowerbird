@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
+import { publicGuard } from './core/guards/public.guard';
 
 export const routes: Routes = [
   {
@@ -7,15 +9,12 @@ export const routes: Routes = [
   },
   {
     path: 'login',
+    canActivate: [publicGuard],
     loadComponent: () => import('./auth/presentation/pages/login/login.component').then((c) => c.LoginComponent),
   },
   {
     path: 'lobby',
+    canActivate: [authGuard],
     loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
-  },
-  {
-    path: 'auth/callback',
-    loadComponent: () =>
-      import('./auth/presentation/pages/callback/callback.component').then((c) => c.CallbackComponent),
   },
 ];

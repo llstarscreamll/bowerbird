@@ -11,45 +11,45 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto space-y-8">
+    <div class="min-h-screen py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-950/50">
+      <div class="max-w-5xl mx-auto space-y-6">
         <!-- Header -->
-        <header class="flex justify-between items-end">
+        <header class="flex justify-between items-center pb-4 border-b border-slate-200 dark:border-slate-800/80">
           <div>
-            <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">Welcome</h1>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Select an organization to continue</p>
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Bienvenido</h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Selecciona una organización para continuar</p>
           </div>
-          <button (click)="logout()" class="btn-secondary gap-2 text-slate-600 dark:text-slate-300">
-            <span class="material-icons-outlined text-sm">logout</span>
-            Logout
+          <button (click)="logout()" class="btn-secondary gap-2 text-slate-700 dark:text-slate-300 py-1.5 px-3">
+            <span class="material-icons-outlined text-[18px]">logout</span>
+            <span class="hidden sm:inline">Cerrar sesión</span>
           </button>
         </header>
 
         <!-- Organizations Card -->
-        <div class="card p-0 sm:p-0 overflow-hidden">
+        <div class="card p-0 sm:p-0 overflow-hidden shadow-sm">
           <!-- Card Header -->
           <div
-            class="px-6 py-5 border-b border-slate-200 dark:border-slate-800/80 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50"
+            class="px-5 py-4 border-b border-slate-200 dark:border-slate-800/80 flex justify-between items-center bg-white dark:bg-slate-900"
           >
-            <h3 class="text-base font-semibold leading-6 text-slate-900 dark:text-white">Your Organizations</h3>
-            <button (click)="toggleCreateForm()" class="btn-primary py-2 px-3 text-xs gap-1">
-              <span class="material-icons-outlined text-sm">{{ showCreateForm ? 'close' : 'add' }}</span>
-              {{ showCreateForm ? 'Cancel' : 'Create New' }}
+            <h3 class="text-sm font-medium leading-6 text-slate-900 dark:text-white">Tus Organizaciones</h3>
+            <button (click)="toggleCreateForm()" class="btn-primary py-1.5 px-3 gap-2">
+              <span class="material-icons-outlined text-[18px]">{{ showCreateForm ? 'close' : 'add' }}</span>
+              <span>{{ showCreateForm ? 'Cancelar' : 'Crear nueva' }}</span>
             </button>
           </div>
 
           <!-- Create Tenant Form -->
           <div
             *ngIf="showCreateForm"
-            class="p-6 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800/80"
+            class="p-5 bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-200 dark:border-slate-800/80"
           >
             <form (ngSubmit)="onCreateTenant()" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label for="orgName" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
-                    Organization Name
+                  <label for="orgName" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Nombre de la Organización
                   </label>
-                  <div class="mt-2">
+                  <div class="mt-1.5">
                     <input
                       id="orgName"
                       type="text"
@@ -57,23 +57,23 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                       [(ngModel)]="newOrgName"
                       (ngModelChange)="onNameChange($event)"
                       name="orgName"
-                      class="input-field"
+                      class="input-field py-2"
                       placeholder="Acme Corp"
                     />
                   </div>
                 </div>
                 <div>
-                  <label for="orgSlug" class="block text-sm font-medium leading-6 text-slate-900 dark:text-slate-200">
-                    Workspace URL / Slug
+                  <label for="orgSlug" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    URL del espacio / Slug
                   </label>
-                  <div class="mt-2">
+                  <div class="mt-1.5">
                     <input
                       id="orgSlug"
                       type="text"
                       required
                       [(ngModel)]="newOrgSlug"
                       name="orgSlug"
-                      class="input-field"
+                      class="input-field py-2"
                       placeholder="acme"
                     />
                   </div>
@@ -84,9 +84,9 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                 {{ createError }}
               </div>
 
-              <div class="flex justify-end">
-                <button type="submit" [disabled]="isCreating" class="btn-primary py-2 px-4">
-                  <span *ngIf="!isCreating">Create Organization</span>
+              <div class="flex justify-end pt-2">
+                <button type="submit" [disabled]="isCreating" class="btn-primary py-2 px-4 shadow-sm text-sm">
+                  <span *ngIf="!isCreating">Crear Organización</span>
                   <span *ngIf="isCreating" class="flex items-center gap-2">
                     <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -96,7 +96,7 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Creating...
+                    Creando...
                   </span>
                 </button>
               </div>
@@ -104,8 +104,8 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
           </div>
 
           <!-- Loading State -->
-          <div *ngIf="store.isLoading()" class="p-12 flex flex-col items-center justify-center space-y-4">
-            <svg class="animate-spin h-8 w-8 text-indigo-600 dark:text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <div *ngIf="store.isLoading()" class="py-12 flex flex-col items-center justify-center space-y-3">
+            <svg class="animate-spin h-6 w-6 text-indigo-600 dark:text-indigo-500" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path
                 class="opacity-75"
@@ -113,65 +113,64 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <span class="text-sm text-slate-500 dark:text-slate-400">Loading organizations...</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">Cargando organizaciones...</span>
           </div>
 
           <!-- Empty State -->
-          <div *ngIf="!store.isLoading() && store.tenants().length === 0" class="p-16 text-center">
+          <div *ngIf="!store.isLoading() && store.tenants().length === 0" class="py-16 px-6 text-center">
             <div
-              class="mx-auto h-12 w-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4"
+              class="mx-auto h-10 w-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4"
             >
-              <span class="material-icons-outlined text-slate-400 dark:text-slate-500">domain_disabled</span>
+              <span class="material-icons-outlined text-slate-400 dark:text-slate-500">domain</span>
             </div>
-            <h3 class="text-sm font-medium text-slate-900 dark:text-white">No organizations found</h3>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              You don't belong to any organizations yet. Create one to get started!
+            <h3 class="text-sm font-medium text-slate-900 dark:text-white">No se encontraron organizaciones</h3>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              Aún no perteneces a ninguna organización. Crea una nueva para comenzar.
             </p>
           </div>
 
           <!-- Tenant List -->
           <ul
             *ngIf="!store.isLoading() && store.tenants().length > 0"
-            class="divide-y divide-slate-200 dark:divide-slate-800/80"
+            class="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-900"
           >
             <li
               *ngFor="let tenant of store.tenants()"
-              class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors duration-200"
+              class="group relative hover:bg-slate-50/80 dark:hover:bg-slate-800/30 cursor-pointer transition-colors duration-200"
               (click)="selectTenant(tenant)"
             >
-              <div class="px-6 py-5 flex items-center justify-between">
-                <div class="flex items-center gap-4">
+              <div class="px-5 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
                   <!-- Avatar placeholder -->
                   <div
-                    class="h-10 w-10 flex-shrink-0 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center font-semibold text-sm border border-indigo-200 dark:border-indigo-800"
+                    class="h-9 w-9 flex-shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center font-medium text-xs border border-indigo-100/50 dark:border-indigo-500/20"
                   >
                     {{ tenant.tenant_id.substring(0, 2).toUpperCase() }}
                   </div>
                   <div>
                     <div
-                      class="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
+                      class="text-sm font-medium text-slate-900 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
                     >
                       {{ tenant.tenant_id }}
                     </div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Workspace</div>
                   </div>
                 </div>
 
                 <div class="flex items-center gap-4">
                   <span
-                    class="px-2.5 py-1 inline-flex text-xs font-medium rounded-md border"
+                    class="px-2 py-0.5 inline-flex text-[11px] font-medium rounded-md border"
                     [ngClass]="{
-                      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20':
+                      'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700':
                         tenant.role === 'OWNER',
-                      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20':
-                        tenant.role === 'ADMIN',
-                      'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20':
-                        tenant.role !== 'OWNER' && tenant.role !== 'ADMIN',
+                      'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/50 dark:text-slate-400 dark:border-slate-700/50':
+                        tenant.role !== 'OWNER',
                     }"
                   >
-                    {{ tenant.role }}
+                    {{ tenant.role | titlecase }}
                   </span>
-                  <span class="material-icons-outlined text-slate-400 group-hover:text-indigo-500 transition-colors">
+                  <span
+                    class="material-icons-outlined text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors text-[20px]"
+                  >
                     chevron_right
                   </span>
                 </div>
