@@ -58,12 +58,12 @@ func (r *PostgresRepository) FindUserByID(ctx context.Context, id string) (*doma
 }
 
 func (r *PostgresRepository) CreateUser(ctx context.Context, user *domain.User) error {
-	query := `INSERT INTO users (email, first_name, last_name, picture_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	query := `INSERT INTO users (id, email, first_name, last_name, picture_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	var pictureURL *string
 	if user.PictureURL != "" {
 		pictureURL = &user.PictureURL
 	}
-	err := r.controlDB.QueryRow(ctx, query, user.Email, user.FirstName, user.LastName, pictureURL, user.CreatedAt, user.UpdatedAt).Scan(&user.ID)
+	_, err := r.controlDB.Exec(ctx, query, user.ID, user.Email, user.FirstName, user.LastName, pictureURL, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -101,8 +101,8 @@ func (r *PostgresRepository) FindUserIdentityByProvider(ctx context.Context, use
 }
 
 func (r *PostgresRepository) CreateUserIdentity(ctx context.Context, identity *domain.UserIdentity) error {
-	query := `INSERT INTO user_identities (user_id, provider, provider_id, created_at) VALUES ($1, $2, $3, $4) RETURNING id`
-	err := r.controlDB.QueryRow(ctx, query, identity.UserID, identity.Provider, identity.ProviderID, identity.CreatedAt).Scan(&identity.ID)
+	query := `INSERT INTO user_identities (id, user_id, provider, provider_id, created_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.controlDB.Exec(ctx, query, identity.ID, identity.UserID, identity.Provider, identity.ProviderID, identity.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create user identity: %w", err)
 	}
@@ -155,7 +155,7 @@ func (r *PostgresRepository) RemoveTenantMembership(ctx context.Context, userID,
 }
 
 func (r *PostgresRepository) SoftDeleteUser(ctx context.Context, userID string) error {
-	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', gen_random_uuid()), first_name = 'Deleted', last_name = 'User' WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', id), first_name = 'Deleted', last_name = 'User' WHERE id = $1 AND deleted_at IS NULL`
 	_, err := r.controlDB.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to soft delete user: %w", err)
@@ -173,7 +173,7 @@ func (r *PostgresRepository) SoftDeleteTenantUserProfile(ctx context.Context, te
 		return fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
 
-	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', gen_random_uuid()), first_name = 'Deleted', last_name = 'User', status = 'inactive' WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE users SET deleted_at = CURRENT_TIMESTAMP, email = CONCAT(email, '-deleted-', id), first_name = 'Deleted', last_name = 'User', status = 'inactive' WHERE id = $1 AND deleted_at IS NULL`
 	_, err = pool.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to soft delete tenant user profile: %w", err)

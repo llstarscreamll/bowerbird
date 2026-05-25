@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/organization/domain"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/id"
 )
 
 var (
@@ -40,6 +41,7 @@ func (uc *CreateOrganizationUseCase) Execute(ctx context.Context, cmd CreateOrga
 	if err != nil {
 		return nil, fmt.Errorf("invalid organization data: %w", err)
 	}
+	org.ID = id.NewULID()
 
 	// 2. Check for uniqueness in Control Plane
 	exists, err := uc.repo.ExistsBySlug(ctx, org.Slug)

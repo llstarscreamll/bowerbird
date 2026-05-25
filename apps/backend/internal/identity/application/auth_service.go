@@ -9,6 +9,7 @@ import (
 
 	"github.com/money-path/bowerbird/apps/backend/internal/identity/domain"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/id"
 )
 
 type AuthService struct {
@@ -36,32 +37,19 @@ func (s *AuthService) RegisterLocal(ctx context.Context, email, password string)
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user
-	user := domain.NewUser("", email, "Local", "User", "")
+	user := domain.NewUser(id.NewULID(), email, "Local", "User", "")
 	err = s.repo.CreateUser(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fetch to get DB-generated ID if needed, or assume repository assigns it.
-	// Since we use gen_random_uuid(), we should fetch it back or generate uuid in code.
-	// Wait, our repository logic for CreateUser doesn't fetch the generated ID.
-	// We need to modify CreateUser to scan the ID, or we generate UUID in Go.
-	// Let's assume we update repo to return the generated User or generate UUID in Go.
-	// Let's fetch it by email.
-	createdUser, err := s.repo.FindUserByEmail(ctx, email)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create identity
-	identity := domain.NewUserIdentity("", createdUser.ID, "local", string(hashed))
+	identity := domain.NewUserIdentity(id.NewULID(), user.ID, "local", string(hashed))
 	err = s.repo.CreateUserIdentity(ctx, identity)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.tokenGen.GenerateTokens(createdUser.ID, createdUser.Email, createdUser.FirstName, createdUser.LastName, createdUser.PictureURL)
+	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
 }
 
 // LoginLocal is only for local dev/e2e testing
@@ -110,7 +98,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerI
 		if err != nil {
 			if errors.Is(err, domain.ErrUserNotFound) {
 				// Link new identity
-				identity := domain.NewUserIdentity("", user.ID, provider, providerID)
+				identity := domain.NewUserIdentity(id.NewULID(), user.ID, provider, providerID)
 				err = s.repo.CreateUserIdentity(ctx, identity)
 				if err != nil {
 					return nil, fmt.Errorf("failed to link identity: %w", err)
@@ -121,18 +109,13 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerI
 		}
 	} else {
 		// Create new user
-		user = domain.NewUser("", email, firstName, lastName, pictureURL)
+		user = domain.NewUser(id.NewULID(), email, firstName, lastName, pictureURL)
 		err = s.repo.CreateUser(ctx, user)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
 
-		user, err = s.repo.FindUserByEmail(ctx, email)
-		if err != nil {
-			return nil, err
-		}
-
-		identity := domain.NewUserIdentity("", user.ID, provider, providerID)
+		identity := domain.NewUserIdentity(id.NewULID(), user.ID, provider, providerID)
 		err = s.repo.CreateUserIdentity(ctx, identity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create identity: %w", err)

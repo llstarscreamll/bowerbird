@@ -17,18 +17,18 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 
 func (r *PostgresRepository) Create(ctx context.Context, org *domain.Organization) error {
 	query := `
-		INSERT INTO tenants (organization_name, slug, db_name, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id
+		INSERT INTO tenants (id, organization_name, slug, db_name, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	err := r.pool.QueryRow(ctx, query,
+	_, err := r.pool.Exec(ctx, query,
+		org.ID,
 		org.Name,
 		org.Slug,
 		org.DBName,
 		org.Status,
 		org.CreatedAt,
 		org.UpdatedAt,
-	).Scan(&org.ID)
+	)
 
 	return err
 }

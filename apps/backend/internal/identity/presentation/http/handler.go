@@ -207,8 +207,8 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 
-	// Redirect to frontend with access token in fragment (or via a specific callback page)
-	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokens.AccessToken, http.StatusTemporaryRedirect)
+	// Redirect to frontend lobby. The frontend auth guard will fetch the access token using the refresh cookie.
+	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +264,7 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
-	http.Redirect(w, r, h.frontendURL+"/auth/callback?access_token="+tokens.AccessToken, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) ListUserTenants(w http.ResponseWriter, r *http.Request) {
