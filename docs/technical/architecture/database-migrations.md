@@ -60,3 +60,36 @@ Cuando el sistema registre una nueva Organización (Tenant) en el futuro, el flu
 1. Crear el registro en el Control Plane (tabla `tenants`).
 2. Ejecutar físicamente `CREATE DATABASE {db_name}` en PostgreSQL.
 3. Importar y llamar a la función `database.RunMigrations(tenantURL, "migrations/tenant")` de manera programática en Go para que esa base de datos recién nacida adopte el esquema más actual de negocio inmediatamente.
+
+## 4. Reset completo de bases de datos en local
+
+Si necesitas reiniciar por completo la base principal (Control Plane) y todas las bases de tenants en tu entorno local, usa este flujo:
+
+```bash
+docker compose down -v
+pnpm run infra:up
+pnpm run migrate:all
+```
+
+Qué hace cada paso:
+
+1. `docker compose down -v`: apaga contenedores y elimina volúmenes persistentes, incluyendo `postgres_data`.
+2. `pnpm run infra:up`: vuelve a levantar Postgres/Redis/LocalStack/Caddy desde cero.
+3. `pnpm run migrate:all`: reaplica migraciones de `controlplane/` y luego intenta migrar los tenants activos registrados.
+
+Notas importantes:
+
+- Este reset borra tambien los datos persistidos de Redis, LocalStack y Caddy, no solo Postgres.
+- Si no existen tenants activos en `tenants`, la fase de migración de tenants no aplica cambios (comportamiento esperado).
+- Si quieres recrear el tenant demo despues del reset, ejecuta `pnpm run seed`.
+
+### Variante: resetear solo Postgres
+
+Si prefieres no tocar otros servicios, elimina solo el volumen de Postgres y vuelve a levantar infraestructura:
+
+```bash
+docker compose down
+docker volume rm bowerbird_postgres_data
+pnpm run infra:up
+pnpm run migrate:all
+```
