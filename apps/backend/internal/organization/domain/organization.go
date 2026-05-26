@@ -21,14 +21,16 @@ var slugRegex = regexp.MustCompile(`^[a-z0-9-]+$`)
 
 // Organization represents a tenant in the system.
 type Organization struct {
-	ID        string
-	Name      string
-	Slug      string
-	DBName    string
-	Status    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	ID              string
+	Name            string
+	Slug            string
+	DBName          string
+	Status          string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
+	MembersCount    int
+	CurrentUserRole string
 }
 
 // NewOrganization creates a new organization entity with valid defaults.

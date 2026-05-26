@@ -14,6 +14,8 @@ export interface OrganizationResponse {
   slug: string;
   status: string;
   created_at: string;
+  members_count?: number;
+  current_user_role?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -23,5 +25,9 @@ export class OrganizationHttpService {
 
   createOrganization(data: CreateOrganizationRequest): Observable<OrganizationResponse> {
     return this.http.post<OrganizationResponse>(this.baseUrl, data);
+  }
+
+  getOrganization(id: string): Observable<OrganizationResponse> {
+    return this.http.get<OrganizationResponse>(`${this.baseUrl}/${id}`);
   }
 }

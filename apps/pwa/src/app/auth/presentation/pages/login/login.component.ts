@@ -6,10 +6,12 @@ import { FormsModule } from '@angular/forms';
 
 import { environment } from '../../../../../environments/environment';
 
+import { AlertComponent } from '../../../../core/presentation/components/alert/alert.component';
+
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AlertComponent],
   template: `
     <div class="flex min-h-screen flex-col items-center justify-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-950/50">
       <div class="sm:mx-auto sm:w-full sm:max-w-[400px] text-center mb-6">
@@ -62,16 +64,9 @@ import { environment } from '../../../../../environments/environment';
               </div>
             </div>
 
-            <div *ngIf="store.error()" class="rounded-md bg-red-50 dark:bg-red-500/10 p-3 border border-red-200 dark:border-red-500/20">
-              <div class="flex items-start">
-                <div class="flex-shrink-0 mt-0.5">
-                  <span class="material-icons-outlined text-red-500 dark:text-red-400 text-sm">error</span>
-                </div>
-                <div class="ml-2.5">
-                  <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ store.error() }}</p>
-                </div>
-              </div>
-            </div>
+            <app-alert *ngIf="store.error()" type="error">
+              {{ store.error() }}
+            </app-alert>
 
             <div class="pt-2">
               <button type="submit" [disabled]="store.isLoading()" class="btn-primary w-full py-2.5 shadow-sm text-sm">

@@ -42,6 +42,10 @@ func (r *fakeOrganizationRepo) ExistsBySlug(ctx context.Context, slug string) (b
 	return r.existsBySlug, nil
 }
 
+func (r *fakeOrganizationRepo) GetByID(ctx context.Context, id, userID string) (*domain.Organization, error) {
+	return nil, nil // Dummy implementation for test
+}
+
 func (r *fakeOrganizationRepo) AddMembership(ctx context.Context, userID, tenantID, role string) error {
 	if r.addMembershipErr != nil {
 		return r.addMembershipErr

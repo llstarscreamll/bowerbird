@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { AuthStore } from '../../../application/auth.store';
 import { LobbyStore } from '../../../application/lobby.store';
 import { TenantMembership } from '../../../domain/auth.model';
+import { AlertComponent } from '../../../../core/presentation/components/alert/alert.component';
 
 @Component({
   selector: 'app-lobby',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AlertComponent],
   template: `
     <div class="min-h-screen py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-950/50">
       <div class="max-w-5xl mx-auto space-y-6">
@@ -53,9 +54,9 @@ import { TenantMembership } from '../../../domain/auth.model';
                 </div>
               </div>
 
-              <div *ngIf="createError()" class="text-sm text-red-600 dark:text-red-400">
+              <app-alert *ngIf="createError()" type="error">
                 {{ createError() }}
-              </div>
+              </app-alert>
 
               <div class="flex justify-end pt-2">
                 <button type="submit" [disabled]="isCreating()" class="btn-primary py-2 px-4 shadow-sm text-sm">

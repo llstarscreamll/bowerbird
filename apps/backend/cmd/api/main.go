@@ -114,8 +114,9 @@ func main() {
 		}
 	}
 	orgProvisioner := orginfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, migrationsDir)
-	orgUseCase := orgapplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
-	orgHandler := orghttp.NewHandler(orgUseCase)
+	orgCreateUseCase := orgapplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
+	orgGetUseCase := orgapplication.NewGetOrganizationUseCase(orgRepo)
+	orgHandler := orghttp.NewHandler(orgCreateUseCase, orgGetUseCase)
 
 	// Register Routes
 	orgHandler.Register(mux, authMiddleware, isDev)

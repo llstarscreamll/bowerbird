@@ -6,13 +6,17 @@ import { InboxConnectionsStore } from '../../../application/inbox-connections.st
 import { ConnectedAccount } from '../../../domain/inbox-connections.model';
 import { ConnectionStatus, MailProvider } from '../../../domain/inbox.types';
 import { AccountStatusChipComponent } from '../../components/account-status-chip/account-status-chip.component';
+import { AlertComponent } from '../../../../core/presentation/components/alert/alert.component';
 
 @Component({
   selector: 'app-inbox-connections',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, AccountStatusChipComponent],
+  imports: [CommonModule, FormsModule, RouterLink, AccountStatusChipComponent, AlertComponent],
+  host: {
+    class: 'flex-1 flex flex-col min-h-0 w-full',
+  },
   template: `
-    <div class="min-h-screen bg-gradient-to-b from-slate-50 to-white px-4 py-8 sm:px-6 lg:px-8">
+    <div class="h-full bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 px-4 py-8 sm:px-6 lg:px-8 overflow-y-auto transition-colors duration-200">
       <div class="mx-auto w-full max-w-6xl space-y-6">
         <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tenant: {{ tenantId() || 'N/A' }}</p>
@@ -82,9 +86,9 @@ import { AccountStatusChipComponent } from '../../components/account-status-chip
                 <input id="email" name="email" type="email" class="input-field" [(ngModel)]="newEmailAddress" required placeholder="facturas@empresa.com" />
               </div>
 
-              <div *ngIf="errorMessage()" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              <app-alert *ngIf="errorMessage()" type="error">
                 {{ errorMessage() }}
-              </div>
+              </app-alert>
 
               <button class="btn-primary w-full" type="submit" [disabled]="submitting()">
                 {{ submitting() ? 'Conectando...' : 'Conectar cuenta' }}

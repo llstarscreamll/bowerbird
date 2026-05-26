@@ -12,16 +12,19 @@ import (
 
 type Handler struct {
 	createUseCase *application.CreateOrganizationUseCase
+	getUseCase    *application.GetOrganizationUseCase
 }
 
-func NewHandler(createUseCase *application.CreateOrganizationUseCase) *Handler {
+func NewHandler(createUseCase *application.CreateOrganizationUseCase, getUseCase *application.GetOrganizationUseCase) *Handler {
 	return &Handler{
 		createUseCase: createUseCase,
+		getUseCase:    getUseCase,
 	}
 }
 
 func (h *Handler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler, isDev bool) {
 	mux.Handle("POST /api/v1/organizations", authMiddleware(api.Wrap(h.CreateOrganization, isDev)))
+	mux.Handle("GET /api/v1/organizations/{id}", authMiddleware(api.Wrap(h.GetOrganization, isDev)))
 }
 
 type CreateOrganizationRequest struct {
@@ -30,11 +33,13 @@ type CreateOrganizationRequest struct {
 }
 
 type CreateOrganizationResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	Status          string `json:"status"`
+	CreatedAt       string `json:"created_at"`
+	MembersCount    int    `json:"members_count,omitempty"`
+	CurrentUserRole string `json:"current_user_role,omitempty"`
 }
 
 func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) error {
@@ -75,4 +80,33 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) err
 	}
 
 	return api.Success(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) GetOrganization(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	if id == "" {
+		return apperrors.New(apperrors.CodeValidation, "id is required")
+	}
+
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+	}
+
+	org, err := h.getUseCase.Execute(r.Context(), id, claims.UserID)
+	if err != nil {
+		return apperrors.Wrap(err, apperrors.CodeNotFound, "organization not found")
+	}
+
+	resp := CreateOrganizationResponse{
+		ID:              org.ID,
+		Name:            org.Name,
+		Slug:            org.Slug,
+		Status:          org.Status,
+		CreatedAt:       org.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		MembersCount:    org.MembersCount,
+		CurrentUserRole: org.CurrentUserRole,
+	}
+
+	return api.Success(w, http.StatusOK, resp)
 }

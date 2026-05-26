@@ -3,6 +3,7 @@ import { finalize } from 'rxjs';
 import { ConnectAccountRequest, ConnectedAccount } from '../domain/inbox-connections.model';
 import { INBOX_CONNECTIONS_REPOSITORY } from '../domain/inbox-connections.repository';
 import { MAIL_PROVIDERS, MailProvider, providerLabel } from '../domain/inbox.types';
+import { ToastService } from '../../core/services/toast.service';
 
 @Injectable({ providedIn: 'root' })
 export class InboxConnectionsStore {
@@ -14,6 +15,7 @@ export class InboxConnectionsStore {
   readonly errorMessage = signal('');
 
   private readonly repository = inject(INBOX_CONNECTIONS_REPOSITORY);
+  private readonly toast = inject(ToastService);
 
   loadAccounts(): void {
     this.loading.set(true);
@@ -67,7 +69,10 @@ export class InboxConnectionsStore {
       .disconnectAccount(accountID)
       .pipe(finalize(() => this.disconnectingId.set(null)))
       .subscribe({
-        next: () => this.accounts.update((list) => list.filter((item) => item.id !== accountID)),
+        next: () => {
+          this.accounts.update((list) => list.filter((item) => item.id !== accountID));
+          this.toast.showSuccess('Cuenta desconectada exitosamente');
+        },
         error: () => this.errorMessage.set('No fue posible desconectar la cuenta.'),
       });
   }

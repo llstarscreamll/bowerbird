@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { AuthStore } from './auth.store';
 import { TenantMembership } from '../domain/auth.model';
 import { OrganizationHttpService } from '../../organization/infrastructure/organization.http.service';
+import { ToastService } from '../../core/services/toast.service';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyStore {
@@ -15,6 +16,7 @@ export class LobbyStore {
   private readonly authStore = inject(AuthStore);
   private readonly orgService = inject(OrganizationHttpService);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   init(): void {
     if (!this.authStore.isAuthenticated()) {
@@ -70,6 +72,7 @@ export class LobbyStore {
         this.isCreating.set(false);
         this.toggleCreateForm();
         this.authStore.loadTenants();
+        this.toast.showSuccess('Organización creada correctamente');
       },
       error: (err) => {
         this.isCreating.set(false);

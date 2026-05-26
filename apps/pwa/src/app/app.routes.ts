@@ -23,12 +23,25 @@ export const routes: Routes = [
     loadComponent: () => import('./core/presentation/layouts/tenant-layout/tenant-layout.component').then((c) => c.TenantLayoutComponent),
     children: [
       {
+        path: '',
+        redirectTo: 'dashboard',
+        pathMatch: 'full',
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./dashboard/presentation/pages/dashboard/dashboard.component').then((c) => c.DashboardComponent),
+      },
+      {
         path: 'inbox/connections',
         loadComponent: () => import('./inbox/presentation/pages/connections/inbox-connections.component').then((c) => c.InboxConnectionsComponent),
       },
       {
         path: 'inbox/unified',
         loadComponent: () => import('./inbox/presentation/pages/unified/unified-inbox.component').then((c) => c.UnifiedInboxComponent),
+      },
+      {
+        path: 'invoices',
+        loadComponent: () => import('./invoices/presentation/pages/invoices-list/invoices-list.component').then((c) => c.InvoicesListComponent),
       },
     ],
   },
