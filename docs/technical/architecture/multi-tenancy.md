@@ -32,9 +32,9 @@ La arquitectura híbrida (Subdominio en Frontend + Header en Backend) permite un
 
 ### 2.1. Experiencia de Usuario (Frontend - Angular)
 
-- **Subdominios:** La PWA de Angular responde a subdominios _wildcard_ (ej. `https://acme.bowerbird.com`).
-- **Intercepción HTTP:** En el arranque de la PWA, el `tenant.interceptor.ts` de Angular extrae el slug (`acme`) de la URL (`window.location.hostname`).
-- **Peticiones Salientes:** El interceptor inyecta este slug en el header HTTP `X-Tenant-ID` en absolutamente todas las llamadas que se realizan hacia la API central (`https://api.bowerbird.com`).
+- **Rutas por Tenant:** La PWA de Angular estructura la navegación colocando el identificador del tenant en el primer segmento de la ruta (ej. `https://app.bowerbird.com/acme/inbox`).
+- **Layout Centralizado:** Todas las rutas asociadas a un tenant (`/:tenantId/*`) están anidadas bajo el `TenantLayoutComponent`, garantizando un contexto visual coherente.
+- **Intercepción HTTP:** En la PWA, el archivo `tenant.interceptor.ts` examina la URL activa (`location.pathname`), extrae el primer segmento (si no es una ruta global como `/login`), y lo inyecta en el header HTTP `X-Tenant-ID` en absolutamente todas las llamadas que se realizan hacia la API central (`https://api.bowerbird.com`).
 
 ### 2.2. Resolución en API (Backend - Go)
 

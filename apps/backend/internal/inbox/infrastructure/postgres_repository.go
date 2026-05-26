@@ -107,6 +107,62 @@ func (r *PostgresRepository) GetConnectedAccountByID(ctx context.Context, accoun
 	return &account, nil
 }
 
+func (r *PostgresRepository) ListConnectedAccounts(ctx context.Context) ([]*domain.ConnectedAccount, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	query := `
+		SELECT
+			id,
+			provider,
+			email_address,
+			status,
+			encrypted_credentials,
+			last_synced_at,
+			last_error,
+			raw_data,
+			created_at,
+			updated_at
+		FROM connected_accounts
+		ORDER BY created_at ASC
+	`
+
+	rows, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list connected accounts: %w", err)
+	}
+	defer rows.Close()
+
+	accounts := make([]*domain.ConnectedAccount, 0)
+	for rows.Next() {
+		var account domain.ConnectedAccount
+		if err := rows.Scan(
+			&account.ID,
+			&account.Provider,
+			&account.EmailAddress,
+			&account.Status,
+			&account.EncryptedCredentials,
+			&account.LastSyncedAt,
+			&account.LastError,
+			&account.RawData,
+			&account.CreatedAt,
+			&account.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan connected account: %w", err)
+		}
+
+		accounts = append(accounts, &account)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while iterating connected accounts: %w", err)
+	}
+
+	return accounts, nil
+}
+
 func (r *PostgresRepository) ListConnectedAccountsByStatus(ctx context.Context, status string) ([]*domain.ConnectedAccount, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
@@ -402,6 +458,65 @@ func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context
 	}
 
 	return attachments, nil
+}
+
+func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain.UnifiedMessage, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	query := `
+		SELECT
+			m.id,
+			c.provider,
+			c.id AS account_id,
+			c.email_address AS account_email,
+			COALESCE(m.subject, '(Sin asunto)') AS subject,
+			COALESCE(m.sender_email, 'Desconocido') AS sender,
+			COALESCE(m.raw_data->>'snippet', '') AS snippet,
+			COALESCE(m.received_at, m.created_at) AS received_at,
+			COALESCE(m.sync_status, 'new') AS processing_status,
+			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.xml') AS has_xml,
+			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.pdf') AS has_pdf
+		FROM email_messages m
+		JOIN connected_accounts c ON m.account_id = c.id
+		ORDER BY received_at DESC NULLS LAST
+	`
+
+	rows, err := pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list unified messages: %w", err)
+	}
+	defer rows.Close()
+
+	messages := make([]*domain.UnifiedMessage, 0)
+	for rows.Next() {
+		var msg domain.UnifiedMessage
+		if err := rows.Scan(
+			&msg.ID,
+			&msg.Provider,
+			&msg.AccountID,
+			&msg.AccountEmail,
+			&msg.Subject,
+			&msg.Sender,
+			&msg.Snippet,
+			&msg.ReceivedAt,
+			&msg.ProcessingStatus,
+			&msg.HasXML,
+			&msg.HasPDF,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan unified message: %w", err)
+		}
+
+		messages = append(messages, &msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while iterating unified messages: %w", err)
+	}
+
+	return messages, nil
 }
 
 func defaultRawData(raw []byte) []byte {

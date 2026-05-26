@@ -2,16 +2,12 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription, catchError, finalize, forkJoin, interval, of, startWith, switchMap } from 'rxjs';
 import { UNIFIED_INBOX_REPOSITORY } from '../domain/unified-inbox.repository';
 import { MAIL_PROVIDERS, MailProvider, providerLabel } from '../domain/inbox.types';
-import {
-  AccountHealthSummary,
-  MessageProcessingStatus,
-  UnifiedInboxFilters,
-  UnifiedInboxMessage,
-} from '../domain/unified-inbox.model';
+import { AccountHealthSummary, MessageProcessingStatus, UnifiedInboxFilters, UnifiedInboxMessage } from '../domain/unified-inbox.model';
 
 @Injectable({ providedIn: 'root' })
 export class UnifiedInboxStore {
   readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
   readonly messages = signal<UnifiedInboxMessage[]>([]);
   readonly accountHealth = signal<AccountHealthSummary[]>([]);
 
@@ -46,9 +42,7 @@ export class UnifiedInboxStore {
         return true;
       }
 
-      return [message.subject, message.sender, message.account_email].some((value) =>
-        (value || '').toLowerCase().includes(normalizedSearch),
-      );
+      return [message.subject, message.sender, message.account_email].some((value) => (value || '').toLowerCase().includes(normalizedSearch));
     });
   });
 
@@ -66,6 +60,10 @@ export class UnifiedInboxStore {
 
   patchFilters(partial: Partial<UnifiedInboxFilters>): void {
     this.filters.update((current) => ({ ...current, ...partial }));
+  }
+
+  clearError(): void {
+    this.error.set(null);
   }
 
   providerLabel(provider: MailProvider): string {
@@ -119,10 +117,21 @@ export class UnifiedInboxStore {
 
   private loadData(): void {
     this.loading.set(true);
+    this.error.set(null);
 
     forkJoin({
-      messages: this.repository.listMessages().pipe(catchError(() => of([] as UnifiedInboxMessage[]))),
-      accounts: this.repository.listAccountHealth().pipe(catchError(() => of([] as AccountHealthSummary[]))),
+      messages: this.repository.listMessages().pipe(
+        catchError((err) => {
+          this.error.set('No se pudieron cargar los mensajes. Por favor, inténtelo de nuevo más tarde.');
+          return of([] as UnifiedInboxMessage[]);
+        }),
+      ),
+      accounts: this.repository.listAccountHealth().pipe(
+        catchError((err) => {
+          this.error.set('No se pudo cargar el estado de las cuentas. Por favor, inténtelo de nuevo más tarde.');
+          return of([] as AccountHealthSummary[]);
+        }),
+      ),
     })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe(({ messages, accounts }) => {
@@ -136,7 +145,14 @@ export class UnifiedInboxStore {
     this.accountHealthSub = interval(30000)
       .pipe(
         startWith(0),
-        switchMap(() => this.repository.listAccountHealth().pipe(catchError(() => of([] as AccountHealthSummary[])))),
+        switchMap(() =>
+          this.repository.listAccountHealth().pipe(
+            catchError((err) => {
+              this.error.set('No se pudo actualizar el estado de las cuentas. Por favor, revise su conexión.');
+              return of([] as AccountHealthSummary[]);
+            }),
+          ),
+        ),
       )
       .subscribe((accounts) => this.accountHealth.set(accounts));
   }

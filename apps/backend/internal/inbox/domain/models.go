@@ -200,3 +200,17 @@ func NewEmailAttachment(input NewEmailAttachmentInput) (*EmailAttachment, error)
 		UpdatedAt: input.UpdatedAt,
 	}, nil
 }
+
+type UnifiedMessage struct {
+	ID               string
+	Provider         string
+	AccountID        string
+	AccountEmail     string
+	Subject          string
+	Sender           string
+	Snippet          string
+	ReceivedAt       time.Time
+	ProcessingStatus string
+	HasXML           bool
+	HasPDF           bool
+}

@@ -23,18 +23,21 @@ test.describe('Tenant: navegación', () => {
       await page.getByRole('listitem').filter({ hasText: orgName }).getByRole('button', { name: 'Correo' }).click();
       await expect(page).toHaveURL(/.*\/inbox\/connections$/);
       await expect(page.getByRole('heading', { name: 'Conexiones de correo' })).toBeVisible();
+      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
     });
 
     await test.step('Y puede navegar a "Bandeja unificada" desde conexiones', async () => {
       await page.getByRole('link', { name: 'Ir a bandeja unificada' }).click();
       await expect(page).toHaveURL(/.*\/inbox\/unified$/);
-      await expect(page.getByRole('heading', { name: 'Bandeja unificada' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
+      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
     });
 
     await test.step('Y puede volver a "Conexiones de correo" desde la bandeja', async () => {
-      await page.getByRole('link', { name: 'Gestionar conexiones de correo' }).click();
+      await page.goBack();
       await expect(page).toHaveURL(/.*\/inbox\/connections$/);
       await expect(page.getByRole('heading', { name: 'Conexiones de correo' })).toBeVisible();
+      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
     });
   });
 });

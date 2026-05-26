@@ -90,9 +90,7 @@ export class PwaService {
 
     this.destroyRef.onDestroy(() => stableSubscription.unsubscribe());
 
-    const updatesSubscription = this.swUpdate.versionUpdates
-      .pipe(filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY'))
-      .subscribe(() => this.updateAvailable.set(true));
+    const updatesSubscription = this.swUpdate.versionUpdates.pipe(filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY')).subscribe(() => this.updateAvailable.set(true));
 
     this.destroyRef.onDestroy(() => updatesSubscription.unsubscribe());
   }

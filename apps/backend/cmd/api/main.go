@@ -16,6 +16,9 @@ import (
 	identityapp "github.com/money-path/bowerbird/apps/backend/internal/identity/application"
 	identityinfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
 	identityhttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
+	inboxapp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
+	inboxinfra "github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure"
+	inboxhttp "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/http"
 	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
 	invoicinginfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
 	invoicingevents "github.com/money-path/bowerbird/apps/backend/internal/invoicing/presentation/events"
@@ -62,8 +65,9 @@ func main() {
 	healthUseCase := application.NewCheckHealthUseCase(healthRepo)
 	healthHandler := healthhttp.NewHandler(healthUseCase)
 
+	isDev := cfg.AppEnv == "development" || cfg.AppEnv == "local"
 	mux := http.NewServeMux()
-	healthHandler.Register(mux)
+	healthHandler.Register(mux, isDev)
 
 	// Setup Auth & Identity
 	tokenGen := auth.NewTokenGenerator(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
@@ -96,7 +100,7 @@ func main() {
 	}
 
 	authHandler := identityhttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, strings.TrimRight(cfg.FrontendURL, "/"))
-	authHandler.Register(mux, authMiddleware)
+	authHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Organization Context
 	// Provide the root directory for migrations relative to the running binary (or use an env var)
@@ -114,7 +118,14 @@ func main() {
 	orgHandler := orghttp.NewHandler(orgUseCase)
 
 	// Register Routes
-	orgHandler.Register(mux, authMiddleware)
+	orgHandler.Register(mux, authMiddleware, isDev)
+
+	// Setup Inbox Context
+	inboxRepo := inboxinfra.NewPostgresRepository(registry)
+	listAccountHealthUseCase := inboxapp.NewListAccountHealthUseCase(inboxRepo)
+	listMessagesUseCase := inboxapp.NewListMessagesUseCase(inboxRepo)
+	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase)
+	inboxHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Event Poller
 	invoicingRouter := invoicinginfra.NewLogRouter()

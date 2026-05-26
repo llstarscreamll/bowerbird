@@ -11,9 +11,7 @@ import { environment } from '../../../../../environments/environment';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div
-      class="flex min-h-screen flex-col items-center justify-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-950/50"
-    >
+    <div class="flex min-h-screen flex-col items-center justify-center py-10 px-4 sm:px-6 lg:px-8 bg-slate-50/50 dark:bg-slate-950/50">
       <div class="sm:mx-auto sm:w-full sm:max-w-[400px] text-center mb-6">
         <div class="mx-auto h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
           <span class="material-icons-outlined text-white text-2xl">flight_takeoff</span>
@@ -26,38 +24,16 @@ import { environment } from '../../../../../environments/environment';
         <div class="card p-6 sm:p-8 space-y-6 shadow-sm">
           <form class="space-y-5" (ngSubmit)="onLocalLogin()">
             <div>
-              <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Correo electronico
-              </label>
+              <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> Correo electronico </label>
               <div class="mt-1.5">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autocomplete="email"
-                  required
-                  [(ngModel)]="email"
-                  class="input-field py-2"
-                  placeholder="nombre@ejemplo.com"
-                />
+                <input id="email" name="email" type="email" autocomplete="email" required [(ngModel)]="email" class="input-field py-2" placeholder="nombre@ejemplo.com" />
               </div>
             </div>
 
             <div>
-              <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Contrasena
-              </label>
+              <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> Contrasena </label>
               <div class="mt-1.5">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autocomplete="current-password"
-                  required
-                  [(ngModel)]="password"
-                  class="input-field py-2"
-                  placeholder="••••••••"
-                />
+                <input id="password" name="password" type="password" autocomplete="current-password" required [(ngModel)]="password" class="input-field py-2" placeholder="••••••••" />
               </div>
             </div>
 
@@ -75,32 +51,18 @@ import { environment } from '../../../../../environments/environment';
                     viewBox="0 0 14 10"
                     fill="none"
                   >
-                    <path
-                      d="M1 5L4.5 8.5L13 1"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
+                    <path d="M1 5L4.5 8.5L13 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
                 </div>
                 <label for="remember-me" class="block text-sm text-slate-600 dark:text-slate-400">Recordarme</label>
               </div>
 
               <div class="text-sm">
-                <a
-                  href="#"
-                  class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
-                >
-                  Olvidaste tu contrasena?
-                </a>
+                <a href="#" class="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"> Olvidaste tu contrasena? </a>
               </div>
             </div>
 
-            <div
-              *ngIf="store.error()"
-              class="rounded-md bg-red-50 dark:bg-red-500/10 p-3 border border-red-200 dark:border-red-500/20"
-            >
+            <div *ngIf="store.error()" class="rounded-md bg-red-50 dark:bg-red-500/10 p-3 border border-red-200 dark:border-red-500/20">
               <div class="flex items-start">
                 <div class="flex-shrink-0 mt-0.5">
                   <span class="material-icons-outlined text-red-500 dark:text-red-400 text-sm">error</span>
@@ -117,11 +79,7 @@ import { environment } from '../../../../../environments/environment';
                 <span *ngIf="store.isLoading()" class="flex items-center justify-center gap-2">
                   <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   Iniciando sesion...
                 </span>
@@ -135,26 +93,18 @@ import { environment } from '../../../../../environments/environment';
                 <div class="w-full border-t border-slate-200 dark:border-slate-800/80"></div>
               </div>
               <div class="relative flex justify-center">
-                <span class="bg-white dark:bg-slate-900 px-3 text-[13px] text-slate-500 dark:text-slate-400"
-                  >O continua con</span
-                >
+                <span class="bg-white dark:bg-slate-900 px-3 text-[13px] text-slate-500 dark:text-slate-400">O continua con</span>
               </div>
             </div>
 
             <div class="mt-6 grid grid-cols-2 gap-3">
-              <a
-                [href]="apiUrl + '/api/v1/auth/google/login'"
-                class="btn-secondary w-full gap-2 text-sm py-2 shadow-none border-slate-200 dark:border-slate-700/50"
-              >
+              <a [href]="apiUrl + '/api/v1/auth/google/login'" class="btn-secondary w-full gap-2 text-sm py-2 shadow-none border-slate-200 dark:border-slate-700/50">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M12.0003 4.75C13.7703 4.75 15.3553 5.36002 16.6053 6.54998L20.0303 3.125C17.9502 1.19 15.2353 0 12.0003 0C7.31028 0 3.25527 2.69 1.28027 6.60998L5.27028 9.70498C6.21525 6.86002 8.87028 4.75 12.0003 4.75Z"
                     fill="#EA4335"
                   />
-                  <path
-                    d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z"
-                    fill="#4285F4"
-                  />
+                  <path d="M23.49 12.275C23.49 11.49 23.415 10.73 23.3 10H12V14.51H18.47C18.18 15.99 17.34 17.25 16.08 18.1L19.945 21.1C22.2 19.01 23.49 15.92 23.49 12.275Z" fill="#4285F4" />
                   <path
                     d="M5.26498 14.2949C5.02498 13.5699 4.88501 12.7999 4.88501 11.9999C4.88501 11.1999 5.01998 10.4299 5.26498 9.7049L1.275 6.60986C0.46 8.22986 0 10.0599 0 11.9999C0 13.9399 0.46 15.7699 1.28 17.3899L5.26498 14.2949Z"
                     fill="#FBBC05"
@@ -166,10 +116,7 @@ import { environment } from '../../../../../environments/environment';
                 </svg>
                 Google
               </a>
-              <a
-                [href]="apiUrl + '/api/v1/auth/microsoft/login'"
-                class="btn-secondary w-full gap-2 text-sm py-2 shadow-none border-slate-200 dark:border-slate-700/50"
-              >
+              <a [href]="apiUrl + '/api/v1/auth/microsoft/login'" class="btn-secondary w-full gap-2 text-sm py-2 shadow-none border-slate-200 dark:border-slate-700/50">
                 <svg class="h-4 w-4" viewBox="0 0 21 21" aria-hidden="true">
                   <path d="M10 0H0V10H10V0Z" fill="#F25022" />
                   <path d="M21 0H11V10H21V0Z" fill="#7FBA00" />

@@ -15,26 +15,14 @@ import { AccountStatusChipComponent } from '../../components/account-status-chip
     <div class="min-h-screen bg-gradient-to-b from-slate-50 to-white px-4 py-8 sm:px-6 lg:px-8">
       <div class="mx-auto w-full max-w-6xl space-y-6">
         <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Tenant: {{ tenantId() || 'N/A' }}
-          </p>
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Tenant: {{ tenantId() || 'N/A' }}</p>
           <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Conexiones de correo</h1>
-          <p class="mt-2 max-w-3xl text-sm text-slate-600">
-            Conecta y gestiona cuentas de Gmail, Outlook y otros proveedores para sincronizar facturas electronicas.
-          </p>
+          <p class="mt-2 max-w-3xl text-sm text-slate-600">Conecta y gestiona cuentas de Gmail, Outlook y otros proveedores para sincronizar facturas electronicas.</p>
           <div class="mt-5 flex flex-wrap gap-2 text-xs">
-            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
-              Activas: {{ statusCount('active') }}
-            </span>
-            <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">
-              Reconexion: {{ statusCount('requires_reconnect') }}
-            </span>
-            <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">
-              Errores: {{ statusCount('error') }}
-            </span>
-            <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">
-              Pausadas: {{ statusCount('paused') }}
-            </span>
+            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700"> Activas: {{ statusCount('active') }} </span>
+            <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700"> Reconexion: {{ statusCount('requires_reconnect') }} </span>
+            <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700"> Errores: {{ statusCount('error') }} </span>
+            <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700"> Pausadas: {{ statusCount('paused') }} </span>
           </div>
         </header>
 
@@ -61,18 +49,12 @@ import { AccountStatusChipComponent } from '../../components/account-status-chip
                     </div>
                     <p class="mt-1 text-xs text-slate-500">
                       {{ providerLabel(account.provider) }}
-                      <span *ngIf="account.last_synced_at"
-                        >- Ultima sincronizacion: {{ account.last_synced_at | date: 'short' }}</span
-                      >
+                      <span *ngIf="account.last_synced_at">- Ultima sincronizacion: {{ account.last_synced_at | date: 'short' }}</span>
                     </p>
                     <p *ngIf="account.last_error" class="mt-1 text-xs text-rose-600">{{ account.last_error }}</p>
                   </div>
                   <div class="flex gap-2">
-                    <button
-                      class="btn-secondary px-3 py-2 text-xs"
-                      [disabled]="disconnectingId() === account.id"
-                      (click)="disconnect(account)"
-                    >
+                    <button class="btn-secondary px-3 py-2 text-xs" [disabled]="disconnectingId() === account.id" (click)="disconnect(account)">
                       {{ disconnectingId() === account.id ? 'Desconectando...' : 'Desconectar' }}
                     </button>
                   </div>
@@ -97,21 +79,10 @@ import { AccountStatusChipComponent } from '../../components/account-status-chip
 
               <div>
                 <label for="email" class="mb-1 block text-xs font-medium text-slate-600">Correo de la cuenta</label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  class="input-field"
-                  [(ngModel)]="newEmailAddress"
-                  required
-                  placeholder="facturas@empresa.com"
-                />
+                <input id="email" name="email" type="email" class="input-field" [(ngModel)]="newEmailAddress" required placeholder="facturas@empresa.com" />
               </div>
 
-              <div
-                *ngIf="errorMessage()"
-                class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
-              >
+              <div *ngIf="errorMessage()" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                 {{ errorMessage() }}
               </div>
 
@@ -120,18 +91,8 @@ import { AccountStatusChipComponent } from '../../components/account-status-chip
               </button>
             </form>
 
-            <a
-              [routerLink]="['/', tenantId(), 'inbox', 'connections']"
-              class="inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Actualizar vista
-            </a>
-            <a
-              [routerLink]="['/', tenantId(), 'inbox', 'unified']"
-              class="inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              Ir a bandeja unificada
-            </a>
+            <a [routerLink]="['/', tenantId(), 'inbox', 'connections']" class="inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-500"> Actualizar vista </a>
+            <a [routerLink]="['/', tenantId(), 'inbox', 'unified']" class="inline-flex text-xs font-medium text-indigo-600 hover:text-indigo-500"> Ir a bandeja unificada </a>
           </aside>
         </section>
       </div>

@@ -158,9 +158,7 @@ export class BowerbirdStack extends cdk.Stack {
       responseHeadersPolicyName: `${prefix}-spa-headers`,
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy:
-            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://" +
-            apiDomain,
+          contentSecurityPolicy: "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://" + apiDomain,
           override: true,
         },
         contentTypeOptions: { override: true },
@@ -223,11 +221,7 @@ export class BowerbirdStack extends cdk.Stack {
     new s3deploy.BucketDeployment(this, 'WebStaticAssetsDeployment', {
       destinationBucket: websiteBucket,
       prune: false,
-      cacheControl: [
-        s3deploy.CacheControl.fromString('public'),
-        s3deploy.CacheControl.maxAge(cdk.Duration.days(365)),
-        s3deploy.CacheControl.immutable(),
-      ],
+      cacheControl: [s3deploy.CacheControl.fromString('public'), s3deploy.CacheControl.maxAge(cdk.Duration.days(365)), s3deploy.CacheControl.immutable()],
       sources: [
         s3deploy.Source.asset(webBuildPath, {
           exclude: ['index.html', 'ngsw.json', 'ngsw-worker.js', 'safety-worker.js', 'manifest.webmanifest'],
@@ -270,12 +264,7 @@ export class BowerbirdStack extends cdk.Stack {
     new route53.ARecord(this, 'ApiAliasRecord', {
       zone,
       recordName: apiSubdomain,
-      target: route53.RecordTarget.fromAlias(
-        new route53Targets.ApiGatewayv2DomainProperties(
-          apiDomainName.regionalDomainName,
-          apiDomainName.regionalHostedZoneId,
-        ),
-      ),
+      target: route53.RecordTarget.fromAlias(new route53Targets.ApiGatewayv2DomainProperties(apiDomainName.regionalDomainName, apiDomainName.regionalHostedZoneId)),
     });
 
     new cdk.CfnOutput(this, 'WebUrl', { value: `https://${appDomain}` });

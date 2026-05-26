@@ -8,6 +8,4 @@ export interface InboxConnectionsRepository {
   disconnectAccount(accountId: string): Observable<void>;
 }
 
-export const INBOX_CONNECTIONS_REPOSITORY = new InjectionToken<InboxConnectionsRepository>(
-  'INBOX_CONNECTIONS_REPOSITORY',
-);
+export const INBOX_CONNECTIONS_REPOSITORY = new InjectionToken<InboxConnectionsRepository>('INBOX_CONNECTIONS_REPOSITORY');

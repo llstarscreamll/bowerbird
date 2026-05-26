@@ -14,6 +14,7 @@ var (
 type Repository interface {
 	CreateConnectedAccount(ctx context.Context, account *ConnectedAccount) error
 	GetConnectedAccountByID(ctx context.Context, accountID string) (*ConnectedAccount, error)
+	ListConnectedAccounts(ctx context.Context) ([]*ConnectedAccount, error)
 	ListConnectedAccountsByStatus(ctx context.Context, status string) ([]*ConnectedAccount, error)
 	UpdateConnectedAccountSyncState(ctx context.Context, accountID, status string, lastSyncedAt *time.Time, lastError *string, updatedAt time.Time) error
 
@@ -22,4 +23,6 @@ type Repository interface {
 
 	UpsertEmailAttachment(ctx context.Context, attachment *EmailAttachment) (bool, error)
 	ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]*EmailAttachment, error)
+
+	ListUnifiedMessages(ctx context.Context) ([]*UnifiedMessage, error)
 }

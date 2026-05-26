@@ -24,8 +24,6 @@ export class AuthApiClient {
     }
 
     const body = await response.text();
-    throw new Error(
-      `Failed to create local account. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`,
-    );
+    throw new Error(`Failed to create local account. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`);
   }
 }

@@ -51,7 +51,7 @@ func (r *Registry) GetPool(ctx context.Context) (*pgxpool.Pool, error) {
 		return pool, nil
 	}
 
-	dbName, err := r.resolveTenantDatabaseBySlug(ctx, tenantSlug)
+	dbName, err := r.resolveTenantDatabase(ctx, tenantSlug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve tenant db: %w", err)
 	}
@@ -97,11 +97,12 @@ func (r *Registry) GetPoolByDBName(ctx context.Context, dbName string) (*pgxpool
 	return newPool, nil
 }
 
-// resolveTenantDatabaseBySlug looks up the database name for a given tenant slug in the control plane.
-func (r *Registry) resolveTenantDatabaseBySlug(ctx context.Context, tenantSlug string) (string, error) {
+// resolveTenantDatabase looks up the database name for a given tenant identifier (ID or slug) in the control plane.
+func (r *Registry) resolveTenantDatabase(ctx context.Context, identifier string) (string, error) {
 	var dbName string
-	query := `SELECT db_name FROM tenants WHERE slug = $1 AND status = 'active'`
-	err := r.controlDB.QueryRow(ctx, query, tenantSlug).Scan(&dbName)
+	// Allow resolving by either ID or slug, as X-Tenant-ID may contain the ULID
+	query := `SELECT db_name FROM tenants WHERE (id = $1 OR slug = $1) AND status = 'active'`
+	err := r.controlDB.QueryRow(ctx, query, identifier).Scan(&dbName)
 	if err != nil {
 		return "", err
 	}

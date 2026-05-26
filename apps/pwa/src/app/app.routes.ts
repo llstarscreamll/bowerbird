@@ -18,17 +18,18 @@ export const routes: Routes = [
     loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
   },
   {
-    path: ':tenantId/inbox/connections',
+    path: ':tenantId',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./inbox/presentation/pages/connections/inbox-connections.component').then(
-        (c) => c.InboxConnectionsComponent,
-      ),
-  },
-  {
-    path: ':tenantId/inbox/unified',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./inbox/presentation/pages/unified/unified-inbox.component').then((c) => c.UnifiedInboxComponent),
+    loadComponent: () => import('./core/presentation/layouts/tenant-layout/tenant-layout.component').then((c) => c.TenantLayoutComponent),
+    children: [
+      {
+        path: 'inbox/connections',
+        loadComponent: () => import('./inbox/presentation/pages/connections/inbox-connections.component').then((c) => c.InboxConnectionsComponent),
+      },
+      {
+        path: 'inbox/unified',
+        loadComponent: () => import('./inbox/presentation/pages/unified/unified-inbox.component').then((c) => c.UnifiedInboxComponent),
+      },
+    ],
   },
 ];

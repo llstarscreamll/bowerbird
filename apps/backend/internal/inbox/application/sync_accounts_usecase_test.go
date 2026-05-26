@@ -33,6 +33,16 @@ func (r *fakeInboxRepo) GetConnectedAccountByID(ctx context.Context, accountID s
 }
 
 func (r *fakeInboxRepo) ListConnectedAccountsByStatus(ctx context.Context, status string) ([]*domain.ConnectedAccount, error) {
+	var filtered []*domain.ConnectedAccount
+	for _, acc := range r.accounts {
+		if acc.Status == status {
+			filtered = append(filtered, acc)
+		}
+	}
+	return filtered, nil
+}
+
+func (r *fakeInboxRepo) ListConnectedAccounts(ctx context.Context) ([]*domain.ConnectedAccount, error) {
 	return r.accounts, nil
 }
 
@@ -62,6 +72,10 @@ func (r *fakeInboxRepo) UpsertEmailAttachment(ctx context.Context, attachment *d
 }
 
 func (r *fakeInboxRepo) ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]*domain.EmailAttachment, error) {
+	return nil, nil
+}
+
+func (r *fakeInboxRepo) ListUnifiedMessages(ctx context.Context) ([]*domain.UnifiedMessage, error) {
 	return nil, nil
 }
 

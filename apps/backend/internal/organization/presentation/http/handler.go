@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/organization/application"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
 )
 
 type Handler struct {
@@ -18,8 +20,8 @@ func NewHandler(createUseCase *application.CreateOrganizationUseCase) *Handler {
 	}
 }
 
-func (h *Handler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler) {
-	mux.Handle("POST /api/v1/organizations", authMiddleware(http.HandlerFunc(h.CreateOrganization)))
+func (h *Handler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler, isDev bool) {
+	mux.Handle("POST /api/v1/organizations", authMiddleware(api.Wrap(h.CreateOrganization, isDev)))
 }
 
 type CreateOrganizationRequest struct {
@@ -35,17 +37,15 @@ type CreateOrganizationResponse struct {
 	CreatedAt string `json:"created_at"`
 }
 
-func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) error {
 	var req CreateOrganizationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
+		return apperrors.Wrap(err, apperrors.CodeValidation, "invalid request body")
 	}
 
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
+		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
 	}
 
 	cmd := application.CreateOrganizationCommand{
@@ -61,11 +61,9 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
 	org, err := h.createUseCase.Execute(r.Context(), cmd)
 	if err != nil {
 		if err == application.ErrSlugAlreadyExists {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
+			return apperrors.Wrap(err, apperrors.CodeConflict, "slug already exists")
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to create organization")
 	}
 
 	resp := CreateOrganizationResponse{
@@ -76,7 +74,5 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: org.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	return api.Success(w, http.StatusCreated, resp)
 }

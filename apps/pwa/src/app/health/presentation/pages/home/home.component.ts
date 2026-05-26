@@ -25,9 +25,7 @@ import { HealthStore } from '../../../application/health.store';
                 <span class="material-icons-outlined">notifications</span>
               </button>
 
-              <div
-                class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-slate-300 dark:border-slate-700 cursor-pointer overflow-hidden"
-              >
+              <div class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-slate-300 dark:border-slate-700 cursor-pointer overflow-hidden">
                 <span class="material-icons-outlined text-slate-500 text-sm">person</span>
               </div>
             </div>
@@ -40,11 +38,7 @@ import { HealthStore } from '../../../application/health.store';
         <!-- Page Header -->
         <div class="md:flex md:items-center md:justify-between mb-8">
           <div class="min-w-0 flex-1">
-            <h2
-              class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight"
-            >
-              Dashboard Overview
-            </h2>
+            <h2 class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">Dashboard Overview</h2>
           </div>
           <div class="mt-4 flex md:ml-4 md:mt-0 gap-3">
             <button (click)="goLobby()" class="btn-secondary gap-2">
@@ -52,9 +46,7 @@ import { HealthStore } from '../../../application/health.store';
               Switch Organization
             </button>
             <button (click)="healthStore.checkHealth()" [disabled]="healthStore.isLoading()" class="btn-primary gap-2">
-              <span class="material-icons-outlined text-sm" [class.animate-spin]="healthStore.isLoading()"
-                >refresh</span
-              >
+              <span class="material-icons-outlined text-sm" [class.animate-spin]="healthStore.isLoading()">refresh</span>
               Refresh Status
             </button>
           </div>
@@ -75,16 +67,13 @@ import { HealthStore } from '../../../application/health.store';
               <div class="mt-4 flex items-center gap-3">
                 <span class="relative flex h-4 w-4">
                   @if (healthStore.isHealthy() && !healthStore.isLoading()) {
-                    <span
-                      class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
-                    ></span>
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   }
                   <span
                     class="relative inline-flex rounded-full h-4 w-4"
                     [ngClass]="{
                       'bg-emerald-500': healthStore.isHealthy() && !healthStore.isLoading(),
-                      'bg-amber-500':
-                        !healthStore.isHealthy() && healthStore.status() !== 'checking...' && !healthStore.isLoading(),
+                      'bg-amber-500': !healthStore.isHealthy() && healthStore.status() !== 'checking...' && !healthStore.isLoading(),
                       'bg-slate-400': healthStore.status() === 'checking...' || healthStore.isLoading(),
                     }"
                   ></span>

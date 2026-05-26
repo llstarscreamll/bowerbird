@@ -14,11 +14,7 @@ describe('HomeComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [HomeComponent],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: HEALTH_REPOSITORY, useClass: HealthHttpService },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: HEALTH_REPOSITORY, useClass: HealthHttpService }],
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);

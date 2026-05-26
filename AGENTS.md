@@ -18,6 +18,8 @@
 ## Backend (`apps/backend`)
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources `apps/backend/.env` if present.
+- Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
+- Domain Errors: Wrap or create errors using `apperrors.Wrap(err, apperrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
 - Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
 - Runtime config is env + SSM merge (`internal/platform/config/config.go`).
   - Local default SSM parameter: `/bowerbird/local/secrets`.
@@ -30,7 +32,11 @@
 
 - Angular standalone + zoneless app. Wiring is in `src/app/app.config.ts`, routes in `src/app/app.routes.ts`.
 - Serve command is fixed to `ng serve --host 0.0.0.0 --port 4200`; `angular.json` only allows host `app.bowerbird.dev`.
-- Tenant header is derived from first non-global path segment in `core/interceptors/tenant.interceptor.ts`.
+- Tenant routing: Tenant pages are children of the `/:tenantId` route and wrapped by `TenantLayoutComponent`.
+- Tenant header is derived from the `tenantId` param via `core/interceptors/tenant.interceptor.ts`.
+- Error Handling & UI Feedback: `error.interceptor.ts` globally handles JSON:API responses and logs `meta._debug` to the console.
+  - **Toast (`ToastService`)**: Use for global, transient messages like 5xx server errors, network drops, or success notifications ("Saved successfully"). The interceptor handles 5xx/network toasts automatically.
+  - **Alert (`AlertComponent`)**: Use inline within forms or pages for contextual, actionable 4xx validation errors (e.g., "Email already in use"). Components should handle these manually.
 - Auth refresh behavior is in `core/interceptors/auth.interceptor.ts` (401 -> refresh -> retry).
 - Feature convention: keep business/data orchestration in `*/application/*store.ts`; keep `presentation` components thin.
 - Shared inbox/provider primitives now live in `src/app/core/domain/inbox-types.ts` (avoid cross-feature domain imports for these types).
