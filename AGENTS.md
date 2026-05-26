@@ -12,6 +12,7 @@
 - Root deploy: `pnpm run deploy` (builds first, deploys only `@bowerbird/infra`).
 - Backend targeted: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
+- E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:ui`.
 - Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy`.
 
 ## Backend (`apps/backend`)
@@ -34,6 +35,14 @@
 - Feature convention: keep business/data orchestration in `*/application/*store.ts`; keep `presentation` components thin.
 - Shared inbox/provider primitives now live in `src/app/core/domain/inbox-types.ts` (avoid cross-feature domain imports for these types).
 - Shared visual primitives are in `src/styles.css` (`.card`, `.input-field`, `.btn-primary`, `.btn-secondary`).
+
+## E2E Testing (`apps/e2e`)
+
+- Uses Playwright. Always run `pnpm run test:e2e:install` to ensure the local browser is present before running tests.
+- Execution requires the local backend to be running (`pnpm run dev`) with `api.bowerbird.dev` accessible (Caddy routing).
+- To test the full auth flow, the backend must be in `local` or `development` mode so the `/api/v1/auth/register-local` endpoint is enabled.
+- UI doesn't have a signup form yet, so `test.fixture.ts` relies on the API `registerLocalOrFail` directly for setup.
+- Commands from root: `pnpm run test:e2e` (headless), `pnpm run test:e2e:ui` (interactive).
 
 ## Local infra and deploy constraints
 

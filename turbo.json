@@ -13,6 +13,10 @@
       "dependsOn": ["^test"],
       "outputs": []
     },
+    "test:e2e": {
+      "cache": false,
+      "outputs": []
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

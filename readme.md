@@ -15,6 +15,7 @@ Monorepo para una arquitectura SPA (Angular) + API/Lambda (Golang) + IaC (AWS CD
 - Setup y entorno local: [docs/technical/getting-started.md](./docs/technical/getting-started.md)
 - Convenciones de documentación de negocio: [docs/product/README.md](./docs/product/README.md)
 - Tooling de análisis de código (CodeGraph): [docs/technical/tooling/codegraph.md](./docs/technical/tooling/codegraph.md)
+- Suite E2E con Playwright: [apps/e2e/README.md](./apps/e2e/README.md)
 
 ## Inicio rápido
 
@@ -28,6 +29,7 @@ Comandos principales:
 
 - `pnpm run build`
 - `pnpm run test`
+- `pnpm run test:e2e`
 - `pnpm run lint`
 - `pnpm run format`
 - `pnpm run format:check`
