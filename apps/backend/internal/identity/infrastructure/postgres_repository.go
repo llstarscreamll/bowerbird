@@ -111,7 +111,7 @@ func (r *PostgresRepository) CreateUserIdentity(ctx context.Context, identity *d
 
 func (r *PostgresRepository) FindTenantMemberships(ctx context.Context, userID string) ([]*domain.TenantMembership, error) {
 	query := `
-		SELECT m.user_id, m.tenant_id, m.role, m.created_at, m.deleted_at 
+		SELECT m.user_id, m.tenant_id, t.organization_name, m.role, m.created_at, m.deleted_at 
 		FROM tenant_memberships m
 		JOIN tenants t ON m.tenant_id = t.id
 		WHERE m.user_id = $1 AND m.deleted_at IS NULL AND t.status = 'active'
@@ -125,7 +125,7 @@ func (r *PostgresRepository) FindTenantMemberships(ctx context.Context, userID s
 	var memberships []*domain.TenantMembership
 	for rows.Next() {
 		var m domain.TenantMembership
-		if err := rows.Scan(&m.UserID, &m.TenantID, &m.Role, &m.CreatedAt, &m.DeletedAt); err != nil {
+		if err := rows.Scan(&m.UserID, &m.TenantID, &m.Name, &m.Role, &m.CreatedAt, &m.DeletedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan tenant membership: %w", err)
 		}
 		memberships = append(memberships, &m)

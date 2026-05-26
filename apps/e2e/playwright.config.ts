@@ -16,7 +16,7 @@ export default defineConfig({
   use: {
     baseURL: appBaseUrl,
     ignoreHTTPSErrors: true,
-    trace: 'on-first-retry',
+    trace: { mode: 'retain-on-failure-and-retries', snapshots: true, sources: true, attachments: true },
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

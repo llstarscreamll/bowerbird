@@ -143,15 +143,15 @@ import { TenantMembership } from '../../../domain/auth.model';
                 <div class="flex items-center gap-3">
                   <!-- Avatar placeholder -->
                   <div
-                    class="h-9 w-9 flex-shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center font-medium text-xs border border-indigo-100/50 dark:border-indigo-500/20"
+                    class="h-9 w-9 flex-shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center font-medium text-xs border border-indigo-100/50 dark:border-indigo-500/20 uppercase"
                   >
-                    {{ tenant.tenant_id.substring(0, 2).toUpperCase() }}
+                    {{ (tenant.name || tenant.tenant_id).substring(0, 2) }}
                   </div>
                   <div>
                     <div
                       class="text-sm font-medium text-slate-900 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"
                     >
-                      {{ tenant.tenant_id }}
+                      {{ tenant.name || tenant.tenant_id }}
                     </div>
                   </div>
                 </div>

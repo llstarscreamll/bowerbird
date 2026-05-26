@@ -101,7 +101,15 @@ func main() {
 	// Setup Organization Context
 	// Provide the root directory for migrations relative to the running binary (or use an env var)
 	orgRepo := orginfra.NewPostgresRepository(pool)
-	orgProvisioner := orginfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, "apps/backend/migrations/tenant")
+
+	migrationsDir := os.Getenv("TENANT_MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations/tenant"
+		if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
+			migrationsDir = "apps/backend/migrations/tenant"
+		}
+	}
+	orgProvisioner := orginfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, migrationsDir)
 	orgUseCase := orgapplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
 	orgHandler := orghttp.NewHandler(orgUseCase)
 

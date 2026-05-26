@@ -44,6 +44,7 @@ const (
 type TenantMembership struct {
 	UserID    string
 	TenantID  string
+	Name      string // Tenant name
 	Role      TenantMembershipRole
 	CreatedAt time.Time
 	DeletedAt *time.Time

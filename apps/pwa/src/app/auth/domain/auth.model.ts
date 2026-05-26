@@ -10,5 +10,6 @@ export interface User {
 
 export interface TenantMembership {
   tenant_id: string;
+  name: string;
   role: string;
 }

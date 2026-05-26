@@ -18,6 +18,7 @@ func NewIdentityService(repo domain.Repository) *IdentityService {
 
 type TenantMembershipDTO struct {
 	TenantID string `json:"tenant_id"`
+	Name     string `json:"name"`
 	Role     string `json:"role"`
 }
 
@@ -31,6 +32,7 @@ func (s *IdentityService) ListUserTenants(ctx context.Context, userID string) ([
 	for i, m := range memberships {
 		dtos[i] = TenantMembershipDTO{
 			TenantID: m.TenantID,
+			Name:     m.Name,
 			Role:     string(m.Role),
 		}
 	}
