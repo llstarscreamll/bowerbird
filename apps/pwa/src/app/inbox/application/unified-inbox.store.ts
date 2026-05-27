@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { Subscription, catchError, finalize, forkJoin, interval, of, startWith, switchMap } from 'rxjs';
+import { Subscription, catchError, finalize, forkJoin, interval, of, switchMap } from 'rxjs';
 import { UNIFIED_INBOX_REPOSITORY } from '../domain/unified-inbox.repository';
 import { MAIL_PROVIDERS, MailProvider, providerLabel } from '../domain/inbox.types';
-import { AccountHealthSummary, MessageProcessingStatus, UnifiedInboxFilters, UnifiedInboxMessage } from '../domain/unified-inbox.model';
+import { AccountHealthSummary, AccountSyncStatus, MessageProcessingStatus, UnifiedInboxFilters, UnifiedInboxMessage, UnifiedInboxMessageDetail } from '../domain/unified-inbox.model';
 
 @Injectable({ providedIn: 'root' })
 export class UnifiedInboxStore {
@@ -10,15 +10,27 @@ export class UnifiedInboxStore {
   readonly error = signal<string | null>(null);
   readonly messages = signal<UnifiedInboxMessage[]>([]);
   readonly accountHealth = signal<AccountHealthSummary[]>([]);
+  readonly detailError = signal<string | null>(null);
+  readonly loadingMessageId = signal<string | null>(null);
 
   readonly providers = MAIL_PROVIDERS;
   readonly statuses: MessageProcessingStatus[] = ['new', 'processed', 'skipped', 'error'];
 
   readonly filters = signal<UnifiedInboxFilters>({
     provider: 'all',
+    accountId: 'all',
     status: 'all',
     onlyInvoices: false,
     search: '',
+  });
+
+  readonly isSyncing = computed(() => {
+    const targetAccountId = this.filters().accountId;
+    if (targetAccountId === 'all') {
+      return this.accountHealth().some((acc) => acc.status === 'syncing');
+    }
+    const acc = this.accountHealth().find((a) => a.id === targetAccountId);
+    return acc ? acc.status === 'syncing' : false;
   });
 
   readonly filteredMessages = computed(() => {
@@ -27,6 +39,10 @@ export class UnifiedInboxStore {
 
     return this.messages().filter((message) => {
       if (activeFilters.provider !== 'all' && message.provider !== activeFilters.provider) {
+        return false;
+      }
+
+      if (activeFilters.accountId !== 'all' && message.account_id !== activeFilters.accountId) {
         return false;
       }
 
@@ -48,14 +64,62 @@ export class UnifiedInboxStore {
 
   private readonly repository = inject(UNIFIED_INBOX_REPOSITORY);
   private accountHealthSub?: Subscription;
+  private messagePollSub?: Subscription;
+  private readonly messageDetails = signal<Record<string, UnifiedInboxMessageDetail>>({});
 
   init(): void {
     this.loadData();
-    this.startAccountHealthPolling();
+    this.startPolling();
   }
 
   destroy(): void {
     this.accountHealthSub?.unsubscribe();
+    this.messagePollSub?.unsubscribe();
+  }
+
+  triggerSync(accountId?: string): void {
+    const targetAccountId = accountId || this.filters().accountId;
+
+    const requestedAccounts = targetAccountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === targetAccountId);
+
+    const activeAccounts = requestedAccounts.filter((account) => this.isActiveAccount(account));
+    const syncableAccounts = activeAccounts.filter((account) => account.status !== 'syncing');
+
+    if (syncableAccounts.length === 0) {
+      return;
+    }
+
+    const syncableAccountIds = new Set(syncableAccounts.map((account) => account.id));
+
+    // Optimistically update status to 'syncing' for targeted accounts
+    this.accountHealth.update((accounts) =>
+      accounts.map((acc) => {
+        if (syncableAccountIds.has(acc.id)) {
+          return { ...acc, status: 'syncing', sync_status: 'syncing' };
+        }
+        return acc;
+      }),
+    );
+
+    forkJoin(syncableAccounts.map((account) => this.repository.triggerSync(account.id)))
+      .pipe(
+        catchError(() => {
+          this.error.set('No se pudo iniciar la sincronización.');
+          // Revert status on error by forcing a health check
+          this.refreshHealth();
+          return of(null);
+        }),
+      )
+      .subscribe();
+  }
+
+  refreshHealth(): void {
+    this.repository
+      .listAccountSyncStatus()
+      .pipe(catchError(() => of([] as AccountSyncStatus[])))
+      .subscribe((syncStatus) => {
+        this.accountHealth.update((accounts) => this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
+      });
   }
 
   patchFilters(partial: Partial<UnifiedInboxFilters>): void {
@@ -64,6 +128,44 @@ export class UnifiedInboxStore {
 
   clearError(): void {
     this.error.set(null);
+  }
+
+  loadMessageDetail(messageId: string): void {
+    if (!messageId || this.messageDetails()[messageId]) {
+      return;
+    }
+
+    this.detailError.set(null);
+    this.loadingMessageId.set(messageId);
+
+    this.repository
+      .getMessage(messageId)
+      .pipe(
+        catchError(() => {
+          this.detailError.set('No se pudieron cargar los detalles del correo.');
+          return of(null);
+        }),
+        finalize(() => {
+          if (this.loadingMessageId() === messageId) {
+            this.loadingMessageId.set(null);
+          }
+        }),
+      )
+      .subscribe((detail) => {
+        if (!detail) {
+          return;
+        }
+
+        this.messageDetails.update((current) => ({ ...current, [messageId]: detail }));
+      });
+  }
+
+  getMessageDetail(messageId: string): UnifiedInboxMessageDetail | null {
+    if (!messageId) {
+      return null;
+    }
+
+    return this.messageDetails()[messageId] ?? null;
   }
 
   providerLabel(provider: MailProvider): string {
@@ -128,32 +230,87 @@ export class UnifiedInboxStore {
       ),
       accounts: this.repository.listAccountHealth().pipe(
         catchError((err) => {
-          this.error.set('No se pudo cargar el estado de las cuentas. Por favor, inténtelo de nuevo más tarde.');
+          this.error.set('No se pudieron cargar las cuentas conectadas. Por favor, inténtelo de nuevo más tarde.');
           return of([] as AccountHealthSummary[]);
         }),
       ),
+      syncStatus: this.repository.listAccountSyncStatus().pipe(catchError(() => of([] as AccountSyncStatus[]))),
     })
       .pipe(finalize(() => this.loading.set(false)))
-      .subscribe(({ messages, accounts }) => {
+      .subscribe(({ messages, accounts, syncStatus }) => {
         this.messages.set(messages);
-        this.accountHealth.set(accounts);
+        this.accountHealth.set(this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
+
+        this.triggerSync('all');
+
+        // Auto-select the single account if there's exactly one
+        if (accounts.length === 1 && this.filters().accountId === 'all') {
+          this.patchFilters({ accountId: accounts[0].id });
+        }
       });
   }
 
-  private startAccountHealthPolling(): void {
+  private startPolling(): void {
     this.accountHealthSub?.unsubscribe();
-    this.accountHealthSub = interval(30000)
+    this.messagePollSub?.unsubscribe();
+
+    // Poll health status more frequently if syncing
+    this.accountHealthSub = interval(10000)
       .pipe(
-        startWith(0),
         switchMap(() =>
-          this.repository.listAccountHealth().pipe(
+          forkJoin({
+            accounts: this.repository.listAccountHealth().pipe(catchError(() => of([] as AccountHealthSummary[]))),
+            syncStatus: this.repository.listAccountSyncStatus().pipe(catchError(() => of([] as AccountSyncStatus[]))),
+          }),
+        ),
+      )
+      .subscribe(({ accounts, syncStatus }) => {
+        this.accountHealth.set(this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
+      });
+
+    // Poll messages
+    this.messagePollSub = interval(30000)
+      .pipe(
+        switchMap(() =>
+          this.repository.listMessages().pipe(
             catchError((err) => {
-              this.error.set('No se pudo actualizar el estado de las cuentas. Por favor, revise su conexión.');
-              return of([] as AccountHealthSummary[]);
+              return of([] as UnifiedInboxMessage[]);
             }),
           ),
         ),
       )
-      .subscribe((accounts) => this.accountHealth.set(accounts));
+      .subscribe((messages) => {
+        if (messages.length > 0) {
+          this.messages.set(messages);
+        }
+      });
+  }
+
+  private mergeAccountHealthWithSyncStatus(accounts: AccountHealthSummary[], syncStatus: AccountSyncStatus[]): AccountHealthSummary[] {
+    const syncStatusByAccount = new Map(syncStatus.map((status) => [status.id, status]));
+
+    return accounts.map((account) => {
+      const currentSyncStatus = syncStatusByAccount.get(account.id);
+
+      return {
+        ...account,
+        status: currentSyncStatus?.status ?? account.status,
+        connection_status: account.connection_status ?? this.toConnectionStatus(account.status),
+        sync_status: currentSyncStatus?.status,
+        last_synced_at: currentSyncStatus?.last_synced_at,
+      };
+    });
+  }
+
+  private isActiveAccount(account: AccountHealthSummary): boolean {
+    return (account.connection_status ?? this.toConnectionStatus(account.status)) === 'active';
+  }
+
+  private toConnectionStatus(status: AccountHealthSummary['status']): 'active' | 'requires_reconnect' | 'paused' | 'error' | undefined {
+    if (status === 'active' || status === 'requires_reconnect' || status === 'paused' || status === 'error') {
+      return status;
+    }
+
+    return undefined;
   }
 }

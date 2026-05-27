@@ -32,12 +32,16 @@ export const routes: Routes = [
         loadComponent: () => import('./dashboard/presentation/pages/dashboard/dashboard.component').then((c) => c.DashboardComponent),
       },
       {
-        path: 'inbox/connections',
-        loadComponent: () => import('./inbox/presentation/pages/connections/inbox-connections.component').then((c) => c.InboxConnectionsComponent),
+        path: 'inbox/master',
+        loadComponent: () => import('./inbox/presentation/pages/master/master-inbox.component').then((c) => c.MasterInboxComponent),
       },
       {
-        path: 'inbox/unified',
-        loadComponent: () => import('./inbox/presentation/pages/unified/unified-inbox.component').then((c) => c.UnifiedInboxComponent),
+        path: 'connections',
+        loadComponent: () => import('./connections/presentation/pages/connections-list/connections-list.component').then((c) => c.ConnectionsListComponent),
+      },
+      {
+        path: 'connections/:connectionId',
+        loadComponent: () => import('./connections/presentation/pages/connection-details/connection-details.component').then((c) => c.ConnectionDetailsComponent),
       },
       {
         path: 'invoices',

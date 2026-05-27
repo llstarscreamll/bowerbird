@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfigv2 "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
@@ -42,5 +43,15 @@ func NewS3Client(awsCfg aws.Config, endpointURL string) *s3.Client {
 	return s3.NewFromConfig(awsCfg, func(options *s3.Options) {
 		options.BaseEndpoint = &endpointURL
 		options.UsePathStyle = true
+	})
+}
+
+func NewEventBridgeClient(awsCfg aws.Config, endpointURL string) *eventbridge.Client {
+	if endpointURL == "" {
+		return eventbridge.NewFromConfig(awsCfg)
+	}
+
+	return eventbridge.NewFromConfig(awsCfg, func(options *eventbridge.Options) {
+		options.BaseEndpoint = &endpointURL
 	})
 }

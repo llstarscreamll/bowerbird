@@ -10,9 +10,9 @@ import { HealthHttpService } from './health/infrastructure/health.http.service';
 import { tenantInterceptor } from './core/interceptors/tenant.interceptor';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
-import { INBOX_CONNECTIONS_REPOSITORY } from './inbox/domain/inbox-connections.repository';
+import { CONNECTIONS_REPOSITORY } from './connections/domain/connections.repository';
+import { ConnectionsHttpRepository } from './connections/infrastructure/connections.http.repository';
 import { UNIFIED_INBOX_REPOSITORY } from './inbox/domain/unified-inbox.repository';
-import { InboxConnectionsHttpRepository } from './inbox/infrastructure/inbox-connections.http.repository';
 import { UnifiedInboxHttpRepository } from './inbox/infrastructure/unified-inbox.http.repository';
 
 export const appConfig: ApplicationConfig = {
@@ -22,7 +22,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor, tenantInterceptor])),
     { provide: AUTH_REPOSITORY, useClass: AuthHttpService },
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpService },
-    { provide: INBOX_CONNECTIONS_REPOSITORY, useClass: InboxConnectionsHttpRepository },
+    { provide: CONNECTIONS_REPOSITORY, useClass: ConnectionsHttpRepository },
     { provide: UNIFIED_INBOX_REPOSITORY, useClass: UnifiedInboxHttpRepository },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),

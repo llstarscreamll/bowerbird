@@ -10,20 +10,28 @@ import (
 
 type fakeClient struct{}
 
-func (f fakeClient) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
+func (c fakeClient) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
 	return nil, "", nil
 }
 
-func (f fakeClient) GetMessage(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+func (c fakeClient) GetMessage(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
 	return nil, nil
 }
 
-func (f fakeClient) DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error) {
+func (c fakeClient) DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error) {
 	return nil, nil
 }
 
-func (f fakeClient) DownloadMessageAttachments(ctx context.Context, userID, messageID string, refs []domain.MailAttachmentRef) ([]domain.DownloadedMailAttachment, error) {
+func (c fakeClient) DownloadMessageAttachments(ctx context.Context, userID, messageID string, refs []domain.MailAttachmentRef) ([]domain.DownloadedMailAttachment, error) {
 	return nil, nil
+}
+
+func (c fakeClient) CreateLabel(ctx context.Context, userID, labelName string) (string, error) {
+	return "", nil
+}
+
+func (c fakeClient) AddLabelToMessage(ctx context.Context, userID, messageID, labelID string) error {
+	return nil
 }
 
 func TestFactoryBuildUsesRegisteredProvider(t *testing.T) {

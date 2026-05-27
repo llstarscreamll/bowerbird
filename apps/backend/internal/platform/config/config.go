@@ -18,6 +18,7 @@ type Config struct {
 	DatabaseURL                   string    `json:"database_url"`
 	SQSQueueURL                   string    `json:"sqs_queue_url"`
 	EventBridgeQueueURL           string    `json:"eventbridge_queue_url"`
+	EventBusName                  string    `json:"event_bus_name"`
 	S3BucketName                  string    `json:"s3_bucket_name"`
 	AWSRegion                     string    `json:"aws_region"`
 	AWSEndpointURL                string    `json:"aws_endpoint_url"`
@@ -87,6 +88,10 @@ func Load(ctx context.Context) (Config, error) {
 	}
 	if cfg.S3BucketName == "" {
 		cfg.S3BucketName = os.Getenv("S3_BUCKET_NAME")
+	}
+
+	if cfg.EventBusName == "" {
+		cfg.EventBusName = os.Getenv("EVENT_BUS_NAME")
 	}
 
 	if cfg.DatabaseURL == "" {

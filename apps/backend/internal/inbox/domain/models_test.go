@@ -5,56 +5,35 @@ import (
 	"time"
 )
 
-func TestConnectedAccountMarkSyncFailed(t *testing.T) {
+func TestInboxSyncCursorMarkSyncFailed(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
-	account := &ConnectedAccount{ID: "acc-1", Status: ConnectedAccountStatusActive}
+	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusIdle}
 
-	if err := account.MarkSyncFailed(now, "provider timeout"); err != nil {
-		t.Fatalf("mark sync failed: %v", err)
-	}
+	cursor.MarkSyncFailed(now, "provider timeout")
 
-	if account.Status != ConnectedAccountStatusError {
-		t.Fatalf("expected status error, got %s", account.Status)
+	if cursor.Status != InboxSyncStatusError {
+		t.Fatalf("expected status error, got %s", cursor.Status)
 	}
-	if account.LastError == nil || *account.LastError != "provider timeout" {
-		t.Fatalf("expected last error populated, got %#v", account.LastError)
-	}
-
-	events := account.PullSyncStateEvents()
-	if len(events) != 1 {
-		t.Fatalf("expected 1 pending event, got %d", len(events))
-	}
-	if events[0].FromStatus != ConnectedAccountStatusActive || events[0].ToStatus != ConnectedAccountStatusError {
-		t.Fatalf("unexpected transition event: %#v", events[0])
+	if cursor.LastError == nil || *cursor.LastError != "provider timeout" {
+		t.Fatalf("expected last error populated, got %#v", cursor.LastError)
 	}
 }
 
-func TestConnectedAccountMarkSyncSucceeded(t *testing.T) {
+func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	prevError := "failed"
-	account := &ConnectedAccount{ID: "acc-1", Status: ConnectedAccountStatusError, LastError: &prevError}
+	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusError, LastError: &prevError}
 
-	if err := account.MarkSyncSucceeded(now); err != nil {
-		t.Fatalf("mark sync succeeded: %v", err)
-	}
+	cursor.MarkSyncSucceeded(now)
 
-	if account.Status != ConnectedAccountStatusActive {
-		t.Fatalf("expected status active, got %s", account.Status)
+	if cursor.Status != InboxSyncStatusIdle {
+		t.Fatalf("expected status idle, got %s", cursor.Status)
 	}
-	if account.LastError != nil {
+	if cursor.LastError != nil {
 		t.Fatalf("expected last error to be cleared")
 	}
-	if account.LastSyncedAt == nil || !account.LastSyncedAt.Equal(now) {
-		t.Fatalf("expected last synced at %v, got %#v", now, account.LastSyncedAt)
-	}
-}
-
-func TestConnectedAccountMarkSyncFailedRequiresReason(t *testing.T) {
-	account := &ConnectedAccount{ID: "acc-1", Status: ConnectedAccountStatusActive}
-
-	err := account.MarkSyncFailed(time.Now(), "")
-	if err == nil {
-		t.Fatal("expected error for empty failure reason")
+	if cursor.LastSyncedAt == nil || !cursor.LastSyncedAt.Equal(now) {
+		t.Fatalf("expected last synced at %v, got %#v", now, cursor.LastSyncedAt)
 	}
 }
 

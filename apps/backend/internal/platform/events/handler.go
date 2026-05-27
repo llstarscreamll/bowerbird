@@ -17,16 +17,22 @@ type EventHandler struct {
 	eventBridgeSubscribers map[string]EventBridgeSubscriber
 }
 
-func NewEventHandler(subscribers ...EventBridgeSubscriber) EventHandler {
-	routes := make(map[string]EventBridgeSubscriber, len(subscribers))
+func NewEventHandler(subscribers ...interface{}) EventHandler {
+	ebRoutes := make(map[string]EventBridgeSubscriber)
+
 	for _, subscriber := range subscribers {
 		if subscriber == nil {
 			continue
 		}
-		routes[subscriber.DetailType()] = subscriber
+
+		if ebSub, ok := subscriber.(EventBridgeSubscriber); ok {
+			ebRoutes[ebSub.DetailType()] = ebSub
+		}
 	}
 
-	return EventHandler{eventBridgeSubscribers: routes}
+	return EventHandler{
+		eventBridgeSubscribers: ebRoutes,
+	}
 }
 
 func (h EventHandler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {

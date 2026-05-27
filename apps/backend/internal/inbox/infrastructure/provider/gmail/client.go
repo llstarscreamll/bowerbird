@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -80,7 +81,7 @@ func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptio
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("list messages request failed with status %d", resp.StatusCode)
+		return nil, "", c.requestStatusError("list messages request failed", resp)
 	}
 
 	var payload struct {
@@ -92,6 +93,30 @@ func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptio
 	}
 
 	return payload.Messages, payload.NextPageToken, nil
+}
+
+func (c *Client) requestStatusError(prefix string, resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	bodyText := strings.TrimSpace(string(body))
+	if len(bodyText) > 1000 {
+		bodyText = bodyText[:1000]
+	}
+
+	wwwAuthenticate := strings.TrimSpace(resp.Header.Get("WWW-Authenticate"))
+
+	if bodyText != "" && wwwAuthenticate != "" {
+		return fmt.Errorf("%s with status %d (www-authenticate=%q, body=%q)", prefix, resp.StatusCode, wwwAuthenticate, bodyText)
+	}
+
+	if bodyText != "" {
+		return fmt.Errorf("%s with status %d (body=%q)", prefix, resp.StatusCode, bodyText)
+	}
+
+	if wwwAuthenticate != "" {
+		return fmt.Errorf("%s with status %d (www-authenticate=%q)", prefix, resp.StatusCode, wwwAuthenticate)
+	}
+
+	return fmt.Errorf("%s with status %d", prefix, resp.StatusCode)
 }
 
 func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
@@ -124,12 +149,14 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 	headers := flattenHeaders(payload.Payload)
 
 	msg := &domain.MailMessage{
-		ID:          payload.ID,
-		ThreadID:    payload.ThreadID,
-		Subject:     headers["subject"],
-		Sender:      headers["from"],
-		ReceivedAt:  parseRFC1123(headers["date"]),
-		Attachments: attachments,
+		ID:            payload.ID,
+		ThreadID:      payload.ThreadID,
+		Subject:       headers["subject"],
+		Sender:        headers["from"],
+		Snippet:       payload.Snippet,
+		PlainTextBody: extractPlainTextBody(payload.Payload),
+		ReceivedAt:    parseRFC1123(headers["date"]),
+		Attachments:   attachments,
 	}
 
 	if payload.InternalDate != "" {
@@ -199,9 +226,92 @@ func (c *Client) DownloadMessageAttachments(ctx context.Context, userID, message
 	return results, nil
 }
 
+func (c *Client) CreateLabel(ctx context.Context, userID, labelName string) (string, error) {
+	if userID == "" {
+		userID = "me"
+	}
+
+	payload := map[string]interface{}{
+		"name":                  labelName,
+		"labelListVisibility":   "labelShow",
+		"messageListVisibility": "show",
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal label payload: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/labels", c.baseURL, url.PathEscape(userID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return "", fmt.Errorf("build create label request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("create label request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Attempt to read body for error details
+		var errDetails string
+		if b, _ := json.Marshal(resp.Body); len(b) > 0 {
+			errDetails = string(b) // just roughly
+		}
+		return "", fmt.Errorf("create label request failed with status %d: %s", resp.StatusCode, errDetails)
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode create label response: %w", err)
+	}
+
+	return result.ID, nil
+}
+
+func (c *Client) AddLabelToMessage(ctx context.Context, userID, messageID, labelID string) error {
+	if userID == "" {
+		userID = "me"
+	}
+
+	payload := map[string]interface{}{
+		"addLabelIds": []string{labelID},
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal modify message payload: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/%s/modify", c.baseURL, url.PathEscape(userID), url.PathEscape(messageID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return fmt.Errorf("build modify message request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("modify message request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("modify message request failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 type gmailMessageResponse struct {
 	ID           string            `json:"id"`
 	ThreadID     string            `json:"threadId"`
+	Snippet      string            `json:"snippet"`
 	InternalDate string            `json:"internalDate"`
 	Payload      *gmailMessagePart `json:"payload"`
 }
@@ -221,6 +331,7 @@ type gmailHeader struct {
 
 type gmailPartBody struct {
 	AttachmentID string `json:"attachmentId"`
+	Data         string `json:"data"`
 	Size         int64  `json:"size"`
 }
 
@@ -287,4 +398,25 @@ func parseRFC1123(value string) *time.Time {
 
 	utc := t.UTC()
 	return &utc
+}
+
+func extractPlainTextBody(part *gmailMessagePart) string {
+	if part == nil {
+		return ""
+	}
+
+	if strings.EqualFold(part.MimeType, "text/plain") && part.Body.AttachmentID == "" && part.Body.Data != "" {
+		decoded, err := base64.URLEncoding.DecodeString(part.Body.Data)
+		if err == nil {
+			return strings.TrimSpace(string(decoded))
+		}
+	}
+
+	for _, child := range part.Parts {
+		if content := extractPlainTextBody(child); content != "" {
+			return content
+		}
+	}
+
+	return ""
 }

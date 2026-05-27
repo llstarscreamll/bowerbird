@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
+	"github.com/money-path/bowerbird/apps/backend/internal/connections/domain"
 )
 
 var ErrCipherNotConfigured = errors.New("credentials cipher is not configured")
@@ -48,7 +48,7 @@ func (s *CredentialsService) DecryptFromStorage(ciphertext []byte) ([]byte, erro
 	return plaintext, nil
 }
 
-func (s *CredentialsService) SetEncryptedCredentials(account *domain.ConnectedAccount, plaintext []byte) error {
+func (s *CredentialsService) SetEncryptedCredentials(account *domain.Connection, plaintext []byte) error {
 	encrypted, err := s.EncryptForStorage(plaintext)
 	if err != nil {
 		return err
@@ -58,6 +58,6 @@ func (s *CredentialsService) SetEncryptedCredentials(account *domain.ConnectedAc
 	return nil
 }
 
-func (s *CredentialsService) ReadDecryptedCredentials(account *domain.ConnectedAccount) ([]byte, error) {
+func (s *CredentialsService) ReadDecryptedCredentials(account *domain.Connection) ([]byte, error) {
 	return s.DecryptFromStorage(account.EncryptedCredentials)
 }

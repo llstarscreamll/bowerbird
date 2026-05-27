@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"errors"
-	"time"
 )
 
 var (
@@ -12,17 +11,14 @@ var (
 )
 
 type Repository interface {
-	CreateConnectedAccount(ctx context.Context, account *ConnectedAccount) error
-	GetConnectedAccountByID(ctx context.Context, accountID string) (*ConnectedAccount, error)
-	ListConnectedAccounts(ctx context.Context) ([]*ConnectedAccount, error)
-	ListConnectedAccountsByStatus(ctx context.Context, status string) ([]*ConnectedAccount, error)
-	UpdateConnectedAccountSyncState(ctx context.Context, accountID, status string, lastSyncedAt *time.Time, lastError *string, updatedAt time.Time) error
+	GetSyncCursor(ctx context.Context, connectionID string) (*InboxSyncCursor, error)
+	UpsertSyncCursor(ctx context.Context, cursor *InboxSyncCursor) error
 
-	UpsertEmailMessage(ctx context.Context, message *EmailMessage) (bool, error)
-	GetEmailMessageByProviderID(ctx context.Context, accountID, providerMessageID string) (*EmailMessage, error)
-
+	UpsertEmailMessage(ctx context.Context, msg *EmailMessage) (bool, error)
 	UpsertEmailAttachment(ctx context.Context, attachment *EmailAttachment) (bool, error)
-	ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]*EmailAttachment, error)
 
-	ListUnifiedMessages(ctx context.Context) ([]*UnifiedMessage, error)
+	ListUnifiedMessages(ctx context.Context) ([]UnifiedMessage, error)
+	ListMessagesByAccount(ctx context.Context, accountID string, limit, offset int) ([]UnifiedMessage, error)
+	GetMessageByID(ctx context.Context, messageID string) (*UnifiedMessage, error)
+	GetMessageAttachments(ctx context.Context, messageID string) ([]EmailAttachment, error)
 }

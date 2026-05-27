@@ -4,6 +4,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute, Router, Nav
 import { filter } from 'rxjs';
 import { OrganizationHttpService, OrganizationResponse } from '../../../../organization/infrastructure/organization.http.service';
 import { AuthStore } from '../../../../auth/application/auth.store';
+import { TenantContextStore } from '../../../store/tenant-context.store';
 
 @Component({
   selector: 'app-tenant-layout',
@@ -113,7 +114,7 @@ import { AuthStore } from '../../../../auth/application/auth.store';
 
           <!-- Inbox Link -->
           <a
-            [routerLink]="['/', tenantId(), 'inbox', 'unified']"
+            [routerLink]="['/', tenantId(), 'inbox', 'master']"
             routerLinkActive="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-800 dark:text-indigo-100 font-medium"
             [routerLinkActiveOptions]="{ exact: false }"
             class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
@@ -273,14 +274,16 @@ export class TenantLayoutComponent implements OnInit {
   private router = inject(Router);
   private organizationService = inject(OrganizationHttpService);
   private authStore = inject(AuthStore);
+  private tenantContextStore = inject(TenantContextStore);
 
   isCollapsed = signal(false);
   isTenantMenuOpen = signal(false);
   isUserMenuOpen = signal(false);
   themeMode = signal<'system' | 'light' | 'dark'>('system');
-  tenantId = signal('');
-  tenantDetails = signal<OrganizationResponse | null>(null);
   isLoadingTenant = signal(false);
+
+  tenantId = this.tenantContextStore.tenantId;
+  tenantDetails = this.tenantContextStore.tenantDetails;
 
   private get decodedToken(): any {
     const token = this.authStore.accessToken();
@@ -414,8 +417,7 @@ export class TenantLayoutComponent implements OnInit {
     }
 
     if (newTenantId && newTenantId !== this.tenantId()) {
-      this.tenantId.set(newTenantId);
-      this.fetchTenantDetails(newTenantId);
+      this.tenantContextStore.setTenantId(newTenantId);
     }
   }
 
@@ -427,7 +429,7 @@ export class TenantLayoutComponent implements OnInit {
         // Se asume que el interceptor/http extrae data o lo devuelve directo
         // (Ajusta la extracción según la convención json:api de tu app)
         const data = (response as any).data ? (response as any).data : response;
-        this.tenantDetails.set(data);
+        this.tenantContextStore.tenantDetails.set(data);
         this.isLoadingTenant.set(false);
       },
       error: (err) => {

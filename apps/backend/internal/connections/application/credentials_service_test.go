@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
+	"github.com/money-path/bowerbird/apps/backend/internal/connections/domain"
 	platformcrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
 )
 
@@ -38,7 +38,7 @@ func TestCredentialsServiceEncryptDecryptRoundtrip(t *testing.T) {
 	}
 }
 
-func TestCredentialsServiceSetAndReadOnConnectedAccount(t *testing.T) {
+func TestCredentialsServiceSetAndReadOnConnection(t *testing.T) {
 	key := base64.StdEncoding.EncodeToString([]byte("12345678901234567890123456789012"))
 	cipher, err := platformcrypto.NewAESCipherFromBase64Key(key)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestCredentialsServiceSetAndReadOnConnectedAccount(t *testing.T) {
 	}
 
 	svc := NewCredentialsService(cipher)
-	account := &domain.ConnectedAccount{ID: "01JWTENANTACCOUNT1234567890"}
+	account := &domain.Connection{ID: "01JWTENANTACCOUNT1234567890"}
 	plaintext := []byte(`{"refresh_token":"rt_123"}`)
 
 	if err := svc.SetEncryptedCredentials(account, plaintext); err != nil {

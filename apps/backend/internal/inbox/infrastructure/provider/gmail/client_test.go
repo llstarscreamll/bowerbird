@@ -55,6 +55,7 @@ func TestGetMessageExtractsHeadersAndAttachments(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"id":"m1",
 			"threadId":"t1",
+			"snippet":"Resumen del correo",
 			"internalDate":"1716633600000",
 			"payload":{
 				"headers":[
@@ -63,6 +64,10 @@ func TestGetMessageExtractsHeadersAndAttachments(t *testing.T) {
 					{"name":"Date","value":"Tue, 25 May 2026 10:00:00 +0000"}
 				],
 				"parts":[
+					{
+						"mimeType":"text/plain",
+						"body":{"data":"SG9sYSBlc3RlIGVzIGVsIGN1ZXJwbyBkZWwgY29ycmVvLg=="}
+					},
 					{
 						"filename":"factura.xml",
 						"mimeType":"application/xml",
@@ -95,8 +100,44 @@ func TestGetMessageExtractsHeadersAndAttachments(t *testing.T) {
 		t.Fatalf("unexpected sender: %s", msg.Sender)
 	}
 
+	if msg.Snippet != "Resumen del correo" {
+		t.Fatalf("unexpected snippet: %s", msg.Snippet)
+	}
+
+	if msg.PlainTextBody != "Hola este es el cuerpo del correo." {
+		t.Fatalf("unexpected plain text body: %s", msg.PlainTextBody)
+	}
+
 	if len(msg.Attachments) != 2 {
 		t.Fatalf("expected 2 attachments, got %d", len(msg.Attachments))
+	}
+}
+
+func TestListMessagesStatusErrorIncludesResponseDetails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="https://accounts.google.com/", error="insufficient_scope"`)
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":403,"message":"Request had insufficient authentication scopes.","status":"PERMISSION_DENIED"}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client())
+	client.SetBaseURL(server.URL)
+
+	_, _, err := client.ListMessages(context.Background(), domain.ListMessagesOptions{UserID: "me"})
+	if err == nil {
+		t.Fatal("expected list messages status error")
+	}
+
+	errText := err.Error()
+	if !strings.Contains(errText, "status 403") {
+		t.Fatalf("expected status in error, got %q", errText)
+	}
+	if !strings.Contains(errText, "www-authenticate") {
+		t.Fatalf("expected WWW-Authenticate in error, got %q", errText)
+	}
+	if !strings.Contains(errText, "insufficient authentication scopes") {
+		t.Fatalf("expected response body in error, got %q", errText)
 	}
 }
 

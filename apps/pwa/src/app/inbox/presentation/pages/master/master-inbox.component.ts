@@ -1,14 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { UnifiedInboxStore } from '../../../application/unified-inbox.store';
-import { MessageProcessingStatus } from '../../../domain/unified-inbox.model';
+import { AccountHealthSummary, MessageProcessingStatus, UnifiedInboxMessage } from '../../../domain/unified-inbox.model';
 import { MailProvider } from '../../../domain/inbox.types';
 import { AlertComponent } from '../../../../core/presentation/components/alert/alert.component';
 
 @Component({
-  selector: 'app-unified-inbox',
+  selector: 'app-master-inbox',
   standalone: true,
   imports: [CommonModule, FormsModule, AlertComponent],
   host: {
@@ -43,9 +43,88 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
               <span class="material-icons-outlined text-slate-400 dark:text-slate-500 text-[20px]">inbox</span>
               Inbox
             </h2>
-            <div class="flex items-center text-xs text-slate-500 dark:text-slate-400 gap-1 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
-              <span class="material-icons-outlined text-[16px]">check</span> Select
-            </div>
+            <ng-container *ngIf="accountHealth().length > 0; else noAccountsHeaderBtn">
+              <div class="relative">
+                <button
+                  (click)="isAccountDropdownOpen.set(!isAccountDropdownOpen())"
+                  class="flex items-center justify-between gap-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-300 py-1 pl-2.5 pr-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors w-full max-w-[160px] focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                >
+                  <span class="truncate flex-1">{{ currentAccountLabel() }}</span>
+                  <ng-container *ngIf="selectedAccount() as account; else allAccountsSelectedStatus">
+                    <span
+                      class="material-icons-outlined text-[15px]"
+                      [ngClass]="connectionStatusIconClasses(account)"
+                      [title]="connectionStatusLabel(account)"
+                      [attr.aria-label]="connectionStatusLabel(account)"
+                      >{{ connectionStatusIcon(account) }}</span
+                    >
+                  </ng-container>
+                  <ng-template #allAccountsSelectedStatus>
+                    <span class="material-icons-outlined text-[15px] text-slate-400 dark:text-slate-500" title="Todas las cuentas" aria-label="Todas las cuentas">all_inbox</span>
+                  </ng-template>
+                  <span class="material-icons-outlined text-[16px] text-slate-400 dark:text-slate-500">expand_more</span>
+                </button>
+
+                <!-- Backdrop -->
+                <div *ngIf="isAccountDropdownOpen()" class="fixed inset-0 z-40" (click)="isAccountDropdownOpen.set(false)"></div>
+
+                <!-- Dropdown Menu -->
+                <div
+                  *ngIf="isAccountDropdownOpen()"
+                  class="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-slate-200 dark:border-slate-700 overflow-hidden z-50 flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-200"
+                >
+                  <button
+                    *ngIf="accountHealth().length !== 1"
+                    (click)="selectAccount('all')"
+                    class="text-left px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-2"
+                    [class.bg-slate-50]="filters().accountId === 'all'"
+                    [class.dark:bg-slate-700]="filters().accountId === 'all'"
+                  >
+                    <span class="material-icons-outlined text-[16px] text-slate-400 dark:text-slate-500">all_inbox</span>
+                    <span class="truncate">Todas las cuentas</span>
+                  </button>
+
+                  <button
+                    *ngFor="let account of accountHealth()"
+                    (click)="selectAccount(account.id)"
+                    class="text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center gap-2"
+                    [class.bg-slate-50]="filters().accountId === account.id"
+                    [class.dark:bg-slate-700]="filters().accountId === account.id"
+                  >
+                    <span class="material-icons-outlined text-[16px]" [class.text-indigo-500]="filters().accountId === account.id" [class.text-slate-400]="filters().accountId !== account.id"
+                      >mail</span
+                    >
+                    <span class="truncate font-medium flex-1">{{ account.email_address }}</span>
+                    <span
+                      class="material-icons-outlined text-[15px]"
+                      [ngClass]="connectionStatusIconClasses(account)"
+                      [title]="connectionStatusLabel(account)"
+                      [attr.aria-label]="connectionStatusLabel(account)"
+                      >{{ connectionStatusIcon(account) }}</span
+                    >
+                  </button>
+
+                  <div class="h-px bg-slate-100 dark:bg-slate-700/50 my-1"></div>
+
+                  <button
+                    (click)="navigateToAddAccount()"
+                    class="text-left px-3 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors flex items-center gap-2"
+                  >
+                    <span class="material-icons-outlined text-[16px]">add_circle_outline</span>
+                    <span>Añadir cuenta</span>
+                  </button>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #noAccountsHeaderBtn>
+              <button
+                (click)="navigateToAddAccount()"
+                class="flex items-center gap-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+              >
+                <span class="material-icons-outlined text-[16px]">add_circle_outline</span>
+                <span>Añadir cuenta</span>
+              </button>
+            </ng-template>
           </div>
 
           <!-- Search Bar -->
@@ -90,6 +169,14 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
             >
               <span class="material-icons-outlined text-[16px]">notifications</span>
             </button>
+            <button
+              class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              [disabled]="isSyncing() || !hasSyncableAccounts()"
+              (click)="triggerSync()"
+              title="Sincronizar correos"
+            >
+              <span class="material-icons-outlined text-[16px]" [class.animate-spin]="isSyncing()">sync</span>
+            </button>
           </div>
         </div>
 
@@ -101,8 +188,12 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
 
           <div *ngIf="loading()" class="p-8 text-center text-sm text-slate-500 dark:text-slate-400 transition-colors">Cargando mensajes...</div>
 
-          <div *ngIf="!loading() && filteredMessages().length === 0" class="p-8 text-center">
+          <div *ngIf="!loading() && accountHealth().length > 0 && filteredMessages().length === 0" class="p-8 text-center">
             <p class="text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors">No hay mensajes.</p>
+          </div>
+
+          <div *ngIf="!loading() && accountHealth().length === 0" class="p-8 text-center flex flex-col items-center justify-center h-40">
+            <p class="text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors">No hay cuentas conectadas.</p>
           </div>
 
           <div *ngIf="!loading() && filteredMessages().length > 0">
@@ -113,7 +204,7 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
             <ul class="divide-y divide-slate-50 dark:divide-slate-800 transition-colors">
               <li
                 *ngFor="let message of filteredMessages()"
-                (click)="selectedMessage.set(message)"
+                (click)="selectMessage(message)"
                 class="flex items-start gap-3 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors relative"
                 [class.bg-indigo-50]="selectedMessage()?.id === message.id"
                 [class.dark:bg-indigo-500]="false"
@@ -224,8 +315,12 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
               </div>
 
               <div class="prose prose-sm prose-slate dark:prose-invert max-w-none whitespace-pre-wrap text-slate-700 dark:text-slate-300 transition-colors">
-                {{ selectedMessage()!.snippet || 'Este mensaje no contiene texto plano o aún no se ha extraído.' }}
+                <ng-container *ngIf="!isDetailLoading(); else loadingDetailContent">
+                  {{ selectedMessageBody() || 'Este mensaje no contiene texto plano o aun no se ha extraido.' }}
+                </ng-container>
+                <ng-template #loadingDetailContent>Cargando contenido del correo...</ng-template>
               </div>
+              <p *ngIf="detailError()" class="mt-3 text-sm text-rose-600 dark:text-rose-400">{{ detailError() }}</p>
 
               <!-- Attachments Box (Mockup) -->
               <div
@@ -268,22 +363,39 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
         <ng-template #emptyState>
           <div class="absolute inset-0 flex items-center justify-center p-8">
             <div class="text-center max-w-sm mx-auto">
-              <!-- Illustration Circle -->
-              <div class="w-32 h-32 rounded-full bg-slate-50 dark:bg-slate-900 mx-auto mb-6 flex items-center justify-center relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-colors">
-                <!-- Inner card mockup -->
-                <div
-                  class="w-16 h-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 p-2.5 flex flex-col gap-2 -rotate-6 transform hover:rotate-0 transition-all duration-300 cursor-default"
-                >
-                  <div class="flex items-center gap-1 border-b border-slate-100 dark:border-slate-700 pb-2 transition-colors">
-                    <span class="material-icons-outlined text-[10px] text-slate-400 dark:text-slate-500">mail</span>
-                    <div class="h-1.5 w-6 bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
+              <ng-container *ngIf="accountHealth().length > 0; else noAccountsIllustration">
+                <!-- Illustration Circle -->
+                <div class="w-32 h-32 rounded-full bg-slate-50 dark:bg-slate-900 mx-auto mb-6 flex items-center justify-center relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-colors">
+                  <!-- Inner card mockup -->
+                  <div
+                    class="w-16 h-20 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700 p-2.5 flex flex-col gap-2 -rotate-6 transform hover:rotate-0 transition-all duration-300 cursor-default"
+                  >
+                    <div class="flex items-center gap-1 border-b border-slate-100 dark:border-slate-700 pb-2 transition-colors">
+                      <span class="material-icons-outlined text-[10px] text-slate-400 dark:text-slate-500">mail</span>
+                      <div class="h-1.5 w-6 bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
+                    </div>
+                    <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
+                    <div class="h-1.5 w-2/3 bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
                   </div>
-                  <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
-                  <div class="h-1.5 w-2/3 bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
                 </div>
-              </div>
-              <h3 class="text-lg font-medium text-slate-900 dark:text-white transition-colors">No hay mensajes</h3>
-              <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 transition-colors">Elige un correo para ver los detalles</p>
+                <h3 class="text-lg font-medium text-slate-900 dark:text-white transition-colors">No hay mensajes</h3>
+                <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 transition-colors">Elige un correo para ver los detalles</p>
+              </ng-container>
+
+              <ng-template #noAccountsIllustration>
+                <div class="w-32 h-32 rounded-full bg-indigo-50 dark:bg-indigo-900/20 mx-auto mb-6 flex items-center justify-center relative transition-colors">
+                  <span class="material-icons-outlined text-[48px] text-indigo-500 dark:text-indigo-400">mark_email_unread</span>
+                </div>
+                <h3 class="text-lg font-medium text-slate-900 dark:text-white transition-colors">Empieza a recibir tus correos</h3>
+                <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 transition-colors mb-6">Conecta tu cuenta de correo para centralizar tus facturas y documentos.</p>
+                <button
+                  (click)="navigateToAddAccount()"
+                  class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <span class="material-icons-outlined text-[18px]">add_circle_outline</span>
+                  Conectar cuenta
+                </button>
+              </ng-template>
             </div>
           </div>
         </ng-template>
@@ -291,22 +403,59 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
     </div>
   `,
 })
-export class UnifiedInboxComponent implements OnInit, OnDestroy {
+export class MasterInboxComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly store = inject(UnifiedInboxStore);
 
   readonly loading = this.store.loading;
   readonly error = this.store.error;
+  readonly detailError = this.store.detailError;
+  readonly loadingMessageId = this.store.loadingMessageId;
   readonly tenantId = signal('');
   readonly messages = this.store.messages;
   readonly accountHealth = this.store.accountHealth;
   readonly filteredMessages = this.store.filteredMessages;
   readonly filters = this.store.filters;
+  readonly isSyncing = this.store.isSyncing;
+  readonly hasSyncableAccounts = computed(() => {
+    const accountId = this.filters().accountId;
+    const candidateAccounts = accountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === accountId);
+
+    return candidateAccounts.some((account) => account.connection_status === 'active' && account.status !== 'syncing');
+  });
 
   readonly providers = this.store.providers;
   readonly statuses = this.store.statuses;
 
-  readonly selectedMessage = signal<any | null>(null);
+  readonly selectedMessage = signal<UnifiedInboxMessage | null>(null);
+  readonly isAccountDropdownOpen = signal(false);
+  readonly selectedMessageBody = computed(() => {
+    const selected = this.selectedMessage();
+    if (!selected) {
+      return '';
+    }
+
+    const detail = this.store.getMessageDetail(selected.id);
+    return detail?.body_text || detail?.snippet || selected.snippet || '';
+  });
+  readonly isDetailLoading = computed(() => {
+    const selected = this.selectedMessage();
+    return !!selected && this.loadingMessageId() === selected.id;
+  });
+
+  readonly currentAccountLabel = computed(() => {
+    const accountId = this.filters().accountId;
+    if (accountId === 'all') return 'Todas las cuentas';
+    const account = this.accountHealth().find((a) => a.id === accountId);
+    return account ? account.email_address : 'Todas las cuentas';
+  });
+
+  readonly selectedAccount = computed(() => {
+    const accountId = this.filters().accountId;
+    if (accountId === 'all') return null;
+    return this.accountHealth().find((account) => account.id === accountId) ?? null;
+  });
 
   ngOnInit(): void {
     this.tenantId.set(this.route.snapshot.paramMap.get('tenantId') || '');
@@ -349,7 +498,89 @@ export class UnifiedInboxComponent implements OnInit, OnDestroy {
     this.store.patchFilters({ onlyInvoices });
   }
 
+  triggerSync(): void {
+    this.store.triggerSync();
+  }
+
+  selectAccount(accountId: string): void {
+    this.store.patchFilters({ accountId });
+    this.isAccountDropdownOpen.set(false);
+  }
+
+  navigateToAddAccount(): void {
+    this.isAccountDropdownOpen.set(false);
+    void this.router.navigate(['/', this.tenantId(), 'connections']);
+  }
+
   clearError(): void {
     this.store.clearError();
+  }
+
+  selectMessage(message: UnifiedInboxMessage): void {
+    this.selectedMessage.set(message);
+    this.store.loadMessageDetail(message.id);
+  }
+
+  connectionStatusIcon(account: AccountHealthSummary): string {
+    const status = this.getConnectionStatus(account);
+
+    switch (status) {
+      case 'active':
+        return 'check_circle';
+      case 'requires_reconnect':
+        return 'sync_problem';
+      case 'paused':
+        return 'pause_circle';
+      case 'error':
+        return 'error';
+      default:
+        return 'help';
+    }
+  }
+
+  connectionStatusIconClasses(account: AccountHealthSummary): string {
+    const status = this.getConnectionStatus(account);
+
+    switch (status) {
+      case 'active':
+        return 'text-emerald-500 dark:text-emerald-400';
+      case 'requires_reconnect':
+        return 'text-amber-500 dark:text-amber-400';
+      case 'paused':
+        return 'text-slate-400 dark:text-slate-500';
+      case 'error':
+        return 'text-rose-500 dark:text-rose-400';
+      default:
+        return 'text-slate-400 dark:text-slate-500';
+    }
+  }
+
+  connectionStatusLabel(account: AccountHealthSummary): string {
+    const status = this.getConnectionStatus(account);
+
+    switch (status) {
+      case 'active':
+        return 'Conexion activa';
+      case 'requires_reconnect':
+        return 'Requiere reconexion';
+      case 'paused':
+        return 'Conexion pausada';
+      case 'error':
+        return 'Conexion con error';
+      default:
+        return 'Estado de conexion desconocido';
+    }
+  }
+
+  private getConnectionStatus(account: AccountHealthSummary): 'active' | 'requires_reconnect' | 'paused' | 'error' | undefined {
+    if (account.connection_status) {
+      return account.connection_status;
+    }
+
+    if (account.status === 'active' || account.status === 'requires_reconnect' || account.status === 'paused' || account.status === 'error') {
+      return account.status;
+    }
+
+    return undefined;
   }
 }

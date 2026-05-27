@@ -53,8 +53,8 @@ export class LobbyStore {
     void this.router.navigate(['/', tenant.tenant_id, 'inbox', 'connections']);
   }
 
-  goToUnifiedInbox(tenant: TenantMembership): void {
-    void this.router.navigate(['/', tenant.tenant_id, 'inbox', 'unified']);
+  goToMasterInbox(tenant: TenantMembership): void {
+    void this.router.navigate(['/', tenant.tenant_id, 'inbox', 'master']);
   }
 
   createTenant(): void {

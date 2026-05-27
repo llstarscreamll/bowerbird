@@ -10,6 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	connectionsapp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
+	connectionsinfra "github.com/money-path/bowerbird/apps/backend/internal/connections/infrastructure"
+	connectionshttp "github.com/money-path/bowerbird/apps/backend/internal/connections/presentation/http"
 	"github.com/money-path/bowerbird/apps/backend/internal/health/application"
 	healthinfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
 	healthhttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
@@ -18,6 +22,9 @@ import (
 	identityhttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
 	inboxapp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
 	inboxinfra "github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure"
+	"github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure/provider"
+	"github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure/provider/gmail"
+	inboxevents "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/events"
 	inboxhttp "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/http"
 	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
 	invoicinginfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
@@ -28,8 +35,10 @@ import (
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
+	platformcrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
+	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -121,25 +130,92 @@ func main() {
 	// Register Routes
 	orgHandler.Register(mux, authMiddleware, isDev)
 
+	// Setup AWS Config
+	var awsCfg aws.Config
+	if cfg.AWSEndpointURL != "" {
+		awsCfg, err = awsconfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
+		if err != nil {
+			log.Fatalf("load aws config: %v", err)
+		}
+	} else if cfg.AWSRegion != "" {
+		awsCfg, err = awsconfig.Load(ctxApp, cfg.AWSRegion, "", "", "")
+		if err != nil {
+			log.Fatalf("load aws config: %v", err)
+		}
+	}
+
+	var eventPublisher connectionshttp.EventPublisher
+	if cfg.EventBusName != "" {
+		ebClient := awsconfig.NewEventBridgeClient(awsCfg, cfg.AWSEndpointURL)
+		eventPublisher = events.NewEventBridgePublisher(ebClient, cfg.EventBusName)
+	}
+
+	// Setup Connections Context
+	var connectionsService connectionsapp.InternalService
+	var connectionsHandler *connectionshttp.Handler
+	if cfg.InboxCredentialsEncryptionKey != "" {
+		cipher, err := platformcrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+		if err != nil {
+			log.Fatalf("new cipher failed: %v", err)
+		}
+		credentialsService := connectionsapp.NewCredentialsService(cipher)
+		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
+		connectionsService = connectionsapp.NewInternalService(connectionsRepo, credentialsService, observability.NoopMetrics{})
+
+		var connectionsGoogleConfig *oauth2.Config
+		if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+			connectionsGoogleConfig = &oauth2.Config{
+				ClientID:     cfg.GoogleClientID,
+				ClientSecret: cfg.GoogleClientSecret,
+				RedirectURL:  strings.TrimRight(cfg.BackendURL, "/") + "/api/v1/connections/google/callback",
+				Scopes:       []string{"email", "https://www.googleapis.com/auth/gmail.modify"},
+				Endpoint:     google.Endpoint,
+			}
+		}
+		connectionsHandler = connectionshttp.NewHandler(connectionsRepo, credentialsService, connectionsGoogleConfig, tokenGen, cipher, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/"))
+	} else {
+		// Just for fallback if not provided, though it's typically required
+		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
+		connectionsService = connectionsapp.NewInternalService(connectionsRepo, nil, observability.NoopMetrics{})
+		connectionsHandler = connectionshttp.NewHandler(connectionsRepo, nil, nil, tokenGen, nil, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/")) // In a real scenario this nil might cause panic if hit, but this block is a fallback
+	}
+	connectionsHandler.Register(mux, authMiddleware, isDev)
+
 	// Setup Inbox Context
 	inboxRepo := inboxinfra.NewPostgresRepository(registry)
-	listAccountHealthUseCase := inboxapp.NewListAccountHealthUseCase(inboxRepo)
+
+	// Create Provider Factory for sync accounts
+	var providerFactory inboxapp.ProviderClientFactory
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		providerFactory = provider.NewDefaultFactory(gmail.OAuthConfig{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+		})
+	}
+
+	// The sync process needs these
+	var syncAccounts *inboxapp.SyncAccountsUseCase
+	if providerFactory != nil {
+		syncAccounts = inboxapp.NewSyncAccountsUseCase(inboxRepo, connectionsService, providerFactory, nil, nil) // we don't have attachments setup here fully but we can pass nil or similar
+	}
+	initialSyncUseCase := inboxapp.NewInitialSyncUseCase(inboxRepo, connectionsService, syncAccounts)
+
+	listAccountHealthUseCase := inboxapp.NewListAccountHealthUseCase(inboxRepo, connectionsService)
 	listMessagesUseCase := inboxapp.NewListMessagesUseCase(inboxRepo)
-	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase)
+	getMessageUseCase := inboxapp.NewGetMessageUseCase(inboxRepo)
+	triggerSyncUseCase := inboxapp.NewTriggerSyncUseCase(inboxRepo, connectionsService, syncAccounts)
+	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase, getMessageUseCase, triggerSyncUseCase)
 	inboxHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Event Poller
 	invoicingRouter := invoicinginfra.NewLogRouter()
 	invoicingUseCase := invoicingapp.NewProcessInboxEventUseCase(invoicingRouter)
 	inboxMessageSubscriber := invoicingevents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
-	eventHandler := events.NewEventHandler(inboxMessageSubscriber)
+
+	inboxEventsSubscriber := inboxevents.NewConnectionAddedSubscriber(initialSyncUseCase)
+	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
-		awsCfg, err := awsconfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
-		if err != nil {
-			log.Fatalf("load aws config: %v", err)
-		}
-
 		sqsClient := awsconfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)
 		poller := events.NewPoller(sqsClient, eventHandler, cfg.SQSQueueURL, cfg.EventBridgeQueueURL)
 		poller.Run(ctxApp)

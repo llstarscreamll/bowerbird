@@ -1,4 +1,4 @@
-import { ConnectionStatus, MailProvider } from './inbox.types';
+import { ConnectionStatus, MailProvider, SyncStatus } from './inbox.types';
 
 export type MessageProcessingStatus = 'new' | 'processed' | 'skipped' | 'error';
 
@@ -16,8 +16,13 @@ export interface UnifiedInboxMessage {
   has_pdf: boolean;
 }
 
+export interface UnifiedInboxMessageDetail extends UnifiedInboxMessage {
+  body_text?: string;
+}
+
 export interface UnifiedInboxFilters {
   provider: 'all' | MailProvider;
+  accountId: string | 'all';
   status: 'all' | MessageProcessingStatus;
   onlyInvoices: boolean;
   search: string;
@@ -27,6 +32,14 @@ export interface AccountHealthSummary {
   id: string;
   provider: MailProvider;
   email_address: string;
-  status: ConnectionStatus;
+  status: SyncStatus | ConnectionStatus;
+  connection_status?: ConnectionStatus;
+  sync_status?: SyncStatus;
+  last_synced_at?: string;
+}
+
+export interface AccountSyncStatus {
+  id: string;
+  status: SyncStatus;
   last_synced_at?: string;
 }

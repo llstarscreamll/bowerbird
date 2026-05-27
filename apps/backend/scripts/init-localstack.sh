@@ -20,7 +20,7 @@ awslocal events create-event-bus --name "$EVENT_BUS_NAME" >/dev/null || true
 awslocal events put-rule \
   --name "$EVENT_RULE_NAME" \
   --event-bus-name "$EVENT_BUS_NAME" \
-  --event-pattern '{"source": ["bowerbird.app"]}' >/dev/null
+  --event-pattern '{"source": [{"prefix": "bowerbird."}]}' >/dev/null
 awslocal events put-targets \
   --event-bus-name "$EVENT_BUS_NAME" \
   --rule "$EVENT_RULE_NAME" \
@@ -41,6 +41,7 @@ else
   "database_url": "postgres://bowerbird:bowerbird@postgres:5432/bowerbird?sslmode=disable",
   "sqs_queue_url": "http://localhost:4566/000000000000/bowerbird-local-sqs",
   "eventbridge_queue_url": "http://localhost:4566/000000000000/bowerbird-local-eventbridge",
+  "event_bus_name": "bowerbird-local-bus",
   "s3_bucket_name": "bowerbird-local-bucket",
   "third_party_api_key": "dummy-api-key",
   "google_client_id": "dummy-google-client-id",

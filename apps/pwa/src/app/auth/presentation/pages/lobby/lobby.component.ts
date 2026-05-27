@@ -143,7 +143,7 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
 
                 <div class="flex items-center gap-4">
                   <button class="btn-secondary px-2.5 py-1.5 text-xs" (click)="goToConnections($event, tenant)" type="button">Correo</button>
-                  <button class="btn-secondary px-2.5 py-1.5 text-xs" (click)="goToUnifiedInbox($event, tenant)" type="button">Bandeja</button>
+                  <button class="btn-secondary px-2.5 py-1.5 text-xs" (click)="goToMasterInbox($event, tenant)" type="button">Bandeja</button>
                   <span
                     class="px-2 py-0.5 inline-flex text-[11px] font-medium rounded-md border"
                     [ngClass]="{
@@ -188,9 +188,9 @@ export class LobbyComponent implements OnInit {
     this.lobbyStore.goToConnections(tenant);
   }
 
-  goToUnifiedInbox(event: MouseEvent, tenant: TenantMembership) {
+  goToMasterInbox(event: MouseEvent, tenant: TenantMembership) {
     event.stopPropagation();
-    this.lobbyStore.goToUnifiedInbox(tenant);
+    this.lobbyStore.goToMasterInbox(tenant);
   }
 
   toggleCreateForm() {

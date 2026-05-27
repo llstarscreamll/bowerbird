@@ -3,90 +3,28 @@ package domain
 import "time"
 
 const (
-	ConnectedAccountStatusActive            = "active"
-	ConnectedAccountStatusRequiresReconnect = "requires_reconnect"
-	ConnectedAccountStatusPaused            = "paused"
-	ConnectedAccountStatusError             = "error"
+	InboxSyncStatusSyncing = "syncing"
+	InboxSyncStatusIdle    = "idle"
+	InboxSyncStatusError   = "error"
 )
 
-type ConnectedAccountSyncStateChanged struct {
-	AccountID    string
-	FromStatus   string
-	ToStatus     string
-	OccurredAt   time.Time
+type InboxSyncCursor struct {
+	ConnectionID string
 	LastSyncedAt *time.Time
 	LastError    *string
-}
-
-type ConnectedAccount struct {
-	ID           string
-	Provider     string
-	EmailAddress string
 	Status       string
-	// EncryptedCredentials stores provider tokens encrypted at application layer.
-	EncryptedCredentials []byte
-	LastSyncedAt         *time.Time
-	LastError            *string
-	RawData              []byte
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	pendingEvents        []ConnectedAccountSyncStateChanged
 }
 
-func (a *ConnectedAccount) MarkSyncFailed(at time.Time, failure string) error {
-	if a == nil {
-		return ErrNilConnectedAccount
-	}
-	if failure == "" {
-		return ErrSyncFailureReasonRequired
-	}
-
-	next := ConnectedAccountStatusError
-	lastError := failure
-	a.transitionSyncState(next, at.UTC(), a.LastSyncedAt, &lastError)
-
-	return nil
+func (c *InboxSyncCursor) MarkSyncFailed(at time.Time, failure string) {
+	c.Status = InboxSyncStatusError
+	c.LastError = &failure
 }
 
-func (a *ConnectedAccount) MarkSyncSucceeded(at time.Time) error {
-	if a == nil {
-		return ErrNilConnectedAccount
-	}
-
+func (c *InboxSyncCursor) MarkSyncSucceeded(at time.Time) {
+	c.Status = InboxSyncStatusIdle
+	c.LastError = nil
 	syncedAt := at.UTC()
-	next := ConnectedAccountStatusActive
-	a.transitionSyncState(next, syncedAt, &syncedAt, nil)
-
-	return nil
-}
-
-func (a *ConnectedAccount) PullSyncStateEvents() []ConnectedAccountSyncStateChanged {
-	if len(a.pendingEvents) == 0 {
-		return nil
-	}
-
-	events := make([]ConnectedAccountSyncStateChanged, len(a.pendingEvents))
-	copy(events, a.pendingEvents)
-	a.pendingEvents = nil
-
-	return events
-}
-
-func (a *ConnectedAccount) transitionSyncState(nextStatus string, at time.Time, lastSyncedAt *time.Time, lastError *string) {
-	previous := a.Status
-	a.Status = nextStatus
-	a.LastSyncedAt = lastSyncedAt
-	a.LastError = lastError
-	a.UpdatedAt = at
-
-	a.pendingEvents = append(a.pendingEvents, ConnectedAccountSyncStateChanged{
-		AccountID:    a.ID,
-		FromStatus:   previous,
-		ToStatus:     nextStatus,
-		OccurredAt:   at,
-		LastSyncedAt: lastSyncedAt,
-		LastError:    lastError,
-	})
+	c.LastSyncedAt = &syncedAt
 }
 
 type EmailMessage struct {
@@ -209,6 +147,7 @@ type UnifiedMessage struct {
 	Subject          string
 	Sender           string
 	Snippet          string
+	BodyText         string
 	ReceivedAt       time.Time
 	ProcessingStatus string
 	HasXML           bool

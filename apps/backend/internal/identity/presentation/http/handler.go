@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -143,6 +144,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *AuthHandler) OAuthGoogleLogin(w http.ResponseWriter, r *http.Request) error {
+	slog.Info("Starting Identity Google login flow", "state", "state-token")
 	if h.googleConfig == nil {
 		return apperrors.New(apperrors.CodeNotImplemented, "google oauth not configured")
 	}
@@ -152,25 +154,37 @@ func (h *AuthHandler) OAuthGoogleLogin(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request) error {
-	if h.googleConfig == nil {
-		return apperrors.New(apperrors.CodeNotImplemented, "google oauth not configured")
+	state := r.FormValue("state")
+	slog.Info("Received Identity Google login callback", "state", state, "error", r.FormValue("error"))
+
+	redirectOnError := func(reason string) error {
+		slog.Error("Identity Google login callback failed", "reason", reason)
+		http.Redirect(w, r, h.frontendURL+"/login?error=google_auth_failed", http.StatusTemporaryRedirect)
+		return nil
 	}
 
-	state := r.FormValue("state")
+	if h.googleConfig == nil {
+		return redirectOnError("google oauth not configured")
+	}
+
 	if state != "state-token" {
-		return apperrors.New(apperrors.CodeValidation, "invalid oauth state")
+		return redirectOnError("invalid oauth state")
 	}
 
 	code := r.FormValue("code")
+	if code == "" {
+		return redirectOnError("missing code parameter")
+	}
+
 	token, err := h.googleConfig.Exchange(r.Context(), code)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "code exchange failed")
+		return redirectOnError("code exchange failed")
 	}
 
 	client := h.googleConfig.Client(r.Context(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed getting user info")
+		return redirectOnError("failed getting user info")
 	}
 	defer resp.Body.Close()
 
@@ -181,13 +195,17 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 		Picture string `json:"picture"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed parsing user info")
+		return redirectOnError("failed parsing user info")
 	}
+
+	slog.Info("Fetched Identity Google user info", "email", userInfo.Email, "provider_id", userInfo.ID)
 
 	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "google", userInfo.ID, userInfo.Name, userInfo.Picture)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "oauth login failed")
+		return redirectOnError("oauth login failed")
 	}
+
+	slog.Info("Identity Google login successful", "email", userInfo.Email)
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
@@ -195,6 +213,7 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 }
 
 func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request) error {
+	slog.Info("Starting Identity Microsoft login flow", "state", "state-token")
 	if h.microsoftConfig == nil {
 		return apperrors.New(apperrors.CodeNotImplemented, "microsoft oauth not configured")
 	}
@@ -204,25 +223,37 @@ func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request
 }
 
 func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Request) error {
-	if h.microsoftConfig == nil {
-		return apperrors.New(apperrors.CodeNotImplemented, "microsoft oauth not configured")
+	state := r.FormValue("state")
+	slog.Info("Received Identity Microsoft login callback", "state", state, "error", r.FormValue("error"))
+
+	redirectOnError := func(reason string) error {
+		slog.Error("Identity Microsoft login callback failed", "reason", reason)
+		http.Redirect(w, r, h.frontendURL+"/login?error=microsoft_auth_failed", http.StatusTemporaryRedirect)
+		return nil
 	}
 
-	state := r.FormValue("state")
+	if h.microsoftConfig == nil {
+		return redirectOnError("microsoft oauth not configured")
+	}
+
 	if state != "state-token" {
-		return apperrors.New(apperrors.CodeValidation, "invalid oauth state")
+		return redirectOnError("invalid oauth state")
 	}
 
 	code := r.FormValue("code")
+	if code == "" {
+		return redirectOnError("missing code parameter")
+	}
+
 	token, err := h.microsoftConfig.Exchange(r.Context(), code)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "code exchange failed")
+		return redirectOnError("code exchange failed")
 	}
 
 	client := h.microsoftConfig.Client(r.Context(), token)
 	resp, err := client.Get("https://graph.microsoft.com/v1.0/me")
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed getting user info")
+		return redirectOnError("failed getting user info")
 	}
 	defer resp.Body.Close()
 
@@ -232,13 +263,17 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 		Name  string `json:"displayName"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed parsing user info")
+		return redirectOnError("failed parsing user info")
 	}
+
+	slog.Info("Fetched Identity Microsoft user info", "email", userInfo.Email, "provider_id", userInfo.ID)
 
 	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "microsoft", userInfo.ID, userInfo.Name, "")
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "oauth login failed")
+		return redirectOnError("oauth login failed")
 	}
+
+	slog.Info("Identity Microsoft login successful", "email", userInfo.Email)
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)

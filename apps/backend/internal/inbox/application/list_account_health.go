@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 
+	"github.com/money-path/bowerbird/apps/backend/internal/connections/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 )
 
@@ -10,37 +11,48 @@ type AccountHealthSummary struct {
 	ID           string  `json:"id"`
 	Provider     string  `json:"provider"`
 	EmailAddress string  `json:"email_address"`
-	Status       string  `json:"status"`
+	Status       string  `json:"status"` // the sync status
 	LastSyncedAt *string `json:"last_synced_at,omitempty"`
 }
 
 type ListAccountHealthUseCase struct {
-	repo domain.Repository
+	repo               domain.Repository
+	connectionsService application.InternalService
 }
 
-func NewListAccountHealthUseCase(repo domain.Repository) *ListAccountHealthUseCase {
-	return &ListAccountHealthUseCase{repo: repo}
+func NewListAccountHealthUseCase(repo domain.Repository, connectionsService application.InternalService) *ListAccountHealthUseCase {
+	return &ListAccountHealthUseCase{repo: repo, connectionsService: connectionsService}
 }
 
 func (uc *ListAccountHealthUseCase) Execute(ctx context.Context) ([]AccountHealthSummary, error) {
-	accounts, err := uc.repo.ListConnectedAccounts(ctx)
+	connections, err := uc.connectionsService.GetActiveConnections(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	summaries := make([]AccountHealthSummary, 0, len(accounts))
-	for _, acc := range accounts {
+	summaries := make([]AccountHealthSummary, 0, len(connections))
+	for _, conn := range connections {
+		cursor, err := uc.repo.GetSyncCursor(ctx, conn.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		var lastSyncedAt *string
-		if acc.LastSyncedAt != nil {
-			t := acc.LastSyncedAt.Format("2006-01-02T15:04:05Z07:00")
-			lastSyncedAt = &t
+		var status = "idle" // default
+
+		if cursor != nil {
+			status = cursor.Status
+			if cursor.LastSyncedAt != nil {
+				t := cursor.LastSyncedAt.Format("2006-01-02T15:04:05Z07:00")
+				lastSyncedAt = &t
+			}
 		}
 
 		summaries = append(summaries, AccountHealthSummary{
-			ID:           acc.ID,
-			Provider:     acc.Provider,
-			EmailAddress: acc.EmailAddress,
-			Status:       acc.Status,
+			ID:           conn.ID,
+			Provider:     conn.Provider,
+			EmailAddress: conn.ProviderAccountEmail,
+			Status:       status,
 			LastSyncedAt: lastSyncedAt,
 		})
 	}

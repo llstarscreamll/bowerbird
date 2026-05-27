@@ -86,6 +86,16 @@ Utilizado para vistas de alta densidad de información, implementado en la **Ban
 
 ### Componentes Destacados
 
+#### Modal (`<app-modal>`)
+
+Componente universal y declarativo para renderizar diálogos flotantes accesibles. Sigue estrictamente los estándares modernos recomendados por la W3C usando la etiqueta nativa `<dialog>` y la Pseudo-clase `::backdrop`.
+
+- **Responsabilidad Visual:** Atrae el foco del usuario atenuando y bloqueando el fondo para tareas que requieren confirmación, selección rápida o flujos aislados (ej. _"Añadir cuenta"_).
+- **Especificaciones Técnicas (Modern Web Guidance):**
+  - Usa el nuevo atributo declarativo `closedby="any"` (Baseline Newly Available) para habilitar el descarte ligero (_Light-dismiss_) al pinchar fuera de la caja, con un fallback riguroso basado en `getBoundingClientRect()` para navegadores que aún no lo soportan.
+  - El modal atrapa el teclado de forma automática sin polifills pesados y responde nativamente a la tecla `Escape`.
+  - La directiva estructural de Angular unifica su ciclo de vida escuchando `(cancel)` y `(close)` para sincronizar la propiedad `@Input() isOpen`.
+
 #### Alert (`<app-alert>`)
 
 Componente Callout diseñado para captar la atención del usuario siguiendo convenciones visuales semánticas de color e íconos. (Ver sección de [Manejo de Errores](#manejo-de-errores-y-retroalimentación-ui) para lineamientos de uso versus Toasts).

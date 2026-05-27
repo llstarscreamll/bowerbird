@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/money-path/bowerbird/apps/backend/internal/connections/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/id"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
@@ -44,7 +45,7 @@ type StoredAttachment struct {
 
 type SyncAccountsUseCase struct {
 	repo               domain.Repository
-	credentialsService *CredentialsService
+	connectionsService application.InternalService
 	providerFactory    ProviderClientFactory
 	publisher          InboxEventPublisher
 	attachmentStorage  AttachmentStorage
@@ -63,14 +64,14 @@ type SyncAccountsResult struct {
 
 func NewSyncAccountsUseCase(
 	repo domain.Repository,
-	credentialsService *CredentialsService,
+	connectionsService application.InternalService,
 	providerFactory ProviderClientFactory,
 	publisher InboxEventPublisher,
 	attachmentStorage AttachmentStorage,
 ) *SyncAccountsUseCase {
 	return &SyncAccountsUseCase{
 		repo:               repo,
-		credentialsService: credentialsService,
+		connectionsService: connectionsService,
 		providerFactory:    providerFactory,
 		publisher:          publisher,
 		attachmentStorage:  attachmentStorage,
@@ -88,65 +89,106 @@ func (u *SyncAccountsUseCase) Run(ctx context.Context) (*SyncAccountsResult, err
 		return nil, err
 	}
 
-	accounts, err := u.repo.ListConnectedAccountsByStatus(ctx, "active")
+	accounts, err := u.connectionsService.GetActiveConnections(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list active connected accounts: %w", err)
+		return nil, fmt.Errorf("list active connections: %w", err)
 	}
 
 	result := &SyncAccountsResult{}
 	for _, account := range accounts {
 		result.AccountsProcessed++
-		if err := u.syncAccount(ctx, tenantSlug, account, result); err != nil {
-			result.Failures++
-			u.metrics.IncCounter("inbox_sync_errors_total", map[string]string{"tenant_slug": tenantSlug, "provider": account.Provider})
-			u.logger.Error(
-				"inbox account sync failed",
-				"tenant_slug",
-				tenantSlug,
-				"account_id",
-				account.ID,
-				"provider",
-				account.Provider,
-				"error",
-				err,
-			)
-			now := u.now().UTC()
-			if markErr := account.MarkSyncFailed(now, err.Error()); markErr != nil {
-				u.logger.Error("inbox account state transition failed", "account_id", account.ID, "error", markErr)
-			} else {
-				_ = u.repo.UpdateConnectedAccountSyncState(ctx, account.ID, account.Status, account.LastSyncedAt, account.LastError, account.UpdatedAt)
-			}
-			continue
-		}
-
-		now := u.now().UTC()
-		if err := account.MarkSyncSucceeded(now); err != nil {
-			u.logger.Error("inbox account state transition failed", "account_id", account.ID, "error", err)
-		} else {
-			_ = u.repo.UpdateConnectedAccountSyncState(ctx, account.ID, account.Status, account.LastSyncedAt, account.LastError, account.UpdatedAt)
+		err := u.SyncSingleAccountWithResult(ctx, tenantSlug, account, result)
+		if err != nil {
+			// already logged
 		}
 	}
 
-	u.metrics.ObserveDuration("inbox_sync_run_duration_ms", u.now().Sub(startedAt), map[string]string{"tenant_slug": tenantSlug})
 	u.logger.Info(
-		"inbox sync run completed",
+		"sync accounts completed",
 		"tenant_slug",
 		tenantSlug,
 		"accounts_processed",
 		result.AccountsProcessed,
 		"messages_synced",
 		result.MessagesSynced,
-		"events_published",
-		result.EventsPublished,
 		"failures",
 		result.Failures,
+		"duration",
+		u.now().Sub(startedAt).String(),
 	)
 
 	return result, nil
 }
 
-func (u *SyncAccountsUseCase) syncAccount(ctx context.Context, tenantSlug string, account *domain.ConnectedAccount, result *SyncAccountsResult) error {
-	credentialsJSON, err := u.credentialsService.DecryptFromStorage(account.EncryptedCredentials)
+func (u *SyncAccountsUseCase) SyncSingleAccount(ctx context.Context, connectionID string) (*SyncAccountsResult, error) {
+	tenantSlug, err := tenant.TenantSlugFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts, err := u.connectionsService.GetActiveConnections(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list active connections: %w", err)
+	}
+
+	var targetAccount *application.ConnectionInfo
+	for _, acc := range accounts {
+		if acc.ID == connectionID {
+			targetAccount = &acc
+			break
+		}
+	}
+
+	if targetAccount == nil {
+		return nil, fmt.Errorf("active connection not found: %s", connectionID)
+	}
+
+	result := &SyncAccountsResult{}
+	result.AccountsProcessed = 1
+	err = u.SyncSingleAccountWithResult(ctx, tenantSlug, *targetAccount, result)
+	return result, err
+}
+
+func (u *SyncAccountsUseCase) SyncSingleAccountWithResult(ctx context.Context, tenantSlug string, account application.ConnectionInfo, result *SyncAccountsResult) error {
+	cursor, err := u.repo.GetSyncCursor(ctx, account.ID)
+	if err != nil {
+		u.logger.Error("failed to get sync cursor", "account_id", account.ID, "error", err)
+		return err
+	}
+	if cursor == nil {
+		cursor = &domain.InboxSyncCursor{
+			ConnectionID: account.ID,
+			Status:       domain.InboxSyncStatusIdle,
+		}
+	}
+
+	if err := u.syncAccount(ctx, tenantSlug, account, cursor, result); err != nil {
+		result.Failures++
+		u.metrics.IncCounter("inbox_sync_errors_total", map[string]string{"tenant_slug": tenantSlug, "provider": account.Provider})
+		u.logger.Error(
+			"inbox account sync failed",
+			"tenant_slug",
+			tenantSlug,
+			"account_id",
+			account.ID,
+			"provider",
+			account.Provider,
+			"error",
+			err,
+		)
+		now := u.now().UTC()
+		cursor.MarkSyncFailed(now, err.Error())
+		_ = u.repo.UpsertSyncCursor(ctx, cursor)
+
+		_ = u.connectionsService.MarkRequiresReconnect(ctx, account.ID, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (u *SyncAccountsUseCase) syncAccount(ctx context.Context, tenantSlug string, account application.ConnectionInfo, cursor *domain.InboxSyncCursor, result *SyncAccountsResult) error {
+	credentialsJSON, err := u.connectionsService.DecryptCredentials(ctx, account.ID)
 	if err != nil {
 		return fmt.Errorf("decrypt account credentials: %w", err)
 	}
@@ -156,7 +198,7 @@ func (u *SyncAccountsUseCase) syncAccount(ctx context.Context, tenantSlug string
 		return fmt.Errorf("build provider client: %w", err)
 	}
 
-	query := incrementalQuery(account.LastSyncedAt)
+	query := incrementalQuery(cursor.LastSyncedAt)
 	pageToken := ""
 	for {
 		refs, nextPageToken, err := client.ListMessages(ctx, domain.ListMessagesOptions{
@@ -181,186 +223,153 @@ func (u *SyncAccountsUseCase) syncAccount(ctx context.Context, tenantSlug string
 			}
 
 			now := u.now().UTC()
+
+			// Extracting pointers properly to variables
+			var threadIDPtr *string
+			if message.ThreadID != "" {
+				threadIDStr := message.ThreadID
+				threadIDPtr = &threadIDStr
+			}
+
+			var subjectPtr *string
+			if message.Subject != "" {
+				subjectStr := message.Subject
+				subjectPtr = &subjectStr
+			}
+
+			var senderPtr *string
+			if message.Sender != "" {
+				senderStr := message.Sender
+				senderPtr = &senderStr
+			}
+
 			emailMessage, err := domain.NewSyncedEmailMessage(domain.NewEmailMessageInput{
 				ID:                u.newID(),
 				AccountID:         account.ID,
 				ProviderMessageID: message.ID,
-				ProviderThreadID:  asPtr(message.ThreadID),
-				Subject:           asPtr(message.Subject),
-				SenderEmail:       asPtr(message.Sender),
+				ProviderThreadID:  threadIDPtr,
+				Subject:           subjectPtr,
+				SenderEmail:       senderPtr,
 				ReceivedAt:        message.ReceivedAt,
 				RawData:           rawData,
 				CreatedAt:         now,
 				UpdatedAt:         now,
 			})
 			if err != nil {
-				return fmt.Errorf("build synced email message: %w", err)
+				return fmt.Errorf("build internal message: %w", err)
 			}
 
-			inserted, err := u.repo.UpsertEmailMessage(ctx, emailMessage)
-			if err != nil {
-				return fmt.Errorf("upsert email message: %w", err)
+			if _, err := u.repo.UpsertEmailMessage(ctx, emailMessage); err != nil {
+				return fmt.Errorf("save internal message: %w", err)
 			}
 
-			if inserted {
-				result.MessagesSynced++
-				u.metrics.IncCounter("inbox_sync_messages_total", map[string]string{"tenant_slug": tenantSlug, "provider": account.Provider})
-
-				eventAttachmentRefs, err := u.syncMessageAttachments(ctx, tenantSlug, emailMessage, message, client)
+			var attachmentRefs []domain.AttachmentRef
+			if len(message.Attachments) > 0 {
+				attachmentRefs, err = u.syncMessageAttachments(ctx, tenantSlug, account.ID, emailMessage.ID, message.Attachments, client)
 				if err != nil {
-					return fmt.Errorf("sync message attachments: %w", err)
+					u.logger.Error("failed to sync attachments", "message_id", emailMessage.ID, "error", err)
 				}
+			}
 
+			result.MessagesSynced++
+
+			if u.publisher != nil {
 				event := domain.InboxMessageReceived{
 					EventID:           u.newID(),
-					OccurredAt:        now.Format(time.RFC3339),
+					OccurredAt:        now.Format(time.RFC3339Nano),
 					TenantSlug:        tenantSlug,
 					AccountID:         account.ID,
 					Provider:          account.Provider,
 					ProviderMessageID: message.ID,
 					MessageInternalID: emailMessage.ID,
-					Subject:           message.Subject,
-					Sender:            message.Sender,
-					AttachmentRefs:    eventAttachmentRefs,
-					RawDataRef:        emailMessage.ID,
 				}
 
+				if message.Subject != "" {
+					event.Subject = message.Subject
+				}
+				if message.Sender != "" {
+					event.Sender = message.Sender
+				}
 				if message.ReceivedAt != nil {
 					event.ReceivedAt = message.ReceivedAt.Format(time.RFC3339)
 				}
 
-				if err := u.publisher.PublishInboxMessageReceived(ctx, event); err != nil {
-					return fmt.Errorf("publish InboxMessageReceived event: %w", err)
+				for _, att := range attachmentRefs {
+					event.AttachmentRefs = append(event.AttachmentRefs, domain.AttachmentRef{
+						S3Key:    att.S3Key,
+						Filename: att.Filename,
+						MimeType: att.MimeType,
+						SHA256:   att.SHA256,
+					})
 				}
 
-				result.EventsPublished++
-				u.logger.Info(
-					"inbox message synced and event published",
-					"tenant_slug",
-					tenantSlug,
-					"account_id",
-					account.ID,
-					"provider",
-					account.Provider,
-					"provider_message_id",
-					message.ID,
-					"attachments",
-					len(eventAttachmentRefs),
-				)
-			} else {
-				u.logger.Info(
-					"inbox message already upserted, skipped event publish",
-					"tenant_slug",
-					tenantSlug,
-					"account_id",
-					account.ID,
-					"provider_message_id",
-					message.ID,
-				)
+				if err := u.publisher.PublishInboxMessageReceived(ctx, event); err != nil {
+					u.logger.Error("failed to publish InboxMessageReceived", "event_id", event.EventID, "error", err)
+				} else {
+					result.EventsPublished++
+				}
 			}
 		}
 
-		if nextPageToken == "" {
+		pageToken = nextPageToken
+		if pageToken == "" {
 			break
 		}
-
-		pageToken = nextPageToken
 	}
 
-	return nil
-}
-
-func incrementalQuery(lastSyncedAt *time.Time) string {
-	if lastSyncedAt == nil {
-		return ""
-	}
-
-	return fmt.Sprintf("after:%d", lastSyncedAt.UTC().Unix())
-}
-
-func asPtr(value string) *string {
-	if value == "" {
-		return nil
-	}
-
-	v := value
-	return &v
+	now := u.now().UTC()
+	cursor.MarkSyncSucceeded(now)
+	return u.repo.UpsertSyncCursor(ctx, cursor)
 }
 
 func (u *SyncAccountsUseCase) syncMessageAttachments(
 	ctx context.Context,
 	tenantSlug string,
-	emailMessage *domain.EmailMessage,
-	providerMessage *domain.MailMessage,
+	accountID string,
+	messageID string,
+	attachments []domain.MailAttachmentRef,
 	client domain.MailProviderClient,
 ) ([]domain.AttachmentRef, error) {
-	if len(providerMessage.Attachments) == 0 {
+	if u.attachmentStorage == nil {
 		return nil, nil
 	}
 
-	if u.attachmentStorage == nil {
-		return nil, fmt.Errorf("attachment storage is not configured")
-	}
-
-	downloaded, err := client.DownloadMessageAttachments(ctx, "me", providerMessage.ID, providerMessage.Attachments)
-	if err != nil {
-		return nil, fmt.Errorf("download message attachments: %w", err)
-	}
-
-	eventRefs := make([]domain.AttachmentRef, 0, len(downloaded))
-	now := u.now().UTC()
-	for _, item := range downloaded {
-		attachmentRecordID := u.newID()
+	var refs []domain.AttachmentRef
+	for _, att := range attachments {
+		data, err := client.DownloadAttachment(ctx, "me", messageID, att.AttachmentID)
+		if err != nil {
+			return refs, fmt.Errorf("get provider attachment %s: %w", att.AttachmentID, err)
+		}
 
 		stored, err := u.attachmentStorage.StoreAttachment(ctx, StoreAttachmentInput{
 			TenantSlug:         tenantSlug,
-			ConnectedAccountID: emailMessage.AccountID,
-			MessageID:          emailMessage.ID,
-			AttachmentID:       attachmentRecordID,
-			Filename:           item.Filename,
-			ContentType:        item.MimeType,
-			Data:               item.Data,
+			ConnectedAccountID: accountID,
+			MessageID:          messageID,
+			AttachmentID:       att.AttachmentID,
+			Filename:           att.Filename,
+			ContentType:        att.MimeType,
+			Data:               data,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("store attachment %s: %w", item.Filename, err)
+			return refs, fmt.Errorf("store attachment %s: %w", att.AttachmentID, err)
 		}
 
-		sizeBytes := stored.SizeBytes
-		rawAttachmentData, err := json.Marshal(map[string]any{
-			"uploaded":      true,
-			"attachment_id": item.AttachmentID,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("marshal attachment raw data: %w", err)
-		}
-
-		attachment, err := domain.NewEmailAttachment(domain.NewEmailAttachmentInput{
-			ID:        attachmentRecordID,
-			MessageID: emailMessage.ID,
-			Filename:  item.Filename,
-			MimeType:  asPtr(item.MimeType),
-			SizeBytes: &sizeBytes,
-			SHA256:    stored.SHA256,
-			S3Key:     stored.S3Key,
-			RawData:   rawAttachmentData,
-			CreatedAt: now,
-			UpdatedAt: now,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("build email attachment: %w", err)
-		}
-
-		if _, err := u.repo.UpsertEmailAttachment(ctx, attachment); err != nil {
-			return nil, fmt.Errorf("upsert email attachment: %w", err)
-		}
-
-		eventRefs = append(eventRefs, domain.AttachmentRef{
+		refs = append(refs, domain.AttachmentRef{
 			S3Key:    stored.S3Key,
-			Filename: item.Filename,
-			MimeType: item.MimeType,
+			Filename: att.Filename,
+			MimeType: att.MimeType,
 			SHA256:   stored.SHA256,
 		})
 	}
 
-	return eventRefs, nil
+	return refs, nil
+}
+
+func incrementalQuery(lastSyncedAt *time.Time) string {
+	if lastSyncedAt == nil || lastSyncedAt.IsZero() {
+		return ""
+	}
+	// Add 1 second overlap or just use exact time depending on provider
+	// Most providers accept standard formats.
+	return fmt.Sprintf("after:%d", lastSyncedAt.Unix())
 }

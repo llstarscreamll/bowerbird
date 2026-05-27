@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
@@ -19,231 +18,52 @@ func NewPostgresRepository(registry *database.Registry) *PostgresRepository {
 	return &PostgresRepository{registry: registry}
 }
 
-func (r *PostgresRepository) CreateConnectedAccount(ctx context.Context, account *domain.ConnectedAccount) error {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get tenant db pool: %w", err)
-	}
-
-	query := `
-		INSERT INTO connected_accounts (
-			id,
-			provider,
-			email_address,
-			status,
-			encrypted_credentials,
-			last_synced_at,
-			last_error,
-			raw_data,
-			created_at,
-			updated_at
-		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-	`
-
-	_, err = pool.Exec(
-		ctx,
-		query,
-		account.ID,
-		account.Provider,
-		account.EmailAddress,
-		account.Status,
-		account.EncryptedCredentials,
-		account.LastSyncedAt,
-		account.LastError,
-		defaultRawData(account.RawData),
-		account.CreatedAt,
-		account.UpdatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create connected account: %w", err)
-	}
-
-	return nil
-}
-
-func (r *PostgresRepository) GetConnectedAccountByID(ctx context.Context, accountID string) (*domain.ConnectedAccount, error) {
+func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID string) (*domain.InboxSyncCursor, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
 
 	query := `
-		SELECT
-			id,
-			provider,
-			email_address,
-			status,
-			encrypted_credentials,
-			last_synced_at,
-			last_error,
-			raw_data,
-			created_at,
-			updated_at
-		FROM connected_accounts
-		WHERE id = $1
+		SELECT connection_id, last_synced_at, last_error, status
+		FROM inbox_sync_cursors
+		WHERE connection_id = $1
 	`
-
-	var account domain.ConnectedAccount
-	err = pool.QueryRow(ctx, query, accountID).Scan(
-		&account.ID,
-		&account.Provider,
-		&account.EmailAddress,
-		&account.Status,
-		&account.EncryptedCredentials,
-		&account.LastSyncedAt,
-		&account.LastError,
-		&account.RawData,
-		&account.CreatedAt,
-		&account.UpdatedAt,
+	var cursor domain.InboxSyncCursor
+	err = pool.QueryRow(ctx, query, connectionID).Scan(
+		&cursor.ConnectionID,
+		&cursor.LastSyncedAt,
+		&cursor.LastError,
+		&cursor.Status,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrConnectedAccountNotFound
+			return nil, nil // Not found is fine, we can create one
 		}
-		return nil, fmt.Errorf("failed to get connected account: %w", err)
+		return nil, fmt.Errorf("failed to get sync cursor: %w", err)
 	}
 
-	return &account, nil
+	return &cursor, nil
 }
 
-func (r *PostgresRepository) ListConnectedAccounts(ctx context.Context) ([]*domain.ConnectedAccount, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
-	}
-
-	query := `
-		SELECT
-			id,
-			provider,
-			email_address,
-			status,
-			encrypted_credentials,
-			last_synced_at,
-			last_error,
-			raw_data,
-			created_at,
-			updated_at
-		FROM connected_accounts
-		ORDER BY created_at ASC
-	`
-
-	rows, err := pool.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list connected accounts: %w", err)
-	}
-	defer rows.Close()
-
-	accounts := make([]*domain.ConnectedAccount, 0)
-	for rows.Next() {
-		var account domain.ConnectedAccount
-		if err := rows.Scan(
-			&account.ID,
-			&account.Provider,
-			&account.EmailAddress,
-			&account.Status,
-			&account.EncryptedCredentials,
-			&account.LastSyncedAt,
-			&account.LastError,
-			&account.RawData,
-			&account.CreatedAt,
-			&account.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan connected account: %w", err)
-		}
-
-		accounts = append(accounts, &account)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed while iterating connected accounts: %w", err)
-	}
-
-	return accounts, nil
-}
-
-func (r *PostgresRepository) ListConnectedAccountsByStatus(ctx context.Context, status string) ([]*domain.ConnectedAccount, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
-	}
-
-	query := `
-		SELECT
-			id,
-			provider,
-			email_address,
-			status,
-			encrypted_credentials,
-			last_synced_at,
-			last_error,
-			raw_data,
-			created_at,
-			updated_at
-		FROM connected_accounts
-		WHERE status = $1
-		ORDER BY created_at ASC
-	`
-
-	rows, err := pool.Query(ctx, query, status)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list connected accounts: %w", err)
-	}
-	defer rows.Close()
-
-	accounts := make([]*domain.ConnectedAccount, 0)
-	for rows.Next() {
-		var account domain.ConnectedAccount
-		if err := rows.Scan(
-			&account.ID,
-			&account.Provider,
-			&account.EmailAddress,
-			&account.Status,
-			&account.EncryptedCredentials,
-			&account.LastSyncedAt,
-			&account.LastError,
-			&account.RawData,
-			&account.CreatedAt,
-			&account.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan connected account: %w", err)
-		}
-
-		accounts = append(accounts, &account)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed while iterating connected accounts: %w", err)
-	}
-
-	return accounts, nil
-}
-
-func (r *PostgresRepository) UpdateConnectedAccountSyncState(ctx context.Context, accountID, status string, lastSyncedAt *time.Time, lastError *string, updatedAt time.Time) error {
+func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domain.InboxSyncCursor) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
 
 	query := `
-		UPDATE connected_accounts
-		SET status = $1,
-			last_synced_at = $2,
-			last_error = $3,
-			updated_at = $4
-		WHERE id = $5
+		INSERT INTO inbox_sync_cursors (connection_id, last_synced_at, last_error, status)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (connection_id) DO UPDATE SET
+			last_synced_at = EXCLUDED.last_synced_at,
+			last_error = EXCLUDED.last_error,
+			status = EXCLUDED.status
 	`
-
-	tag, err := pool.Exec(ctx, query, status, lastSyncedAt, lastError, updatedAt, accountID)
+	_, err = pool.Exec(ctx, query, cursor.ConnectionID, cursor.LastSyncedAt, cursor.LastError, cursor.Status)
 	if err != nil {
-		return fmt.Errorf("failed to update connected account sync state: %w", err)
+		return fmt.Errorf("failed to upsert sync cursor: %w", err)
 	}
-
-	if tag.RowsAffected() == 0 {
-		return domain.ErrConnectedAccountNotFound
-	}
-
 	return nil
 }
 
@@ -403,7 +223,7 @@ func (r *PostgresRepository) UpsertEmailAttachment(ctx context.Context, attachme
 	return inserted, nil
 }
 
-func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]*domain.EmailAttachment, error) {
+func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]domain.EmailAttachment, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -432,7 +252,7 @@ func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context
 	}
 	defer rows.Close()
 
-	attachments := make([]*domain.EmailAttachment, 0)
+	attachments := make([]domain.EmailAttachment, 0)
 	for rows.Next() {
 		var attachment domain.EmailAttachment
 		if err := rows.Scan(
@@ -450,7 +270,7 @@ func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context
 			return nil, fmt.Errorf("failed to scan email attachment: %w", err)
 		}
 
-		attachments = append(attachments, &attachment)
+		attachments = append(attachments, attachment)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -460,7 +280,7 @@ func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context
 	return attachments, nil
 }
 
-func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain.UnifiedMessage, error) {
+func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]domain.UnifiedMessage, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -474,13 +294,13 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain
 			c.email_address AS account_email,
 			COALESCE(m.subject, '(Sin asunto)') AS subject,
 			COALESCE(m.sender_email, 'Desconocido') AS sender,
-			COALESCE(m.raw_data->>'snippet', '') AS snippet,
+			COALESCE(NULLIF(m.raw_data->>'snippet', ''), m.raw_data->>'Snippet', '') AS snippet,
 			COALESCE(m.received_at, m.created_at) AS received_at,
 			COALESCE(m.sync_status, 'new') AS processing_status,
 			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.xml') AS has_xml,
 			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.pdf') AS has_pdf
 		FROM email_messages m
-		JOIN connected_accounts c ON m.account_id = c.id
+		JOIN connections c ON m.account_id = c.id
 		ORDER BY received_at DESC NULLS LAST
 	`
 
@@ -490,7 +310,7 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain
 	}
 	defer rows.Close()
 
-	messages := make([]*domain.UnifiedMessage, 0)
+	messages := make([]domain.UnifiedMessage, 0)
 	for rows.Next() {
 		var msg domain.UnifiedMessage
 		if err := rows.Scan(
@@ -509,7 +329,7 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain
 			return nil, fmt.Errorf("failed to scan unified message: %w", err)
 		}
 
-		messages = append(messages, &msg)
+		messages = append(messages, msg)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -517,6 +337,71 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]*domain
 	}
 
 	return messages, nil
+}
+
+func (r *PostgresRepository) ListMessagesByAccount(ctx context.Context, accountID string, limit, offset int) ([]domain.UnifiedMessage, error) {
+	// Not implemented fully yet but required by interface
+	return nil, errors.New("ListMessagesByAccount not implemented")
+}
+
+func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID string) (*domain.UnifiedMessage, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	query := `
+		SELECT
+			m.id,
+			c.provider,
+			c.id AS account_id,
+			c.email_address AS account_email,
+			COALESCE(m.subject, '(Sin asunto)') AS subject,
+			COALESCE(m.sender_email, 'Desconocido') AS sender,
+			COALESCE(NULLIF(m.raw_data->>'snippet', ''), m.raw_data->>'Snippet', '') AS snippet,
+			COALESCE(
+				NULLIF(m.raw_data->>'plain_text_body', ''),
+				NULLIF(m.raw_data->>'PlainTextBody', ''),
+				NULLIF(m.raw_data->>'snippet', ''),
+				m.raw_data->>'Snippet',
+				''
+			) AS body_text,
+			COALESCE(m.received_at, m.created_at) AS received_at,
+			COALESCE(m.sync_status, 'new') AS processing_status,
+			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.xml') AS has_xml,
+			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.pdf') AS has_pdf
+		FROM email_messages m
+		JOIN connections c ON m.account_id = c.id
+		WHERE m.id = $1
+	`
+
+	var msg domain.UnifiedMessage
+	err = pool.QueryRow(ctx, query, messageID).Scan(
+		&msg.ID,
+		&msg.Provider,
+		&msg.AccountID,
+		&msg.AccountEmail,
+		&msg.Subject,
+		&msg.Sender,
+		&msg.Snippet,
+		&msg.BodyText,
+		&msg.ReceivedAt,
+		&msg.ProcessingStatus,
+		&msg.HasXML,
+		&msg.HasPDF,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrEmailMessageNotFound
+		}
+		return nil, fmt.Errorf("failed to get message by id: %w", err)
+	}
+
+	return &msg, nil
+}
+
+func (r *PostgresRepository) GetMessageAttachments(ctx context.Context, messageID string) ([]domain.EmailAttachment, error) {
+	return r.ListEmailAttachmentsByMessageID(ctx, messageID)
 }
 
 func defaultRawData(raw []byte) []byte {
