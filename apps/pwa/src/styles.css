@@ -43,6 +43,41 @@
     @apply block w-full rounded-lg border-0 py-2.5 px-3 text-slate-900 dark:text-white shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-inset focus:ring-indigo-600 dark:focus:ring-indigo-500 sm:text-sm sm:leading-6 bg-white dark:bg-slate-900 transition-shadow duration-200 ease-in-out;
   }
 
+  /* Autofill Form Highlights - Best Practice */
+  input:-webkit-autofill,
+  input:autofill {
+    border: 2px solid #2e7d32;
+    box-shadow: 0 0 0 100vmax #e8f5e9 inset;
+    -webkit-text-fill-color: #1b5e20;
+  }
+
+  input:-webkit-autofill:focus-visible,
+  input:autofill:focus-visible {
+    outline: 3px solid #1b5e20;
+    outline-offset: 2px;
+  }
+
+  /* Required Field Validation / User-Invalid - Best Practice */
+  .input-field:user-invalid,
+  .input-field.user-invalid-fallback {
+    border-color: #d93025;
+    background-color: #fce8e6;
+    color: #b71c1c;
+  }
+
+  /* .input-error-msg is placed next to .input-field to show validation */
+  .input-field:user-invalid ~ .input-error-msg,
+  .input-field.user-invalid-fallback ~ .input-error-msg {
+    display: block;
+  }
+
+  .input-error-msg {
+    display: none;
+    color: #d93025;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
   /* Buttons */
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed;

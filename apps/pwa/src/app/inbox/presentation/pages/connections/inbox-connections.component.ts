@@ -76,14 +76,26 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
             <form (ngSubmit)="connect()" class="space-y-4">
               <div>
                 <label for="provider" class="mb-1 block text-xs font-medium text-slate-600">Proveedor</label>
-                <select id="provider" name="provider" class="input-field" [(ngModel)]="newProvider" required>
-                  <option *ngFor="let provider of providers" [value]="provider">{{ providerLabel(provider) }}</option>
-                </select>
+                <div class="relative">
+                  <select id="provider" name="provider" class="input-field" [(ngModel)]="newProvider" required aria-errormessage="provider-error">
+                    <option *ngFor="let provider of providers" [value]="provider">{{ providerLabel(provider) }}</option>
+                  </select>
+                  <div id="provider-error" class="input-error-msg flex items-center gap-1">
+                    <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                    <span>El proveedor es requerido.</span>
+                  </div>
+                </div>
               </div>
 
               <div>
                 <label for="email" class="mb-1 block text-xs font-medium text-slate-600">Correo de la cuenta</label>
-                <input id="email" name="email" type="email" class="input-field" [(ngModel)]="newEmailAddress" required placeholder="facturas@empresa.com" />
+                <div class="relative">
+                  <input id="email" name="email" type="email" class="input-field" [(ngModel)]="newEmailAddress" required aria-errormessage="email-error" placeholder="facturas@empresa.com" />
+                  <div id="email-error" class="input-error-msg flex items-center gap-1">
+                    <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                    <span>El correo es requerido.</span>
+                  </div>
+                </div>
               </div>
 
               <app-alert *ngIf="errorMessage()" type="error">

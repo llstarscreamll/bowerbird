@@ -42,14 +42,42 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label for="orgName" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> Nombre de la Organización </label>
-                  <div class="mt-1.5">
-                    <input id="orgName" type="text" required [ngModel]="newOrgName()" (ngModelChange)="onOrgNameInput($event)" name="orgName" class="input-field py-2" placeholder="Acme Corp" />
+                  <div class="mt-1.5 relative">
+                    <input
+                      id="orgName"
+                      type="text"
+                      required
+                      aria-errormessage="orgName-error"
+                      [ngModel]="newOrgName()"
+                      (ngModelChange)="onOrgNameInput($event)"
+                      name="orgName"
+                      class="input-field py-2"
+                      placeholder="Acme Corp"
+                    />
+                    <div id="orgName-error" class="input-error-msg flex items-center gap-1">
+                      <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                      <span>El nombre es requerido.</span>
+                    </div>
                   </div>
                 </div>
                 <div>
                   <label for="orgSlug" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> URL del espacio / Slug </label>
-                  <div class="mt-1.5">
-                    <input id="orgSlug" type="text" required [ngModel]="newOrgSlug()" (ngModelChange)="setNewOrgSlug($event)" name="orgSlug" class="input-field py-2" placeholder="acme" />
+                  <div class="mt-1.5 relative">
+                    <input
+                      id="orgSlug"
+                      type="text"
+                      required
+                      aria-errormessage="orgSlug-error"
+                      [ngModel]="newOrgSlug()"
+                      (ngModelChange)="setNewOrgSlug($event)"
+                      name="orgSlug"
+                      class="input-field py-2"
+                      placeholder="acme"
+                    />
+                    <div id="orgSlug-error" class="input-error-msg flex items-center gap-1">
+                      <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                      <span>El slug es requerido.</span>
+                    </div>
                   </div>
                 </div>
               </div>

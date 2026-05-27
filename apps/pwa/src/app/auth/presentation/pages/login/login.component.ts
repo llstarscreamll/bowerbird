@@ -27,15 +27,43 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
           <form class="space-y-5" (ngSubmit)="onLocalLogin()">
             <div>
               <label for="email" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> Correo electronico </label>
-              <div class="mt-1.5">
-                <input id="email" name="email" type="email" autocomplete="email" required [(ngModel)]="email" class="input-field py-2" placeholder="nombre@ejemplo.com" />
+              <div class="mt-1.5 relative">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  aria-errormessage="email-error"
+                  [(ngModel)]="email"
+                  class="input-field py-2"
+                  placeholder="nombre@ejemplo.com"
+                />
+                <div id="email-error" class="input-error-msg flex items-center gap-1">
+                  <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                  <span>Este campo es requerido.</span>
+                </div>
               </div>
             </div>
 
             <div>
               <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300"> Contrasena </label>
-              <div class="mt-1.5">
-                <input id="password" name="password" type="password" autocomplete="current-password" required [(ngModel)]="password" class="input-field py-2" placeholder="••••••••" />
+              <div class="mt-1.5 relative">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  aria-errormessage="password-error"
+                  [(ngModel)]="password"
+                  class="input-field py-2"
+                  placeholder="••••••••"
+                />
+                <div id="password-error" class="input-error-msg flex items-center gap-1">
+                  <span class="material-icons-outlined text-[16px]" aria-hidden="true">error_outline</span>
+                  <span>Este campo es requerido.</span>
+                </div>
               </div>
             </div>
 
