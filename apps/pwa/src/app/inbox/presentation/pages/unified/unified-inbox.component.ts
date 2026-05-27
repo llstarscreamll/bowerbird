@@ -282,8 +282,8 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
                   <div class="h-1.5 w-2/3 bg-slate-100 dark:bg-slate-700 rounded-full transition-colors"></div>
                 </div>
               </div>
-              <h3 class="text-lg font-medium text-slate-900 dark:text-white transition-colors">It's empty here</h3>
-              <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 transition-colors">Choose an email to view details</p>
+              <h3 class="text-lg font-medium text-slate-900 dark:text-white transition-colors">No hay mensajes</h3>
+              <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400 transition-colors">Elige un correo para ver los detalles</p>
             </div>
           </div>
         </ng-template>

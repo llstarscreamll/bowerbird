@@ -148,7 +148,9 @@ import { AuthStore } from '../../../../auth/application/auth.store';
             class="flex items-center gap-4 h-8 w-full px-4 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             [title]="isCollapsed() ? 'Expandir' : 'Contraer'"
           >
-            <span class="whitespace-nowrap transition-opacity duration-200 grow text-left text-slate-300" [class.opacity-0]="isCollapsed()" [class.hidden]="isCollapsed()"> Contraer menú </span>
+            <span class="whitespace-nowrap transition-opacity duration-200 grow text-left text-slate-600 dark:text-slate-300" [class.opacity-0]="isCollapsed()" [class.hidden]="isCollapsed()">
+              Contraer menú
+            </span>
             <span class="material-icons-outlined text-sm">
               {{ isCollapsed() ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left' }}
             </span>
