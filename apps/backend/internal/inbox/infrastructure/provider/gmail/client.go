@@ -103,17 +103,34 @@ func (c *Client) requestStatusError(prefix string, resp *http.Response) error {
 	}
 
 	wwwAuthenticate := strings.TrimSpace(resp.Header.Get("WWW-Authenticate"))
+	retryAfter := strings.TrimSpace(resp.Header.Get("Retry-After"))
+
+	if bodyText != "" && wwwAuthenticate != "" && retryAfter != "" {
+		return fmt.Errorf("%s with status %d (www-authenticate=%q, retry-after=%q, body=%q)", prefix, resp.StatusCode, wwwAuthenticate, retryAfter, bodyText)
+	}
 
 	if bodyText != "" && wwwAuthenticate != "" {
 		return fmt.Errorf("%s with status %d (www-authenticate=%q, body=%q)", prefix, resp.StatusCode, wwwAuthenticate, bodyText)
+	}
+
+	if bodyText != "" && retryAfter != "" {
+		return fmt.Errorf("%s with status %d (retry-after=%q, body=%q)", prefix, resp.StatusCode, retryAfter, bodyText)
 	}
 
 	if bodyText != "" {
 		return fmt.Errorf("%s with status %d (body=%q)", prefix, resp.StatusCode, bodyText)
 	}
 
+	if wwwAuthenticate != "" && retryAfter != "" {
+		return fmt.Errorf("%s with status %d (www-authenticate=%q, retry-after=%q)", prefix, resp.StatusCode, wwwAuthenticate, retryAfter)
+	}
+
 	if wwwAuthenticate != "" {
 		return fmt.Errorf("%s with status %d (www-authenticate=%q)", prefix, resp.StatusCode, wwwAuthenticate)
+	}
+
+	if retryAfter != "" {
+		return fmt.Errorf("%s with status %d (retry-after=%q)", prefix, resp.StatusCode, retryAfter)
 	}
 
 	return fmt.Errorf("%s with status %d", prefix, resp.StatusCode)

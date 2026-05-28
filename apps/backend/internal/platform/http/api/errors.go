@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -25,8 +26,13 @@ type JSONAPIErrorObject struct {
 	Code   string         `json:"code,omitempty"`
 	Title  string         `json:"title,omitempty"`
 	Detail string         `json:"detail,omitempty"`
+	Links  *ErrorLinks    `json:"links,omitempty"`
 	Source *ErrorSource   `json:"source,omitempty"`
 	Meta   map[string]any `json:"meta,omitempty"`
+}
+
+type ErrorLinks struct {
+	About string `json:"about,omitempty"`
 }
 
 type ErrorSource struct {
@@ -41,13 +47,27 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 	}
 
 	var appErr *apperrors.AppError
+	var syncErr *apperrors.SyncError
 	var httpStatus int
-	var title, detail, code string
+	var title, detail, code, helpURL string
+	meta := map[string]any{}
 
-	if errors.As(err, &appErr) {
+	if errors.As(err, &syncErr) {
+		code = syncErr.Code
+		detail = syncErr.Message
+		httpStatus, title = statusFromCode(syncErr.Code)
+		helpURL = syncErr.HelpURL
+		if helpURL == "" {
+			helpURL = apperrors.HelpURLForCode(syncErr.Code)
+		}
+		for key, value := range filterAllowedErrorMeta(syncErr.UXMeta()) {
+			meta[key] = value
+		}
+	} else if errors.As(err, &appErr) {
 		code = appErr.Code
 		detail = appErr.Message
 		httpStatus, title = statusFromCode(appErr.Code)
+		helpURL = apperrors.HelpURLForCode(appErr.Code)
 	} else {
 		// Generic or unexpected error
 		code = apperrors.CodeInternal
@@ -55,6 +75,8 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		httpStatus = http.StatusInternalServerError
 		title = http.StatusText(http.StatusInternalServerError)
 	}
+
+	detail = redactSensitive(detail)
 
 	obj := JSONAPIErrorObject{
 		ID:     traceID,
@@ -67,10 +89,18 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		},
 	}
 
+	if helpURL != "" {
+		obj.Links = &ErrorLinks{About: helpURL}
+	}
+
+	for key, value := range meta {
+		obj.Meta[key] = redactAnySensitive(value)
+	}
+
 	// In development, populate _debug
 	if isDev {
 		obj.Meta["_debug"] = map[string]any{
-			"error":       err.Error(),
+			"error":       redactSensitive(err.Error()),
 			"stack_trace": captureStackTrace(3), // skip up to the handler
 		}
 	}
@@ -97,6 +127,16 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, err error, isDev b
 
 func statusFromCode(code string) (int, string) {
 	switch code {
+	case apperrors.CodeSyncReauthRequired:
+		return http.StatusUnauthorized, "Unauthorized"
+	case apperrors.CodeSyncRateLimited:
+		return http.StatusTooManyRequests, "Too Many Requests"
+	case apperrors.CodeSyncProviderTemporary:
+		return http.StatusServiceUnavailable, "Service Unavailable"
+	case apperrors.CodeSyncPayloadRejected:
+		return http.StatusUnprocessableEntity, "Unprocessable Entity"
+	case apperrors.CodeSyncInternal:
+		return http.StatusInternalServerError, "Internal Server Error"
 	case apperrors.CodeValidation:
 		return http.StatusBadRequest, "Bad Request"
 	case apperrors.CodeUnauthorized:
@@ -114,6 +154,56 @@ func statusFromCode(code string) (int, string) {
 	default:
 		return http.StatusInternalServerError, "Internal Server Error"
 	}
+}
+
+func filterAllowedErrorMeta(meta map[string]any) map[string]any {
+	if len(meta) == 0 {
+		return nil
+	}
+
+	allowed := map[string]struct{}{
+		"requires_reauth":     {},
+		"provider":            {},
+		"retry_after_seconds": {},
+		"account_email":       {},
+	}
+
+	out := map[string]any{}
+	for key, value := range meta {
+		if _, ok := allowed[key]; ok {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
+}
+
+var sensitiveValuePattern = regexp.MustCompile(`(?i)(access[_-]?token|refresh[_-]?token|password|authorization)\s*[:=]\s*([^\s,;]+)`)
+var bearerTokenPattern = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9\-\._~\+/]+=*`)
+var authorizationBearerPattern = regexp.MustCompile(`(?i)(authorization)\s*[:=]\s*bearer\s+[^\s,;]+`)
+
+func redactSensitive(text string) string {
+	if text == "" {
+		return text
+	}
+
+	redacted := bearerTokenPattern.ReplaceAllString(text, "Bearer [REDACTED]")
+	redacted = authorizationBearerPattern.ReplaceAllString(redacted, "$1=[REDACTED]")
+	redacted = sensitiveValuePattern.ReplaceAllString(redacted, "$1=[REDACTED]")
+	redacted = bearerTokenPattern.ReplaceAllString(redacted, "Bearer [REDACTED]")
+	return redacted
+}
+
+func redactAnySensitive(value any) any {
+	strValue, ok := value.(string)
+	if !ok {
+		return value
+	}
+
+	return redactSensitive(strValue)
 }
 
 func captureStackTrace(skip int) string {
