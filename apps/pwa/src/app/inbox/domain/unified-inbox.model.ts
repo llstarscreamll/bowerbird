@@ -18,6 +18,7 @@ export interface UnifiedInboxMessage {
 
 export interface UnifiedInboxMessageDetail extends UnifiedInboxMessage {
   body_text?: string;
+  body_html?: string;
 }
 
 export interface UnifiedInboxFilters {

@@ -12,6 +12,11 @@ export class ErrorTranslationService {
     ERR_FORBIDDEN: 'No tienes los permisos necesarios para acceder a este recurso.',
     ERR_CONFLICT: 'Hubo un conflicto con el estado actual (ej: el registro ya existe).',
     ERR_NOT_IMPLEMENTED: 'Esta funcionalidad aún no está implementada.',
+    ERR_SYNC_REAUTH_REQUIRED: 'La cuenta de correo requiere reconexión para continuar sincronizando.',
+    ERR_SYNC_RATE_LIMITED: 'El proveedor de correo limitó temporalmente las solicitudes de sincronización.',
+    ERR_SYNC_PROVIDER_TEMPORARY: 'El proveedor de correo no está disponible temporalmente.',
+    ERR_SYNC_PAYLOAD_REJECTED: 'Se detectó un correo con contenido no procesable de forma segura y fue omitido.',
+    ERR_SYNC_INTERNAL: 'Ocurrió un problema interno al sincronizar la cuenta de correo.',
     // Specific domain errors can be added here
     ERR_NETWORK: 'No se pudo conectar con el servidor. Verifica tu conexión a internet.',
   };

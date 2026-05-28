@@ -2,20 +2,9 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { EnrichedHttpError, JSONAPIError } from '../http/jsonapi-error';
 import { ToastService } from '../services/toast.service';
 import { ErrorTranslationService } from '../services/error-translation.service';
-
-export interface JSONAPIError {
-  id?: string;
-  status?: string;
-  code?: string;
-  title?: string;
-  detail?: string;
-  meta?: {
-    _debug?: any;
-    [key: string]: any;
-  };
-}
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(ToastService);
@@ -61,7 +50,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           err.detail = friendlyMessage; // Swap the detail with the translated message so components can just show it
         });
 
-        return throwError(() => ({ original: error, jsonApiErrors }));
+        const enrichedError: EnrichedHttpError = { original: error, jsonApiErrors };
+        return throwError(() => enrichedError);
       }
 
       // Fallback if not JSON:API

@@ -43,6 +43,11 @@ export class UnifiedInboxHttpRepository implements UnifiedInboxRepository {
     return this.http.post<void>(`${this.baseUrl}/sync`, body);
   }
 
+  getProviderAuthUrl(provider: MailProvider): Observable<string> {
+    const backendProvider = this.toBackendConnectionProvider(provider);
+    return this.http.get<{ data: { auth_url: string } }>(`${this.connectionsUrl}/${backendProvider}`).pipe(map((response) => response.data.auth_url));
+  }
+
   private normalizeProvider(provider: string): MailProvider {
     switch (provider) {
       case 'google':
@@ -55,6 +60,21 @@ export class UnifiedInboxHttpRepository implements UnifiedInboxRepository {
         return provider;
       default:
         return 'gmail';
+    }
+  }
+
+  private toBackendConnectionProvider(provider: MailProvider): string {
+    switch (provider) {
+      case 'gmail':
+        return 'google';
+      case 'microsoft':
+      case 'outlook':
+      case 'hotmail':
+        return 'microsoft';
+      case 'yahoo':
+        return 'yahoo';
+      default:
+        return provider;
     }
   }
 }

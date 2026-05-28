@@ -6,11 +6,12 @@ import { UnifiedInboxStore } from '../../../application/unified-inbox.store';
 import { AccountHealthSummary, MessageProcessingStatus, UnifiedInboxMessage } from '../../../domain/unified-inbox.model';
 import { MailProvider } from '../../../domain/inbox.types';
 import { AlertComponent } from '../../../../core/presentation/components/alert/alert.component';
+import { SecureEmailBodyComponent } from '../../components/secure-email-body/secure-email-body.component';
 
 @Component({
   selector: 'app-master-inbox',
   standalone: true,
-  imports: [CommonModule, FormsModule, AlertComponent],
+  imports: [CommonModule, FormsModule, AlertComponent, SecureEmailBodyComponent],
   host: {
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
@@ -171,7 +172,7 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
             </button>
             <button
               class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              [disabled]="isSyncing() || !hasSyncableAccounts()"
+              [disabled]="isSyncing() || !hasSyncableAccounts() || syncRetrySecondsLeft() > 0"
               (click)="triggerSync()"
               title="Sincronizar correos"
             >
@@ -184,6 +185,29 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
         <div class="flex-1 overflow-y-auto relative">
           <div *ngIf="error()" class="p-4 sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm transition-colors">
             <app-alert type="error" title="Error de conexión" [message]="error() || ''" [dismissible]="true" (dismissed)="clearError()"> </app-alert>
+          </div>
+
+          <div *ngIf="syncActionError() as syncError" class="p-4 sticky top-0 z-10 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm transition-colors">
+            <app-alert [type]="syncRetrySecondsLeft() > 0 ? 'warning' : 'error'" [title]="syncError.title" [message]="syncError.message" [dismissible]="true" (dismissed)="clearSyncActionError()">
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button *ngIf="syncError.requiresReauth" type="button" class="btn-primary text-xs" (click)="reauthenticateProvider(syncError.provider)">
+                  Reconectar {{ providerLabelFromCode(syncError.provider) }}
+                </button>
+
+                <button *ngIf="!syncError.requiresReauth" type="button" class="btn-secondary text-xs" [disabled]="syncRetrySecondsLeft() > 0" (click)="triggerSync()">
+                  {{ syncRetrySecondsLeft() > 0 ? 'Reintentar en ' + formatRetryCountdown(syncRetrySecondsLeft()) : 'Reintentar ahora' }}
+                </button>
+
+                <a
+                  *ngIf="syncError.helpUrl"
+                  class="text-xs font-medium text-indigo-700 underline underline-offset-2 hover:text-indigo-800"
+                  [href]="syncError.helpUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Ver ayuda</a
+                >
+              </div>
+            </app-alert>
           </div>
 
           <div *ngIf="loading()" class="p-8 text-center text-sm text-slate-500 dark:text-slate-400 transition-colors">Cargando mensajes...</div>
@@ -316,7 +340,12 @@ import { AlertComponent } from '../../../../core/presentation/components/alert/a
 
               <div class="prose prose-sm prose-slate dark:prose-invert max-w-none whitespace-pre-wrap text-slate-700 dark:text-slate-300 transition-colors">
                 <ng-container *ngIf="!isDetailLoading(); else loadingDetailContent">
-                  {{ selectedMessageBody() || 'Este mensaje no contiene texto plano o aun no se ha extraido.' }}
+                  <ng-container *ngIf="selectedMessageHtml(); else plainTextDetail">
+                    <app-secure-email-body [html]="selectedMessageHtml() || ''"></app-secure-email-body>
+                  </ng-container>
+                  <ng-template #plainTextDetail>
+                    {{ selectedMessageBody() || 'Este mensaje no contiene texto plano o aun no se ha extraido.' }}
+                  </ng-template>
                 </ng-container>
                 <ng-template #loadingDetailContent>Cargando contenido del correo...</ng-template>
               </div>
@@ -418,6 +447,8 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   readonly filteredMessages = this.store.filteredMessages;
   readonly filters = this.store.filters;
   readonly isSyncing = this.store.isSyncing;
+  readonly syncActionError = this.store.syncActionError;
+  readonly syncRetrySecondsLeft = this.store.syncRetrySecondsLeft;
   readonly hasSyncableAccounts = computed(() => {
     const accountId = this.filters().accountId;
     const candidateAccounts = accountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === accountId);
@@ -438,6 +469,15 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
 
     const detail = this.store.getMessageDetail(selected.id);
     return detail?.body_text || detail?.snippet || selected.snippet || '';
+  });
+  readonly selectedMessageHtml = computed(() => {
+    const selected = this.selectedMessage();
+    if (!selected) {
+      return '';
+    }
+
+    const detail = this.store.getMessageDetail(selected.id);
+    return detail?.body_html || '';
   });
   readonly isDetailLoading = computed(() => {
     const selected = this.selectedMessage();
@@ -514,6 +554,39 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
 
   clearError(): void {
     this.store.clearError();
+  }
+
+  clearSyncActionError(): void {
+    this.store.clearSyncActionError();
+  }
+
+  reauthenticateProvider(providerCode: string | undefined): void {
+    this.store.reauthenticateProvider(providerCode, () => this.navigateToAddAccount());
+  }
+
+  providerLabelFromCode(providerCode: string | undefined): string {
+    const normalized = (providerCode || '').trim().toLowerCase() as MailProvider;
+    if (!normalized) {
+      return 'cuenta';
+    }
+
+    if (!['gmail', 'microsoft', 'outlook', 'hotmail', 'yahoo'].includes(normalized)) {
+      return 'cuenta';
+    }
+
+    return this.providerLabel(normalized);
+  }
+
+  formatRetryCountdown(totalSeconds: number): string {
+    if (totalSeconds <= 0) {
+      return '00:00';
+    }
+
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, '0');
+    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${seconds}`;
   }
 
   selectMessage(message: UnifiedInboxMessage): void {

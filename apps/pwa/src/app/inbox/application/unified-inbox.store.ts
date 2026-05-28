@@ -1,7 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subscription, catchError, finalize, forkJoin, interval, of, switchMap } from 'rxjs';
+import { MailProvider, MAIL_PROVIDERS, providerLabel } from '../domain/inbox.types';
+import { extractSyncActionError, SyncActionError } from './sync-error-parser';
 import { UNIFIED_INBOX_REPOSITORY } from '../domain/unified-inbox.repository';
-import { MAIL_PROVIDERS, MailProvider, providerLabel } from '../domain/inbox.types';
 import { AccountHealthSummary, AccountSyncStatus, MessageProcessingStatus, UnifiedInboxFilters, UnifiedInboxMessage, UnifiedInboxMessageDetail } from '../domain/unified-inbox.model';
 
 @Injectable({ providedIn: 'root' })
@@ -12,6 +13,8 @@ export class UnifiedInboxStore {
   readonly accountHealth = signal<AccountHealthSummary[]>([]);
   readonly detailError = signal<string | null>(null);
   readonly loadingMessageId = signal<string | null>(null);
+  readonly syncActionError = signal<SyncActionError | null>(null);
+  readonly syncRetrySecondsLeft = signal(0);
 
   readonly providers = MAIL_PROVIDERS;
   readonly statuses: MessageProcessingStatus[] = ['new', 'processed', 'skipped', 'error'];
@@ -65,6 +68,7 @@ export class UnifiedInboxStore {
   private readonly repository = inject(UNIFIED_INBOX_REPOSITORY);
   private accountHealthSub?: Subscription;
   private messagePollSub?: Subscription;
+  private retryCountdownSub?: Subscription;
   private readonly messageDetails = signal<Record<string, UnifiedInboxMessageDetail>>({});
 
   init(): void {
@@ -75,9 +79,14 @@ export class UnifiedInboxStore {
   destroy(): void {
     this.accountHealthSub?.unsubscribe();
     this.messagePollSub?.unsubscribe();
+    this.retryCountdownSub?.unsubscribe();
   }
 
   triggerSync(accountId?: string): void {
+    if (this.syncRetrySecondsLeft() > 0) {
+      return;
+    }
+
     const targetAccountId = accountId || this.filters().accountId;
 
     const requestedAccounts = targetAccountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === targetAccountId);
@@ -103,8 +112,40 @@ export class UnifiedInboxStore {
 
     forkJoin(syncableAccounts.map((account) => this.repository.triggerSync(account.id)))
       .pipe(
-        catchError(() => {
-          this.error.set('No se pudo iniciar la sincronización.');
+        catchError((error: unknown) => {
+          const syncError = extractSyncActionError(error);
+          if (syncError) {
+            this.syncActionError.set(syncError);
+            this.error.set(null);
+            this.startRetryCountdown(syncError.retryAfterSeconds);
+            this.logSyncEvent('sync_error_classified', {
+              error_code: syncError.code,
+              trace_id: syncError.traceId,
+              provider: syncError.provider,
+              requires_reauth: syncError.requiresReauth,
+              retry_after_seconds: syncError.retryAfterSeconds,
+            });
+
+            if (syncError.requiresReauth) {
+              this.logSyncEvent('sync_reauth_required', {
+                error_code: syncError.code,
+                trace_id: syncError.traceId,
+                provider: syncError.provider,
+              });
+            }
+
+            if (syncError.retryAfterSeconds > 0) {
+              this.logSyncEvent('sync_rate_limited', {
+                error_code: syncError.code,
+                trace_id: syncError.traceId,
+                provider: syncError.provider,
+                retry_after_seconds: syncError.retryAfterSeconds,
+              });
+            }
+          } else {
+            this.error.set('No se pudo iniciar la sincronización.');
+          }
+
           // Revert status on error by forcing a health check
           this.refreshHealth();
           return of(null);
@@ -128,6 +169,34 @@ export class UnifiedInboxStore {
 
   clearError(): void {
     this.error.set(null);
+  }
+
+  clearSyncActionError(): void {
+    this.syncActionError.set(null);
+    this.stopRetryCountdown();
+  }
+
+  reauthenticateProvider(provider: string | undefined, onFallback: () => void): void {
+    const normalizedProvider = this.normalizeProvider(provider);
+    if (!normalizedProvider) {
+      onFallback();
+      return;
+    }
+
+    this.repository.getProviderAuthUrl(normalizedProvider).subscribe({
+      next: (authUrl) => {
+        this.logSyncEvent('sync_reauth_redirect_started', {
+          provider: normalizedProvider.toUpperCase(),
+          trace_id: this.syncActionError()?.traceId,
+          error_code: this.syncActionError()?.code,
+        });
+        window.location.assign(authUrl);
+      },
+      error: () => {
+        this.error.set('No se pudo iniciar la reconexión automática. Continúa desde Conexiones.');
+        onFallback();
+      },
+    });
   }
 
   loadMessageDetail(messageId: string): void {
@@ -312,5 +381,49 @@ export class UnifiedInboxStore {
     }
 
     return undefined;
+  }
+
+  private startRetryCountdown(seconds: number): void {
+    this.stopRetryCountdown();
+    if (seconds <= 0) {
+      this.syncRetrySecondsLeft.set(0);
+      return;
+    }
+
+    this.syncRetrySecondsLeft.set(seconds);
+    this.retryCountdownSub = interval(1000).subscribe(() => {
+      const nextSeconds = this.syncRetrySecondsLeft() - 1;
+      if (nextSeconds <= 0) {
+        this.syncRetrySecondsLeft.set(0);
+        this.retryCountdownSub?.unsubscribe();
+        return;
+      }
+
+      this.syncRetrySecondsLeft.set(nextSeconds);
+    });
+  }
+
+  private stopRetryCountdown(): void {
+    this.retryCountdownSub?.unsubscribe();
+    this.retryCountdownSub = undefined;
+    this.syncRetrySecondsLeft.set(0);
+  }
+
+  private normalizeProvider(provider: string | undefined): MailProvider | null {
+    const value = (provider || '').trim().toLowerCase();
+    switch (value) {
+      case 'gmail':
+      case 'microsoft':
+      case 'outlook':
+      case 'hotmail':
+      case 'yahoo':
+        return value;
+      default:
+        return null;
+    }
+  }
+
+  private logSyncEvent(eventName: string, payload: Record<string, unknown>): void {
+    console.info(`[${eventName}]`, payload);
   }
 }
