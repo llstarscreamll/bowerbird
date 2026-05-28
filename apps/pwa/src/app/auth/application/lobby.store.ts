@@ -49,14 +49,6 @@ export class LobbyStore {
     void this.router.navigate(['/', tenant.tenant_id, 'dashboard']);
   }
 
-  goToConnections(tenant: TenantMembership): void {
-    void this.router.navigate(['/', tenant.tenant_id, 'inbox', 'connections']);
-  }
-
-  goToMasterInbox(tenant: TenantMembership): void {
-    void this.router.navigate(['/', tenant.tenant_id, 'inbox', 'master']);
-  }
-
   createTenant(): void {
     const name = this.newOrgName();
     const slug = this.newOrgSlug();
