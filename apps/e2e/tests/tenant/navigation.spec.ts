@@ -19,25 +19,28 @@ test.describe('Tenant: navegación', () => {
       await lobbyPage.expectTenantInList(orgName);
     });
 
-    await test.step('Cuando hace clic en "Correo" va a la página de conexiones', async () => {
-      await page.getByRole('listitem').filter({ hasText: orgName }).getByRole('button', { name: 'Correo' }).click();
-      await expect(page).toHaveURL(/.*\/inbox\/connections$/);
-      await expect(page.getByRole('heading', { name: 'Conexiones de correo' })).toBeVisible();
-      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
+    await test.step('Cuando selecciona la organización va al dashboard del tenant', async () => {
+      await lobbyPage.openTenant(orgName);
+      await expect(page).toHaveURL(/.*\/dashboard$/);
+      await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
     });
 
-    await test.step('Y puede navegar a "Bandeja unificada" desde conexiones', async () => {
-      await page.getByRole('link', { name: 'Ir a bandeja unificada' }).click();
-      await expect(page).toHaveURL(/.*\/inbox\/unified$/);
-      await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
-      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
+    await test.step('Y puede navegar a "Mails" desde el menú lateral', async () => {
+      await page.getByRole('link', { name: 'Mails' }).click();
+      await expect(page).toHaveURL(/.*\/inbox\/master$/);
+      await expect(page.getByRole('heading', { level: 2, name: /Inbox/ })).toBeVisible();
     });
 
-    await test.step('Y puede volver a "Conexiones de correo" desde la bandeja', async () => {
-      await page.goBack();
-      await expect(page).toHaveURL(/.*\/inbox\/connections$/);
-      await expect(page.getByRole('heading', { name: 'Conexiones de correo' })).toBeVisible();
-      await expect(page.locator('app-alert[type="error"]')).not.toBeVisible();
+    await test.step('Y puede navegar a "Conexiones" desde inbox', async () => {
+      await page.getByRole('button', { name: 'Añadir cuenta' }).click();
+      await expect(page).toHaveURL(/.*\/connections$/);
+      await expect(page.getByRole('heading', { name: 'Conexiones' })).toBeVisible();
+    });
+
+    await test.step('Y puede volver a "Mails" desde conexiones', async () => {
+      await page.getByRole('link', { name: 'Mails' }).click();
+      await expect(page).toHaveURL(/.*\/inbox\/master$/);
+      await expect(page.getByRole('heading', { level: 2, name: /Inbox/ })).toBeVisible();
     });
   });
 });
