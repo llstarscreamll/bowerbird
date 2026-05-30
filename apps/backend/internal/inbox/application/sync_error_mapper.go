@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	connectionsapp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
+	connectionsApp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 )
 
 var errPayloadRejected = errors.New("sync payload rejected")
@@ -16,22 +16,22 @@ var errPayloadRejected = errors.New("sync payload rejected")
 var statusCodePattern = regexp.MustCompile(`(?i)status\s+(\d{3})`)
 var retryAfterPattern = regexp.MustCompile(`(?i)retry-after\s*=\s*"?([0-9]+)"?`)
 
-func classifySyncError(account connectionsapp.ConnectionInfo, err error) error {
+func classifySyncError(account connectionsApp.ConnectionInfo, err error) error {
 	if err == nil {
 		return nil
 	}
 
-	var existingSyncErr *apperrors.SyncError
+	var existingSyncErr *appErrors.SyncError
 	if errors.As(err, &existingSyncErr) {
 		return err
 	}
 
 	providerName := normalizeProviderForDetail(account.Provider)
 	accountEmail := strings.TrimSpace(account.ProviderAccountEmail)
-	detail := fmt.Sprintf("La cuenta de %s %s requiere atencion.", providerName, accountEmail)
+	detail := fmt.Sprintf("La cuenta de %s %s requiere atención.", providerName, accountEmail)
 
 	if errors.Is(err, errPayloadRejected) {
-		return apperrors.WrapSync(err, apperrors.CodeSyncPayloadRejected, detail, apperrors.SyncErrorOptions{
+		return appErrors.WrapSync(err, appErrors.CodeSyncPayloadRejected, detail, appErrors.SyncErrorOptions{
 			Provider:     normalizeProviderForMeta(account.Provider),
 			AccountEmail: accountEmail,
 		})
@@ -42,7 +42,7 @@ func classifySyncError(account connectionsapp.ConnectionInfo, err error) error {
 	retryAfterSeconds := parseRetryAfterSeconds(errText)
 
 	if isReauthError(statusCode, errText) {
-		return apperrors.WrapSync(err, apperrors.CodeSyncReauthRequired, detail, apperrors.SyncErrorOptions{
+		return appErrors.WrapSync(err, appErrors.CodeSyncReauthRequired, detail, appErrors.SyncErrorOptions{
 			Provider:       normalizeProviderForMeta(account.Provider),
 			AccountEmail:   accountEmail,
 			RequiresReauth: true,
@@ -53,7 +53,7 @@ func classifySyncError(account connectionsapp.ConnectionInfo, err error) error {
 		if retryAfterSeconds == 0 {
 			retryAfterSeconds = 120
 		}
-		return apperrors.WrapSync(err, apperrors.CodeSyncRateLimited, detail, apperrors.SyncErrorOptions{
+		return appErrors.WrapSync(err, appErrors.CodeSyncRateLimited, detail, appErrors.SyncErrorOptions{
 			Provider:          normalizeProviderForMeta(account.Provider),
 			AccountEmail:      accountEmail,
 			RetryAfterSeconds: retryAfterSeconds,
@@ -61,34 +61,34 @@ func classifySyncError(account connectionsapp.ConnectionInfo, err error) error {
 	}
 
 	if isProviderTemporaryError(statusCode, errText) {
-		return apperrors.WrapSync(err, apperrors.CodeSyncProviderTemporary, detail, apperrors.SyncErrorOptions{
+		return appErrors.WrapSync(err, appErrors.CodeSyncProviderTemporary, detail, appErrors.SyncErrorOptions{
 			Provider:     normalizeProviderForMeta(account.Provider),
 			AccountEmail: accountEmail,
 		})
 	}
 
-	return apperrors.WrapSync(err, apperrors.CodeSyncInternal, detail, apperrors.SyncErrorOptions{
+	return appErrors.WrapSync(err, appErrors.CodeSyncInternal, detail, appErrors.SyncErrorOptions{
 		Provider:     normalizeProviderForMeta(account.Provider),
 		AccountEmail: accountEmail,
 	})
 }
 
 func shouldMarkRequiresReconnect(err error) bool {
-	var syncErr *apperrors.SyncError
+	var syncErr *appErrors.SyncError
 	if !errors.As(err, &syncErr) {
 		return false
 	}
 
-	return syncErr.Code == apperrors.CodeSyncReauthRequired
+	return syncErr.Code == appErrors.CodeSyncReauthRequired
 }
 
 func syncErrorCode(err error) string {
-	var syncErr *apperrors.SyncError
+	var syncErr *appErrors.SyncError
 	if errors.As(err, &syncErr) {
 		return syncErr.Code
 	}
 
-	return apperrors.CodeSyncInternal
+	return appErrors.CodeSyncInternal
 }
 
 func parseStatusCode(errText string) int {

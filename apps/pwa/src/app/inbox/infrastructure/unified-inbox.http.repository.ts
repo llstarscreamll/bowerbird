@@ -38,9 +38,8 @@ export class UnifiedInboxHttpRepository implements UnifiedInboxRepository {
     return this.http.get<AccountSyncStatus[]>(`${this.baseUrl}/sync-status`);
   }
 
-  triggerSync(accountId?: string): Observable<void> {
-    const body = accountId && accountId !== 'all' ? { account_id: accountId } : {};
-    return this.http.post<void>(`${this.baseUrl}/sync`, body);
+  triggerSync(): Observable<void> {
+    return this.http.post(`${this.baseUrl}/sync`, {}, { responseType: 'text' }).pipe(map(() => void 0));
   }
 
   getProviderAuthUrl(provider: MailProvider): Observable<string> {

@@ -15,6 +15,10 @@ type InboxSyncCursor struct {
 	Status       string
 }
 
+func (c *InboxSyncCursor) MarkSyncing() {
+	c.Status = InboxSyncStatusSyncing
+}
+
 func (c *InboxSyncCursor) MarkSyncFailed(at time.Time, failure string) {
 	c.Status = InboxSyncStatusError
 	c.LastError = &failure
@@ -69,6 +73,15 @@ type NewEmailMessageInput struct {
 	UpdatedAt         time.Time
 }
 
+type NewEmailMessageFromProviderInput struct {
+	ID              string
+	AccountID       string
+	ProviderMessage *MailMessage
+	RawData         []byte
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 func NewSyncedEmailMessage(input NewEmailMessageInput) (*EmailMessage, error) {
 	if input.ID == "" {
 		return nil, ErrEmailMessageIDRequired
@@ -93,6 +106,34 @@ func NewSyncedEmailMessage(input NewEmailMessageInput) (*EmailMessage, error) {
 		CreatedAt:         input.CreatedAt,
 		UpdatedAt:         input.UpdatedAt,
 	}, nil
+}
+
+func NewSyncedEmailMessageFromProvider(input NewEmailMessageFromProviderInput) (*EmailMessage, error) {
+	if input.ProviderMessage == nil {
+		return nil, ErrEmailMessageProviderIDRequired
+	}
+
+	return NewSyncedEmailMessage(NewEmailMessageInput{
+		ID:                input.ID,
+		AccountID:         input.AccountID,
+		ProviderMessageID: input.ProviderMessage.ID,
+		ProviderThreadID:  optionalStringPointer(input.ProviderMessage.ThreadID),
+		Subject:           optionalStringPointer(input.ProviderMessage.Subject),
+		SenderEmail:       optionalStringPointer(input.ProviderMessage.Sender),
+		ReceivedAt:        input.ProviderMessage.ReceivedAt,
+		RawData:           input.RawData,
+		CreatedAt:         input.CreatedAt,
+		UpdatedAt:         input.UpdatedAt,
+	})
+}
+
+func optionalStringPointer(value string) *string {
+	if value == "" {
+		return nil
+	}
+
+	v := value
+	return &v
 }
 
 type NewEmailAttachmentInput struct {
@@ -148,6 +189,7 @@ type UnifiedMessage struct {
 	Sender           string
 	Snippet          string
 	BodyText         string
+	RawData          []byte
 	ReceivedAt       time.Time
 	ProcessingStatus string
 	HasXML           bool

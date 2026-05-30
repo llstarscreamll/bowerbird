@@ -8,27 +8,38 @@ import (
 	"testing"
 
 	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
+	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 )
 
-type fakeAttachmentReader struct {
+type fakeFileStore struct {
 	data map[string][]byte
 }
 
-func (r *fakeAttachmentReader) ReadByKey(ctx context.Context, key string) ([]byte, error) {
-	if payload, ok := r.data[key]; ok {
+func (r *fakeFileStore) WriteFileIfAbsent(ctx context.Context, input platformstorage.WriteFileIfAbsentInput) (*platformstorage.WriteFileIfAbsentResult, error) {
+	if r.data == nil {
+		r.data = map[string][]byte{}
+	}
+	if _, ok := r.data[input.Path]; !ok {
+		r.data[input.Path] = input.Data
+	}
+	return &platformstorage.WriteFileIfAbsentResult{Written: true, SizeBytes: int64(len(input.Data))}, nil
+}
+
+func (r *fakeFileStore) ReadFile(ctx context.Context, input platformstorage.ReadFileInput) ([]byte, error) {
+	if payload, ok := r.data[input.Path]; ok {
 		return payload, nil
 	}
 	return nil, errors.New("attachment not found")
 }
 
 func TestClassifyFromInboxEventGroupsDirectXMLAndPDF(t *testing.T) {
-	reader := &fakeAttachmentReader{data: map[string][]byte{
+	store := &fakeFileStore{data: map[string][]byte{
 		"k1": []byte("<Invoice><ID>INV-1</ID></Invoice>"),
 		"k2": []byte("%PDF-1.4 file"),
 		"k3": []byte("plain text"),
 	}}
 
-	uc := NewClassifyDocumentsUseCase(reader)
+	uc := NewClassifyDocumentsUseCase(store)
 	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",
@@ -64,11 +75,11 @@ func TestClassifyFromInboxEventDecompressesZIPAndGroupsPair(t *testing.T) {
 		"docs/readme.txt": []byte("hello"),
 	})
 
-	reader := &fakeAttachmentReader{data: map[string][]byte{
+	store := &fakeFileStore{data: map[string][]byte{
 		"zip-key": zipPayload,
 	}}
 
-	uc := NewClassifyDocumentsUseCase(reader)
+	uc := NewClassifyDocumentsUseCase(store)
 	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",
@@ -107,12 +118,12 @@ func TestClassifyFromInboxEventGroupsAcrossDirectAndZipSources(t *testing.T) {
 		"INV100.pdf": []byte("%PDF-1.4 file"),
 	})
 
-	reader := &fakeAttachmentReader{data: map[string][]byte{
+	store := &fakeFileStore{data: map[string][]byte{
 		"xml-key": []byte("<Invoice><ID>INV100</ID></Invoice>"),
 		"zip-key": zipPayload,
 	}}
 
-	uc := NewClassifyDocumentsUseCase(reader)
+	uc := NewClassifyDocumentsUseCase(store)
 	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",

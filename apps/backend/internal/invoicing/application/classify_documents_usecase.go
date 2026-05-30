@@ -7,12 +7,8 @@ import (
 
 	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
 	"github.com/money-path/bowerbird/apps/backend/internal/invoicing/domain"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
+	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 )
-
-type AttachmentContentReader interface {
-	ReadByKey(ctx context.Context, key string) ([]byte, error)
-}
 
 type DocumentKind = domain.DocumentKind
 
@@ -28,24 +24,22 @@ type DocumentGroup = domain.DocumentGroup
 type ClassificationResult = domain.ClassificationResult
 
 type ClassifyDocumentsUseCase struct {
-	reader     AttachmentContentReader
+	store      platformstorage.FileStore
 	classifier domain.DocumentClassifier
 	logger     *slog.Logger
-	metrics    observability.Metrics
 }
 
-func NewClassifyDocumentsUseCase(reader AttachmentContentReader) *ClassifyDocumentsUseCase {
+func NewClassifyDocumentsUseCase(store platformstorage.FileStore) *ClassifyDocumentsUseCase {
 	return &ClassifyDocumentsUseCase{
-		reader:     reader,
+		store:      store,
 		classifier: domain.NewInvoiceDocumentClassifier(),
 		logger:     slog.Default(),
-		metrics:    observability.NoopMetrics{},
 	}
 }
 
 func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, event contractevents.InboxMessageReceived) (*ClassificationResult, error) {
-	if u.reader == nil {
-		return nil, fmt.Errorf("attachment content reader is required")
+	if u.store == nil {
+		return nil, fmt.Errorf("file store is required")
 	}
 
 	attachments := make([]domain.AttachmentContent, 0, len(event.AttachmentRefs))
@@ -54,9 +48,9 @@ func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, e
 			continue
 		}
 
-		data, err := u.reader.ReadByKey(ctx, ref.S3Key)
+		data, err := u.store.ReadFile(ctx, platformstorage.ReadFileInput{Path: ref.S3Key})
 		if err != nil {
-			return nil, fmt.Errorf("read attachment from s3 key %s: %w", ref.S3Key, err)
+			return nil, fmt.Errorf("read attachment from key %s: %w", ref.S3Key, err)
 		}
 
 		attachments = append(attachments, domain.AttachmentContent{
@@ -71,7 +65,6 @@ func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, e
 		return nil, fmt.Errorf("classify attachments: %w", err)
 	}
 
-	u.metrics.IncCounter("invoicing_documents_classified_total", map[string]string{"tenant_slug": event.TenantSlug, "result": "done"})
 	u.logger.Info(
 		"invoicing documents classified",
 		"tenant_slug",

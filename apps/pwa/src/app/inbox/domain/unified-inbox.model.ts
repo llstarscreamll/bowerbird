@@ -19,6 +19,52 @@ export interface UnifiedInboxMessage {
 export interface UnifiedInboxMessageDetail extends UnifiedInboxMessage {
   body_text?: string;
   body_html?: string;
+  provider_message?: ProviderMailMessage;
+}
+
+export interface ProviderMailHeader {
+  name: string;
+  value: string;
+}
+
+export interface ProviderMailPartBody {
+  attachment_id?: string;
+  data?: string;
+  size: number;
+}
+
+export interface ProviderMailPart {
+  part_id?: string;
+  mime_type?: string;
+  filename?: string;
+  headers?: ProviderMailHeader[];
+  body: ProviderMailPartBody;
+  parts?: ProviderMailPart[];
+}
+
+export interface ProviderMailAttachmentRef {
+  AttachmentID: string;
+  Filename: string;
+  MimeType: string;
+  Size: number;
+}
+
+export interface ProviderMailMessage {
+  id: string;
+  thread_id: string;
+  label_ids?: string[];
+  subject: string;
+  sender: string;
+  snippet: string;
+  plain_text_body: string;
+  html_body?: string;
+  headers?: ProviderMailHeader[];
+  payload?: ProviderMailPart;
+  history_id?: string;
+  size_estimate?: number;
+  received_at?: string;
+  internal_date?: string;
+  attachments?: ProviderMailAttachmentRef[];
 }
 
 export interface UnifiedInboxFilters {

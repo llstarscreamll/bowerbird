@@ -7,7 +7,7 @@ import (
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 )
 
-type AccountHealthSummary struct {
+type AccountSyncStatus struct {
 	ID           string  `json:"id"`
 	Provider     string  `json:"provider"`
 	EmailAddress string  `json:"email_address"`
@@ -24,13 +24,13 @@ func NewListAccountHealthUseCase(repo domain.Repository, connectionsService appl
 	return &ListAccountHealthUseCase{repo: repo, connectionsService: connectionsService}
 }
 
-func (uc *ListAccountHealthUseCase) Execute(ctx context.Context) ([]AccountHealthSummary, error) {
+func (uc *ListAccountHealthUseCase) Execute(ctx context.Context) ([]AccountSyncStatus, error) {
 	connections, err := uc.connectionsService.GetActiveConnections(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	summaries := make([]AccountHealthSummary, 0, len(connections))
+	summaries := make([]AccountSyncStatus, 0, len(connections))
 	for _, conn := range connections {
 		cursor, err := uc.repo.GetSyncCursor(ctx, conn.ID)
 		if err != nil {
@@ -48,7 +48,7 @@ func (uc *ListAccountHealthUseCase) Execute(ctx context.Context) ([]AccountHealt
 			}
 		}
 
-		summaries = append(summaries, AccountHealthSummary{
+		summaries = append(summaries, AccountSyncStatus{
 			ID:           conn.ID,
 			Provider:     conn.Provider,
 			EmailAddress: conn.ProviderAccountEmail,

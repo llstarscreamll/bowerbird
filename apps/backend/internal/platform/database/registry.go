@@ -29,7 +29,7 @@ func NewRegistry(controlDB *pgxpool.Pool, baseConfigURL string) *Registry {
 // GetPool returns the connection pool for the tenant slug in the context.
 // If the pool doesn't exist, it resolves the database name and creates a new one.
 func (r *Registry) GetPool(ctx context.Context) (*pgxpool.Pool, error) {
-	tenantSlug, err := tenant.TenantSlugFromContext(ctx)
+	tenantSlug, err := tenant.TenantIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}

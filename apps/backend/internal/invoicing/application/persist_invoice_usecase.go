@@ -9,7 +9,6 @@ import (
 
 	"github.com/money-path/bowerbird/apps/backend/internal/invoicing/domain"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/id"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
 )
 
 type PersistInvoiceInput struct {
@@ -25,15 +24,14 @@ type PersistInvoiceResult struct {
 }
 
 type PersistInvoiceUseCase struct {
-	repo    domain.InvoiceWriteRepository
-	logger  *slog.Logger
-	metrics observability.Metrics
-	now     func() time.Time
-	newID   func() string
+	repo   domain.InvoiceWriteRepository
+	logger *slog.Logger
+	now    func() time.Time
+	newID  func() string
 }
 
 func NewPersistInvoiceUseCase(repo domain.InvoiceWriteRepository) *PersistInvoiceUseCase {
-	return &PersistInvoiceUseCase{repo: repo, logger: slog.Default(), metrics: observability.NoopMetrics{}, now: time.Now, newID: id.NewULID}
+	return &PersistInvoiceUseCase{repo: repo, logger: slog.Default(), now: time.Now, newID: id.NewULID}
 }
 
 func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoiceInput) (*PersistInvoiceResult, error) {
@@ -104,10 +102,8 @@ func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoic
 	}
 
 	if err := u.repo.PersistInvoiceAtomic(ctx, header, lines); err != nil {
-		u.metrics.IncCounter("invoicing_persist_errors_total", nil)
 		return nil, err
 	}
-	u.metrics.IncCounter("invoicing_persist_success_total", nil)
 	u.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
 
 	return &PersistInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil

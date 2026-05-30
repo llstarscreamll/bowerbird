@@ -10,11 +10,11 @@ import (
 )
 
 type ConnectionAddedSubscriber struct {
-	useCase *application.InitialSyncUseCase
+	command *application.SyncAccountCommand
 }
 
-func NewConnectionAddedSubscriber(useCase *application.InitialSyncUseCase) *ConnectionAddedSubscriber {
-	return &ConnectionAddedSubscriber{useCase: useCase}
+func NewConnectionAddedSubscriber(command *application.SyncAccountCommand) *ConnectionAddedSubscriber {
+	return &ConnectionAddedSubscriber{command: command}
 }
 
 func (s *ConnectionAddedSubscriber) DetailType() string {
@@ -22,11 +22,15 @@ func (s *ConnectionAddedSubscriber) DetailType() string {
 }
 
 func (s *ConnectionAddedSubscriber) HandleEventBridge(ctx context.Context, event awsevents.CloudWatchEvent) error {
+	if s.command == nil {
+		return nil
+	}
+
 	decoded, err := contractevents.UnmarshalConnectionAdded(event.Detail)
 	if err != nil {
 		return err
 	}
 
-	msgCtx := tenant.WithTenantSlug(ctx, decoded.TenantSlug)
-	return s.useCase.Process(msgCtx, decoded.TenantSlug, decoded.ConnectionID, decoded.Provider)
+	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
+	return s.command.Execute(msgCtx, application.SyncAccountCommandInput{AccountID: decoded.ConnectionID})
 }

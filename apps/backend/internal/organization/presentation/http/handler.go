@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/organization/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
 )
 
@@ -45,12 +45,12 @@ type CreateOrganizationResponse struct {
 func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) error {
 	var req CreateOrganizationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.Wrap(err, apperrors.CodeValidation, "invalid request body")
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
 	}
 
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
 	cmd := application.CreateOrganizationCommand{
@@ -66,9 +66,9 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) err
 	org, err := h.createUseCase.Execute(r.Context(), cmd)
 	if err != nil {
 		if err == application.ErrSlugAlreadyExists {
-			return apperrors.Wrap(err, apperrors.CodeConflict, "slug already exists")
+			return appErrors.Wrap(err, appErrors.CodeConflict, "slug already exists")
 		}
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to create organization")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to create organization")
 	}
 
 	resp := CreateOrganizationResponse{
@@ -85,17 +85,17 @@ func (h *Handler) CreateOrganization(w http.ResponseWriter, r *http.Request) err
 func (h *Handler) GetOrganization(w http.ResponseWriter, r *http.Request) error {
 	id := r.PathValue("id")
 	if id == "" {
-		return apperrors.New(apperrors.CodeValidation, "id is required")
+		return appErrors.New(appErrors.CodeValidation, "id is required")
 	}
 
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
 	org, err := h.getUseCase.Execute(r.Context(), id, claims.UserID)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeNotFound, "organization not found")
+		return appErrors.Wrap(err, appErrors.CodeNotFound, "organization not found")
 	}
 
 	resp := CreateOrganizationResponse{

@@ -16,7 +16,7 @@ import { secureEmailHtml } from '../../../application/email-html-security';
       }
 
       <iframe
-        class="w-full min-h-[280px] rounded-lg border border-slate-200 bg-white"
+        class="w-full h-[75dvh] min-h-[420px] rounded-lg border border-slate-200 bg-white"
         [attr.srcdoc]="iframeSrcDoc()"
         sandbox="allow-popups allow-popups-to-escape-sandbox"
         referrerpolicy="no-referrer"

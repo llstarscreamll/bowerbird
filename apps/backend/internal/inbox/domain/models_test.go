@@ -37,6 +37,16 @@ func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 	}
 }
 
+func TestInboxSyncCursorMarkSyncing(t *testing.T) {
+	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusIdle}
+
+	cursor.MarkSyncing()
+
+	if cursor.Status != InboxSyncStatusSyncing {
+		t.Fatalf("expected status syncing, got %s", cursor.Status)
+	}
+}
+
 func TestNewSyncedEmailMessage(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	message, err := NewSyncedEmailMessage(NewEmailMessageInput{
@@ -58,5 +68,43 @@ func TestNewEmailAttachmentRequiresFields(t *testing.T) {
 	_, err := NewEmailAttachment(NewEmailAttachmentInput{})
 	if err == nil {
 		t.Fatal("expected required field error")
+	}
+}
+
+func TestNewSyncedEmailMessageFromProvider(t *testing.T) {
+	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	receivedAt := now.Add(-time.Hour)
+
+	message, err := NewSyncedEmailMessageFromProvider(NewEmailMessageFromProviderInput{
+		ID:        "msg-1",
+		AccountID: "acc-1",
+		ProviderMessage: &MailMessage{
+			ID:         "provider-msg-1",
+			ThreadID:   "thread-1",
+			Subject:    "Invoice",
+			Sender:     "sender@example.com",
+			ReceivedAt: &receivedAt,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("new synced email message from provider: %v", err)
+	}
+
+	if message.ProviderMessageID != "provider-msg-1" {
+		t.Fatalf("expected provider message id provider-msg-1, got %s", message.ProviderMessageID)
+	}
+	if message.ProviderThreadID == nil || *message.ProviderThreadID != "thread-1" {
+		t.Fatalf("expected provider thread id thread-1, got %#v", message.ProviderThreadID)
+	}
+	if message.Subject == nil || *message.Subject != "Invoice" {
+		t.Fatalf("expected subject Invoice, got %#v", message.Subject)
+	}
+	if message.SenderEmail == nil || *message.SenderEmail != "sender@example.com" {
+		t.Fatalf("expected sender sender@example.com, got %#v", message.SenderEmail)
+	}
+	if message.ReceivedAt == nil || !message.ReceivedAt.Equal(receivedAt) {
+		t.Fatalf("expected received at %v, got %#v", receivedAt, message.ReceivedAt)
 	}
 }

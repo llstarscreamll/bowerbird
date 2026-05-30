@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/identity/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
 	"golang.org/x/oauth2"
 )
@@ -78,12 +78,12 @@ func (h *AuthHandler) setRefreshTokenCookie(w http.ResponseWriter, token string)
 func (h *AuthHandler) RegisterLocal(w http.ResponseWriter, r *http.Request) error {
 	var req LocalAuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.Wrap(err, apperrors.CodeValidation, "invalid request")
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request")
 	}
 
 	tokens, err := h.authService.RegisterLocal(r.Context(), req.Email, req.Password)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to register")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to register")
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -96,12 +96,12 @@ func (h *AuthHandler) RegisterLocal(w http.ResponseWriter, r *http.Request) erro
 func (h *AuthHandler) LoginLocal(w http.ResponseWriter, r *http.Request) error {
 	var req LocalAuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.Wrap(err, apperrors.CodeValidation, "invalid request")
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request")
 	}
 
 	tokens, err := h.authService.LoginLocal(r.Context(), req.Email, req.Password)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeUnauthorized, "invalid credentials")
+		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid credentials")
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -114,12 +114,12 @@ func (h *AuthHandler) LoginLocal(w http.ResponseWriter, r *http.Request) error {
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) error {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeUnauthorized, "missing refresh token")
+		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "missing refresh token")
 	}
 
 	tokens, err := h.authService.RefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeUnauthorized, "invalid refresh token")
+		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid refresh token")
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -146,7 +146,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 func (h *AuthHandler) OAuthGoogleLogin(w http.ResponseWriter, r *http.Request) error {
 	slog.Info("Starting Identity Google login flow", "state", "state-token")
 	if h.googleConfig == nil {
-		return apperrors.New(apperrors.CodeNotImplemented, "google oauth not configured")
+		return appErrors.New(appErrors.CodeNotImplemented, "google oauth not configured")
 	}
 	url := h.googleConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
@@ -215,7 +215,7 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request) error {
 	slog.Info("Starting Identity Microsoft login flow", "state", "state-token")
 	if h.microsoftConfig == nil {
-		return apperrors.New(apperrors.CodeNotImplemented, "microsoft oauth not configured")
+		return appErrors.New(appErrors.CodeNotImplemented, "microsoft oauth not configured")
 	}
 	url := h.microsoftConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
@@ -283,12 +283,12 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 func (h *AuthHandler) ListUserTenants(w http.ResponseWriter, r *http.Request) error {
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
 	tenants, err := h.identityService.ListUserTenants(r.Context(), claims.UserID)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to list tenants")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list tenants")
 	}
 
 	return api.Success(w, http.StatusOK, tenants)
@@ -297,17 +297,17 @@ func (h *AuthHandler) ListUserTenants(w http.ResponseWriter, r *http.Request) er
 func (h *AuthHandler) LeaveTenant(w http.ResponseWriter, r *http.Request) error {
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
 	tenantID := r.PathValue("tenant_id")
 	if tenantID == "" {
-		return apperrors.New(apperrors.CodeValidation, "tenant_id is required")
+		return appErrors.New(appErrors.CodeValidation, "tenant_id is required")
 	}
 
 	err := h.identityService.LeaveTenant(r.Context(), claims.UserID, tenantID)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to leave tenant")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to leave tenant")
 	}
 
 	w.WriteHeader(http.StatusNoContent)
@@ -317,12 +317,12 @@ func (h *AuthHandler) LeaveTenant(w http.ResponseWriter, r *http.Request) error 
 func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) error {
 	claims, ok := auth.ClaimsFromContext(r.Context())
 	if !ok {
-		return apperrors.New(apperrors.CodeUnauthorized, "unauthorized")
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
 	err := h.identityService.DeleteAccount(r.Context(), claims.UserID)
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to delete account")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to delete account")
 	}
 
 	return h.Logout(w, r)

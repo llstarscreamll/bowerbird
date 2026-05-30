@@ -40,10 +40,10 @@ func (h EventHandler) HandleSQSEvent(ctx context.Context, event events.SQSEvent)
 		msgCtx := ctx
 		// Extract tenant slug from message attributes.
 		if attr, ok := record.MessageAttributes["TenantSlug"]; ok && attr.StringValue != nil {
-			msgCtx = tenant.WithTenantSlug(msgCtx, *attr.StringValue)
+			msgCtx = tenant.WithTenantID(msgCtx, *attr.StringValue)
 		}
 
-		tenantSlug, _ := tenant.TenantSlugFromContext(msgCtx)
+		tenantSlug, _ := tenant.TenantIDFromContext(msgCtx)
 		log.Printf("sqs message processed: id=%s tenant=%s body=%s", record.MessageId, tenantSlug, record.Body)
 	}
 

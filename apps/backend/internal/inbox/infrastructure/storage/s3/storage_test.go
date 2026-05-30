@@ -5,22 +5,26 @@ import (
 	"strings"
 	"testing"
 
-	platforms3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
+	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 )
 
 type fakeObjectStore struct {
 	objects map[string]struct{}
 }
 
-func (f *fakeObjectStore) PutObjectIfAbsent(ctx context.Context, input platforms3.PutObjectIfAbsentInput) (*platforms3.PutObjectIfAbsentResult, error) {
+func (f *fakeObjectStore) WriteFileIfAbsent(ctx context.Context, input platformstorage.WriteFileIfAbsentInput) (*platformstorage.WriteFileIfAbsentResult, error) {
 	if f.objects == nil {
 		f.objects = map[string]struct{}{}
 	}
-	if _, ok := f.objects[input.Key]; ok {
-		return &platforms3.PutObjectIfAbsentResult{Uploaded: false, SizeBytes: int64(len(input.Data))}, nil
+	if _, ok := f.objects[input.Path]; ok {
+		return &platformstorage.WriteFileIfAbsentResult{Written: false, SizeBytes: int64(len(input.Data))}, nil
 	}
-	f.objects[input.Key] = struct{}{}
-	return &platforms3.PutObjectIfAbsentResult{Uploaded: true, SizeBytes: int64(len(input.Data))}, nil
+	f.objects[input.Path] = struct{}{}
+	return &platformstorage.WriteFileIfAbsentResult{Written: true, SizeBytes: int64(len(input.Data))}, nil
+}
+
+func (f *fakeObjectStore) ReadFile(ctx context.Context, input platformstorage.ReadFileInput) ([]byte, error) {
+	return nil, nil
 }
 
 func TestStoreAttachmentUploadsAndComputesDeterministicKey(t *testing.T) {

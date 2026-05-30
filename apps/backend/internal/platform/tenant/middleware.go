@@ -13,7 +13,7 @@ func Middleware(next http.Handler) http.Handler {
 		// For health checks and public webhooks, it might be optional.
 		// We add it to the context if present.
 		if tenantSlug != "" {
-			ctx := WithTenantSlug(r.Context(), tenantSlug)
+			ctx := WithTenantID(r.Context(), tenantSlug)
 			r = r.WithContext(ctx)
 		}
 

@@ -1,17 +1,17 @@
-package apperrors_test
+package errors_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 )
 
 func TestSyncError_UXMeta(t *testing.T) {
-	err := apperrors.NewSync(
-		apperrors.CodeSyncReauthRequired,
+	err := appErrors.NewSync(
+		appErrors.CodeSyncReauthRequired,
 		"requires reauth",
-		apperrors.SyncErrorOptions{
+		appErrors.SyncErrorOptions{
 			Provider:       "GMAIL",
 			AccountEmail:   "user@gmail.com",
 			RequiresReauth: true,
@@ -38,7 +38,7 @@ func TestSyncError_UXMeta(t *testing.T) {
 
 func TestWrapSync_Unwrap(t *testing.T) {
 	baseErr := errors.New("provider failed")
-	err := apperrors.WrapSync(baseErr, apperrors.CodeSyncInternal, "sync failed", apperrors.SyncErrorOptions{})
+	err := appErrors.WrapSync(baseErr, appErrors.CodeSyncInternal, "sync failed", appErrors.SyncErrorOptions{})
 
 	if !errors.Is(err, baseErr) {
 		t.Fatalf("expected wrapped sync error to unwrap base error")
@@ -46,7 +46,7 @@ func TestWrapSync_Unwrap(t *testing.T) {
 }
 
 func TestHelpURLForCode(t *testing.T) {
-	url := apperrors.HelpURLForCode(apperrors.CodeSyncRateLimited)
+	url := appErrors.HelpURLForCode(appErrors.CodeSyncRateLimited)
 	if url == "" {
 		t.Fatalf("expected help URL for sync error code")
 	}

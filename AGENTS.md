@@ -19,7 +19,7 @@
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources `apps/backend/.env` if present.
 - Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
-- Domain Errors: Wrap or create errors using `apperrors.Wrap(err, apperrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
+- Domain Errors: Wrap or create errors using `appErrors.Wrap(err, appErrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
 - Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
 - Runtime config is env + SSM merge (`internal/platform/config/config.go`).
   - Local default SSM parameter: `/bowerbird/local/secrets`.

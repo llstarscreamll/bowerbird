@@ -27,6 +27,6 @@ func (s *InboxMessageReceivedSubscriber) HandleEventBridge(ctx context.Context, 
 		return err
 	}
 
-	msgCtx := tenant.WithTenantSlug(ctx, decoded.TenantSlug)
+	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
 	return s.useCase.Process(msgCtx, decoded)
 }

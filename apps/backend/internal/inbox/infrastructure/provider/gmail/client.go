@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"path"
 	"strconv"
@@ -51,21 +52,14 @@ func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptio
 		maxResults = 50
 	}
 
-	labelIDs := opts.LabelIDs
-	if len(labelIDs) == 0 {
-		labelIDs = []string{"UNREAD"}
-	}
-
 	values := url.Values{}
 	values.Set("maxResults", strconv.Itoa(maxResults))
-	if opts.Query != "" {
-		values.Set("q", opts.Query)
+	query := withInboxExclusions(opts.Query)
+	if query != "" {
+		values.Set("q", query)
 	}
 	if opts.PageToken != "" {
 		values.Set("pageToken", opts.PageToken)
-	}
-	for _, labelID := range labelIDs {
-		values.Add("labelIds", labelID)
 	}
 
 	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages?%s", c.baseURL, url.PathEscape(userID), values.Encode())
@@ -154,7 +148,7 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("get message request failed with status %d", resp.StatusCode)
+		return nil, c.requestStatusError("get message request failed", resp)
 	}
 
 	var payload gmailMessageResponse
@@ -163,24 +157,37 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 	}
 
 	attachments := extractAttachments(payload.Payload)
-	headers := flattenHeaders(payload.Payload)
+	headers := payloadHeaders(payload.Payload)
+	receivedAt := parseMailDate(headerValue(headers, "date"))
+
+	var internalDate *time.Time
+	if payload.InternalDate != "" {
+		if ms, err := strconv.ParseInt(payload.InternalDate, 10, 64); err == nil {
+			t := time.UnixMilli(ms).UTC()
+			internalDate = &t
+		}
+	}
+
+	if receivedAt == nil {
+		receivedAt = internalDate
+	}
 
 	msg := &domain.MailMessage{
 		ID:            payload.ID,
 		ThreadID:      payload.ThreadID,
-		Subject:       headers["subject"],
-		Sender:        headers["from"],
+		LabelIDs:      payload.LabelIDs,
+		Subject:       headerValue(headers, "subject"),
+		Sender:        headerValue(headers, "from"),
 		Snippet:       payload.Snippet,
 		PlainTextBody: extractPlainTextBody(payload.Payload),
-		ReceivedAt:    parseRFC1123(headers["date"]),
+		HTMLBody:      extractHTMLBody(payload.Payload),
+		Headers:       mapHeaders(headers),
+		Payload:       mapPayloadPart(payload.Payload),
+		HistoryID:     payload.HistoryID,
+		SizeEstimate:  payload.SizeEstimate,
+		ReceivedAt:    receivedAt,
+		InternalDate:  internalDate,
 		Attachments:   attachments,
-	}
-
-	if payload.InternalDate != "" {
-		if ms, err := strconv.ParseInt(payload.InternalDate, 10, 64); err == nil {
-			t := time.UnixMilli(ms).UTC()
-			msg.InternalDate = &t
-		}
 	}
 
 	return msg, nil
@@ -214,7 +221,7 @@ func (c *Client) DownloadAttachment(ctx context.Context, userID, messageID, atta
 		return nil, fmt.Errorf("decode attachment response: %w", err)
 	}
 
-	decoded, err := base64.URLEncoding.DecodeString(payload.Data)
+	decoded, err := decodeBase64URL(payload.Data)
 	if err != nil {
 		return nil, fmt.Errorf("decode attachment data: %w", err)
 	}
@@ -328,12 +335,16 @@ func (c *Client) AddLabelToMessage(ctx context.Context, userID, messageID, label
 type gmailMessageResponse struct {
 	ID           string            `json:"id"`
 	ThreadID     string            `json:"threadId"`
+	LabelIDs     []string          `json:"labelIds"`
 	Snippet      string            `json:"snippet"`
+	HistoryID    string            `json:"historyId"`
+	SizeEstimate int64             `json:"sizeEstimate"`
 	InternalDate string            `json:"internalDate"`
 	Payload      *gmailMessagePart `json:"payload"`
 }
 
 type gmailMessagePart struct {
+	PartID   string              `json:"partId"`
 	Filename string              `json:"filename"`
 	MimeType string              `json:"mimeType"`
 	Headers  []gmailHeader       `json:"headers"`
@@ -387,25 +398,83 @@ func extractAttachments(part *gmailMessagePart) []domain.MailAttachmentRef {
 	return refs
 }
 
-func flattenHeaders(part *gmailMessagePart) map[string]string {
-	values := map[string]string{}
+func payloadHeaders(part *gmailMessagePart) []gmailHeader {
 	if part == nil {
-		return values
+		return nil
 	}
 
-	for _, header := range part.Headers {
-		values[strings.ToLower(header.Name)] = header.Value
-	}
-
-	return values
+	return part.Headers
 }
 
-func parseRFC1123(value string) *time.Time {
+func headerValue(headers []gmailHeader, name string) string {
+	for _, header := range headers {
+		if strings.EqualFold(header.Name, name) {
+			return header.Value
+		}
+	}
+
+	return ""
+}
+
+func mapHeaders(headers []gmailHeader) []domain.MailHeader {
+	if len(headers) == 0 {
+		return nil
+	}
+
+	mapped := make([]domain.MailHeader, 0, len(headers))
+	for _, header := range headers {
+		mapped = append(mapped, domain.MailHeader{
+			Name:  header.Name,
+			Value: header.Value,
+		})
+	}
+
+	return mapped
+}
+
+func mapPayloadPart(part *gmailMessagePart) *domain.MailPart {
+	if part == nil {
+		return nil
+	}
+
+	mapped := &domain.MailPart{
+		PartID:   part.PartID,
+		MimeType: part.MimeType,
+		Filename: part.Filename,
+		Headers:  mapHeaders(part.Headers),
+		Body: domain.MailPartBody{
+			AttachmentID: part.Body.AttachmentID,
+			Data:         part.Body.Data,
+			Size:         part.Body.Size,
+		},
+	}
+
+	if len(part.Parts) > 0 {
+		mapped.Parts = make([]domain.MailPart, 0, len(part.Parts))
+		for _, child := range part.Parts {
+			mappedChild := mapPayloadPart(child)
+			if mappedChild == nil {
+				continue
+			}
+			mapped.Parts = append(mapped.Parts, *mappedChild)
+		}
+	}
+
+	return mapped
+}
+
+func parseMailDate(value string) *time.Time {
 	if value == "" {
 		return nil
 	}
 
-	t, err := time.Parse(time.RFC1123Z, value)
+	t, err := mail.ParseDate(value)
+	if err == nil {
+		utc := t.UTC()
+		return &utc
+	}
+
+	t, err = time.Parse(time.RFC1123Z, value)
 	if err != nil {
 		t, err = time.Parse(time.RFC1123, value)
 		if err != nil {
@@ -423,7 +492,7 @@ func extractPlainTextBody(part *gmailMessagePart) string {
 	}
 
 	if strings.EqualFold(part.MimeType, "text/plain") && part.Body.AttachmentID == "" && part.Body.Data != "" {
-		decoded, err := base64.URLEncoding.DecodeString(part.Body.Data)
+		decoded, err := decodeBase64URL(part.Body.Data)
 		if err == nil {
 			return strings.TrimSpace(string(decoded))
 		}
@@ -436,4 +505,52 @@ func extractPlainTextBody(part *gmailMessagePart) string {
 	}
 
 	return ""
+}
+
+func extractHTMLBody(part *gmailMessagePart) string {
+	if part == nil {
+		return ""
+	}
+
+	if strings.EqualFold(part.MimeType, "text/html") && part.Body.AttachmentID == "" && part.Body.Data != "" {
+		decoded, err := decodeBase64URL(part.Body.Data)
+		if err == nil {
+			return strings.TrimSpace(string(decoded))
+		}
+	}
+
+	for _, child := range part.Parts {
+		if content := extractHTMLBody(child); content != "" {
+			return content
+		}
+	}
+
+	return ""
+}
+
+func decodeBase64URL(value string) ([]byte, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err == nil {
+		return decoded, nil
+	}
+
+	return base64.URLEncoding.DecodeString(value)
+}
+
+func withInboxExclusions(query string) string {
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
+		return "-in:spam -in:sent"
+	}
+
+	lower := strings.ToLower(trimmed)
+	if !strings.Contains(lower, "in:spam") {
+		trimmed += " -in:spam"
+	}
+
+	if !strings.Contains(lower, "in:sent") {
+		trimmed += " -in:sent"
+	}
+
+	return trimmed
 }

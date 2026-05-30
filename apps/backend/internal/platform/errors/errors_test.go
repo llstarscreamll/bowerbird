@@ -1,20 +1,20 @@
-package apperrors_test
+package errors_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 )
 
 func TestAppError_Error(t *testing.T) {
-	err := apperrors.New(apperrors.CodeNotFound, "user not found")
+	err := appErrors.New(appErrors.CodeNotFound, "user not found")
 	expected := "ERR_NOT_FOUND: user not found"
 	if err.Error() != expected {
 		t.Errorf("expected %q, got %q", expected, err.Error())
 	}
 
-	wrapped := apperrors.Wrap(errors.New("db connection failed"), apperrors.CodeInternal, "internal server error")
+	wrapped := appErrors.Wrap(errors.New("db connection failed"), appErrors.CodeInternal, "internal server error")
 	expectedWrapped := "ERR_INTERNAL: internal server error (db connection failed)"
 	if wrapped.Error() != expectedWrapped {
 		t.Errorf("expected %q, got %q", expectedWrapped, wrapped.Error())
@@ -23,17 +23,17 @@ func TestAppError_Error(t *testing.T) {
 
 func TestAppError_Unwrap(t *testing.T) {
 	baseErr := errors.New("base error")
-	err := apperrors.Wrap(baseErr, apperrors.CodeInternal, "failed")
+	err := appErrors.Wrap(baseErr, appErrors.CodeInternal, "failed")
 
 	if !errors.Is(err, baseErr) {
 		t.Errorf("expected wrapped error to match base error")
 	}
 
-	var appErr *apperrors.AppError
+	var appErr *appErrors.AppError
 	if !errors.As(err, &appErr) {
 		t.Errorf("expected to be able to extract AppError")
 	}
-	if appErr.Code != apperrors.CodeInternal {
-		t.Errorf("expected code %q, got %q", apperrors.CodeInternal, appErr.Code)
+	if appErr.Code != appErrors.CodeInternal {
+		t.Errorf("expected code %q, got %q", appErrors.CodeInternal, appErr.Code)
 	}
 }

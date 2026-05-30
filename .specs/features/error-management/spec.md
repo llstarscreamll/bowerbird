@@ -37,4 +37,4 @@
 
 - [ERR-001] **Network Drop:** User submits form without internet -> Angular Interceptor catches status 0 -> Triggers Toast with "Error de conexión".
 - [ERR-002] **Backend Panic / Unhandled Exception:** DB drops connection -> Controller returns raw error -> `api.Wrap` catches it -> Returns 500 JSON:API -> In Dev: shows stacktrace in `meta._debug` -> Interceptor logs trace to console and shows generic Toast to user.
-- [ERR-003] **Domain Validation Failure:** User enters duplicated slug -> Controller returns `apperrors.Wrap(err, CodeConflict, "slug exists")` -> `api.Wrap` maps to 409 JSON:API -> Interceptor translates code to "El identificador ya existe" -> Throws to component -> Component renders `<app-alert>` above the form.
+- [ERR-003] **Domain Validation Failure:** User enters duplicated slug -> Controller returns `appErrors.Wrap(err, CodeConflict, "slug exists")` -> `api.Wrap` maps to 409 JSON:API -> Interceptor translates code to "El identificador ya existe" -> Throws to component -> Component renders `<app-alert>` above the form.

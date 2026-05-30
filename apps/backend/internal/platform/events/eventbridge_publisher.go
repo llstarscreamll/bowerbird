@@ -26,7 +26,7 @@ func NewEventBridgePublisher(client *eventbridge.Client, eventBus string) *Event
 }
 
 func (p *EventBridgePublisher) PublishConnectionAdded(ctx context.Context, connection *domain.Connection) error {
-	tenantSlug, _ := tenant.TenantSlugFromContext(ctx)
+	tenantSlug, _ := tenant.TenantIDFromContext(ctx)
 
 	event := contractevents.ConnectionAdded{
 		EventID:              id.NewULID(),
@@ -42,13 +42,21 @@ func (p *EventBridgePublisher) PublishConnectionAdded(ctx context.Context, conne
 		return err
 	}
 
-	_, err = p.client.PutEvents(ctx, &eventbridge.PutEventsInput{
+	return p.PublishBusinessEvent(ctx, BusinessEvent{
+		Source:     contractevents.ConnectionAddedSource,
+		DetailType: contractevents.ConnectionAddedDetailType,
+		Detail:     payload,
+	})
+}
+
+func (p *EventBridgePublisher) PublishBusinessEvent(ctx context.Context, event BusinessEvent) error {
+	_, err := p.client.PutEvents(ctx, &eventbridge.PutEventsInput{
 		Entries: []types.PutEventsRequestEntry{
 			{
 				EventBusName: aws.String(p.eventBus),
-				Source:       aws.String(contractevents.ConnectionAddedSource),
-				DetailType:   aws.String(contractevents.ConnectionAddedDetailType),
-				Detail:       aws.String(string(payload)),
+				Source:       aws.String(event.Source),
+				DetailType:   aws.String(event.DetailType),
+				Detail:       aws.String(string(event.Detail)),
 			},
 		},
 	})

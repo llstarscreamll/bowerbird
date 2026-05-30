@@ -64,6 +64,7 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 	if err != nil {
 		return fmt.Errorf("failed to upsert sync cursor: %w", err)
 	}
+
 	return nil
 }
 
@@ -366,6 +367,7 @@ func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID strin
 				m.raw_data->>'Snippet',
 				''
 			) AS body_text,
+			m.raw_data,
 			COALESCE(m.received_at, m.created_at) AS received_at,
 			COALESCE(m.sync_status, 'new') AS processing_status,
 			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.xml') AS has_xml,
@@ -385,6 +387,7 @@ func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID strin
 		&msg.Sender,
 		&msg.Snippet,
 		&msg.BodyText,
+		&msg.RawData,
 		&msg.ReceivedAt,
 		&msg.ProcessingStatus,
 		&msg.HasXML,

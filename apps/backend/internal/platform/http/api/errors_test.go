@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
 )
 
 func TestMapError_AppError(t *testing.T) {
-	appErr := apperrors.New(apperrors.CodeNotFound, "resource missing")
+	appErr := appErrors.New(appErrors.CodeNotFound, "resource missing")
 	doc, status := api.MapError(appErr, "trace-123", false)
 
 	if status != http.StatusNotFound {
@@ -30,8 +30,8 @@ func TestMapError_AppError(t *testing.T) {
 	if errObj.Status != "404" {
 		t.Errorf("expected status 404, got %q", errObj.Status)
 	}
-	if errObj.Code != apperrors.CodeNotFound {
-		t.Errorf("expected code %q, got %q", apperrors.CodeNotFound, errObj.Code)
+	if errObj.Code != appErrors.CodeNotFound {
+		t.Errorf("expected code %q, got %q", appErrors.CodeNotFound, errObj.Code)
 	}
 	if errObj.Detail != "resource missing" {
 		t.Errorf("expected detail %q, got %q", "resource missing", errObj.Detail)
@@ -53,8 +53,8 @@ func TestMapError_GenericError_DevMode(t *testing.T) {
 	}
 
 	errObj := doc.Errors[0]
-	if errObj.Code != apperrors.CodeInternal {
-		t.Errorf("expected code %q, got %q", apperrors.CodeInternal, errObj.Code)
+	if errObj.Code != appErrors.CodeInternal {
+		t.Errorf("expected code %q, got %q", appErrors.CodeInternal, errObj.Code)
 	}
 
 	debugInfo, ok := errObj.Meta["_debug"].(map[string]any)
@@ -70,10 +70,10 @@ func TestMapError_GenericError_DevMode(t *testing.T) {
 }
 
 func TestMapError_SyncError_MetadataAndHelpLink(t *testing.T) {
-	syncErr := apperrors.NewSync(
-		apperrors.CodeSyncRateLimited,
+	syncErr := appErrors.NewSync(
+		appErrors.CodeSyncRateLimited,
 		"La cuenta de Yahoo personal@yahoo.com requiere espera temporal",
-		apperrors.SyncErrorOptions{
+		appErrors.SyncErrorOptions{
 			Provider:          "YAHOO",
 			AccountEmail:      "personal@yahoo.com",
 			RetryAfterSeconds: 120,
@@ -140,7 +140,7 @@ func containsSensitive(text string) bool {
 }
 
 func TestWrap(t *testing.T) {
-	expectedErr := apperrors.New(apperrors.CodeValidation, "invalid input")
+	expectedErr := appErrors.New(appErrors.CodeValidation, "invalid input")
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) error {
 		return expectedErr
 	}
@@ -164,7 +164,7 @@ func TestWrap(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if len(doc.Errors) != 1 || doc.Errors[0].Code != apperrors.CodeValidation {
+	if len(doc.Errors) != 1 || doc.Errors[0].Code != appErrors.CodeValidation {
 		t.Errorf("expected json:api response to contain the validation error")
 	}
 }

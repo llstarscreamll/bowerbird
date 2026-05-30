@@ -173,6 +173,6 @@
 
 ## Notas de implementacion
 
-- Mantener compatibilidad con patron actual: `api.Wrap(handler, isDev)` y `apperrors.Wrap(...)`.
+- Mantener compatibilidad con patron actual: `api.Wrap(handler, isDev)` y `appErrors.Wrap(...)`.
 - No introducir `http.Error()` en handlers.
 - No introducir DLQ por tenant; resiliencia por guardrails en el worker.

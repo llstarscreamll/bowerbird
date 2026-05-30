@@ -4,10 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"strings"
-	"time"
 
 	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
 )
 
 type InboxInvoiceRouter interface {
@@ -15,22 +13,19 @@ type InboxInvoiceRouter interface {
 }
 
 type ProcessInboxEventUseCase struct {
-	router  InboxInvoiceRouter
-	logger  *slog.Logger
-	metrics observability.Metrics
+	router InboxInvoiceRouter
+	logger *slog.Logger
 }
 
 func NewProcessInboxEventUseCase(router InboxInvoiceRouter) *ProcessInboxEventUseCase {
-	return &ProcessInboxEventUseCase{router: router, logger: slog.Default(), metrics: observability.NoopMetrics{}}
+	return &ProcessInboxEventUseCase{router: router, logger: slog.Default()}
 }
 
 func (u *ProcessInboxEventUseCase) Process(ctx context.Context, event contractevents.InboxMessageReceived) error {
-	startedAt := time.Now()
 	if !isInvoiceCandidate(event) {
 		u.logger.Info("invoicing event skipped: not invoice candidate", "tenant_slug", event.TenantSlug, "message_id", event.MessageInternalID)
 		return nil
 	}
-	u.metrics.IncCounter("invoicing_documents_classified_total", map[string]string{"tenant_slug": event.TenantSlug, "result": "candidate"})
 
 	if u.router == nil {
 		u.logger.Info("invoicing router not configured", "tenant_slug", event.TenantSlug, "message_id", event.MessageInternalID)
@@ -38,10 +33,8 @@ func (u *ProcessInboxEventUseCase) Process(ctx context.Context, event contractev
 	}
 
 	if err := u.router.RouteInboxInvoiceCandidate(ctx, event); err != nil {
-		u.metrics.IncCounter("invoicing_processing_errors_total", map[string]string{"tenant_slug": event.TenantSlug})
 		return err
 	}
-	u.metrics.ObserveDuration("invoicing_processing_latency_ms", time.Since(startedAt), map[string]string{"tenant_slug": event.TenantSlug})
 	u.logger.Info(
 		"invoicing event routed",
 		"tenant_slug",

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
-
 	"github.com/money-path/bowerbird/apps/backend/internal/invoicing/domain"
 )
 
@@ -42,7 +40,6 @@ type ExtractInvoiceUseCase struct {
 	llmExtractor domain.InvoiceLLMExtractor
 	repo         InvoiceDedupRepository
 	logger       *slog.Logger
-	metrics      observability.Metrics
 }
 
 func NewExtractInvoiceUseCase(
@@ -55,7 +52,6 @@ func NewExtractInvoiceUseCase(
 		llmExtractor: llmExtractor,
 		repo:         repo,
 		logger:       slog.Default(),
-		metrics:      observability.NoopMetrics{},
 	}
 }
 
@@ -69,7 +65,6 @@ func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMess
 		return nil, fmt.Errorf("check invoice by source message id: %w", err)
 	}
 	if processed {
-		u.metrics.IncCounter("invoicing_duplicates_skipped_total", map[string]string{"reason": string(SkipReasonMessageAlreadyProcessed)})
 		u.logger.Info("invoice extraction skipped by source message", "source_message_id", sourceMessageID)
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonMessageAlreadyProcessed}, nil
 	}
@@ -79,7 +74,6 @@ func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMess
 		return nil, err
 	}
 	if invoice == nil {
-		u.metrics.IncCounter("invoicing_documents_classified_total", map[string]string{"result": "no_supported_document"})
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonNoSupportedDocument}, nil
 	}
 
@@ -88,17 +82,10 @@ func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMess
 		return nil, fmt.Errorf("check invoice by cufe: %w", err)
 	}
 	if duplicated {
-		u.metrics.IncCounter("invoicing_duplicates_skipped_total", map[string]string{"reason": string(SkipReasonCUFEAlreadyExists)})
 		u.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonCUFEAlreadyExists}, nil
 	}
 
-	if source == "xml" {
-		u.metrics.IncCounter("invoicing_extraction_xml_total", nil)
-	}
-	if source == "llm" {
-		u.metrics.IncCounter("invoicing_extraction_llm_total", nil)
-	}
 	u.logger.Info("invoice extracted and ready", "source", source, "cufe", invoice.CUFE)
 
 	return &ExtractInvoiceResult{

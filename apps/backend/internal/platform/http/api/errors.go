@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 )
 
 // JSONAPIErrorDocument is the top-level structure for JSON:API errors.
@@ -46,8 +46,8 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		Errors: []JSONAPIErrorObject{},
 	}
 
-	var appErr *apperrors.AppError
-	var syncErr *apperrors.SyncError
+	var appErr *appErrors.AppError
+	var syncErr *appErrors.SyncError
 	var httpStatus int
 	var title, detail, code, helpURL string
 	meta := map[string]any{}
@@ -58,7 +58,7 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		httpStatus, title = statusFromCode(syncErr.Code)
 		helpURL = syncErr.HelpURL
 		if helpURL == "" {
-			helpURL = apperrors.HelpURLForCode(syncErr.Code)
+			helpURL = appErrors.HelpURLForCode(syncErr.Code)
 		}
 		for key, value := range filterAllowedErrorMeta(syncErr.UXMeta()) {
 			meta[key] = value
@@ -67,10 +67,10 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		code = appErr.Code
 		detail = appErr.Message
 		httpStatus, title = statusFromCode(appErr.Code)
-		helpURL = apperrors.HelpURLForCode(appErr.Code)
+		helpURL = appErrors.HelpURLForCode(appErr.Code)
 	} else {
 		// Generic or unexpected error
-		code = apperrors.CodeInternal
+		code = appErrors.CodeInternal
 		detail = "An unexpected error occurred."
 		httpStatus = http.StatusInternalServerError
 		title = http.StatusText(http.StatusInternalServerError)
@@ -127,29 +127,29 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, err error, isDev b
 
 func statusFromCode(code string) (int, string) {
 	switch code {
-	case apperrors.CodeSyncReauthRequired:
+	case appErrors.CodeSyncReauthRequired:
 		return http.StatusUnauthorized, "Unauthorized"
-	case apperrors.CodeSyncRateLimited:
+	case appErrors.CodeSyncRateLimited:
 		return http.StatusTooManyRequests, "Too Many Requests"
-	case apperrors.CodeSyncProviderTemporary:
+	case appErrors.CodeSyncProviderTemporary:
 		return http.StatusServiceUnavailable, "Service Unavailable"
-	case apperrors.CodeSyncPayloadRejected:
+	case appErrors.CodeSyncPayloadRejected:
 		return http.StatusUnprocessableEntity, "Unprocessable Entity"
-	case apperrors.CodeSyncInternal:
+	case appErrors.CodeSyncInternal:
 		return http.StatusInternalServerError, "Internal Server Error"
-	case apperrors.CodeValidation:
+	case appErrors.CodeValidation:
 		return http.StatusBadRequest, "Bad Request"
-	case apperrors.CodeUnauthorized:
+	case appErrors.CodeUnauthorized:
 		return http.StatusUnauthorized, "Unauthorized"
-	case apperrors.CodeForbidden:
+	case appErrors.CodeForbidden:
 		return http.StatusForbidden, "Forbidden"
-	case apperrors.CodeNotFound:
+	case appErrors.CodeNotFound:
 		return http.StatusNotFound, "Not Found"
-	case apperrors.CodeConflict:
+	case appErrors.CodeConflict:
 		return http.StatusConflict, "Conflict"
-	case apperrors.CodeNotImplemented:
+	case appErrors.CodeNotImplemented:
 		return http.StatusNotImplemented, "Not Implemented"
-	case apperrors.CodeInternal:
+	case appErrors.CodeInternal:
 		fallthrough
 	default:
 		return http.StatusInternalServerError, "Internal Server Error"

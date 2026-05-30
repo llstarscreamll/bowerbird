@@ -6,24 +6,20 @@ import (
 	"time"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/connections/domain"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
 )
 
 type internalService struct {
 	repo               domain.Repository
 	credentialsService *CredentialsService
-	metrics            observability.Metrics
 }
 
 func NewInternalService(
 	repo domain.Repository,
 	credentialsService *CredentialsService,
-	metrics observability.Metrics,
 ) InternalService {
 	return &internalService{
 		repo:               repo,
 		credentialsService: credentialsService,
-		metrics:            metrics,
 	}
 }
 

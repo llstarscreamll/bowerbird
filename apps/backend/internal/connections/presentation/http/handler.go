@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/money-path/bowerbird/apps/backend/internal/connections/domain"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/apperrors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
+	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/id"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
@@ -101,7 +101,7 @@ func (h *Handler) DeleteConnection(w http.ResponseWriter, r *http.Request) error
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		return apperrors.New(apperrors.CodeValidation, "connection id is required")
+		return appErrors.New(appErrors.CodeValidation, "connection id is required")
 	}
 
 	err := h.repo.Delete(ctx, id)
@@ -114,31 +114,31 @@ func (h *Handler) DeleteConnection(w http.ResponseWriter, r *http.Request) error
 
 func (h *Handler) GoogleConnect(w http.ResponseWriter, r *http.Request) error {
 	if h.googleConfig == nil {
-		return apperrors.New(apperrors.CodeInternal, "google integration not configured")
+		return appErrors.New(appErrors.CodeInternal, "google integration not configured")
 	}
 
 	authHeader := r.Header.Get("Authorization")
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-		return apperrors.New(apperrors.CodeUnauthorized, "missing or invalid authorization header")
+		return appErrors.New(appErrors.CodeUnauthorized, "missing or invalid authorization header")
 	}
 	tokenString := parts[1]
 
 	claims, err := h.tokenGen.ValidateAccessToken(tokenString)
 	if err != nil {
-		return apperrors.New(apperrors.CodeUnauthorized, "invalid authorization token")
+		return appErrors.New(appErrors.CodeUnauthorized, "invalid authorization token")
 	}
 
-	tenantID, err := tenant.TenantSlugFromContext(r.Context())
+	tenantID, err := tenant.TenantIDFromContext(r.Context())
 	if err != nil {
-		return apperrors.New(apperrors.CodeValidation, "missing tenant context")
+		return appErrors.New(appErrors.CodeValidation, "missing tenant context")
 	}
 
 	// Create an opaque state containing the UserID, tenantID, and a timestamp
 	statePayload := fmt.Sprintf("%s|%s|%d", claims.Subject, tenantID, time.Now().Unix())
 	encryptedState, err := h.stateProtect.Encrypt([]byte(statePayload))
 	if err != nil {
-		return apperrors.Wrap(err, apperrors.CodeInternal, "failed to secure state parameter")
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to secure state parameter")
 	}
 	opaqueState := base64.URLEncoding.EncodeToString(encryptedState)
 
@@ -253,7 +253,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Inject tenant ID back into context for the repository
-	ctx = tenant.WithTenantSlug(ctx, tenantID)
+	ctx = tenant.WithTenantID(ctx, tenantID)
 
 	if err := h.repo.Upsert(ctx, conn); err != nil {
 		return redirectOnError(tenantID, fmt.Sprintf("save connection failed: %v", err))

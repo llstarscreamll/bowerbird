@@ -82,35 +82,13 @@ export class UnifiedInboxStore {
     this.retryCountdownSub?.unsubscribe();
   }
 
-  triggerSync(accountId?: string): void {
+  triggerSync(): void {
     if (this.syncRetrySecondsLeft() > 0) {
       return;
     }
 
-    const targetAccountId = accountId || this.filters().accountId;
-
-    const requestedAccounts = targetAccountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === targetAccountId);
-
-    const activeAccounts = requestedAccounts.filter((account) => this.isActiveAccount(account));
-    const syncableAccounts = activeAccounts.filter((account) => account.status !== 'syncing');
-
-    if (syncableAccounts.length === 0) {
-      return;
-    }
-
-    const syncableAccountIds = new Set(syncableAccounts.map((account) => account.id));
-
-    // Optimistically update status to 'syncing' for targeted accounts
-    this.accountHealth.update((accounts) =>
-      accounts.map((acc) => {
-        if (syncableAccountIds.has(acc.id)) {
-          return { ...acc, status: 'syncing', sync_status: 'syncing' };
-        }
-        return acc;
-      }),
-    );
-
-    forkJoin(syncableAccounts.map((account) => this.repository.triggerSync(account.id)))
+    this.repository
+      .triggerSync()
       .pipe(
         catchError((error: unknown) => {
           const syncError = extractSyncActionError(error);
@@ -146,7 +124,6 @@ export class UnifiedInboxStore {
             this.error.set('No se pudo iniciar la sincronización.');
           }
 
-          // Revert status on error by forcing a health check
           this.refreshHealth();
           return of(null);
         }),
@@ -310,7 +287,7 @@ export class UnifiedInboxStore {
         this.messages.set(messages);
         this.accountHealth.set(this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
 
-        this.triggerSync('all');
+        this.triggerSync();
 
         // Auto-select the single account if there's exactly one
         if (accounts.length === 1 && this.filters().accountId === 'all') {
@@ -369,10 +346,6 @@ export class UnifiedInboxStore {
         last_synced_at: currentSyncStatus?.last_synced_at,
       };
     });
-  }
-
-  private isActiveAccount(account: AccountHealthSummary): boolean {
-    return (account.connection_status ?? this.toConnectionStatus(account.status)) === 'active';
   }
 
   private toConnectionStatus(status: AccountHealthSummary['status']): 'active' | 'requires_reconnect' | 'paused' | 'error' | undefined {

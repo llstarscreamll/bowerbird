@@ -172,7 +172,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
             </button>
             <button
               class="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              [disabled]="isSyncing() || !hasSyncableAccounts() || syncRetrySecondsLeft() > 0"
+              [disabled]="isSyncing() || syncRetrySecondsLeft() > 0"
               (click)="triggerSync()"
               title="Sincronizar correos"
             >
@@ -317,7 +317,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
             </div>
 
             <!-- Content -->
-            <div class="max-w-3xl mx-auto px-8 py-10">
+            <div class="w-full min-h-full px-8 py-10">
               <h1 class="text-2xl font-semibold text-slate-900 dark:text-white mb-8 transition-colors">{{ selectedMessage()!.subject || '(Sin asunto)' }}</h1>
 
               <div class="flex items-start justify-between mb-8">
@@ -449,13 +449,6 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   readonly isSyncing = this.store.isSyncing;
   readonly syncActionError = this.store.syncActionError;
   readonly syncRetrySecondsLeft = this.store.syncRetrySecondsLeft;
-  readonly hasSyncableAccounts = computed(() => {
-    const accountId = this.filters().accountId;
-    const candidateAccounts = accountId === 'all' ? this.accountHealth() : this.accountHealth().filter((account) => account.id === accountId);
-
-    return candidateAccounts.some((account) => account.connection_status === 'active' && account.status !== 'syncing');
-  });
-
   readonly providers = this.store.providers;
   readonly statuses = this.store.statuses;
 
@@ -468,7 +461,11 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
     }
 
     const detail = this.store.getMessageDetail(selected.id);
-    return detail?.body_text || detail?.snippet || selected.snippet || '';
+    if (!detail) {
+      return selected.snippet || '';
+    }
+
+    return detail.body_text || '';
   });
   readonly selectedMessageHtml = computed(() => {
     const selected = this.selectedMessage();

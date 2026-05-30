@@ -38,5 +38,6 @@ func NewOAuthHTTPClient(ctx context.Context, cfg OAuthConfig, credentialsJSON []
 	}
 
 	httpClient := oauthCfg.Client(ctx, &token)
+
 	return NewClient(httpClient), nil
 }

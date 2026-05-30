@@ -7,21 +7,22 @@ import (
 
 type contextKey string
 
-const tenantSlugKey contextKey = "tenant_slug"
+const tenantIdKey contextKey = "tenant_id"
 
-// ErrNoTenantSlugInContext is returned when no tenant slug is found in the context.
-var ErrNoTenantSlugInContext = errors.New("no tenant slug found in context")
+// ErrNoTenantIdInContext is returned when no tenant id is found in the context.
+var ErrNoTenantIdInContext = errors.New("no tenant id found in context")
 
-// WithTenantSlug adds a tenant slug to the context.
-func WithTenantSlug(ctx context.Context, tenantSlug string) context.Context {
-	return context.WithValue(ctx, tenantSlugKey, tenantSlug)
+// WithTenantID adds a tenant id to the context.
+func WithTenantID(ctx context.Context, tenantID string) context.Context {
+	return context.WithValue(ctx, tenantIdKey, tenantID)
 }
 
-// TenantSlugFromContext extracts the tenant slug from the context.
-func TenantSlugFromContext(ctx context.Context) (string, error) {
-	tenantSlug, ok := ctx.Value(tenantSlugKey).(string)
-	if !ok || tenantSlug == "" {
-		return "", ErrNoTenantSlugInContext
+// TenantIDFromContext extracts the tenant id from the context.
+func TenantIDFromContext(ctx context.Context) (string, error) {
+	tenantID, ok := ctx.Value(tenantIdKey).(string)
+	if !ok || tenantID == "" {
+		return "", ErrNoTenantIdInContext
 	}
-	return tenantSlug, nil
+
+	return tenantID, nil
 }

@@ -8,7 +8,7 @@ export interface UnifiedInboxRepository {
   getMessage(messageId: string): Observable<UnifiedInboxMessageDetail>;
   listAccountHealth(): Observable<AccountHealthSummary[]>;
   listAccountSyncStatus(): Observable<AccountSyncStatus[]>;
-  triggerSync(accountId?: string): Observable<void>;
+  triggerSync(): Observable<void>;
   getProviderAuthUrl(provider: MailProvider): Observable<string>;
 }
 

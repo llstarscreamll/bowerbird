@@ -38,7 +38,7 @@ import (
 	platformcrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/observability"
+	platforms3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -145,9 +145,12 @@ func main() {
 	}
 
 	var eventPublisher connectionshttp.EventPublisher
+	var businessEventPublisher events.BusinessEventPublisher
 	if cfg.EventBusName != "" {
 		ebClient := awsconfig.NewEventBridgeClient(awsCfg, cfg.AWSEndpointURL)
-		eventPublisher = events.NewEventBridgePublisher(ebClient, cfg.EventBusName)
+		ebPublisher := events.NewEventBridgePublisher(ebClient, cfg.EventBusName)
+		eventPublisher = ebPublisher
+		businessEventPublisher = ebPublisher
 	}
 
 	// Setup Connections Context
@@ -160,7 +163,7 @@ func main() {
 		}
 		credentialsService := connectionsapp.NewCredentialsService(cipher)
 		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
-		connectionsService = connectionsapp.NewInternalService(connectionsRepo, credentialsService, observability.NoopMetrics{})
+		connectionsService = connectionsapp.NewInternalService(connectionsRepo, credentialsService)
 
 		var connectionsGoogleConfig *oauth2.Config
 		if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -176,7 +179,7 @@ func main() {
 	} else {
 		// Just for fallback if not provided, though it's typically required
 		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
-		connectionsService = connectionsapp.NewInternalService(connectionsRepo, nil, observability.NoopMetrics{})
+		connectionsService = connectionsapp.NewInternalService(connectionsRepo, nil)
 		connectionsHandler = connectionshttp.NewHandler(connectionsRepo, nil, nil, tokenGen, nil, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/")) // In a real scenario this nil might cause panic if hit, but this block is a fallback
 	}
 	connectionsHandler.Register(mux, authMiddleware, isDev)
@@ -194,17 +197,34 @@ func main() {
 	}
 
 	// The sync process needs these
-	var syncAccounts *inboxapp.SyncAccountsUseCase
+	var syncAccountCommand *inboxapp.SyncAccountCommand
+	var syncConnectionsCommand *inboxapp.SyncAllAccountsCommand
+	var syncAccountJobDispatcher inboxapp.SyncAccountJobDispatcher
 	if providerFactory != nil {
-		syncAccounts = inboxapp.NewSyncAccountsUseCase(inboxRepo, connectionsService, providerFactory, nil, nil) // we don't have attachments setup here fully but we can pass nil or similar
+		if businessEventPublisher == nil {
+			log.Fatal("event bus publisher is required for inbox sync")
+		}
+		if cfg.S3BucketName == "" {
+			log.Fatal("s3 bucket name is required for inbox sync")
+		}
+
+		attachmentObjectStore := platforms3.NewObjectStore(awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
+
+		syncAccountCommand = inboxapp.NewSyncAccountCommand(
+			inboxRepo,
+			connectionsService,
+			providerFactory,
+			businessEventPublisher,
+			attachmentObjectStore,
+		)
+		syncAccountJobDispatcher = inboxapp.NewInlineSyncAccountJobDispatcher(syncAccountCommand)
+		syncConnectionsCommand = inboxapp.NewSyncAllAccountsCommand(connectionsService, syncAccountJobDispatcher)
 	}
-	initialSyncUseCase := inboxapp.NewInitialSyncUseCase(inboxRepo, connectionsService, syncAccounts)
 
 	listAccountHealthUseCase := inboxapp.NewListAccountHealthUseCase(inboxRepo, connectionsService)
 	listMessagesUseCase := inboxapp.NewListMessagesUseCase(inboxRepo)
 	getMessageUseCase := inboxapp.NewGetMessageUseCase(inboxRepo)
-	triggerSyncUseCase := inboxapp.NewTriggerSyncUseCase(inboxRepo, connectionsService, syncAccounts)
-	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase, getMessageUseCase, triggerSyncUseCase)
+	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase, getMessageUseCase, syncConnectionsCommand)
 	inboxHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Event Poller
@@ -212,7 +232,7 @@ func main() {
 	invoicingUseCase := invoicingapp.NewProcessInboxEventUseCase(invoicingRouter)
 	inboxMessageSubscriber := invoicingevents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
 
-	inboxEventsSubscriber := inboxevents.NewConnectionAddedSubscriber(initialSyncUseCase)
+	inboxEventsSubscriber := inboxevents.NewConnectionAddedSubscriber(syncAccountCommand)
 	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {

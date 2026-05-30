@@ -146,23 +146,23 @@ export class AccountStatusChipComponent {
     <!-- Modal para añadir nueva cuenta -->
     <app-modal [isOpen]="isConnectModalOpen" title="Añadir nueva cuenta" (close)="closeConnectModal()">
       <div class="space-y-6">
-        <p class="leading-relaxed text-slate-600 dark:text-slate-300">Selecciona tu proveedor de correo para vincular tu cuenta. Serás redirigido a una página segura para autorizar el acceso.</p>
+        <p class="leading-relaxed text-slate-600 dark:text-slate-200">Selecciona tu proveedor de correo para vincular tu cuenta. Serás redirigido a una página segura para autorizar el acceso.</p>
 
-        <div class="rounded-lg bg-indigo-50 p-4 dark:bg-indigo-500/15 dark:ring-1 dark:ring-indigo-400/25">
-          <h4 class="flex items-center gap-2 text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+        <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-4 dark:border-indigo-500/35 dark:bg-indigo-950/45 dark:ring-1 dark:ring-indigo-400/20">
+          <h4 class="flex items-center gap-2 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
             <span class="material-icons-outlined text-[18px]">security</span>
             Permisos que solicitaremos
           </h4>
-          <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-indigo-700 dark:text-indigo-200/90">
+          <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-indigo-700 dark:text-indigo-100/95">
             <li>Leer correos electrónicos (para encontrar facturas)</li>
             <li>Crear y asignar etiquetas (para organizar tu bandeja)</li>
           </ul>
-          <p class="mt-3 text-xs text-indigo-600/80 dark:text-indigo-200/80">Nunca borraremos tus correos ni enviaremos mensajes en tu nombre.</p>
+          <p class="mt-3 text-xs text-indigo-600/85 dark:text-indigo-100/85">Nunca borraremos tus correos ni enviaremos mensajes en tu nombre.</p>
         </div>
 
         <div class="grid gap-3 pt-2">
           <button
-            class="flex items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus:ring-offset-slate-950"
+            class="flex items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:focus:ring-indigo-400 dark:focus:ring-offset-slate-900"
             (click)="connect('gmail')"
             [disabled]="submitting()"
           >
@@ -173,7 +173,7 @@ export class AccountStatusChipComponent {
           </button>
 
           <button
-            class="flex cursor-not-allowed items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 opacity-50 shadow-sm transition-all hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-900 dark:focus:ring-offset-slate-950"
+            class="flex items-center justify-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-indigo-400 dark:focus:ring-offset-slate-900 dark:disabled:opacity-45"
             disabled
             title="Próximamente"
           >
