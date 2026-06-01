@@ -39,12 +39,6 @@ type SyncAccountCommandInput struct {
 	AccountID string
 }
 
-type syncAccountRunStats struct {
-	messagesSynced  int
-	eventsPublished int
-	failures        int
-}
-
 func NewSyncAccountCommand(
 	repo domain.Repository,
 	connectionsService connectionsApp.InternalService,
@@ -101,10 +95,8 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 		return err
 	}
 
-	stats := &syncAccountRunStats{}
-	if err := c.syncAccount(ctx, tenantID, account, cursor, stats); err != nil {
+	if err := c.syncAccount(ctx, tenantID, account, cursor); err != nil {
 		err = classifySyncError(account, err)
-		stats.failures++
 
 		now := time.Now().UTC()
 		cursor.MarkSyncFailed(now, err.Error())
@@ -116,8 +108,6 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 
 		return err
 	}
-
-	fmt.Printf("sync account %s completed: %+v\n", account.ID, stats)
 
 	return nil
 }
@@ -164,7 +154,7 @@ func (c *SyncAccountCommand) ensureCursor(ctx context.Context, accountID string)
 	return cursor, nil
 }
 
-func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, account connectionsApp.ConnectionInfo, cursor *domain.InboxSyncCursor, stats *syncAccountRunStats) error {
+func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, account connectionsApp.ConnectionInfo, cursor *domain.InboxSyncCursor) error {
 	credentialsJSON, err := c.connectionsService.DecryptCredentials(ctx, account.ID)
 	if err != nil {
 		return fmt.Errorf("decrypt account credentials: %w", err)
@@ -189,7 +179,7 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 		}
 
 		for _, ref := range refs {
-			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient, stats); err != nil {
+			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient); err != nil {
 				if errors.Is(err, errPayloadRejected) {
 					continue
 				}
@@ -215,7 +205,6 @@ func (c *SyncAccountCommand) processSingleMessage(
 	account connectionsApp.ConnectionInfo,
 	ref domain.MessageRef,
 	client domain.MailProviderClient,
-	stats *syncAccountRunStats,
 ) (retErr error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -269,15 +258,21 @@ func (c *SyncAccountCommand) processSingleMessage(
 		}
 	}
 
-	stats.messagesSynced++
+	if err := c.publishInboxMessageReceivedEvent(ctx, tenantID, account, message, emailMessage, attachmentRefs); err != nil {
+		return fmt.Errorf("publish inbox message received event: %w", err)
+	}
 
+	return nil
+}
+
+func (c *SyncAccountCommand) publishInboxMessageReceivedEvent(ctx context.Context, tenantID string, account connectionsApp.ConnectionInfo, mailMessage *domain.MailMessage, emailMessage *domain.EmailMessage, attachmentRefs []domain.AttachmentRef) error {
 	event, err := domain.NewInboxMessageReceived(domain.NewInboxMessageReceivedInput{
 		EventID:           c.idGenerator(),
-		OccurredAt:        now.Format(time.RFC3339Nano),
+		OccurredAt:        emailMessage.CreatedAt.Format(time.RFC3339Nano),
 		TenantSlug:        tenantID,
 		AccountID:         account.ID,
 		Provider:          account.Provider,
-		ProviderMessage:   message,
+		ProviderMessage:   mailMessage,
 		MessageInternalID: emailMessage.ID,
 		AttachmentRefs:    attachmentRefs,
 	})
@@ -286,17 +281,18 @@ func (c *SyncAccountCommand) processSingleMessage(
 	}
 
 	payload, err := domain.MarshalInboxMessageReceived(event)
-	if err == nil {
-		err = c.publisher.PublishBusinessEvent(ctx, platformEvents.BusinessEvent{
-			Source:     domain.InboxMessageReceivedSource,
-			DetailType: domain.InboxMessageReceivedDetailType,
-			Detail:     payload,
-		})
+	if err != nil {
+		return fmt.Errorf("marshal inbox message received event: %w", err)
 	}
 
+	err = c.publisher.PublishBusinessEvent(ctx, platformEvents.BusinessEvent{
+		Source:     domain.InboxMessageReceivedSource,
+		DetailType: domain.InboxMessageReceivedDetailType,
+		Detail:     payload,
+	})
+
 	if err != nil {
-	} else {
-		stats.eventsPublished++
+		return fmt.Errorf("publish inbox message received event: %w", err)
 	}
 
 	return nil

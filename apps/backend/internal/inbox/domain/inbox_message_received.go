@@ -3,19 +3,19 @@ package domain
 import (
 	"fmt"
 
-	awsevents "github.com/aws/aws-lambda-go/events"
-	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
+	awsEvents "github.com/aws/aws-lambda-go/events"
+	contractEvents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
 )
 
 const (
-	InboxMessageReceivedDetailType    = contractevents.InboxMessageReceivedDetailType
-	InboxMessageReceivedSource        = contractevents.InboxMessageReceivedSource
-	InboxMessageReceivedSchemaVersion = contractevents.InboxMessageReceivedSchemaVersion
+	InboxMessageReceivedDetailType    = contractEvents.InboxMessageReceivedDetailType
+	InboxMessageReceivedSource        = contractEvents.InboxMessageReceivedSource
+	InboxMessageReceivedSchemaVersion = contractEvents.InboxMessageReceivedSchemaVersion
 )
 
-type AttachmentRef = contractevents.AttachmentRef
+type AttachmentRef = contractEvents.AttachmentRef
 
-type InboxMessageReceived = contractevents.InboxMessageReceived
+type InboxMessageReceived = contractEvents.InboxMessageReceived
 
 type NewInboxMessageReceivedInput struct {
 	EventID           string
@@ -79,13 +79,13 @@ func NewInboxMessageReceived(input NewInboxMessageReceivedInput) (InboxMessageRe
 }
 
 func MarshalInboxMessageReceived(event InboxMessageReceived) ([]byte, error) {
-	return contractevents.MarshalInboxMessageReceived(event)
+	return contractEvents.MarshalInboxMessageReceived(event)
 }
 
 func UnmarshalInboxMessageReceived(data []byte) (InboxMessageReceived, error) {
-	return contractevents.UnmarshalInboxMessageReceived(data)
+	return contractEvents.UnmarshalInboxMessageReceived(data)
 }
 
-func DecodeInboxMessageReceivedFromCloudWatchEvent(event awsevents.CloudWatchEvent) (InboxMessageReceived, error) {
-	return contractevents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
+func DecodeInboxMessageReceivedFromCloudWatchEvent(event awsEvents.CloudWatchEvent) (InboxMessageReceived, error) {
+	return contractEvents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
 }
