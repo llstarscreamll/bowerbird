@@ -2,3 +2,4 @@
 node = "24"
 go = "1.25"
 pnpm = "11.5"
+air = "latest"
