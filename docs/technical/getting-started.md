@@ -3,7 +3,6 @@
 ## Requisitos
 
 - Mise
-- Air
 - Caddy (para resolución de DNS local y proxy inverso)
 - AWS CLI autenticado (solo para deploy)
 
@@ -12,13 +11,13 @@ Versiones definidas por el repo en `.mise.toml`:
 - Node.js `24`
 - Go `1.25`
 - pnpm `10.16.1`
+- Air `latest`
 
 ## Setup inicial
 
 ```bash
 mise install
 pnpm install
-go install github.com/air-verse/air@latest
 ```
 
 Si quieres ejecutar comandos con el toolchain del repo sin tocar lo global:
