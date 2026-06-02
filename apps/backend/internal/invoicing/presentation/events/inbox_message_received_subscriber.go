@@ -3,26 +3,26 @@ package events
 import (
 	"context"
 
-	awsevents "github.com/aws/aws-lambda-go/events"
-	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
-	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
+	awsEvents "github.com/aws/aws-lambda-go/events"
+	contractEvents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
+	invoicingApp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 )
 
 type InboxMessageReceivedSubscriber struct {
-	useCase *invoicingapp.ProcessInboxEventUseCase
+	useCase *invoicingApp.ProcessInboxEventUseCase
 }
 
-func NewInboxMessageReceivedSubscriber(useCase *invoicingapp.ProcessInboxEventUseCase) *InboxMessageReceivedSubscriber {
+func NewInboxMessageReceivedSubscriber(useCase *invoicingApp.ProcessInboxEventUseCase) *InboxMessageReceivedSubscriber {
 	return &InboxMessageReceivedSubscriber{useCase: useCase}
 }
 
 func (s *InboxMessageReceivedSubscriber) DetailType() string {
-	return contractevents.InboxMessageReceivedDetailType
+	return contractEvents.InboxMessageReceivedDetailType
 }
 
-func (s *InboxMessageReceivedSubscriber) HandleEventBridge(ctx context.Context, event awsevents.CloudWatchEvent) error {
-	decoded, err := contractevents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
+func (s *InboxMessageReceivedSubscriber) HandleEventBridge(ctx context.Context, event awsEvents.CloudWatchEvent) error {
+	decoded, err := contractEvents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
 	if err != nil {
 		return err
 	}
