@@ -14,6 +14,8 @@ import (
 	connectionsapp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
 	connectionsinfra "github.com/money-path/bowerbird/apps/backend/internal/connections/infrastructure"
 	connectionshttp "github.com/money-path/bowerbird/apps/backend/internal/connections/presentation/http"
+	filesapp "github.com/money-path/bowerbird/apps/backend/internal/files/application"
+	fileshttp "github.com/money-path/bowerbird/apps/backend/internal/files/presentation/http"
 	"github.com/money-path/bowerbird/apps/backend/internal/health/application"
 	healthinfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
 	healthhttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
@@ -142,6 +144,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("load aws config: %v", err)
 		}
+	}
+
+	if cfg.S3BucketName != "" {
+		fileStore := platforms3.NewObjectStore(awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
+		requestUploadURLUseCase := filesapp.NewRequestUploadURLUseCase(fileStore)
+		filesHandler := fileshttp.NewHandler(requestUploadURLUseCase)
+		filesHandler.Register(mux, authMiddleware, isDev)
+	} else {
+		log.Printf("file upload routes disabled: s3_bucket_name is empty")
 	}
 
 	var eventPublisher connectionshttp.EventPublisher
