@@ -7,7 +7,7 @@ import (
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 )
 
-type UnifiedMessageDetail struct {
+type MessageDetail struct {
 	ID               string              `json:"id"`
 	Provider         string              `json:"provider"`
 	AccountID        string              `json:"account_id"`
@@ -25,15 +25,15 @@ type UnifiedMessageDetail struct {
 }
 
 type GetMessageUseCase struct {
-	repo domain.Repository
+	repo MessageQueryRepository
 }
 
-func NewGetMessageUseCase(repo domain.Repository) *GetMessageUseCase {
+func NewGetMessageUseCase(repo MessageQueryRepository) *GetMessageUseCase {
 	return &GetMessageUseCase{repo: repo}
 }
 
-func (uc *GetMessageUseCase) Execute(ctx context.Context, messageID string) (*UnifiedMessageDetail, error) {
-	msg, err := uc.repo.GetMessageByID(ctx, messageID)
+func (uc *GetMessageUseCase) Execute(ctx context.Context, messageID string) (*MessageDetail, error) {
+	msg, err := uc.repo.GetMessageViewByID(ctx, messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (uc *GetMessageUseCase) Execute(ctx context.Context, messageID string) (*Un
 		bodyHTML = providerMessage.HTMLBody
 	}
 
-	return &UnifiedMessageDetail{
+	return &MessageDetail{
 		ID:               msg.ID,
 		Provider:         msg.Provider,
 		AccountID:        msg.AccountID,

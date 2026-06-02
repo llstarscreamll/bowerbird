@@ -2,11 +2,9 @@ package application
 
 import (
 	"context"
-
-	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 )
 
-type UnifiedMessageSummary struct {
+type MessageSummary struct {
 	ID               string `json:"id"`
 	Provider         string `json:"provider"`
 	AccountID        string `json:"account_id"`
@@ -21,22 +19,22 @@ type UnifiedMessageSummary struct {
 }
 
 type ListMessagesUseCase struct {
-	repo domain.Repository
+	repo MessageQueryRepository
 }
 
-func NewListMessagesUseCase(repo domain.Repository) *ListMessagesUseCase {
+func NewListMessagesUseCase(repo MessageQueryRepository) *ListMessagesUseCase {
 	return &ListMessagesUseCase{repo: repo}
 }
 
-func (uc *ListMessagesUseCase) Execute(ctx context.Context) ([]UnifiedMessageSummary, error) {
-	messages, err := uc.repo.ListUnifiedMessages(ctx)
+func (uc *ListMessagesUseCase) Execute(ctx context.Context) ([]MessageSummary, error) {
+	messages, err := uc.repo.ListMessageViews(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	summaries := make([]UnifiedMessageSummary, 0, len(messages))
+	summaries := make([]MessageSummary, 0, len(messages))
 	for _, msg := range messages {
-		summaries = append(summaries, UnifiedMessageSummary{
+		summaries = append(summaries, MessageSummary{
 			ID:               msg.ID,
 			Provider:         msg.Provider,
 			AccountID:        msg.AccountID,

@@ -3,11 +3,14 @@ package infrastructure
 import (
 	"testing"
 
+	inboxapp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 )
 
 func TestPostgresRepositoryImplementsRepository(t *testing.T) {
-	var _ domain.Repository = (*PostgresRepository)(nil)
+	var _ domain.SyncCursorRepository = (*PostgresRepository)(nil)
+	var _ domain.MessageRepository = (*PostgresRepository)(nil)
+	var _ inboxapp.MessageQueryRepository = (*PostgresRepository)(nil)
 }
 
 func TestDefaultRawData(t *testing.T) {

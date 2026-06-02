@@ -43,8 +43,8 @@ func (h EventHandler) HandleSQSEvent(ctx context.Context, event events.SQSEvent)
 			msgCtx = tenant.WithTenantID(msgCtx, *attr.StringValue)
 		}
 
-		tenantSlug, _ := tenant.TenantIDFromContext(msgCtx)
-		log.Printf("sqs message processed: id=%s tenant=%s body=%s", record.MessageId, tenantSlug, record.Body)
+		tenantID, _ := tenant.TenantIDFromContext(msgCtx)
+		log.Printf("sqs message processed: id=%s tenant=%s body=%s", record.MessageId, tenantID, record.Body)
 	}
 
 	return nil

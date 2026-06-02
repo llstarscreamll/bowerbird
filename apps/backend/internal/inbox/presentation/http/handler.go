@@ -76,7 +76,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if len(messages) == 0 {
-		return api.Success(w, http.StatusOK, []application.UnifiedMessageSummary{})
+		return api.Success(w, http.StatusOK, []application.MessageSummary{})
 	}
 	return api.Success(w, http.StatusOK, messages)
 }
@@ -89,7 +89,7 @@ func (h *Handler) GetMessage(w http.ResponseWriter, r *http.Request) error {
 
 	message, err := h.getMessageQuery.Execute(r.Context(), messageID)
 	if err != nil {
-		if errors.Is(err, domain.ErrEmailMessageNotFound) {
+		if errors.Is(err, domain.ErrInboxMessageNotFound) {
 			return appErrors.Wrap(err, appErrors.CodeNotFound, "message not found")
 		}
 

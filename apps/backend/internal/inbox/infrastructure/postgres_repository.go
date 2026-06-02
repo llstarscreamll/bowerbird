@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	inboxapp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 )
@@ -18,7 +19,7 @@ func NewPostgresRepository(registry *database.Registry) *PostgresRepository {
 	return &PostgresRepository{registry: registry}
 }
 
-func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID string) (*domain.InboxSyncCursor, error) {
+func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID string) (*domain.SyncCursor, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -29,12 +30,13 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 		FROM inbox_sync_cursors
 		WHERE connection_id = $1
 	`
-	var cursor domain.InboxSyncCursor
+	var cursor domain.SyncCursor
+	var status string
 	err = pool.QueryRow(ctx, query, connectionID).Scan(
 		&cursor.ConnectionID,
 		&cursor.LastSyncedAt,
 		&cursor.LastError,
-		&cursor.Status,
+		&status,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -43,10 +45,15 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 		return nil, fmt.Errorf("failed to get sync cursor: %w", err)
 	}
 
+	cursor.Status = domain.SyncCursorStatus(status)
+	if !cursor.Status.IsValid() {
+		cursor.Status = domain.SyncCursorStatusIdle
+	}
+
 	return &cursor, nil
 }
 
-func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domain.InboxSyncCursor) error {
+func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domain.SyncCursor) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -60,7 +67,7 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 			last_error = EXCLUDED.last_error,
 			status = EXCLUDED.status
 	`
-	_, err = pool.Exec(ctx, query, cursor.ConnectionID, cursor.LastSyncedAt, cursor.LastError, cursor.Status)
+	_, err = pool.Exec(ctx, query, cursor.ConnectionID, cursor.LastSyncedAt, cursor.LastError, cursor.Status.String())
 	if err != nil {
 		return fmt.Errorf("failed to upsert sync cursor: %w", err)
 	}
@@ -68,7 +75,7 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 	return nil
 }
 
-func (r *PostgresRepository) UpsertEmailMessage(ctx context.Context, message *domain.EmailMessage) (bool, error) {
+func (r *PostgresRepository) UpsertInboxMessage(ctx context.Context, message *domain.InboxMessage) (bool, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -106,72 +113,25 @@ func (r *PostgresRepository) UpsertEmailMessage(ctx context.Context, message *do
 		ctx,
 		query,
 		message.ID,
-		message.AccountID,
+		message.ConnectionID,
 		message.ProviderMessageID,
 		message.ProviderThreadID,
 		message.Subject,
 		message.SenderEmail,
 		message.ReceivedAt,
-		message.SyncStatus,
+		string(message.SyncStatus),
 		defaultRawData(message.RawData),
 		message.CreatedAt,
 		message.UpdatedAt,
 	).Scan(&message.ID, &inserted)
 	if err != nil {
-		return false, fmt.Errorf("failed to upsert email message: %w", err)
+		return false, fmt.Errorf("failed to upsert inbox message: %w", err)
 	}
 
 	return inserted, nil
 }
 
-func (r *PostgresRepository) GetEmailMessageByProviderID(ctx context.Context, accountID, providerMessageID string) (*domain.EmailMessage, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
-	}
-
-	query := `
-		SELECT
-			id,
-			account_id,
-			provider_message_id,
-			provider_thread_id,
-			subject,
-			sender_email,
-			received_at,
-			sync_status,
-			raw_data,
-			created_at,
-			updated_at
-		FROM email_messages
-		WHERE account_id = $1 AND provider_message_id = $2
-	`
-
-	var message domain.EmailMessage
-	err = pool.QueryRow(ctx, query, accountID, providerMessageID).Scan(
-		&message.ID,
-		&message.AccountID,
-		&message.ProviderMessageID,
-		&message.ProviderThreadID,
-		&message.Subject,
-		&message.SenderEmail,
-		&message.ReceivedAt,
-		&message.SyncStatus,
-		&message.RawData,
-		&message.CreatedAt,
-		&message.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrEmailMessageNotFound
-		}
-		return nil, fmt.Errorf("failed to get email message by provider id: %w", err)
-	}
-
-	return &message, nil
-}
-
-func (r *PostgresRepository) UpsertEmailAttachment(ctx context.Context, attachment *domain.EmailAttachment) (bool, error) {
+func (r *PostgresRepository) UpsertMessageAttachment(ctx context.Context, attachment *domain.MessageAttachment) (bool, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -218,70 +178,13 @@ func (r *PostgresRepository) UpsertEmailAttachment(ctx context.Context, attachme
 		attachment.UpdatedAt,
 	).Scan(&attachment.ID, &inserted)
 	if err != nil {
-		return false, fmt.Errorf("failed to upsert email attachment: %w", err)
+		return false, fmt.Errorf("failed to upsert message attachment: %w", err)
 	}
 
 	return inserted, nil
 }
 
-func (r *PostgresRepository) ListEmailAttachmentsByMessageID(ctx context.Context, messageID string) ([]domain.EmailAttachment, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
-	}
-
-	query := `
-		SELECT
-			id,
-			message_id,
-			filename,
-			mime_type,
-			size_bytes,
-			sha256,
-			s3_key,
-			raw_data,
-			created_at,
-			updated_at
-		FROM email_attachments
-		WHERE message_id = $1
-		ORDER BY created_at ASC
-	`
-
-	rows, err := pool.Query(ctx, query, messageID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list email attachments: %w", err)
-	}
-	defer rows.Close()
-
-	attachments := make([]domain.EmailAttachment, 0)
-	for rows.Next() {
-		var attachment domain.EmailAttachment
-		if err := rows.Scan(
-			&attachment.ID,
-			&attachment.MessageID,
-			&attachment.Filename,
-			&attachment.MimeType,
-			&attachment.SizeBytes,
-			&attachment.SHA256,
-			&attachment.S3Key,
-			&attachment.RawData,
-			&attachment.CreatedAt,
-			&attachment.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan email attachment: %w", err)
-		}
-
-		attachments = append(attachments, attachment)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed while iterating email attachments: %w", err)
-	}
-
-	return attachments, nil
-}
-
-func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]domain.UnifiedMessage, error) {
+func (r *PostgresRepository) ListMessageViews(ctx context.Context) ([]inboxapp.MessageListView, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -307,13 +210,13 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]domain.
 
 	rows, err := pool.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list unified messages: %w", err)
+		return nil, fmt.Errorf("failed to list message views: %w", err)
 	}
 	defer rows.Close()
 
-	messages := make([]domain.UnifiedMessage, 0)
+	messages := make([]inboxapp.MessageListView, 0)
 	for rows.Next() {
-		var msg domain.UnifiedMessage
+		var msg inboxapp.MessageListView
 		if err := rows.Scan(
 			&msg.ID,
 			&msg.Provider,
@@ -327,25 +230,20 @@ func (r *PostgresRepository) ListUnifiedMessages(ctx context.Context) ([]domain.
 			&msg.HasXML,
 			&msg.HasPDF,
 		); err != nil {
-			return nil, fmt.Errorf("failed to scan unified message: %w", err)
+			return nil, fmt.Errorf("failed to scan message list view: %w", err)
 		}
 
 		messages = append(messages, msg)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed while iterating unified messages: %w", err)
+		return nil, fmt.Errorf("failed while iterating message list views: %w", err)
 	}
 
 	return messages, nil
 }
 
-func (r *PostgresRepository) ListMessagesByAccount(ctx context.Context, accountID string, limit, offset int) ([]domain.UnifiedMessage, error) {
-	// Not implemented fully yet but required by interface
-	return nil, errors.New("ListMessagesByAccount not implemented")
-}
-
-func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID string) (*domain.UnifiedMessage, error) {
+func (r *PostgresRepository) GetMessageViewByID(ctx context.Context, messageID string) (*inboxapp.MessageDetailView, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
@@ -377,7 +275,7 @@ func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID strin
 		WHERE m.id = $1
 	`
 
-	var msg domain.UnifiedMessage
+	var msg inboxapp.MessageDetailView
 	err = pool.QueryRow(ctx, query, messageID).Scan(
 		&msg.ID,
 		&msg.Provider,
@@ -395,16 +293,12 @@ func (r *PostgresRepository) GetMessageByID(ctx context.Context, messageID strin
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrEmailMessageNotFound
+			return nil, domain.ErrInboxMessageNotFound
 		}
-		return nil, fmt.Errorf("failed to get message by id: %w", err)
+		return nil, fmt.Errorf("failed to get message detail view by id: %w", err)
 	}
 
 	return &msg, nil
-}
-
-func (r *PostgresRepository) GetMessageAttachments(ctx context.Context, messageID string) ([]domain.EmailAttachment, error) {
-	return r.ListEmailAttachmentsByMessageID(ctx, messageID)
 }
 
 func defaultRawData(raw []byte) []byte {

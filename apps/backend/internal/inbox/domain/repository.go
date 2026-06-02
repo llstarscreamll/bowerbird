@@ -6,19 +6,20 @@ import (
 )
 
 var (
-	ErrConnectedAccountNotFound = errors.New("connected account not found")
-	ErrEmailMessageNotFound     = errors.New("email message not found")
+	ErrInboxMessageNotFound = errors.New("inbox message not found")
 )
 
 type Repository interface {
-	GetSyncCursor(ctx context.Context, connectionID string) (*InboxSyncCursor, error)
-	UpsertSyncCursor(ctx context.Context, cursor *InboxSyncCursor) error
+	SyncCursorRepository
+	MessageRepository
+}
 
-	UpsertEmailMessage(ctx context.Context, msg *EmailMessage) (bool, error)
-	UpsertEmailAttachment(ctx context.Context, attachment *EmailAttachment) (bool, error)
+type SyncCursorRepository interface {
+	GetSyncCursor(ctx context.Context, connectionID string) (*SyncCursor, error)
+	UpsertSyncCursor(ctx context.Context, cursor *SyncCursor) error
+}
 
-	ListUnifiedMessages(ctx context.Context) ([]UnifiedMessage, error)
-	ListMessagesByAccount(ctx context.Context, accountID string, limit, offset int) ([]UnifiedMessage, error)
-	GetMessageByID(ctx context.Context, messageID string) (*UnifiedMessage, error)
-	GetMessageAttachments(ctx context.Context, messageID string) ([]EmailAttachment, error)
+type MessageRepository interface {
+	UpsertInboxMessage(ctx context.Context, msg *InboxMessage) (bool, error)
+	UpsertMessageAttachment(ctx context.Context, attachment *MessageAttachment) (bool, error)
 }

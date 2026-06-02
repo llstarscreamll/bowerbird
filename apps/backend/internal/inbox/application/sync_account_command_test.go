@@ -25,7 +25,7 @@ func TestSyncAccountCommand_RequiresAccountID(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{})
@@ -42,7 +42,7 @@ func TestSyncAccountCommand_FailsWhenAccountIsNotActive(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -60,7 +60,7 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -76,17 +76,17 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	assert.WithinDuration(t, expected, time.Unix(queryTs, 0).UTC(), 5*time.Second)
 
 	require.Len(t, repo.upsertedCursors, 2)
-	assert.Equal(t, domain.InboxSyncStatusSyncing, repo.upsertedCursors[0].Status)
-	assert.Equal(t, domain.InboxSyncStatusIdle, repo.upsertedCursors[1].Status)
+	assert.Equal(t, domain.SyncCursorStatusSyncing, repo.upsertedCursors[0].Status)
+	assert.Equal(t, domain.SyncCursorStatusIdle, repo.upsertedCursors[1].Status)
 }
 
 func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T) {
 	previousSync := time.Date(2026, 5, 2, 8, 30, 0, 0, time.UTC)
 	repo := newFakeInboxRepo()
-	repo.cursors["acc-1"] = &domain.InboxSyncCursor{
+	repo.cursors["acc-1"] = &domain.SyncCursor{
 		ConnectionID: "acc-1",
 		LastSyncedAt: &previousSync,
-		Status:       domain.InboxSyncStatusIdle,
+		Status:       domain.SyncCursorStatusIdle,
 	}
 
 	connectionsSvc := &fakeConnectionsInternalService{
@@ -95,7 +95,7 @@ func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T
 	providerClient := &fakeProviderClient{}
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -131,7 +131,7 @@ func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -167,14 +167,16 @@ func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testin
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 	require.Len(t, providerClient.downloadAttachmentCalls, 1)
+	require.Len(t, repo.upsertedAttachments, 1)
 	assert.Equal(t, "provider-msg-1", providerClient.downloadAttachmentCalls[0].messageID)
 	assert.Equal(t, "att-1", providerClient.downloadAttachmentCalls[0].attachmentID)
+	assert.Equal(t, "doc.xml", repo.upsertedAttachments[0].Filename)
 }
 
 func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
@@ -201,7 +203,7 @@ func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -218,7 +220,7 @@ func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
@@ -227,7 +229,7 @@ func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 
 	cursor := repo.cursors["acc-1"]
 	require.NotNil(t, cursor)
-	assert.Equal(t, domain.InboxSyncStatusError, cursor.Status)
+	assert.Equal(t, domain.SyncCursorStatusError, cursor.Status)
 }
 
 func toUnixString(v time.Time) string {
@@ -235,49 +237,35 @@ func toUnixString(v time.Time) string {
 }
 
 type fakeInboxRepo struct {
-	cursors          map[string]*domain.InboxSyncCursor
-	upsertedCursors  []*domain.InboxSyncCursor
-	upsertedMessages []*domain.EmailMessage
+	cursors             map[string]*domain.SyncCursor
+	upsertedCursors     []*domain.SyncCursor
+	upsertedMessages    []*domain.InboxMessage
+	upsertedAttachments []*domain.MessageAttachment
 }
 
 func newFakeInboxRepo() *fakeInboxRepo {
-	return &fakeInboxRepo{cursors: map[string]*domain.InboxSyncCursor{}}
+	return &fakeInboxRepo{cursors: map[string]*domain.SyncCursor{}}
 }
 
-func (f *fakeInboxRepo) GetSyncCursor(ctx context.Context, connectionID string) (*domain.InboxSyncCursor, error) {
+func (f *fakeInboxRepo) GetSyncCursor(ctx context.Context, connectionID string) (*domain.SyncCursor, error) {
 	return f.cursors[connectionID], nil
 }
 
-func (f *fakeInboxRepo) UpsertSyncCursor(ctx context.Context, cursor *domain.InboxSyncCursor) error {
+func (f *fakeInboxRepo) UpsertSyncCursor(ctx context.Context, cursor *domain.SyncCursor) error {
 	cloned := *cursor
 	f.cursors[cursor.ConnectionID] = &cloned
 	f.upsertedCursors = append(f.upsertedCursors, &cloned)
 	return nil
 }
 
-func (f *fakeInboxRepo) UpsertEmailMessage(ctx context.Context, msg *domain.EmailMessage) (bool, error) {
+func (f *fakeInboxRepo) UpsertInboxMessage(ctx context.Context, msg *domain.InboxMessage) (bool, error) {
 	f.upsertedMessages = append(f.upsertedMessages, msg)
 	return true, nil
 }
 
-func (f *fakeInboxRepo) UpsertEmailAttachment(ctx context.Context, attachment *domain.EmailAttachment) (bool, error) {
+func (f *fakeInboxRepo) UpsertMessageAttachment(ctx context.Context, attachment *domain.MessageAttachment) (bool, error) {
+	f.upsertedAttachments = append(f.upsertedAttachments, attachment)
 	return true, nil
-}
-
-func (f *fakeInboxRepo) ListUnifiedMessages(ctx context.Context) ([]domain.UnifiedMessage, error) {
-	return nil, nil
-}
-
-func (f *fakeInboxRepo) ListMessagesByAccount(ctx context.Context, accountID string, limit, offset int) ([]domain.UnifiedMessage, error) {
-	return nil, nil
-}
-
-func (f *fakeInboxRepo) GetMessageByID(ctx context.Context, messageID string) (*domain.UnifiedMessage, error) {
-	return nil, nil
-}
-
-func (f *fakeInboxRepo) GetMessageAttachments(ctx context.Context, messageID string) ([]domain.EmailAttachment, error) {
-	return nil, nil
 }
 
 type fakeConnectionsInternalService struct {
@@ -395,7 +383,8 @@ type attachmentDownloadCall struct {
 }
 
 var _ connectionsApp.InternalService = (*fakeConnectionsInternalService)(nil)
-var _ domain.Repository = (*fakeInboxRepo)(nil)
+var _ domain.SyncCursorRepository = (*fakeInboxRepo)(nil)
+var _ domain.MessageRepository = (*fakeInboxRepo)(nil)
 var _ domain.MailProviderClient = (*fakeProviderClient)(nil)
 var _ platformEvents.BusinessEventPublisher = (*fakeInboxEventPublisher)(nil)
 var _ platformStorage.FileStore = (*fakeFileStore)(nil)

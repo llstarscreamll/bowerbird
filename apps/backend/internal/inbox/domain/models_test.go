@@ -6,12 +6,11 @@ import (
 )
 
 func TestInboxSyncCursorMarkSyncFailed(t *testing.T) {
-	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
-	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusIdle}
+	cursor := &SyncCursor{ConnectionID: "conn-1", Status: SyncCursorStatusIdle}
 
-	cursor.MarkSyncFailed(now, "provider timeout")
+	cursor.MarkSyncFailed("provider timeout")
 
-	if cursor.Status != InboxSyncStatusError {
+	if cursor.Status != SyncCursorStatusError {
 		t.Fatalf("expected status error, got %s", cursor.Status)
 	}
 	if cursor.LastError == nil || *cursor.LastError != "provider timeout" {
@@ -22,11 +21,11 @@ func TestInboxSyncCursorMarkSyncFailed(t *testing.T) {
 func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	prevError := "failed"
-	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusError, LastError: &prevError}
+	cursor := &SyncCursor{ConnectionID: "conn-1", Status: SyncCursorStatusError, LastError: &prevError}
 
 	cursor.MarkSyncSucceeded(now)
 
-	if cursor.Status != InboxSyncStatusIdle {
+	if cursor.Status != SyncCursorStatusIdle {
 		t.Fatalf("expected status idle, got %s", cursor.Status)
 	}
 	if cursor.LastError != nil {
@@ -38,20 +37,20 @@ func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 }
 
 func TestInboxSyncCursorMarkSyncing(t *testing.T) {
-	cursor := &InboxSyncCursor{ConnectionID: "conn-1", Status: InboxSyncStatusIdle}
+	cursor := &SyncCursor{ConnectionID: "conn-1", Status: SyncCursorStatusIdle}
 
 	cursor.MarkSyncing()
 
-	if cursor.Status != InboxSyncStatusSyncing {
+	if cursor.Status != SyncCursorStatusSyncing {
 		t.Fatalf("expected status syncing, got %s", cursor.Status)
 	}
 }
 
-func TestNewSyncedEmailMessage(t *testing.T) {
+func TestNewInboxMessageAsSynced(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
-	message, err := NewSyncedEmailMessage(NewEmailMessageInput{
+	message, err := NewInboxMessageAsSynced(NewInboxMessageInput{
 		ID:                "msg-1",
-		AccountID:         "acc-1",
+		ConnectionID:      "acc-1",
 		ProviderMessageID: "provider-msg-1",
 		CreatedAt:         now,
 		UpdatedAt:         now,
@@ -59,25 +58,25 @@ func TestNewSyncedEmailMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new synced email message: %v", err)
 	}
-	if message.SyncStatus != EmailMessageSyncStatusSynced {
-		t.Fatalf("expected sync status %q, got %q", EmailMessageSyncStatusSynced, message.SyncStatus)
+	if message.SyncStatus != MessageSyncStatusSynced {
+		t.Fatalf("expected sync status %q, got %q", MessageSyncStatusSynced, message.SyncStatus)
 	}
 }
 
 func TestNewEmailAttachmentRequiresFields(t *testing.T) {
-	_, err := NewEmailAttachment(NewEmailAttachmentInput{})
+	_, err := NewMessageAttachment(NewMessageAttachmentInput{})
 	if err == nil {
 		t.Fatal("expected required field error")
 	}
 }
 
-func TestNewSyncedEmailMessageFromProvider(t *testing.T) {
+func TestNewInboxMessageFromProvider(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	receivedAt := now.Add(-time.Hour)
 
-	message, err := NewSyncedEmailMessageFromProvider(NewEmailMessageFromProviderInput{
-		ID:        "msg-1",
-		AccountID: "acc-1",
+	message, err := NewInboxMessageFromProvider(NewInboxMessageFromProviderInput{
+		ID:           "msg-1",
+		ConnectionID: "acc-1",
 		ProviderMessage: &MailMessage{
 			ID:         "provider-msg-1",
 			ThreadID:   "thread-1",
@@ -89,7 +88,7 @@ func TestNewSyncedEmailMessageFromProvider(t *testing.T) {
 		UpdatedAt: now,
 	})
 	if err != nil {
-		t.Fatalf("new synced email message from provider: %v", err)
+		t.Fatalf("new inbox message from provider: %v", err)
 	}
 
 	if message.ProviderMessageID != "provider-msg-1" {

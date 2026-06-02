@@ -16,11 +16,11 @@ type AccountSyncStatus struct {
 }
 
 type ListAccountHealthUseCase struct {
-	repo               domain.Repository
+	repo               domain.SyncCursorRepository
 	connectionsService application.InternalService
 }
 
-func NewListAccountHealthUseCase(repo domain.Repository, connectionsService application.InternalService) *ListAccountHealthUseCase {
+func NewListAccountHealthUseCase(repo domain.SyncCursorRepository, connectionsService application.InternalService) *ListAccountHealthUseCase {
 	return &ListAccountHealthUseCase{repo: repo, connectionsService: connectionsService}
 }
 
@@ -38,10 +38,10 @@ func (uc *ListAccountHealthUseCase) Execute(ctx context.Context) ([]AccountSyncS
 		}
 
 		var lastSyncedAt *string
-		var status = "idle" // default
+		status := domain.SyncCursorStatusIdle.String()
 
 		if cursor != nil {
-			status = cursor.Status
+			status = cursor.Status.String()
 			if cursor.LastSyncedAt != nil {
 				t := cursor.LastSyncedAt.Format("2006-01-02T15:04:05Z07:00")
 				lastSyncedAt = &t

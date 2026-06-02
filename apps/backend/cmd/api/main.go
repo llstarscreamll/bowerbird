@@ -212,6 +212,7 @@ func main() {
 
 		syncAccountCommand = inboxapp.NewSyncAccountCommand(
 			inboxRepo,
+			inboxRepo,
 			connectionsService,
 			providerFactory,
 			businessEventPublisher,
