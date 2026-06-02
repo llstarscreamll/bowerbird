@@ -32,6 +32,21 @@ func (r *fakeFileStore) ReadFile(ctx context.Context, input platformstorage.Read
 	return nil, errors.New("attachment not found")
 }
 
+func (r *fakeFileStore) Exists(ctx context.Context, input platformstorage.ExistsFileInput) (bool, error) {
+	_, ok := r.data[input.Path]
+	return ok, nil
+}
+
+func (r *fakeFileStore) MoveFile(ctx context.Context, input platformstorage.MoveFileInput) error {
+	r.data[input.DestinationPath] = r.data[input.SourcePath]
+	delete(r.data, input.SourcePath)
+	return nil
+}
+
+func (r *fakeFileStore) PresignUpload(ctx context.Context, input platformstorage.PresignUploadInput) (*platformstorage.PresignUploadResult, error) {
+	return nil, nil
+}
+
 func TestClassifyFromInboxEventGroupsDirectXMLAndPDF(t *testing.T) {
 	store := &fakeFileStore{data: map[string][]byte{
 		"k1": []byte("<Invoice><ID>INV-1</ID></Invoice>"),
