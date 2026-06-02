@@ -27,6 +27,26 @@ func (f *fakeObjectStore) ReadFile(ctx context.Context, input platformstorage.Re
 	return nil, nil
 }
 
+func (f *fakeObjectStore) Exists(ctx context.Context, input platformstorage.ExistsFileInput) (bool, error) {
+	_, ok := f.objects[input.Path]
+	return ok, nil
+}
+
+func (f *fakeObjectStore) MoveFile(ctx context.Context, input platformstorage.MoveFileInput) error {
+	if f.objects == nil {
+		f.objects = map[string]struct{}{}
+	}
+	if _, ok := f.objects[input.SourcePath]; ok {
+		f.objects[input.DestinationPath] = struct{}{}
+		delete(f.objects, input.SourcePath)
+	}
+	return nil
+}
+
+func (f *fakeObjectStore) PresignUpload(ctx context.Context, input platformstorage.PresignUploadInput) (*platformstorage.PresignUploadResult, error) {
+	return nil, nil
+}
+
 func TestStoreAttachmentUploadsAndComputesDeterministicKey(t *testing.T) {
 	store := &fakeObjectStore{}
 	storage := NewStorageWithStore(store, "bucket-1")

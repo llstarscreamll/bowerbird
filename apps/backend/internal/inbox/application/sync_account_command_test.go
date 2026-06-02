@@ -377,6 +377,18 @@ func (f *fakeFileStore) ReadFile(ctx context.Context, input platformStorage.Read
 	return nil, nil
 }
 
+func (f *fakeFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeFileStore) MoveFile(ctx context.Context, input platformStorage.MoveFileInput) error {
+	return nil
+}
+
+func (f *fakeFileStore) PresignUpload(ctx context.Context, input platformStorage.PresignUploadInput) (*platformStorage.PresignUploadResult, error) {
+	return nil, nil
+}
+
 type attachmentDownloadCall struct {
 	messageID    string
 	attachmentID string
