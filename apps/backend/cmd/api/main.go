@@ -11,36 +11,36 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	connectionsapp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
-	connectionsinfra "github.com/money-path/bowerbird/apps/backend/internal/connections/infrastructure"
-	connectionshttp "github.com/money-path/bowerbird/apps/backend/internal/connections/presentation/http"
-	filesapp "github.com/money-path/bowerbird/apps/backend/internal/files/application"
-	fileshttp "github.com/money-path/bowerbird/apps/backend/internal/files/presentation/http"
+	connectionsApp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
+	connectionsInfra "github.com/money-path/bowerbird/apps/backend/internal/connections/infrastructure"
+	connectionsHttp "github.com/money-path/bowerbird/apps/backend/internal/connections/presentation/http"
+	filesApp "github.com/money-path/bowerbird/apps/backend/internal/files/application"
+	filesHttp "github.com/money-path/bowerbird/apps/backend/internal/files/presentation/http"
 	"github.com/money-path/bowerbird/apps/backend/internal/health/application"
-	healthinfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
-	healthhttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
-	identityapp "github.com/money-path/bowerbird/apps/backend/internal/identity/application"
-	identityinfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
-	identityhttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
-	inboxapp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
-	inboxinfra "github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure"
+	healthInfra "github.com/money-path/bowerbird/apps/backend/internal/health/infrastructure"
+	healthHttp "github.com/money-path/bowerbird/apps/backend/internal/health/presentation/http"
+	identityApp "github.com/money-path/bowerbird/apps/backend/internal/identity/application"
+	identityInfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
+	identityHttp "github.com/money-path/bowerbird/apps/backend/internal/identity/presentation/http"
+	inboxApp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
+	inboxInfra "github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure/provider"
 	"github.com/money-path/bowerbird/apps/backend/internal/inbox/infrastructure/provider/gmail"
-	inboxevents "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/events"
-	inboxhttp "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/http"
-	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
-	invoicinginfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
-	invoicingevents "github.com/money-path/bowerbird/apps/backend/internal/invoicing/presentation/events"
-	orgapplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
-	orginfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
-	orghttp "github.com/money-path/bowerbird/apps/backend/internal/organization/presentation/http"
+	inboxEvents "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/events"
+	inboxHttp "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/http"
+	invoicingApp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
+	invoicingInfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
+	invoicingEvents "github.com/money-path/bowerbird/apps/backend/internal/invoicing/presentation/events"
+	orgApplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
+	orgInfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
+	orgHttp "github.com/money-path/bowerbird/apps/backend/internal/organization/presentation/http"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
+	awsConfig "github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
-	platformcrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
+	platformCrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
-	platforms3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
+	platformS3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -64,17 +64,17 @@ func main() {
 
 	// Parse base DB URL for tenant databases (e.g. replacing 'bowerbird' with '%s')
 	// Simplified assumption: the last path segment before ? is the db name.
-	baseDBURL := strings.Replace(cfg.DatabaseURL, "/bowerbird?", "/%s?", 1)
-	if baseDBURL == cfg.DatabaseURL {
-		baseDBURL = strings.Replace(cfg.DatabaseURL, "/bowerbird", "/%s", 1)
+	baseDbURL := strings.Replace(cfg.DatabaseURL, "/bowerbird?", "/%s?", 1)
+	if baseDbURL == cfg.DatabaseURL {
+		baseDbURL = strings.Replace(cfg.DatabaseURL, "/bowerbird", "/%s", 1)
 	}
-	registry := database.NewRegistry(pool, baseDBURL)
+	registry := database.NewRegistry(pool, baseDbURL)
 	defer registry.CloseAll()
 
 	// Setup Health Context
-	healthRepo := healthinfra.NewPostgresRepository(pool)
+	healthRepo := healthInfra.NewPostgresRepository(pool)
 	healthUseCase := application.NewCheckHealthUseCase(healthRepo)
-	healthHandler := healthhttp.NewHandler(healthUseCase)
+	healthHandler := healthHttp.NewHandler(healthUseCase)
 
 	isDev := cfg.AppEnv == "development" || cfg.AppEnv == "local"
 	mux := http.NewServeMux()
@@ -84,9 +84,9 @@ func main() {
 	tokenGen := auth.NewTokenGenerator(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
 	authMiddleware := auth.Middleware(tokenGen)
 
-	identityRepo := identityinfra.NewPostgresRepository(pool, registry)
-	authService := identityapp.NewAuthService(identityRepo, tokenGen, cfg.AppEnv)
-	identityService := identityapp.NewIdentityService(identityRepo)
+	identityRepo := identityInfra.NewPostgresRepository(pool, registry)
+	authService := identityApp.NewAuthService(identityRepo, tokenGen, cfg.AppEnv)
+	identityService := identityApp.NewIdentityService(identityRepo)
 
 	var googleConfig *oauth2.Config
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -110,12 +110,12 @@ func main() {
 		}
 	}
 
-	authHandler := identityhttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, strings.TrimRight(cfg.FrontendURL, "/"))
+	authHandler := identityHttp.NewAuthHandler(authService, identityService, googleConfig, microsoftConfig, strings.TrimRight(cfg.FrontendURL, "/"))
 	authHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Organization Context
 	// Provide the root directory for migrations relative to the running binary (or use an env var)
-	orgRepo := orginfra.NewPostgresRepository(pool)
+	orgRepo := orgInfra.NewPostgresRepository(pool)
 
 	migrationsDir := os.Getenv("TENANT_MIGRATIONS_DIR")
 	if migrationsDir == "" {
@@ -124,10 +124,10 @@ func main() {
 			migrationsDir = "apps/backend/migrations/tenant"
 		}
 	}
-	orgProvisioner := orginfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, migrationsDir)
-	orgCreateUseCase := orgapplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
-	orgGetUseCase := orgapplication.NewGetOrganizationUseCase(orgRepo)
-	orgHandler := orghttp.NewHandler(orgCreateUseCase, orgGetUseCase)
+	orgProvisioner := orgInfra.NewPostgresProvisioner(pool, cfg.DatabaseURL, migrationsDir)
+	orgCreateUseCase := orgApplication.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
+	orgGetUseCase := orgApplication.NewGetOrganizationUseCase(orgRepo)
+	orgHandler := orgHttp.NewHandler(orgCreateUseCase, orgGetUseCase)
 
 	// Register Routes
 	orgHandler.Register(mux, authMiddleware, isDev)
@@ -135,54 +135,54 @@ func main() {
 	// Setup AWS Config
 	var awsCfg aws.Config
 	if cfg.AWSEndpointURL != "" {
-		awsCfg, err = awsconfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
+		awsCfg, err = awsConfig.Load(ctxApp, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
 		if err != nil {
 			log.Fatalf("load aws config: %v", err)
 		}
 	} else if cfg.AWSRegion != "" {
-		awsCfg, err = awsconfig.Load(ctxApp, cfg.AWSRegion, "", "", "")
+		awsCfg, err = awsConfig.Load(ctxApp, cfg.AWSRegion, "", "", "")
 		if err != nil {
 			log.Fatalf("load aws config: %v", err)
 		}
 	}
 
 	if cfg.S3BucketName != "" {
-		s3Client := awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL)
+		s3Client := awsConfig.NewS3Client(awsCfg, cfg.AWSEndpointURL)
 		presignEndpointURL := cfg.S3PresignEndpointURL
 		if presignEndpointURL == "" {
 			presignEndpointURL = cfg.AWSEndpointURL
 		}
-		presignClient := awsconfig.NewS3PresignClient(awsCfg, presignEndpointURL)
+		presignClient := awsConfig.NewS3PresignClient(awsCfg, presignEndpointURL)
 
-		fileStore := platforms3.NewObjectStoreWithClients(s3Client, presignClient, cfg.S3BucketName)
-		requestUploadURLUseCase := filesapp.NewRequestUploadURLCommand(fileStore)
-		requestDownloadURLUseCase := filesapp.NewRequestDownloadURLCommand(fileStore)
-		filesHandler := fileshttp.NewHandler(requestUploadURLUseCase, requestDownloadURLUseCase)
+		fileStore := platformS3.NewObjectStoreWithClients(s3Client, presignClient, cfg.S3BucketName)
+		requestUploadURLUseCase := filesApp.NewRequestUploadURLCommand(fileStore)
+		requestDownloadURLUseCase := filesApp.NewRequestDownloadURLCommand(fileStore)
+		filesHandler := filesHttp.NewHandler(requestUploadURLUseCase, requestDownloadURLUseCase)
 		filesHandler.Register(mux, authMiddleware, isDev)
 	} else {
 		log.Printf("file upload routes disabled: s3_bucket_name is empty")
 	}
 
-	var eventPublisher connectionshttp.EventPublisher
+	var eventPublisher connectionsHttp.EventPublisher
 	var businessEventPublisher events.BusinessEventPublisher
 	if cfg.EventBusName != "" {
-		ebClient := awsconfig.NewEventBridgeClient(awsCfg, cfg.AWSEndpointURL)
+		ebClient := awsConfig.NewEventBridgeClient(awsCfg, cfg.AWSEndpointURL)
 		ebPublisher := events.NewEventBridgePublisher(ebClient, cfg.EventBusName)
 		eventPublisher = ebPublisher
 		businessEventPublisher = ebPublisher
 	}
 
 	// Setup Connections Context
-	var connectionsService connectionsapp.InternalService
-	var connectionsHandler *connectionshttp.Handler
+	var connectionsService connectionsApp.InternalService
+	var connectionsHandler *connectionsHttp.Handler
 	if cfg.InboxCredentialsEncryptionKey != "" {
-		cipher, err := platformcrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+		cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
 		if err != nil {
 			log.Fatalf("new cipher failed: %v", err)
 		}
-		credentialsService := connectionsapp.NewCredentialsService(cipher)
-		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
-		connectionsService = connectionsapp.NewInternalService(connectionsRepo, credentialsService)
+		credentialsService := connectionsApp.NewCredentialsService(cipher)
+		connectionsRepo := connectionsInfra.NewPostgresRepository(registry)
+		connectionsService = connectionsApp.NewInternalService(connectionsRepo, credentialsService)
 
 		var connectionsGoogleConfig *oauth2.Config
 		if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -194,20 +194,20 @@ func main() {
 				Endpoint:     google.Endpoint,
 			}
 		}
-		connectionsHandler = connectionshttp.NewHandler(connectionsRepo, credentialsService, connectionsGoogleConfig, tokenGen, cipher, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/"))
+		connectionsHandler = connectionsHttp.NewHandler(connectionsRepo, credentialsService, connectionsGoogleConfig, tokenGen, cipher, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/"))
 	} else {
 		// Just for fallback if not provided, though it's typically required
-		connectionsRepo := connectionsinfra.NewPostgresRepository(registry)
-		connectionsService = connectionsapp.NewInternalService(connectionsRepo, nil)
-		connectionsHandler = connectionshttp.NewHandler(connectionsRepo, nil, nil, tokenGen, nil, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/")) // In a real scenario this nil might cause panic if hit, but this block is a fallback
+		connectionsRepo := connectionsInfra.NewPostgresRepository(registry)
+		connectionsService = connectionsApp.NewInternalService(connectionsRepo, nil)
+		connectionsHandler = connectionsHttp.NewHandler(connectionsRepo, nil, nil, tokenGen, nil, eventPublisher, strings.TrimRight(cfg.FrontendURL, "/")) // In a real scenario this nil might cause panic if hit, but this block is a fallback
 	}
 	connectionsHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Inbox Context
-	inboxRepo := inboxinfra.NewPostgresRepository(registry)
+	inboxRepo := inboxInfra.NewPostgresRepository(registry)
 
 	// Create Provider Factory for sync accounts
-	var providerFactory inboxapp.ProviderClientFactory
+	var providerFactory inboxApp.ProviderClientFactory
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
 		providerFactory = provider.NewDefaultFactory(gmail.OAuthConfig{
 			ClientID:     cfg.GoogleClientID,
@@ -216,9 +216,9 @@ func main() {
 	}
 
 	// The sync process needs these
-	var syncAccountCommand *inboxapp.SyncAccountCommand
-	var syncConnectionsCommand *inboxapp.SyncAllAccountsCommand
-	var syncAccountJobDispatcher inboxapp.SyncAccountJobDispatcher
+	var syncAccountCommand *inboxApp.SyncAccountCommand
+	var syncConnectionsCommand *inboxApp.SyncAllAccountsCommand
+	var syncAccountJobDispatcher inboxApp.SyncAccountJobDispatcher
 	if providerFactory != nil {
 		if businessEventPublisher == nil {
 			log.Fatal("event bus publisher is required for inbox sync")
@@ -227,9 +227,9 @@ func main() {
 			log.Fatal("s3 bucket name is required for inbox sync")
 		}
 
-		attachmentObjectStore := platforms3.NewObjectStore(awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
+		attachmentObjectStore := platformS3.NewObjectStore(awsConfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
 
-		syncAccountCommand = inboxapp.NewSyncAccountCommand(
+		syncAccountCommand = inboxApp.NewSyncAccountCommand(
 			inboxRepo,
 			inboxRepo,
 			connectionsService,
@@ -237,26 +237,26 @@ func main() {
 			businessEventPublisher,
 			attachmentObjectStore,
 		)
-		syncAccountJobDispatcher = inboxapp.NewInlineSyncAccountJobDispatcher(syncAccountCommand)
-		syncConnectionsCommand = inboxapp.NewSyncAllAccountsCommand(connectionsService, syncAccountJobDispatcher)
+		syncAccountJobDispatcher = inboxApp.NewInlineSyncAccountJobDispatcher(syncAccountCommand)
+		syncConnectionsCommand = inboxApp.NewSyncAllAccountsCommand(connectionsService, syncAccountJobDispatcher)
 	}
 
-	listAccountHealthUseCase := inboxapp.NewListAccountHealthUseCase(inboxRepo, connectionsService)
-	listMessagesUseCase := inboxapp.NewListMessagesUseCase(inboxRepo)
-	getMessageUseCase := inboxapp.NewGetMessageUseCase(inboxRepo)
-	inboxHandler := inboxhttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase, getMessageUseCase, syncConnectionsCommand)
+	listAccountHealthUseCase := inboxApp.NewListAccountHealthUseCase(inboxRepo, connectionsService)
+	listMessagesUseCase := inboxApp.NewListMessagesUseCase(inboxRepo)
+	getMessageUseCase := inboxApp.NewGetMessageUseCase(inboxRepo)
+	inboxHandler := inboxHttp.NewHandler(listAccountHealthUseCase, listMessagesUseCase, getMessageUseCase, syncConnectionsCommand)
 	inboxHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Event Poller
-	invoicingRouter := invoicinginfra.NewLogRouter()
-	invoicingUseCase := invoicingapp.NewProcessInboxEventUseCase(invoicingRouter)
-	inboxMessageSubscriber := invoicingevents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
+	invoicingRouter := invoicingInfra.NewLogRouter()
+	invoicingUseCase := invoicingApp.NewProcessInboxEventUseCase(invoicingRouter)
+	inboxMessageSubscriber := invoicingEvents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
 
-	inboxEventsSubscriber := inboxevents.NewConnectionAddedSubscriber(syncAccountCommand)
+	inboxEventsSubscriber := inboxEvents.NewConnectionAddedSubscriber(syncAccountCommand)
 	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
-		sqsClient := awsconfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)
+		sqsClient := awsConfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)
 		poller := events.NewPoller(sqsClient, eventHandler, cfg.SQSQueueURL, cfg.EventBridgeQueueURL)
 		poller.Run(ctxApp)
 		log.Printf("local event loop enabled: sqs=%t eventbridge=%t", cfg.SQSQueueURL != "", cfg.EventBridgeQueueURL != "")
