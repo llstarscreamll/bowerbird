@@ -20,6 +20,7 @@ type Config struct {
 	EventBridgeQueueURL           string    `json:"eventbridge_queue_url"`
 	EventBusName                  string    `json:"event_bus_name"`
 	S3BucketName                  string    `json:"s3_bucket_name"`
+	S3PresignEndpointURL          string    `json:"s3_presign_endpoint_url"`
 	AWSRegion                     string    `json:"aws_region"`
 	AWSEndpointURL                string    `json:"aws_endpoint_url"`
 	AWSAccessKeyID                string    `json:"aws_access_key_id"`
@@ -54,6 +55,7 @@ func Load(ctx context.Context) (Config, error) {
 		Port:                 getEnv("PORT", "8080"),
 		AWSRegion:            getEnv("AWS_REGION", "us-east-1"),
 		AWSEndpointURL:       os.Getenv("AWS_ENDPOINT_URL"),
+		S3PresignEndpointURL: os.Getenv("S3_PRESIGN_ENDPOINT_URL"),
 		AWSAccessKeyID:       getEnv("AWS_ACCESS_KEY_ID", "test"),
 		AWSSecretAccessKey:   getEnv("AWS_SECRET_ACCESS_KEY", "test"),
 		SSMParameterName:     getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets"),

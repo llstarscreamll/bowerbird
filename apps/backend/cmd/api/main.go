@@ -147,9 +147,17 @@ func main() {
 	}
 
 	if cfg.S3BucketName != "" {
-		fileStore := platforms3.NewObjectStore(awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
-		requestUploadURLUseCase := filesapp.NewRequestUploadURLUseCase(fileStore)
-		filesHandler := fileshttp.NewHandler(requestUploadURLUseCase)
+		s3Client := awsconfig.NewS3Client(awsCfg, cfg.AWSEndpointURL)
+		presignEndpointURL := cfg.S3PresignEndpointURL
+		if presignEndpointURL == "" {
+			presignEndpointURL = cfg.AWSEndpointURL
+		}
+		presignClient := awsconfig.NewS3PresignClient(awsCfg, presignEndpointURL)
+
+		fileStore := platforms3.NewObjectStoreWithClients(s3Client, presignClient, cfg.S3BucketName)
+		requestUploadURLUseCase := filesapp.NewRequestUploadURLCommand(fileStore)
+		requestDownloadURLUseCase := filesapp.NewRequestDownloadURLCommand(fileStore)
+		filesHandler := fileshttp.NewHandler(requestUploadURLUseCase, requestDownloadURLUseCase)
 		filesHandler.Register(mux, authMiddleware, isDev)
 	} else {
 		log.Printf("file upload routes disabled: s3_bucket_name is empty")

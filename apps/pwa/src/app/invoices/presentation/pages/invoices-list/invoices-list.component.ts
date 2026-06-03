@@ -1,9 +1,12 @@
-import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
+import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
+import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.model';
 
 @Component({
   selector: 'app-invoices-list',
   standalone: true,
-  imports: [],
+  imports: [CommonModule],
   host: {
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
@@ -37,13 +40,35 @@ import { Component } from '@angular/core';
           <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
             No se han encontrado facturas en este entorno. Pronto podrás sincronizarlas desde tu bandeja o crearlas manualmente.
           </p>
-          <button class="btn-secondary">
+          <input #historyFileInput type="file" class="hidden" [accept]="historyImportAccept" multiple (change)="onFilesSelected($event)" />
+
+          <button class="btn-secondary" [disabled]="isUploading()" (click)="openFilePicker(historyFileInput)">
             <span class="material-icons-outlined text-[18px] mr-1.5">cloud_download</span>
-            Importar histórico
+            {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
           </button>
+
+          <p *ngIf="errorMessage()" class="mt-3 text-sm text-rose-600 dark:text-rose-300">{{ errorMessage() }}</p>
         </div>
       </div>
     </div>
   `,
 })
-export class InvoicesListComponent {}
+export class InvoicesListComponent {
+  private readonly importStore = inject(InvoiceHistoryImportStore);
+
+  readonly historyImportAccept = INVOICE_HISTORY_ACCEPT;
+  readonly isUploading = this.importStore.uploading;
+  readonly errorMessage = this.importStore.errorMessage;
+
+  openFilePicker(input: HTMLInputElement): void {
+    input.click();
+  }
+
+  onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = input.files ? Array.from(input.files) : [];
+
+    this.importStore.importFiles(files);
+    input.value = '';
+  }
+}

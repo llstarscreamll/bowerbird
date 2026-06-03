@@ -28,6 +28,23 @@ awslocal events put-targets \
 
 awslocal s3api create-bucket --bucket "$S3_BUCKET_NAME" >/dev/null || true
 
+awslocal s3api put-bucket-cors \
+  --bucket "$S3_BUCKET_NAME" \
+  --cors-configuration '{
+    "CORSRules": [
+      {
+        "AllowedOrigins": [
+          "https://app.bowerbird.dev",
+          "http://localhost:4200"
+        ],
+        "AllowedMethods": ["GET", "PUT", "HEAD"],
+        "AllowedHeaders": ["content-type", "x-amz-*"],
+        "ExposeHeaders": ["ETag", "x-amz-request-id", "x-amz-id-2"],
+        "MaxAgeSeconds": 300
+      }
+    ]
+  }' >/dev/null
+
 # Configurar secretos en un SecureString
 SECRETS_FILE="/tmp/local-secrets.json"
 if [ -f "$SECRETS_FILE" ]; then
@@ -59,4 +76,4 @@ awslocal ssm put-parameter \
   --value "$SECRETS_JSON" \
   --overwrite >/dev/null
 
-echo "LocalStack resources created: SQS, EventBridge, S3, SSM"
+echo "LocalStack resources created: SQS, EventBridge, S3 (with CORS), SSM"

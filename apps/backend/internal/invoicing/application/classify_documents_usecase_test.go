@@ -47,6 +47,10 @@ func (r *fakeFileStore) PresignUpload(ctx context.Context, input platformstorage
 	return nil, nil
 }
 
+func (r *fakeFileStore) PresignDownload(ctx context.Context, input platformstorage.PresignDownloadInput) (*platformstorage.PresignDownloadResult, error) {
+	return nil, nil
+}
+
 func TestClassifyFromInboxEventGroupsDirectXMLAndPDF(t *testing.T) {
 	store := &fakeFileStore{data: map[string][]byte{
 		"k1": []byte("<Invoice><ID>INV-1</ID></Invoice>"),

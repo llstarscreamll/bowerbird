@@ -46,6 +46,10 @@ func NewS3Client(awsCfg aws.Config, endpointURL string) *s3.Client {
 	})
 }
 
+func NewS3PresignClient(awsCfg aws.Config, endpointURL string) *s3.PresignClient {
+	return s3.NewPresignClient(NewS3Client(awsCfg, endpointURL))
+}
+
 func NewEventBridgeClient(awsCfg aws.Config, endpointURL string) *eventbridge.Client {
 	if endpointURL == "" {
 		return eventbridge.NewFromConfig(awsCfg)

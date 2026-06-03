@@ -389,6 +389,10 @@ func (f *fakeFileStore) PresignUpload(ctx context.Context, input platformStorage
 	return nil, nil
 }
 
+func (f *fakeFileStore) PresignDownload(ctx context.Context, input platformStorage.PresignDownloadInput) (*platformStorage.PresignDownloadResult, error) {
+	return nil, nil
+}
+
 type attachmentDownloadCall struct {
 	messageID    string
 	attachmentID string

@@ -47,6 +47,10 @@ func (f *fakeObjectStore) PresignUpload(ctx context.Context, input platformstora
 	return nil, nil
 }
 
+func (f *fakeObjectStore) PresignDownload(ctx context.Context, input platformstorage.PresignDownloadInput) (*platformstorage.PresignDownloadResult, error) {
+	return nil, nil
+}
+
 func TestStoreAttachmentUploadsAndComputesDeterministicKey(t *testing.T) {
 	store := &fakeObjectStore{}
 	storage := NewStorageWithStore(store, "bucket-1")

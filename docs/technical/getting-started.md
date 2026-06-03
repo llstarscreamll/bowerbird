@@ -44,6 +44,7 @@ Usa **`.env`** únicamente para variables de infraestructura de ejecución que c
 - Credenciales AWS de IAM para el SDK (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
 - Región de AWS (`AWS_REGION`).
 - URL de emulación para el SDK (`AWS_ENDPOINT_URL`).
+- URL pública para generar presigned URLs de S3 (`S3_PRESIGN_ENDPOINT_URL`).
 - El path en SSM donde buscar los secretos (`SSM_PARAMETER_NAME`).
 - Flags de ejecución de desarrollo (`ENABLE_LOCAL_EVENT_LOOP`).
 
@@ -66,6 +67,7 @@ export $(grep -v '^#' apps/backend/.env | xargs)
 Variables clave en `.env` para emulación AWS local:
 
 - `AWS_ENDPOINT_URL=http://localhost:4566`
+- `S3_PRESIGN_ENDPOINT_URL=https://media.bowerbird.dev`
 - `ENABLE_LOCAL_EVENT_LOOP=true`
 - `SSM_PARAMETER_NAME=/bowerbird/local/secrets`
 
@@ -84,7 +86,7 @@ Variables clave en `.env` para emulación AWS local:
 
 ## Configuración de DNS local y HTTPS
 
-Para que el enrutamiento de la PWA funcione correctamente en tu entorno local (ej. `app.bowerbird.dev` y `api.bowerbird.dev`), utilizamos **Caddy** y configuramos el archivo `/etc/hosts` de tu máquina.
+Para que el enrutamiento de la PWA y assets funcione correctamente en tu entorno local (ej. `app.bowerbird.dev`, `api.bowerbird.dev` y `media.bowerbird.dev`), utilizamos **Caddy** y configuramos el archivo `/etc/hosts` de tu máquina.
 
 1. Añade los dominios de desarrollo a tu archivo hosts:
 
@@ -97,12 +99,14 @@ Añade las siguientes líneas:
 ```text
 127.0.0.1   api.bowerbird.dev
 127.0.0.1   app.bowerbird.dev
+127.0.0.1   media.bowerbird.dev
 ```
 
 2. Caddy ya está configurado en el `docker-compose.yml` utilizando el archivo `Caddyfile` en la raíz del proyecto. Este proxy inverso redirige el tráfico HTTPS de manera local:
 
 - `app.bowerbird.dev` -> Angular (`4200`)
 - `api.bowerbird.dev` -> Go API (`8080`)
+- `media.bowerbird.dev` -> LocalStack S3 (`4566`, bucket `bowerbird-local-bucket`)
 
 ### Confiar en el certificado SSL local
 
@@ -153,6 +157,7 @@ Una vez levantado, en lugar de acceder a localhost, debes acceder a través de l
 - Web (App / Global): `https://app.bowerbird.dev`
 - Web (Tenant): `https://app.bowerbird.dev/acme/dashboard` (ejemplo de enrutamiento por path)
 - API: `https://api.bowerbird.dev`
+- Media (S3 local, vía presigned URL): `https://media.bowerbird.dev/bowerbird-local-bucket/<ruta-del-objeto>`
 
 LocalStack inicializa automáticamente recursos con `apps/backend/scripts/init-localstack.sh` al arrancar Docker.
 

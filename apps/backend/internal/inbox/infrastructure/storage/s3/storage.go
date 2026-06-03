@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
+	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	platformStorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 	platforms3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
 )
 
@@ -19,7 +19,7 @@ type Storage struct {
 }
 
 type objectStore interface {
-	platformstorage.FileStore
+	platformStorage.FileStore
 }
 
 type StoreAttachmentInput struct {
@@ -39,7 +39,7 @@ type StoredAttachment struct {
 	Uploaded  bool
 }
 
-func NewStorage(client *awss3.Client, bucket string) *Storage {
+func NewStorage(client *awsS3.Client, bucket string) *Storage {
 	return &Storage{store: platforms3.NewObjectStore(client, bucket), bucket: bucket}
 }
 
@@ -74,7 +74,7 @@ func (s *Storage) StoreAttachment(ctx context.Context, input StoreAttachmentInpu
 	hashHex := hex.EncodeToString(hash[:])
 	key := buildS3Key(input.TenantSlug, input.ConnectedAccountID, input.MessageID, input.AttachmentID, input.Filename)
 
-	res, err := s.store.WriteFileIfAbsent(ctx, platformstorage.WriteFileIfAbsentInput{
+	res, err := s.store.WriteFileIfAbsent(ctx, platformStorage.WriteFileIfAbsentInput{
 		Path:        key,
 		Data:        input.Data,
 		ContentType: input.ContentType,

@@ -78,6 +78,10 @@ func (f fakePresignClient) PresignPutObject(ctx context.Context, params *awss3.P
 	return &v4.PresignedHTTPRequest{URL: "https://example.test/upload"}, nil
 }
 
+func (f fakePresignClient) PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
+	return &v4.PresignedHTTPRequest{URL: "https://example.test/download"}, nil
+}
+
 func TestWriteFileIfAbsentUploadsFirstTime(t *testing.T) {
 	store := NewObjectStoreWithClient(&fakeS3Client{}, "bucket")
 
@@ -166,6 +170,27 @@ func TestPresignUploadReturnsURLAndReference(t *testing.T) {
 	}
 	if result.URL == "" {
 		t.Fatal("expected non-empty URL")
+	}
+	if result.Reference.Key != "1-day/t1/uploads/u1/file.bin" {
+		t.Fatalf("unexpected reference key: %s", result.Reference.Key)
+	}
+}
+
+func TestPresignDownloadReturnsURLAndReference(t *testing.T) {
+	store := NewObjectStoreWithClients(&fakeS3Client{}, fakePresignClient{}, "bucket")
+
+	result, err := store.PresignDownload(context.Background(), platformstorage.PresignDownloadInput{
+		Path:      "1-day/t1/uploads/u1/file.bin",
+		ExpiresIn: 10 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("presign download failed: %v", err)
+	}
+	if result.URL == "" {
+		t.Fatal("expected non-empty URL")
+	}
+	if result.Method != "GET" {
+		t.Fatalf("unexpected method: %s", result.Method)
 	}
 	if result.Reference.Key != "1-day/t1/uploads/u1/file.bin" {
 		t.Fatalf("unexpected reference key: %s", result.Reference.Key)

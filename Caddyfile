@@ -7,3 +7,8 @@ api.bowerbird.dev {
 	tls internal
 	reverse_proxy host.docker.internal:8080
 }
+
+media.bowerbird.dev {
+	tls internal
+	reverse_proxy host.docker.internal:4566
+}

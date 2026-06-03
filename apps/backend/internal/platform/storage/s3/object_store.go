@@ -33,6 +33,7 @@ type ObjectStore struct {
 
 type presignAPIClient interface {
 	PresignPutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
+	PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
 }
 
 var _ platformstorage.FileStore = (*ObjectStore)(nil)
@@ -225,6 +226,43 @@ func (s *ObjectStore) PresignUpload(ctx context.Context, input platformstorage.P
 			Key:    input.Path,
 		},
 		UploadPath: input.Path,
+	}, nil
+}
+
+func (s *ObjectStore) PresignDownload(ctx context.Context, input platformstorage.PresignDownloadInput) (*platformstorage.PresignDownloadResult, error) {
+	if s.presignClient == nil {
+		return nil, fmt.Errorf("s3 presign client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	expiresIn := input.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = s.uploadDuration
+	}
+
+	presignedRequest, err := s.presignClient.PresignGetObject(ctx, &awss3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	}, func(opts *awss3.PresignOptions) {
+		opts.Expires = expiresIn
+	})
+	if err != nil {
+		return nil, fmt.Errorf("presign get object: %w", err)
+	}
+
+	return &platformstorage.PresignDownloadResult{
+		URL:       presignedRequest.URL,
+		Method:    "GET",
+		ExpiresAt: time.Now().Add(expiresIn),
+		Reference: platformstorage.FileReference{
+			Bucket: s.bucket,
+			Key:    input.Path,
+		},
 	}, nil
 }
 
