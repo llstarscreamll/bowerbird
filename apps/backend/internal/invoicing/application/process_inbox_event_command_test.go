@@ -18,9 +18,9 @@ func (r *fakeRouter) RouteInboxInvoiceCandidate(ctx context.Context, event contr
 
 func TestProcessRoutesInvoiceCandidateEvent(t *testing.T) {
 	router := &fakeRouter{}
-	uc := NewProcessInboxEventUseCase(router)
+	uc := NewProcessInboxEventCommand(router)
 
-	err := uc.Process(context.Background(), contractevents.InboxMessageReceived{
+	err := uc.Execute(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt_1",
 		TenantSlug:        "tenant_1",
 		AccountID:         "acc_1",
@@ -42,9 +42,9 @@ func TestProcessRoutesInvoiceCandidateEvent(t *testing.T) {
 
 func TestProcessSkipsNonInvoiceCandidateEvent(t *testing.T) {
 	router := &fakeRouter{}
-	uc := NewProcessInboxEventUseCase(router)
+	uc := NewProcessInboxEventCommand(router)
 
-	err := uc.Process(context.Background(), contractevents.InboxMessageReceived{
+	err := uc.Execute(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt_1",
 		TenantSlug:        "tenant_1",
 		AccountID:         "acc_1",

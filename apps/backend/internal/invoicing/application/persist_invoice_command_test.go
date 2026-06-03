@@ -23,7 +23,7 @@ func (r *fakeInvoiceWriteRepo) PersistInvoiceAtomic(ctx context.Context, header 
 
 func TestPersistInvoiceUseCasePersistBuildsAtomicRecords(t *testing.T) {
 	repo := &fakeInvoiceWriteRepo{}
-	uc := NewPersistInvoiceUseCase(repo)
+	uc := NewPersistInvoiceCommand(repo)
 	uc.now = func() time.Time { return time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC) }
 	ids := []string{"hdr_1", "line_1", "line_2"}
 	i := 0
@@ -33,7 +33,7 @@ func TestPersistInvoiceUseCasePersistBuildsAtomicRecords(t *testing.T) {
 		return id
 	}
 
-	res, err := uc.Persist(context.Background(), PersistInvoiceInput{
+	res, err := uc.Execute(context.Background(), PersistInvoiceInput{
 		SourceMessageID:  "msg_1",
 		ExtractionSource: "xml",
 		DocumentRefS3Key: "tenant/t/inbox/.../invoice.xml",

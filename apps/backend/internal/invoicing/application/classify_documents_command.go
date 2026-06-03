@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
+	contractEvents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
 	"github.com/money-path/bowerbird/apps/backend/internal/invoicing/domain"
-	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
+	platformStorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 )
 
 type DocumentKind = domain.DocumentKind
@@ -23,22 +23,22 @@ type ClassifiedDocument = domain.ClassifiedDocument
 type DocumentGroup = domain.DocumentGroup
 type ClassificationResult = domain.ClassificationResult
 
-type ClassifyDocumentsUseCase struct {
-	store      platformstorage.FileStore
+type ClassifyDocumentsCommand struct {
+	store      platformStorage.FileStore
 	classifier domain.DocumentClassifier
 	logger     *slog.Logger
 }
 
-func NewClassifyDocumentsUseCase(store platformstorage.FileStore) *ClassifyDocumentsUseCase {
-	return &ClassifyDocumentsUseCase{
+func NewClassifyDocumentsCommand(store platformStorage.FileStore) *ClassifyDocumentsCommand {
+	return &ClassifyDocumentsCommand{
 		store:      store,
 		classifier: domain.NewInvoiceDocumentClassifier(),
 		logger:     slog.Default(),
 	}
 }
 
-func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, event contractevents.InboxMessageReceived) (*ClassificationResult, error) {
-	if u.store == nil {
+func (cmd *ClassifyDocumentsCommand) Execute(ctx context.Context, event contractEvents.InboxMessageReceived) (*ClassificationResult, error) {
+	if cmd.store == nil {
 		return nil, fmt.Errorf("file store is required")
 	}
 
@@ -48,7 +48,7 @@ func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, e
 			continue
 		}
 
-		data, err := u.store.ReadFile(ctx, platformstorage.ReadFileInput{Path: ref.S3Key})
+		data, err := cmd.store.ReadFile(ctx, platformStorage.ReadFileInput{Path: ref.S3Key})
 		if err != nil {
 			return nil, fmt.Errorf("read attachment from key %s: %w", ref.S3Key, err)
 		}
@@ -60,12 +60,12 @@ func (u *ClassifyDocumentsUseCase) ClassifyFromInboxEvent(ctx context.Context, e
 		})
 	}
 
-	result, err := u.classifier.ClassifyAttachments(attachments)
+	result, err := cmd.classifier.ClassifyAttachments(attachments)
 	if err != nil {
 		return nil, fmt.Errorf("classify attachments: %w", err)
 	}
 
-	u.logger.Info(
+	cmd.logger.Info(
 		"invoicing documents classified",
 		"tenant_slug",
 		event.TenantSlug,

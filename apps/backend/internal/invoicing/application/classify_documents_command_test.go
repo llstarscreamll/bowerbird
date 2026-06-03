@@ -58,8 +58,8 @@ func TestClassifyFromInboxEventGroupsDirectXMLAndPDF(t *testing.T) {
 		"k3": []byte("plain text"),
 	}}
 
-	uc := NewClassifyDocumentsUseCase(store)
-	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
+	uc := NewClassifyDocumentsCommand(store)
+	res, err := uc.Execute(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",
 		AccountID:         "acc-1",
@@ -98,8 +98,8 @@ func TestClassifyFromInboxEventDecompressesZIPAndGroupsPair(t *testing.T) {
 		"zip-key": zipPayload,
 	}}
 
-	uc := NewClassifyDocumentsUseCase(store)
-	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
+	uc := NewClassifyDocumentsCommand(store)
+	res, err := uc.Execute(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",
 		AccountID:         "acc-1",
@@ -142,8 +142,8 @@ func TestClassifyFromInboxEventGroupsAcrossDirectAndZipSources(t *testing.T) {
 		"zip-key": zipPayload,
 	}}
 
-	uc := NewClassifyDocumentsUseCase(store)
-	res, err := uc.ClassifyFromInboxEvent(context.Background(), contractevents.InboxMessageReceived{
+	uc := NewClassifyDocumentsCommand(store)
+	res, err := uc.Execute(context.Background(), contractevents.InboxMessageReceived{
 		EventID:           "evt-1",
 		TenantSlug:        "tenant-1",
 		AccountID:         "acc-1",

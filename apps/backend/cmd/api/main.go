@@ -249,7 +249,7 @@ func main() {
 
 	// Setup Event Poller
 	invoicingRouter := invoicingInfra.NewLogRouter()
-	invoicingUseCase := invoicingApp.NewProcessInboxEventUseCase(invoicingRouter)
+	invoicingUseCase := invoicingApp.NewProcessInboxEventCommand(invoicingRouter)
 	inboxMessageSubscriber := invoicingEvents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
 
 	inboxEventsSubscriber := inboxEvents.NewConnectionAddedSubscriber(syncAccountCommand)

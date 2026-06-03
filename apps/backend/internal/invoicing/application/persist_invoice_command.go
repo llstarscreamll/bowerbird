@@ -23,19 +23,19 @@ type PersistInvoiceResult struct {
 	LineIDs  []string
 }
 
-type PersistInvoiceUseCase struct {
+type PersistInvoiceCommand struct {
 	repo   domain.InvoiceWriteRepository
 	logger *slog.Logger
 	now    func() time.Time
 	newID  func() string
 }
 
-func NewPersistInvoiceUseCase(repo domain.InvoiceWriteRepository) *PersistInvoiceUseCase {
-	return &PersistInvoiceUseCase{repo: repo, logger: slog.Default(), now: time.Now, newID: id.NewULID}
+func NewPersistInvoiceCommand(repo domain.InvoiceWriteRepository) *PersistInvoiceCommand {
+	return &PersistInvoiceCommand{repo: repo, logger: slog.Default(), now: time.Now, newID: id.NewULID}
 }
 
-func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoiceInput) (*PersistInvoiceResult, error) {
-	if u.repo == nil {
+func (cmd *PersistInvoiceCommand) Execute(ctx context.Context, input PersistInvoiceInput) (*PersistInvoiceResult, error) {
+	if cmd.repo == nil {
 		return nil, fmt.Errorf("invoice write repository is required")
 	}
 	if input.Invoice == nil {
@@ -45,8 +45,8 @@ func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoic
 		return nil, err
 	}
 
-	now := u.now().UTC()
-	headerID := u.newID()
+	now := cmd.now().UTC()
+	headerID := cmd.newID()
 	headerRawData := input.Invoice.RawData
 	if len(headerRawData) == 0 {
 		headerRawData = []byte("{}")
@@ -77,7 +77,7 @@ func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoic
 	lines := make([]domain.InvoiceLineRecord, 0, len(input.Invoice.Lines))
 	lineIDs := make([]string, 0, len(input.Invoice.Lines))
 	for idx, line := range input.Invoice.Lines {
-		lineID := u.newID()
+		lineID := cmd.newID()
 		lineNumber := line.NumberOrDefault(idx + 1)
 		lineRawData, err := json.Marshal(line)
 		if err != nil {
@@ -101,10 +101,10 @@ func (u *PersistInvoiceUseCase) Persist(ctx context.Context, input PersistInvoic
 		lineIDs = append(lineIDs, lineID)
 	}
 
-	if err := u.repo.PersistInvoiceAtomic(ctx, header, lines); err != nil {
+	if err := cmd.repo.PersistInvoiceAtomic(ctx, header, lines); err != nil {
 		return nil, err
 	}
-	u.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
+	cmd.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
 
 	return &PersistInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil
 }

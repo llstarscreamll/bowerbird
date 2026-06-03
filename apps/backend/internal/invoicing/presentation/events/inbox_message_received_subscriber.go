@@ -10,10 +10,10 @@ import (
 )
 
 type InboxMessageReceivedSubscriber struct {
-	useCase *invoicingApp.ProcessInboxEventUseCase
+	useCase *invoicingApp.ProcessInboxEventCommand
 }
 
-func NewInboxMessageReceivedSubscriber(useCase *invoicingApp.ProcessInboxEventUseCase) *InboxMessageReceivedSubscriber {
+func NewInboxMessageReceivedSubscriber(useCase *invoicingApp.ProcessInboxEventCommand) *InboxMessageReceivedSubscriber {
 	return &InboxMessageReceivedSubscriber{useCase: useCase}
 }
 
@@ -28,5 +28,5 @@ func (s *InboxMessageReceivedSubscriber) HandleEventBridge(ctx context.Context, 
 	}
 
 	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
-	return s.useCase.Process(msgCtx, decoded)
+	return s.useCase.Execute(msgCtx, decoded)
 }

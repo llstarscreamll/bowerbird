@@ -20,7 +20,7 @@ func (r *fakeRouter) RouteInboxInvoiceCandidate(ctx context.Context, event contr
 
 func TestSubscriberRoutesInboxMessageReceivedEvent(t *testing.T) {
 	router := &fakeRouter{}
-	uc := invoicingapp.NewProcessInboxEventUseCase(router)
+	uc := invoicingapp.NewProcessInboxEventCommand(router)
 	subscriber := NewInboxMessageReceivedSubscriber(uc)
 
 	detail, err := contractevents.MarshalInboxMessageReceived(contractevents.InboxMessageReceived{

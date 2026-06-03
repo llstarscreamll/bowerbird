@@ -53,8 +53,8 @@ func TestExtractFromGroupSkipsWhenMessageAlreadyProcessed(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{}
 	repo := &fakeDedupRepo{messageProcessed: true}
 
-	uc := NewExtractInvoiceUseCase(xmlExtractor, llmExtractor, repo)
-	res, err := uc.ExtractFromGroup(context.Background(), "msg-1", domain.DocumentGroup{})
+	uc := NewExtractInvoiceCommand(xmlExtractor, llmExtractor, repo)
+	res, err := uc.Execute(context.Background(), "msg-1", domain.DocumentGroup{})
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -72,8 +72,8 @@ func TestExtractFromGroupUsesXMLFirstAndSkipsWhenCUFEExists(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{CUFE: "LLM-CUFE"}}
 	repo := &fakeDedupRepo{cufeExists: true}
 
-	uc := NewExtractInvoiceUseCase(xmlExtractor, llmExtractor, repo)
-	res, err := uc.ExtractFromGroup(context.Background(), "msg-1", domain.DocumentGroup{
+	uc := NewExtractInvoiceCommand(xmlExtractor, llmExtractor, repo)
+	res, err := uc.Execute(context.Background(), "msg-1", domain.DocumentGroup{
 		XML: &domain.ClassifiedDocument{Kind: domain.DocumentKindXML, Data: []byte("<xml/>")},
 		PDF: &domain.ClassifiedDocument{Kind: domain.DocumentKindPDF, Data: []byte("%PDF")},
 	})
@@ -97,8 +97,8 @@ func TestExtractFromGroupFallsBackToLLMAndReturnsReady(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{CUFE: "CUFE-LLM"}}
 	repo := &fakeDedupRepo{}
 
-	uc := NewExtractInvoiceUseCase(xmlExtractor, llmExtractor, repo)
-	res, err := uc.ExtractFromGroup(context.Background(), "msg-1", domain.DocumentGroup{
+	uc := NewExtractInvoiceCommand(xmlExtractor, llmExtractor, repo)
+	res, err := uc.Execute(context.Background(), "msg-1", domain.DocumentGroup{
 		PDF: &domain.ClassifiedDocument{Kind: domain.DocumentKindPDF, Data: []byte("%PDF")},
 	})
 	if err != nil {

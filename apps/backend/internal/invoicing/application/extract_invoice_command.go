@@ -35,19 +35,19 @@ type ExtractInvoiceResult struct {
 	Invoice    *domain.InvoiceDocument
 }
 
-type ExtractInvoiceUseCase struct {
+type ExtractInvoiceCommand struct {
 	xmlExtractor domain.InvoiceXMLExtractor
 	llmExtractor domain.InvoiceLLMExtractor
 	repo         InvoiceDedupRepository
 	logger       *slog.Logger
 }
 
-func NewExtractInvoiceUseCase(
+func NewExtractInvoiceCommand(
 	xmlExtractor domain.InvoiceXMLExtractor,
 	llmExtractor domain.InvoiceLLMExtractor,
 	repo InvoiceDedupRepository,
-) *ExtractInvoiceUseCase {
-	return &ExtractInvoiceUseCase{
+) *ExtractInvoiceCommand {
+	return &ExtractInvoiceCommand{
 		xmlExtractor: xmlExtractor,
 		llmExtractor: llmExtractor,
 		repo:         repo,
@@ -55,21 +55,21 @@ func NewExtractInvoiceUseCase(
 	}
 }
 
-func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMessageID string, group domain.DocumentGroup) (*ExtractInvoiceResult, error) {
-	if u.repo == nil {
+func (cmd *ExtractInvoiceCommand) Execute(ctx context.Context, sourceMessageID string, group domain.DocumentGroup) (*ExtractInvoiceResult, error) {
+	if cmd.repo == nil {
 		return nil, fmt.Errorf("invoice dedup repository is required")
 	}
 
-	processed, err := u.repo.ExistsInvoiceBySourceMessageID(ctx, sourceMessageID)
+	processed, err := cmd.repo.ExistsInvoiceBySourceMessageID(ctx, sourceMessageID)
 	if err != nil {
 		return nil, fmt.Errorf("check invoice by source message id: %w", err)
 	}
 	if processed {
-		u.logger.Info("invoice extraction skipped by source message", "source_message_id", sourceMessageID)
+		cmd.logger.Info("invoice extraction skipped by source message", "source_message_id", sourceMessageID)
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonMessageAlreadyProcessed}, nil
 	}
 
-	invoice, source, err := u.extractInvoiceDocument(ctx, group)
+	invoice, source, err := cmd.extractInvoiceDocument(ctx, group)
 	if err != nil {
 		return nil, err
 	}
@@ -77,16 +77,16 @@ func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMess
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonNoSupportedDocument}, nil
 	}
 
-	duplicated, err := u.repo.ExistsInvoiceByCUFE(ctx, invoice.CUFE)
+	duplicated, err := cmd.repo.ExistsInvoiceByCUFE(ctx, invoice.CUFE)
 	if err != nil {
 		return nil, fmt.Errorf("check invoice by cufe: %w", err)
 	}
 	if duplicated {
-		u.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
+		cmd.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
 		return &ExtractInvoiceResult{Status: ExtractInvoiceStatusSkipped, SkipReason: SkipReasonCUFEAlreadyExists}, nil
 	}
 
-	u.logger.Info("invoice extracted and ready", "source", source, "cufe", invoice.CUFE)
+	cmd.logger.Info("invoice extracted and ready", "source", source, "cufe", invoice.CUFE)
 
 	return &ExtractInvoiceResult{
 		Status:  ExtractInvoiceStatusReady,
@@ -95,17 +95,17 @@ func (u *ExtractInvoiceUseCase) ExtractFromGroup(ctx context.Context, sourceMess
 	}, nil
 }
 
-func (u *ExtractInvoiceUseCase) extractInvoiceDocument(ctx context.Context, group domain.DocumentGroup) (*domain.InvoiceDocument, string, error) {
+func (cmd *ExtractInvoiceCommand) extractInvoiceDocument(ctx context.Context, group domain.DocumentGroup) (*domain.InvoiceDocument, string, error) {
 	if !group.SupportsInvoiceExtraction() {
 		return nil, "", nil
 	}
 
 	source := group.PreferredDocumentSource()
 	if source == "xml" {
-		if u.xmlExtractor == nil {
+		if cmd.xmlExtractor == nil {
 			return nil, "", fmt.Errorf("xml extractor is required")
 		}
-		invoice, err := u.xmlExtractor.ParseInvoiceXML(group.XML.Data)
+		invoice, err := cmd.xmlExtractor.ParseInvoiceXML(group.XML.Data)
 		if err != nil {
 			return nil, "", fmt.Errorf("extract invoice from xml: %w", err)
 		}
@@ -113,10 +113,10 @@ func (u *ExtractInvoiceUseCase) extractInvoiceDocument(ctx context.Context, grou
 	}
 
 	if source == "llm" {
-		if u.llmExtractor == nil {
+		if cmd.llmExtractor == nil {
 			return nil, "", fmt.Errorf("llm extractor is required")
 		}
-		invoice, err := u.llmExtractor.ExtractFromPDF(ctx, group.PDF.Data)
+		invoice, err := cmd.llmExtractor.ExtractFromPDF(ctx, group.PDF.Data)
 		if err != nil {
 			return nil, "", fmt.Errorf("extract invoice from pdf with llm: %w", err)
 		}
