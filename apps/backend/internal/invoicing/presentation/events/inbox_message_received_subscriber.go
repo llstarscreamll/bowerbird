@@ -10,11 +10,11 @@ import (
 )
 
 type InboxMessageReceivedSubscriber struct {
-	useCase *invoicingApp.ProcessInboxEventCommand
+	command *invoicingApp.CheckInboxMessageForInvoiceCandidatesCommand
 }
 
-func NewInboxMessageReceivedSubscriber(useCase *invoicingApp.ProcessInboxEventCommand) *InboxMessageReceivedSubscriber {
-	return &InboxMessageReceivedSubscriber{useCase: useCase}
+func NewInboxMessageReceivedSubscriber(command *invoicingApp.CheckInboxMessageForInvoiceCandidatesCommand) *InboxMessageReceivedSubscriber {
+	return &InboxMessageReceivedSubscriber{command: command}
 }
 
 func (s *InboxMessageReceivedSubscriber) DetailType() string {
@@ -22,11 +22,15 @@ func (s *InboxMessageReceivedSubscriber) DetailType() string {
 }
 
 func (s *InboxMessageReceivedSubscriber) HandleEventBridge(ctx context.Context, event awsEvents.CloudWatchEvent) error {
+	if s.command == nil {
+		return nil
+	}
+
 	decoded, err := contractEvents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
 	if err != nil {
 		return err
 	}
 
 	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
-	return s.useCase.Execute(msgCtx, decoded)
+	return s.command.Execute(msgCtx, decoded)
 }

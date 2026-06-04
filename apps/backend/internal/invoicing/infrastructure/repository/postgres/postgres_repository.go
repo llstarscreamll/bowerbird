@@ -16,6 +16,36 @@ func NewRepository(registry *database.Registry) *Repository {
 	return &Repository{registry: registry}
 }
 
+func (r *Repository) ExistsInvoiceBySourceMessageID(ctx context.Context, sourceMessageID string) (bool, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get tenant db pool: %w", err)
+	}
+
+	var exists bool
+	err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM invoice_headers WHERE source_message_id = $1)`, sourceMessageID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check invoice by source message id: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (r *Repository) ExistsInvoiceByCUFE(ctx context.Context, cufe string) (bool, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get tenant db pool: %w", err)
+	}
+
+	var exists bool
+	err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM invoice_headers WHERE cufe = $1)`, cufe).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check invoice by cufe: %w", err)
+	}
+
+	return exists, nil
+}
+
 func (r *Repository) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {

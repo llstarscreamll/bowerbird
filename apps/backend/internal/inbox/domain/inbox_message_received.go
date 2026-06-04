@@ -68,6 +68,9 @@ func NewInboxMessageReceived(input NewInboxMessageReceivedInput) (InboxMessageRe
 	if input.ProviderMessage.Subject != "" {
 		event.Subject = input.ProviderMessage.Subject
 	}
+	if input.ProviderMessage.PlainTextBody != "" {
+		event.Body = input.ProviderMessage.PlainTextBody
+	}
 	if input.ProviderMessage.Sender != "" {
 		event.Sender = input.ProviderMessage.Sender
 	}

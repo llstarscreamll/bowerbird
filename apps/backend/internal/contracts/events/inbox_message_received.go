@@ -30,6 +30,7 @@ type InboxMessageReceived struct {
 	ProviderMessageID string          `json:"provider_message_id"`
 	MessageInternalID string          `json:"message_internal_id"`
 	Subject           string          `json:"subject,omitempty"`
+	Body              string          `json:"body,omitempty"`
 	Sender            string          `json:"sender,omitempty"`
 	ReceivedAt        string          `json:"received_at,omitempty"`
 	AttachmentRefs    []AttachmentRef `json:"attachment_refs,omitempty"`

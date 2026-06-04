@@ -18,6 +18,7 @@ func TestMarshalUnmarshalInboxMessageReceived(t *testing.T) {
 		ProviderMessageID: "msg_123",
 		MessageInternalID: "01JWMESSAGE123456789ABCDE",
 		Subject:           "Factura mayo",
+		Body:              "Adjuntamos la factura electronica.",
 		Sender:            "billing@vendor.com",
 		AttachmentRefs: []AttachmentRef{
 			{
@@ -115,10 +116,11 @@ func TestNewInboxMessageReceived(t *testing.T) {
 		AccountID:  "01JWACCOUNT123456789ABCDE",
 		Provider:   "gmail",
 		ProviderMessage: &MailMessage{
-			ID:         "msg_123",
-			Subject:    "Factura mayo",
-			Sender:     "billing@vendor.com",
-			ReceivedAt: &receivedAt,
+			ID:            "msg_123",
+			Subject:       "Factura mayo",
+			PlainTextBody: "Adjuntamos la factura electronica.",
+			Sender:        "billing@vendor.com",
+			ReceivedAt:    &receivedAt,
 		},
 		MessageInternalID: "01JWMESSAGE123456789ABCDE",
 		AttachmentRefs: []AttachmentRef{{
@@ -137,6 +139,9 @@ func TestNewInboxMessageReceived(t *testing.T) {
 	}
 	if event.Subject != "Factura mayo" {
 		t.Fatalf("expected subject Factura mayo, got %q", event.Subject)
+	}
+	if event.Body != "Adjuntamos la factura electronica." {
+		t.Fatalf("expected body to be propagated, got %q", event.Body)
 	}
 	if event.Sender != "billing@vendor.com" {
 		t.Fatalf("expected sender billing@vendor.com, got %q", event.Sender)

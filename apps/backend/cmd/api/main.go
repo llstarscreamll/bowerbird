@@ -29,7 +29,9 @@ import (
 	inboxEvents "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/events"
 	inboxHttp "github.com/money-path/bowerbird/apps/backend/internal/inbox/presentation/http"
 	invoicingApp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
-	invoicingInfra "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/router"
+	invoicingLLM "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/llm"
+	invoicingRepo "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/repository/postgres"
+	invoicingXML "github.com/money-path/bowerbird/apps/backend/internal/invoicing/infrastructure/xml"
 	invoicingEvents "github.com/money-path/bowerbird/apps/backend/internal/invoicing/presentation/events"
 	orgApplication "github.com/money-path/bowerbird/apps/backend/internal/organization/application"
 	orgInfra "github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
@@ -40,6 +42,7 @@ import (
 	platformCrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/events"
+	platformStorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
 	platformS3 "github.com/money-path/bowerbird/apps/backend/internal/platform/storage/s3"
 	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 	"golang.org/x/oauth2"
@@ -248,12 +251,36 @@ func main() {
 	inboxHandler.Register(mux, authMiddleware, isDev)
 
 	// Setup Event Poller
-	invoicingRouter := invoicingInfra.NewLogRouter()
-	invoicingUseCase := invoicingApp.NewProcessInboxEventCommand(invoicingRouter)
-	inboxMessageSubscriber := invoicingEvents.NewInboxMessageReceivedSubscriber(invoicingUseCase)
+	invoicingRepoAdapter := invoicingRepo.NewRepository(registry)
+	invoicingXMLExtractor := invoicingXML.NewDIANUBL21Parser()
+
+	var invoicingLLMExtractor *invoicingLLM.GeminiExtractor
+	if cfg.GeminiAPIKey != "" {
+		invoicingLLMExtractor, err = invoicingLLM.NewGeminiExtractor(invoicingLLM.GeminiExtractorConfig{
+			APIKey:   cfg.GeminiAPIKey,
+			Model:    cfg.GeminiModel,
+			Endpoint: cfg.GeminiEndpoint,
+		})
+		if err != nil {
+			log.Fatalf("new gemini extractor failed: %v", err)
+		}
+	}
+
+	var invoicingStore platformStorage.FileStore
+	if cfg.S3BucketName != "" {
+		invoicingStore = platformS3.NewObjectStore(awsConfig.NewS3Client(awsCfg, cfg.AWSEndpointURL), cfg.S3BucketName)
+	}
+
+	checkInboxForInvoicesCommand := invoicingApp.NewCheckInboxMessageForInvoiceCandidatesCommand(businessEventPublisher)
+	var extractInvoiceCommand *invoicingApp.ExtractInvoiceCommand
+	if invoicingStore != nil {
+		extractInvoiceCommand = invoicingApp.NewExtractInvoiceCommand(invoicingStore, invoicingXMLExtractor, invoicingLLMExtractor, invoicingRepoAdapter)
+	}
+	inboxMessageSubscriber := invoicingEvents.NewInboxMessageReceivedSubscriber(checkInboxForInvoicesCommand)
+	invoiceExtractionSubscriber := invoicingEvents.NewInvoiceExtractionRequestedSubscriber(extractInvoiceCommand)
 
 	inboxEventsSubscriber := inboxEvents.NewConnectionAddedSubscriber(syncAccountCommand)
-	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
+	eventHandler := events.NewEventHandler(inboxMessageSubscriber, invoiceExtractionSubscriber, inboxEventsSubscriber)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
 		sqsClient := awsConfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)

@@ -7,21 +7,22 @@ import (
 	awsevents "github.com/aws/aws-lambda-go/events"
 	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
 	invoicingapp "github.com/money-path/bowerbird/apps/backend/internal/invoicing/application"
+	platformevents "github.com/money-path/bowerbird/apps/backend/internal/platform/events"
 )
 
-type fakeRouter struct {
-	routed int
+type fakePublisher struct {
+	published int
 }
 
-func (r *fakeRouter) RouteInboxInvoiceCandidate(ctx context.Context, event contractevents.InboxMessageReceived) error {
-	r.routed++
+func (p *fakePublisher) PublishBusinessEvent(ctx context.Context, event platformevents.BusinessEvent) error {
+	p.published++
 	return nil
 }
 
 func TestSubscriberRoutesInboxMessageReceivedEvent(t *testing.T) {
-	router := &fakeRouter{}
-	uc := invoicingapp.NewProcessInboxEventCommand(router)
-	subscriber := NewInboxMessageReceivedSubscriber(uc)
+	publisher := &fakePublisher{}
+	cmd := invoicingapp.NewCheckInboxMessageForInvoiceCandidatesCommand(publisher)
+	subscriber := NewInboxMessageReceivedSubscriber(cmd)
 
 	detail, err := contractevents.MarshalInboxMessageReceived(contractevents.InboxMessageReceived{
 		EventID:           "evt_1",
@@ -30,6 +31,7 @@ func TestSubscriberRoutesInboxMessageReceivedEvent(t *testing.T) {
 		Provider:          "gmail",
 		ProviderMessageID: "msg_1",
 		MessageInternalID: "m_1",
+		Subject:           "Factura electronica",
 		AttachmentRefs: []contractevents.AttachmentRef{
 			{Filename: "factura.xml"},
 		},
@@ -46,7 +48,7 @@ func TestSubscriberRoutesInboxMessageReceivedEvent(t *testing.T) {
 		t.Fatalf("handle event failed: %v", err)
 	}
 
-	if router.routed != 1 {
-		t.Fatalf("expected 1 routed event, got %d", router.routed)
+	if publisher.published != 1 {
+		t.Fatalf("expected 1 published event, got %d", publisher.published)
 	}
 }
