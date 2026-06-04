@@ -112,27 +112,48 @@ Añade las siguientes líneas:
 
 Caddy genera certificados HTTPS usando una Autoridad Certificadora (CA) interna. Para que el navegador no te muestre la alerta de "Conexión no segura" (`ERR_CERT_AUTHORITY_INVALID`), debes indicar a tu sistema que confíe en ella.
 
-**Paso 1: Extraer el certificado del contenedor**
-Con el entorno en ejecución (`pnpm run dev`), ejecuta en otra terminal:
-
-```bash
-docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
-```
-
-**Paso 2: Registrar el certificado**
-
 **En macOS:**
 
 ```bash
+docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./bowerbird-local-ca.crt
 ```
 
 **En Fedora Linux:**
 
 ```bash
+docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
 sudo cp ./bowerbird-local-ca.crt /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust
 ```
+
+**En Fedora Linux con Chrome instalado via Flatpak:**
+
+Chrome en Flatpak puede no leer automaticamente el trust store del sistema host. En ese caso, ademas de los pasos de Fedora anteriores, importa la CA tambien en la base NSS del perfil de Flatpak:
+
+```bash
+sudo dnf install -y nss-tools
+
+# Exporta la CA actual desde el contenedor de Caddy
+docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
+
+# Crea (si no existe) la base NSS del perfil de Chrome Flatpak
+mkdir -p ~/.var/app/com.google.Chrome/.pki/nssdb
+certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -N --empty-password || true
+
+# Reemplaza una posible entrada previa y agrega la CA como autoridad de confianza
+certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -D -n "Caddy Local Authority - ECC Root" || true
+certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -A -n "Caddy Local Authority - ECC Root" -t "C,," -i /tmp/caddy-root.crt
+
+# Verifica que la CA quedo importada
+certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -L
+
+# Reinicia completamente Chrome Flatpak
+flatpak kill com.google.Chrome
+flatpak run com.google.Chrome
+```
+
+Si persiste `ERR_CERT_AUTHORITY_INVALID`, normalmente significa que Caddy regenero su CA (por ejemplo, despues de borrar volumenes Docker) y hay que volver a exportar/importar el `root.crt` actual.
 
 _(Opcional) Si utilizas Firefox, importa el archivo `bowerbird-local-ca.crt` manualmente desde Ajustes > Privacidad y Seguridad > Ver certificados > Autoridades > Importar._
 
