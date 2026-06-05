@@ -13,6 +13,7 @@ apps/pwa/dist/
 apps/pwa/coverage/
 apps/pwa/node_modules/
 packages/infra/node_modules/
+.cache
 
 # Entornos y Secretos
 .env
