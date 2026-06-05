@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { catchError, finalize, forkJoin, map, of } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 import { FileReference } from '../../core/domain/file-storage.model';
 import { FileStorageService } from '../../core/services/file-storage.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -13,7 +13,14 @@ export interface InvoiceHistoryQueuedFile {
   id: string;
   file: File;
   status: InvoiceHistoryQueueStatus;
+  uploadProgress: number;
   uploadedReference: InvoiceHistoryAnalyzeFileReference | null;
+}
+
+interface UploadBatchState {
+  remaining: number;
+  uploadedCount: number;
+  failedCount: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +57,8 @@ export class InvoiceHistoryImportStore {
   private readonly fileStorage = inject(FileStorageService);
   private readonly invoiceHistoryHttp = inject(InvoiceHistoryHttpService);
   private readonly toast = inject(ToastService);
+  private readonly activeUploads = new Map<string, Subscription>();
+  private currentBatch: UploadBatchState | null = null;
   private nextId = 1;
 
   openImportModal(): void {
@@ -96,6 +105,7 @@ export class InvoiceHistoryImportStore {
         id: String(this.nextId++),
         file,
         status: 'pending',
+        uploadProgress: 0,
         uploadedReference: null,
       });
     }
@@ -131,6 +141,24 @@ export class InvoiceHistoryImportStore {
     this.errorMessage.set('');
   }
 
+  cancelFileUpload(fileId: string): void {
+    if (this.analyzing()) {
+      return;
+    }
+
+    const activeUpload = this.activeUploads.get(fileId);
+    if (!activeUpload) {
+      this.queuedFiles.update((entries) => entries.filter((entry) => entry.id !== fileId));
+      this.errorMessage.set('');
+      return;
+    }
+
+    activeUpload.unsubscribe();
+    this.queuedFiles.update((entries) => entries.filter((entry) => entry.id !== fileId));
+    this.finishSingleUpload(fileId);
+    this.errorMessage.set('');
+  }
+
   private uploadPendingFiles(): void {
     if (this.uploading() || this.analyzing()) {
       return;
@@ -151,65 +179,40 @@ export class InvoiceHistoryImportStore {
         return {
           ...entry,
           status: 'uploading',
+          uploadProgress: 0,
         };
       }),
     );
 
     this.uploading.set(true);
     this.errorMessage.set('');
+    this.currentBatch = {
+      remaining: filesToUpload.length,
+      uploadedCount: 0,
+      failedCount: 0,
+    };
 
-    forkJoin(
-      filesToUpload.map((entry) =>
-        this.fileStorage.uploadFile(entry.file, 'invoices').pipe(
-          map((reference) => ({ id: entry.id, reference, ok: true as const })),
-          catchError(() => of({ id: entry.id, reference: null, ok: false as const })),
-        ),
-      ),
-    )
-      .pipe(finalize(() => this.uploading.set(false)))
-      .subscribe({
-        next: (results) => {
-          const resultById = new Map(results.map((result) => [result.id, result]));
-
-          this.queuedFiles.update((entries) =>
-            entries.map((entry) => {
-              const result = resultById.get(entry.id);
-              if (!result) {
-                return entry;
-              }
-
-              if (!result.ok || !result.reference) {
-                return {
-                  ...entry,
-                  status: 'failed',
-                  uploadedReference: null,
-                };
-              }
-
-              return {
-                ...entry,
-                status: 'uploaded',
-                uploadedReference: this.toAnalyzeFileReference(entry.file, result.reference),
-              };
-            }),
-          );
-
-          const uploadedCount = results.filter((result) => result.ok).length;
-          const failedCount = results.length - uploadedCount;
-
-          if (uploadedCount > 0) {
-            this.toast.showSuccess(`Se subieron ${uploadedCount} archivo(s) correctamente.`);
-          }
-          if (failedCount > 0) {
-            this.errorMessage.set('Algunos archivos no se pudieron subir. Eliminalos y vuelve a intentarlo.');
-            this.toast.showWarning(`No se pudieron subir ${failedCount} archivo(s).`);
+    for (const entry of filesToUpload) {
+      const subscription = this.fileStorage.uploadFile(entry.file, 'invoices').subscribe({
+        next: (event) => {
+          if (event.type === 'progress') {
+            this.updateFileProgress(entry.id, event.progress);
+            return;
           }
 
-          if (this.hasPendingFiles()) {
-            this.uploadPendingFiles();
-          }
+          this.markFileAsUploaded(entry, event.reference);
+        },
+        error: () => {
+          this.markFileAsFailed(entry.id);
+          this.finishSingleUpload(entry.id);
+        },
+        complete: () => {
+          this.finishSingleUpload(entry.id);
         },
       });
+
+      this.activeUploads.set(entry.id, subscription);
+    }
   }
 
   analyzeUploadedFiles(): void {
@@ -243,6 +246,92 @@ export class InvoiceHistoryImportStore {
 
   private fileFingerprint(file: File): string {
     return `${file.name}::${file.size}::${file.lastModified}`;
+  }
+
+  private updateFileProgress(fileId: string, progress: number): void {
+    this.queuedFiles.update((entries) =>
+      entries.map((entry) => {
+        if (entry.id !== fileId || entry.status !== 'uploading') {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          uploadProgress: progress,
+        };
+      }),
+    );
+  }
+
+  private markFileAsUploaded(entry: InvoiceHistoryQueuedFile, reference: FileReference): void {
+    this.queuedFiles.update((entries) =>
+      entries.map((queued) => {
+        if (queued.id !== entry.id) {
+          return queued;
+        }
+
+        return {
+          ...queued,
+          status: 'uploaded',
+          uploadProgress: 100,
+          uploadedReference: this.toAnalyzeFileReference(entry.file, reference),
+        };
+      }),
+    );
+
+    if (this.currentBatch) {
+      this.currentBatch.uploadedCount += 1;
+    }
+  }
+
+  private markFileAsFailed(fileId: string): void {
+    this.queuedFiles.update((entries) =>
+      entries.map((entry) => {
+        if (entry.id !== fileId) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          status: 'failed',
+          uploadProgress: 100,
+          uploadedReference: null,
+        };
+      }),
+    );
+
+    if (this.currentBatch) {
+      this.currentBatch.failedCount += 1;
+    }
+  }
+
+  private finishSingleUpload(fileId: string): void {
+    this.activeUploads.delete(fileId);
+
+    if (!this.currentBatch) {
+      return;
+    }
+
+    this.currentBatch.remaining = Math.max(0, this.currentBatch.remaining - 1);
+    if (this.currentBatch.remaining > 0) {
+      return;
+    }
+
+    const { uploadedCount, failedCount } = this.currentBatch;
+    this.currentBatch = null;
+    this.uploading.set(false);
+
+    if (uploadedCount > 0) {
+      this.toast.showSuccess(`Se subieron ${uploadedCount} archivo(s) correctamente.`);
+    }
+    if (failedCount > 0) {
+      this.errorMessage.set('Algunos archivos no se pudieron subir. Eliminalos y vuelve a intentarlo.');
+      this.toast.showWarning(`No se pudieron subir ${failedCount} archivo(s).`);
+    }
+
+    if (this.hasPendingFiles()) {
+      this.uploadPendingFiles();
+    }
   }
 
   private toAnalyzeFileReference(file: File, uploaded: FileReference): InvoiceHistoryAnalyzeFileReference {
