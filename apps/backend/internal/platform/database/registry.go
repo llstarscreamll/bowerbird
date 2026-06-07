@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 )
 
 // Registry manages database connection pools for multiple tenants.

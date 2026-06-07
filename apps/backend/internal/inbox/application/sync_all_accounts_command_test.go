@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	connectionsApp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
-	inboxApp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
+	connectionsApp "github.com/bowerbird/internal/connections/application"
+	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestSyncAllConnectionsCommand_DispatchesJobPerActiveAccount(t *testing.T) {
 		},
 	}
 	jobDispatcher := &fakeSyncAccountJobDispatcher{}
-	cmd := inboxApp.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	err := cmd.Execute(ctx, "user-1")
@@ -36,7 +36,7 @@ func TestSyncAllConnectionsCommand_DispatchesJobPerActiveAccount(t *testing.T) {
 func TestSyncAllConnectionsCommand_NoActiveAccountsDoesNothing(t *testing.T) {
 	connectionsService := &fakeConnectionsInternalService{}
 	jobDispatcher := &fakeSyncAccountJobDispatcher{}
-	cmd := inboxApp.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	err := cmd.Execute(ctx, "user-1")
@@ -53,7 +53,7 @@ func TestSyncAllConnectionsCommand_ReturnsDispatchErrors(t *testing.T) {
 		},
 	}
 	jobDispatcher := &fakeSyncAccountJobDispatcher{failAccountID: "acc-1"}
-	cmd := inboxApp.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	err := cmd.Execute(ctx, "user-1")
@@ -71,7 +71,7 @@ func TestSyncAllConnectionsCommand_SkipsPrivateAccountsFromOtherUsers(t *testing
 		},
 	}
 	jobDispatcher := &fakeSyncAccountJobDispatcher{}
-	cmd := inboxApp.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	err := cmd.Execute(ctx, "user-1")
@@ -83,11 +83,11 @@ func TestSyncAllConnectionsCommand_SkipsPrivateAccountsFromOtherUsers(t *testing
 }
 
 type fakeSyncAccountJobDispatcher struct {
-	jobs          []inboxApp.SyncAccountJob
+	jobs          []inboxCommands.SyncAccountJob
 	failAccountID string
 }
 
-func (f *fakeSyncAccountJobDispatcher) DispatchSyncAccount(ctx context.Context, job inboxApp.SyncAccountJob) error {
+func (f *fakeSyncAccountJobDispatcher) DispatchSyncAccount(ctx context.Context, job inboxCommands.SyncAccountJob) error {
 	f.jobs = append(f.jobs, job)
 	if job.AccountID == f.failAccountID {
 		return errors.New("dispatch failed")

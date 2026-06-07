@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/identity/domain"
-	idinfra "github.com/money-path/bowerbird/apps/backend/internal/identity/infrastructure"
-	"github.com/money-path/bowerbird/apps/backend/internal/organization/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/organization/infrastructure"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
+	"github.com/bowerbird/internal/identity/domain"
+	idinfra "github.com/bowerbird/internal/identity/infrastructure"
+	organizationModule "github.com/bowerbird/internal/organization"
+	"github.com/bowerbird/internal/organization/application"
+	"github.com/bowerbird/internal/platform/config"
+	"github.com/bowerbird/internal/platform/database"
 )
 
 func main() {
@@ -25,13 +26,21 @@ func main() {
 	}
 	defer pool.Close()
 
-	orgRepo := infrastructure.NewPostgresRepository(pool)
-	orgProvisioner := infrastructure.NewPostgresProvisioner(pool, cfg.DatabaseURL, "migrations/tenant")
-	orgUseCase := application.NewCreateOrganizationUseCase(orgRepo, orgProvisioner)
+	migrationsDir := os.Getenv("TENANT_MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations/tenant"
+		if _, err := os.Stat(migrationsDir); os.IsNotExist(err) {
+			migrationsDir = "apps/backend/migrations/tenant"
+		}
+	}
+
+	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir)
+	orgUseCase := application.NewCreateOrganizationUseCaseFromCommand(organizationApp.Commands.CreateOrganization)
 
 	// We also need the user to exist in the Control Plane identity tables before we create the tenant.
 	// Because the AddMembership requires a foreign key to users.id
 	dbRegistry := database.NewRegistry(pool, cfg.DatabaseURL)
+	defer dbRegistry.CloseAll()
 	idRepo := idinfra.NewPostgresRepository(pool, dbRegistry)
 
 	email := "admin@acme.com"
@@ -50,16 +59,6 @@ func main() {
 		user, _ = idRepo.FindUserByEmail(ctx, email)
 	}
 
-	// Check if already exists
-	exists, err := orgRepo.ExistsBySlug(ctx, "acme")
-	if err != nil {
-		log.Fatalf("Failed to check if org exists: %v", err)
-	}
-	if exists {
-		log.Println("Tenant 'acme' already exists, skipping.")
-		return
-	}
-
 	cmd := application.CreateOrganizationCommand{
 		Name:           "Acme Corp",
 		Slug:           "acme",
@@ -72,6 +71,11 @@ func main() {
 
 	org, err := orgUseCase.Execute(ctx, cmd)
 	if err != nil {
+		if err == application.ErrSlugAlreadyExists {
+			log.Println("Tenant 'acme' already exists, skipping.")
+			return
+		}
+
 		log.Fatalf("Failed to create tenant: %v", err)
 	}
 

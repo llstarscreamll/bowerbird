@@ -6,21 +6,50 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
-	platformevents "github.com/money-path/bowerbird/apps/backend/internal/platform/events"
+	connectionsModule "github.com/bowerbird/internal/connections"
+	inboxModule "github.com/bowerbird/internal/inbox"
+	invoicesModule "github.com/bowerbird/internal/invoices"
+	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
+	"github.com/bowerbird/internal/platform"
+	platformCrypto "github.com/bowerbird/internal/platform/crypto"
+	platformEvents "github.com/bowerbird/internal/platform/events"
 )
 
-var cfg config.Config
-var eventHandler platformevents.EventHandler
+var eventHandler platformEvents.EventHandler
 
 func init() {
-	var err error
-	cfg, err = config.Load(context.Background())
+	platformModule, err := platform.NewModule(context.Background())
 	if err != nil {
-		log.Fatalf("failed to load config at boot: %v", err)
+		log.Fatalf("failed to build dependencies at boot: %v", err)
 	}
 
-	eventHandler = platformevents.NewEventHandler()
+	cfg := platformModule.Config
+	invoicingApp := invoicesModule.NewApplication(
+		cfg,
+		platformModule.EventBus,
+		platformModule.JobQueue,
+		platformModule.FileStore,
+		platformModule.TenantRegistry,
+	)
+	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
+
+	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+	if err != nil {
+		log.Fatalf("failed to create inbox credentials cipher at boot: %v", err)
+	}
+
+	connectionsApp := connectionsModule.NewApplication(platformModule.TenantRegistry, cipher)
+	connectionsService := connectionsModule.NewInternalService(connectionsApp)
+
+	inboxApp := inboxModule.NewApplication(
+		cfg,
+		connectionsService,
+		platformModule.EventBus,
+		platformModule.FileStore,
+		platformModule.TenantRegistry,
+	)
+	connectionAddedSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp)
+	eventHandler = platformEvents.NewEventHandler(inboxMessageSubscriber, connectionAddedSubscriber)
 }
 
 func handle(ctx context.Context, event events.CloudWatchEvent) error {

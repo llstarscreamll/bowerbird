@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ConnectionAddedDetailType    = "ConnectionAdded"
-	ConnectionAddedSource        = "bowerbird.connections"
 	ConnectionAddedSchemaVersion = "1.0"
+	ConnectionAddedSource        = "bowerbird.connections"
+	ConnectionAddedDetailType    = "ConnectionAdded"
 )
 
 type ConnectionAdded struct {
@@ -33,6 +33,7 @@ func (e ConnectionAdded) Validate() error {
 	if e.Provider == "" {
 		return errors.New("provider is required")
 	}
+
 	return nil
 }
 
@@ -40,6 +41,7 @@ func MarshalConnectionAdded(event ConnectionAdded) ([]byte, error) {
 	if err := event.Validate(); err != nil {
 		return nil, err
 	}
+
 	return json.Marshal(event)
 }
 
@@ -51,5 +53,6 @@ func UnmarshalConnectionAdded(data []byte) (ConnectionAdded, error) {
 	if err := event.Validate(); err != nil {
 		return ConnectionAdded{}, err
 	}
+
 	return event, nil
 }

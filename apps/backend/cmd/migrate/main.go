@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/url"
 
+	"github.com/bowerbird/internal/platform/config"
+	"github.com/bowerbird/internal/platform/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/database"
 )
 
 func main() {

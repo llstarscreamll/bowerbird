@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
 // JSONAPIErrorDocument is the top-level structure for JSON:API errors.

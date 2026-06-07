@@ -10,6 +10,7 @@ Para implementación, operación, arquitectura y calidad de código.
 - [Tooling: CodeGraph](./technical/tooling/codegraph.md)
 - [Tooling: LocalStack](./technical/tooling/localstack.md)
 - [Arquitectura backend](./technical/architecture/backend-api.md)
+- [Arquitectura: eventos vs jobs](./technical/architecture/events-vs-jobs.md)
 - [Arquitectura frontend](./technical/architecture/frontend-web.md)
 - [Despliegue AWS](./technical/deployment/aws.md)
 - [Calidad de desarrollo](./technical/quality/development-quality.md)

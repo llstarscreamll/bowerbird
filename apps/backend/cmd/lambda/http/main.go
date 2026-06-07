@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/config"
+	"github.com/bowerbird/internal/platform/config"
 )
 
 var cfg config.Config

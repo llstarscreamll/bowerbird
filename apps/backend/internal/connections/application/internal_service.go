@@ -2,15 +2,11 @@ package application
 
 import (
 	"context"
+
+	"github.com/bowerbird/internal/connections/application/queries"
 )
 
-type ConnectionInfo struct {
-	ID                   string
-	Provider             string
-	ProviderAccountEmail string
-	OwnerUserID          string
-	SharingPolicy        string
-}
+type ConnectionInfo = queries.ConnectionInfo
 
 type InternalService interface {
 	GetActiveConnections(ctx context.Context) ([]ConnectionInfo, error)

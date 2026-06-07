@@ -4,16 +4,16 @@ import (
 	"context"
 
 	awsevents "github.com/aws/aws-lambda-go/events"
-	contractevents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
-	"github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
+	contractevents "github.com/bowerbird/internal/contracts/events"
+	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
+	"github.com/bowerbird/internal/platform/tenant"
 )
 
 type ConnectionAddedSubscriber struct {
-	command *application.SyncAccountCommand
+	command *inboxCommands.SyncAccountCommand
 }
 
-func NewConnectionAddedSubscriber(command *application.SyncAccountCommand) *ConnectionAddedSubscriber {
+func NewConnectionAddedSubscriber(command *inboxCommands.SyncAccountCommand) *ConnectionAddedSubscriber {
 	return &ConnectionAddedSubscriber{command: command}
 }
 
@@ -32,5 +32,5 @@ func (s *ConnectionAddedSubscriber) HandleEventBridge(ctx context.Context, event
 	}
 
 	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
-	return s.command.Execute(msgCtx, application.SyncAccountCommandInput{AccountID: decoded.ConnectionID})
+	return s.command.Execute(msgCtx, inboxCommands.SyncAccountCommandInput{AccountID: decoded.ConnectionID})
 }

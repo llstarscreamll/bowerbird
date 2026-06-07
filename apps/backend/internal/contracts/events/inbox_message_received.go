@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	awsevents "github.com/aws/aws-lambda-go/events"
+	awsEvents "github.com/aws/aws-lambda-go/events"
 )
 
 const (
@@ -23,8 +23,7 @@ type AttachmentRef struct {
 
 type InboxMessageReceived struct {
 	EventID           string          `json:"event_id"`
-	OccurredAt        string          `json:"occurred_at"`
-	TenantSlug        string          `json:"tenant_slug"`
+	TenantID          string          `json:"tenant_slug"`
 	AccountID         string          `json:"account_id"`
 	Provider          string          `json:"provider"`
 	ProviderMessageID string          `json:"provider_message_id"`
@@ -35,6 +34,7 @@ type InboxMessageReceived struct {
 	ReceivedAt        string          `json:"received_at,omitempty"`
 	AttachmentRefs    []AttachmentRef `json:"attachment_refs,omitempty"`
 	RawDataRef        string          `json:"raw_data_ref,omitempty"`
+	OccurredAt        string          `json:"occurred_at"`
 }
 
 func (e InboxMessageReceived) Validate() error {
@@ -42,7 +42,7 @@ func (e InboxMessageReceived) Validate() error {
 		return errors.New("event_id is required")
 	}
 
-	if e.TenantSlug == "" {
+	if e.TenantID == "" {
 		return errors.New("tenant_slug is required")
 	}
 
@@ -91,7 +91,7 @@ func UnmarshalInboxMessageReceived(data []byte) (InboxMessageReceived, error) {
 	return event, nil
 }
 
-func DecodeInboxMessageReceivedFromCloudWatchEvent(event awsevents.CloudWatchEvent) (InboxMessageReceived, error) {
+func DecodeInboxMessageReceivedFromCloudWatchEvent(event awsEvents.CloudWatchEvent) (InboxMessageReceived, error) {
 	if event.DetailType != InboxMessageReceivedDetailType {
 		return InboxMessageReceived{}, fmt.Errorf("unexpected detail type: %s", event.DetailType)
 	}

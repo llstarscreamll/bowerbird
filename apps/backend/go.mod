@@ -1,4 +1,4 @@
-module github.com/money-path/bowerbird/apps/backend
+module github.com/bowerbird
 
 go 1.25.0
 

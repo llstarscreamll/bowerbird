@@ -8,6 +8,6 @@ type BusinessEvent struct {
 	Detail     []byte
 }
 
-type BusinessEventPublisher interface {
-	PublishBusinessEvent(ctx context.Context, event BusinessEvent) error
+type EventBus interface {
+	Publish(ctx context.Context, event BusinessEvent) error
 }

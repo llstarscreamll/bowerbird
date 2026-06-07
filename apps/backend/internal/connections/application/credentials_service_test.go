@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/connections/domain"
-	platformcrypto "github.com/money-path/bowerbird/apps/backend/internal/platform/crypto"
+	"github.com/bowerbird/internal/connections/domain"
+	platformcrypto "github.com/bowerbird/internal/platform/crypto"
 )
 
 func TestCredentialsServiceEncryptDecryptRoundtrip(t *testing.T) {

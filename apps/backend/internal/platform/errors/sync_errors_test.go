@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
 func TestSyncError_UXMeta(t *testing.T) {

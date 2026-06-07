@@ -14,14 +14,12 @@ import (
 )
 
 type Handler interface {
-	HandleSQSEvent(ctx context.Context, event events.SQSEvent) error
 	HandleEventBridgeEvent(ctx context.Context, event events.CloudWatchEvent) error
 }
 
 type Poller struct {
 	client                *sqs.Client
 	handler               Handler
-	sqsQueueURL           string
 	eventBridgeQueueURL   string
 	waitTimeSeconds       int32
 	visibilityTimeoutSec  int32
@@ -29,11 +27,10 @@ type Poller struct {
 	failureBackoffMaxSec  int32
 }
 
-func NewPoller(client *sqs.Client, handler Handler, sqsQueueURL, eventBridgeQueueURL string) Poller {
+func NewPoller(client *sqs.Client, handler Handler, eventBridgeQueueURL string) Poller {
 	return Poller{
 		client:                client,
 		handler:               handler,
-		sqsQueueURL:           sqsQueueURL,
 		eventBridgeQueueURL:   eventBridgeQueueURL,
 		waitTimeSeconds:       10,
 		visibilityTimeoutSec:  30,
@@ -43,16 +40,12 @@ func NewPoller(client *sqs.Client, handler Handler, sqsQueueURL, eventBridgeQueu
 }
 
 func (p Poller) Run(ctx context.Context) {
-	if p.sqsQueueURL != "" {
-		go p.pollSQS(ctx, p.sqsQueueURL, p.handler.HandleSQSEvent)
-	}
-
-	if p.eventBridgeQueueURL != "" {
+	if p.eventBridgeQueueURL != "" && p.handler != nil {
 		go p.pollEventBridge(ctx, p.eventBridgeQueueURL, p.handler.HandleEventBridgeEvent)
 	}
 }
 
-func (p Poller) pollSQS(ctx context.Context, queueURL string, handler func(context.Context, events.SQSEvent) error) {
+func (p Poller) pollEventBridge(ctx context.Context, queueURL string, handler func(context.Context, events.CloudWatchEvent) error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -75,8 +68,7 @@ func (p Poller) pollSQS(ctx context.Context, queueURL string, handler func(conte
 			continue
 		}
 
-		event := events.SQSEvent{Records: toSQSRecords(messages)}
-		if err := handler(ctx, event); err != nil {
+		if err := p.dispatchEvents(ctx, messages, handler); err != nil {
 			log.Printf("sqs handler error (queue=%s): %v", queueURL, err)
 			if backoffErr := p.applyFailureBackoff(ctx, queueURL, messages); backoffErr != nil {
 				log.Printf("sqs backoff error (queue=%s): %v", queueURL, backoffErr)
@@ -90,21 +82,23 @@ func (p Poller) pollSQS(ctx context.Context, queueURL string, handler func(conte
 	}
 }
 
-func (p Poller) pollEventBridge(ctx context.Context, queueURL string, handler func(context.Context, events.CloudWatchEvent) error) {
-	p.pollSQS(ctx, queueURL, func(ctx context.Context, event events.SQSEvent) error {
-		for _, record := range event.Records {
-			var bridgeEvent events.CloudWatchEvent
-			if err := json.Unmarshal([]byte(record.Body), &bridgeEvent); err != nil {
-				return err
-			}
-
-			if err := handler(ctx, bridgeEvent); err != nil {
-				return err
-			}
+func (p Poller) dispatchEvents(ctx context.Context, messages []types.Message, handler func(context.Context, events.CloudWatchEvent) error) error {
+	for _, message := range messages {
+		if message.Body == nil {
+			continue
 		}
 
-		return nil
-	})
+		var bridgeEvent events.CloudWatchEvent
+		if err := json.Unmarshal([]byte(*message.Body), &bridgeEvent); err != nil {
+			return err
+		}
+
+		if err := handler(ctx, bridgeEvent); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (p Poller) receiveMessages(ctx context.Context, queueURL string) ([]types.Message, error) {
@@ -176,53 +170,6 @@ func (p Poller) applyFailureBackoff(ctx context.Context, queueURL string, messag
 	return err
 }
 
-func toSQSRecords(messages []types.Message) []events.SQSMessage {
-	records := make([]events.SQSMessage, 0, len(messages))
-	for _, message := range messages {
-		record := events.SQSMessage{}
-		if message.MessageId != nil {
-			record.MessageId = *message.MessageId
-		}
-		if message.Body != nil {
-			record.Body = *message.Body
-		}
-		record.ReceiptHandle = ""
-		record.Attributes = map[string]string{}
-		for key, value := range message.Attributes {
-			record.Attributes[string(key)] = value
-		}
-		record.MessageAttributes = map[string]events.SQSMessageAttribute{}
-		for k, v := range message.MessageAttributes {
-			val := ""
-			if v.StringValue != nil {
-				val = *v.StringValue
-			}
-			record.MessageAttributes[k] = events.SQSMessageAttribute{
-				StringValue: &val,
-				DataType:    *v.DataType,
-			}
-		}
-		record.Md5OfBody = ""
-		record.EventSource = "aws:sqs"
-		record.EventSourceARN = ""
-		record.AWSRegion = ""
-		records = append(records, record)
-	}
-
-	return records
-}
-
-func parseReceiveCount(raw string) int32 {
-	if raw == "" {
-		return 1
-	}
-	v, err := strconv.ParseInt(raw, 10, 32)
-	if err != nil || v <= 0 {
-		return 1
-	}
-	return int32(v)
-}
-
 func (p Poller) backoffVisibilityTimeout(receiveCount int32) int32 {
 	if receiveCount <= 1 {
 		return p.failureBackoffBaseSec
@@ -234,4 +181,15 @@ func (p Poller) backoffVisibilityTimeout(receiveCount int32) int32 {
 	}
 
 	return visibility
+}
+
+func parseReceiveCount(raw string) int32 {
+	if raw == "" {
+		return 1
+	}
+	v, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil || v <= 0 {
+		return 1
+	}
+	return int32(v)
 }

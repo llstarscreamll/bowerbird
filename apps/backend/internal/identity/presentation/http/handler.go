@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/identity/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/auth"
-	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
+	"github.com/bowerbird/internal/identity/application"
+	"github.com/bowerbird/internal/platform/auth"
+	"github.com/bowerbird/internal/platform/config"
+	appErrors "github.com/bowerbird/internal/platform/errors"
+	"github.com/bowerbird/internal/platform/http/api"
 	"golang.org/x/oauth2"
 )
 
@@ -37,20 +38,20 @@ func NewAuthHandler(
 	}
 }
 
-func (h *AuthHandler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler, isDev bool) {
-	mux.HandleFunc("POST /api/v1/auth/register-local", api.Wrap(h.RegisterLocal, isDev))
-	mux.HandleFunc("POST /api/v1/auth/login-local", api.Wrap(h.LoginLocal, isDev))
-	mux.HandleFunc("POST /api/v1/auth/refresh", api.Wrap(h.RefreshToken, isDev))
-	mux.HandleFunc("POST /api/v1/auth/logout", api.Wrap(h.Logout, isDev))
-	mux.HandleFunc("GET /api/v1/auth/google/login", api.Wrap(h.OAuthGoogleLogin, isDev))
-	mux.HandleFunc("GET /api/v1/auth/google/callback", api.Wrap(h.OAuthGoogleCallback, isDev))
-	mux.HandleFunc("GET /api/v1/auth/microsoft/login", api.Wrap(h.OAuthMicrosoftLogin, isDev))
-	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", api.Wrap(h.OAuthMicrosoftCallback, isDev))
+func (h *AuthHandler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler, cfg config.Config) {
+	mux.HandleFunc("POST /api/v1/auth/register-local", api.Wrap(h.RegisterLocal, cfg))
+	mux.HandleFunc("POST /api/v1/auth/login-local", api.Wrap(h.LoginLocal, cfg))
+	mux.HandleFunc("POST /api/v1/auth/refresh", api.Wrap(h.RefreshToken, cfg))
+	mux.HandleFunc("POST /api/v1/auth/logout", api.Wrap(h.Logout, cfg))
+	mux.HandleFunc("GET /api/v1/auth/google/login", api.Wrap(h.OAuthGoogleLogin, cfg))
+	mux.HandleFunc("GET /api/v1/auth/google/callback", api.Wrap(h.OAuthGoogleCallback, cfg))
+	mux.HandleFunc("GET /api/v1/auth/microsoft/login", api.Wrap(h.OAuthMicrosoftLogin, cfg))
+	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", api.Wrap(h.OAuthMicrosoftCallback, cfg))
 
 	// Protected routes
-	mux.Handle("GET /api/v1/identity/tenants", authMiddleware(api.Wrap(h.ListUserTenants, isDev)))
-	mux.Handle("POST /api/v1/identity/tenants/{tenant_id}/leave", authMiddleware(api.Wrap(h.LeaveTenant, isDev)))
-	mux.Handle("DELETE /api/v1/identity/account", authMiddleware(api.Wrap(h.DeleteAccount, isDev)))
+	mux.Handle("GET /api/v1/identity/tenants", authMiddleware(api.Wrap(h.ListUserTenants, cfg)))
+	mux.Handle("POST /api/v1/identity/tenants/{tenant_id}/leave", authMiddleware(api.Wrap(h.LeaveTenant, cfg)))
+	mux.Handle("DELETE /api/v1/identity/account", authMiddleware(api.Wrap(h.DeleteAccount, cfg)))
 }
 
 type LocalAuthRequest struct {

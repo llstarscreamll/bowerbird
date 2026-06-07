@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	platformStorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
+	platformStorage "github.com/bowerbird/internal/platform/storage"
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

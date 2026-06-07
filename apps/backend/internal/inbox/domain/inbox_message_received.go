@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	awsEvents "github.com/aws/aws-lambda-go/events"
-	contractEvents "github.com/money-path/bowerbird/apps/backend/internal/contracts/events"
+	contractEvents "github.com/bowerbird/internal/contracts/events"
 )
 
 const (
@@ -57,7 +57,7 @@ func NewInboxMessageReceived(input NewInboxMessageReceivedInput) (InboxMessageRe
 	event := InboxMessageReceived{
 		EventID:           input.EventID,
 		OccurredAt:        input.OccurredAt,
-		TenantSlug:        input.TenantSlug,
+		TenantID:          input.TenantSlug,
 		AccountID:         input.AccountID,
 		Provider:          input.Provider,
 		ProviderMessageID: input.ProviderMessage.ID,

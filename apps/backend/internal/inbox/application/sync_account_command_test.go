@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	connectionsApp "github.com/money-path/bowerbird/apps/backend/internal/connections/application"
-	inboxApp "github.com/money-path/bowerbird/apps/backend/internal/inbox/application"
-	"github.com/money-path/bowerbird/apps/backend/internal/inbox/domain"
-	platformEvents "github.com/money-path/bowerbird/apps/backend/internal/platform/events"
-	platformStorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
+	connectionsApp "github.com/bowerbird/internal/connections/application"
+	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
+	"github.com/bowerbird/internal/inbox/domain"
+	platformEvents "github.com/bowerbird/internal/platform/events"
+	platformStorage "github.com/bowerbird/internal/platform/storage"
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,10 +25,10 @@ func TestSyncAccountCommand_RequiresAccountID(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "account id is required")
 }
@@ -42,10 +42,10 @@ func TestSyncAccountCommand_FailsWhenAccountIsNotActive(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "active account not found: acc-1")
 	assert.Empty(t, providerClient.listQueries)
@@ -60,10 +60,10 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 	require.Len(t, providerClient.listQueries, 1)
 
@@ -95,10 +95,10 @@ func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T
 	providerClient := &fakeProviderClient{}
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 
 	expectedQuery := "after:" + toUnixString(previousSync)
@@ -131,10 +131,10 @@ func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 	require.Len(t, repo.upsertedMessages, 1)
 	assert.Equal(t, []string{"m-invalid", "m-valid"}, providerClient.getMessageCalls)
@@ -167,10 +167,10 @@ func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testin
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 	require.Len(t, providerClient.downloadAttachmentCalls, 1)
 	require.Len(t, repo.upsertedAttachments, 1)
@@ -203,10 +203,10 @@ func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "get provider attachment att-1")
 }
@@ -220,10 +220,10 @@ func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 	publisher := &fakeInboxEventPublisher{}
 	attachmentStore := &fakeFileStore{}
 
-	cmd := inboxApp.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
-	err := cmd.Execute(ctx, inboxApp.SyncAccountCommandInput{AccountID: "acc-1"})
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.Error(t, err)
 	assert.Equal(t, 1, connectionsSvc.markReconnectCalls)
 
@@ -356,7 +356,7 @@ type fakeInboxEventPublisher struct {
 	published []platformEvents.BusinessEvent
 }
 
-func (f *fakeInboxEventPublisher) PublishBusinessEvent(ctx context.Context, event platformEvents.BusinessEvent) error {
+func (f *fakeInboxEventPublisher) Publish(ctx context.Context, event platformEvents.BusinessEvent) error {
 	f.published = append(f.published, event)
 	return nil
 }
@@ -402,5 +402,5 @@ var _ connectionsApp.InternalService = (*fakeConnectionsInternalService)(nil)
 var _ domain.SyncCursorRepository = (*fakeInboxRepo)(nil)
 var _ domain.MessageRepository = (*fakeInboxRepo)(nil)
 var _ domain.MailProviderClient = (*fakeProviderClient)(nil)
-var _ platformEvents.BusinessEventPublisher = (*fakeInboxEventPublisher)(nil)
+var _ platformEvents.EventBus = (*fakeInboxEventPublisher)(nil)
 var _ platformStorage.FileStore = (*fakeFileStore)(nil)

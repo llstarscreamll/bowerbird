@@ -10,25 +10,25 @@ import (
 	"time"
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
-	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	platformstorage "github.com/money-path/bowerbird/apps/backend/internal/platform/storage"
+	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	platformStorage "github.com/bowerbird/internal/platform/storage"
 )
 
 type fakeS3Client struct {
 	objects map[string][]byte
 }
 
-func (f *fakeS3Client) HeadObject(ctx context.Context, params *awss3.HeadObjectInput, optFns ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error) {
+func (f *fakeS3Client) HeadObject(ctx context.Context, params *awsS3.HeadObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.HeadObjectOutput, error) {
 	if f.objects == nil {
 		f.objects = map[string][]byte{}
 	}
 	if _, ok := f.objects[*params.Key]; !ok {
 		return nil, errors.New("status code: 404")
 	}
-	return &awss3.HeadObjectOutput{}, nil
+	return &awsS3.HeadObjectOutput{}, nil
 }
 
-func (f *fakeS3Client) PutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.Options)) (*awss3.PutObjectOutput, error) {
+func (f *fakeS3Client) PutObject(ctx context.Context, params *awsS3.PutObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.PutObjectOutput, error) {
 	if f.objects == nil {
 		f.objects = map[string][]byte{}
 	}
@@ -37,18 +37,18 @@ func (f *fakeS3Client) PutObject(ctx context.Context, params *awss3.PutObjectInp
 		return nil, err
 	}
 	f.objects[*params.Key] = body
-	return &awss3.PutObjectOutput{}, nil
+	return &awsS3.PutObjectOutput{}, nil
 }
 
-func (f *fakeS3Client) GetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.Options)) (*awss3.GetObjectOutput, error) {
+func (f *fakeS3Client) GetObject(ctx context.Context, params *awsS3.GetObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.GetObjectOutput, error) {
 	body, ok := f.objects[*params.Key]
 	if !ok {
 		return nil, errors.New("status code: 404")
 	}
-	return &awss3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(body))}, nil
+	return &awsS3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(body))}, nil
 }
 
-func (f *fakeS3Client) CopyObject(ctx context.Context, params *awss3.CopyObjectInput, optFns ...func(*awss3.Options)) (*awss3.CopyObjectOutput, error) {
+func (f *fakeS3Client) CopyObject(ctx context.Context, params *awsS3.CopyObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.CopyObjectOutput, error) {
 	if f.objects == nil {
 		f.objects = map[string][]byte{}
 	}
@@ -62,30 +62,30 @@ func (f *fakeS3Client) CopyObject(ctx context.Context, params *awss3.CopyObjectI
 		return nil, errors.New("status code: 404")
 	}
 	f.objects[*params.Key] = body
-	return &awss3.CopyObjectOutput{}, nil
+	return &awsS3.CopyObjectOutput{}, nil
 }
 
-func (f *fakeS3Client) DeleteObject(ctx context.Context, params *awss3.DeleteObjectInput, optFns ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error) {
+func (f *fakeS3Client) DeleteObject(ctx context.Context, params *awsS3.DeleteObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.DeleteObjectOutput, error) {
 	if f.objects != nil {
 		delete(f.objects, *params.Key)
 	}
-	return &awss3.DeleteObjectOutput{}, nil
+	return &awsS3.DeleteObjectOutput{}, nil
 }
 
 type fakePresignClient struct{}
 
-func (f fakePresignClient) PresignPutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
+func (f fakePresignClient) PresignPutObject(ctx context.Context, params *awsS3.PutObjectInput, optFns ...func(*awsS3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
 	return &v4.PresignedHTTPRequest{URL: "https://example.test/upload"}, nil
 }
 
-func (f fakePresignClient) PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
+func (f fakePresignClient) PresignGetObject(ctx context.Context, params *awsS3.GetObjectInput, optFns ...func(*awsS3.PresignOptions)) (*v4.PresignedHTTPRequest, error) {
 	return &v4.PresignedHTTPRequest{URL: "https://example.test/download"}, nil
 }
 
 func TestWriteFileIfAbsentUploadsFirstTime(t *testing.T) {
 	store := NewObjectStoreWithClient(&fakeS3Client{}, "bucket")
 
-	res, err := store.WriteFileIfAbsent(context.Background(), platformstorage.WriteFileIfAbsentInput{
+	res, err := store.WriteFileIfAbsent(context.Background(), platformStorage.WriteFileIfAbsentInput{
 		Path: "tenant/t/inbox/raw/key",
 		Data: []byte("abc"),
 	})
@@ -101,7 +101,7 @@ func TestWriteFileIfAbsentSkipsWhenExists(t *testing.T) {
 	client := &fakeS3Client{objects: map[string][]byte{"tenant/t/inbox/raw/key": []byte("abc")}}
 	store := NewObjectStoreWithClient(client, "bucket")
 
-	res, err := store.WriteFileIfAbsent(context.Background(), platformstorage.WriteFileIfAbsentInput{
+	res, err := store.WriteFileIfAbsent(context.Background(), platformStorage.WriteFileIfAbsentInput{
 		Path: "tenant/t/inbox/raw/key",
 		Data: []byte("abc"),
 	})
@@ -117,7 +117,7 @@ func TestReadFileReadsObjectContent(t *testing.T) {
 	client := &fakeS3Client{objects: map[string][]byte{"tenant/t/inbox/raw/key": []byte("abc")}}
 	store := NewObjectStoreWithClient(client, "bucket")
 
-	body, err := store.ReadFile(context.Background(), platformstorage.ReadFileInput{
+	body, err := store.ReadFile(context.Background(), platformStorage.ReadFileInput{
 		Path: "tenant/t/inbox/raw/key",
 	})
 	if err != nil {
@@ -132,7 +132,7 @@ func TestExistsReturnsTrueWhenObjectExists(t *testing.T) {
 	client := &fakeS3Client{objects: map[string][]byte{"tenant/t/inbox/raw/key": []byte("abc")}}
 	store := NewObjectStoreWithClient(client, "bucket")
 
-	exists, err := store.Exists(context.Background(), platformstorage.ExistsFileInput{Path: "tenant/t/inbox/raw/key"})
+	exists, err := store.Exists(context.Background(), platformStorage.ExistsFileInput{Path: "tenant/t/inbox/raw/key"})
 	if err != nil {
 		t.Fatalf("exists failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestMoveFileCopiesAndDeletesSource(t *testing.T) {
 	client := &fakeS3Client{objects: map[string][]byte{"source": []byte("abc")}}
 	store := NewObjectStoreWithClient(client, "bucket")
 
-	err := store.MoveFile(context.Background(), platformstorage.MoveFileInput{SourcePath: "source", DestinationPath: "destination"})
+	err := store.MoveFile(context.Background(), platformStorage.MoveFileInput{SourcePath: "source", DestinationPath: "destination"})
 	if err != nil {
 		t.Fatalf("move file failed: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestMoveFileCopiesAndDeletesSource(t *testing.T) {
 func TestPresignUploadReturnsURLAndReference(t *testing.T) {
 	store := NewObjectStoreWithClients(&fakeS3Client{}, fakePresignClient{}, "bucket")
 
-	result, err := store.PresignUpload(context.Background(), platformstorage.PresignUploadInput{
+	result, err := store.PresignUpload(context.Background(), platformStorage.PresignUploadInput{
 		Path:        "1-day/t1/uploads/u1/file.bin",
 		ContentType: "application/octet-stream",
 		ExpiresIn:   10 * time.Minute,
@@ -179,7 +179,7 @@ func TestPresignUploadReturnsURLAndReference(t *testing.T) {
 func TestPresignDownloadReturnsURLAndReference(t *testing.T) {
 	store := NewObjectStoreWithClients(&fakeS3Client{}, fakePresignClient{}, "bucket")
 
-	result, err := store.PresignDownload(context.Background(), platformstorage.PresignDownloadInput{
+	result, err := store.PresignDownload(context.Background(), platformStorage.PresignDownloadInput{
 		Path:      "1-day/t1/uploads/u1/file.bin",
 		ExpiresIn: 10 * time.Minute,
 	})

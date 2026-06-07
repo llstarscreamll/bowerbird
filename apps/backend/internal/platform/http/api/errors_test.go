@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	appErrors "github.com/money-path/bowerbird/apps/backend/internal/platform/errors"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/http/api"
+	"github.com/bowerbird/internal/platform/config"
+	appErrors "github.com/bowerbird/internal/platform/errors"
+	"github.com/bowerbird/internal/platform/http/api"
 )
 
 func TestMapError_AppError(t *testing.T) {
@@ -145,7 +146,7 @@ func TestWrap(t *testing.T) {
 		return expectedErr
 	}
 
-	wrapped := api.Wrap(handlerFunc, false)
+	wrapped := api.Wrap(handlerFunc, config.Config{Debug: false})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()

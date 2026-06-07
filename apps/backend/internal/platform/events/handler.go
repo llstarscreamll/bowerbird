@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/tenant"
 )
 
 type EventBridgeSubscriber interface {
@@ -17,7 +16,7 @@ type EventHandler struct {
 	eventBridgeSubscribers map[string]EventBridgeSubscriber
 }
 
-func NewEventHandler(subscribers ...interface{}) EventHandler {
+func NewEventHandler(subscribers ...EventBridgeSubscriber) EventHandler {
 	ebRoutes := make(map[string]EventBridgeSubscriber)
 
 	for _, subscriber := range subscribers {
@@ -25,29 +24,12 @@ func NewEventHandler(subscribers ...interface{}) EventHandler {
 			continue
 		}
 
-		if ebSub, ok := subscriber.(EventBridgeSubscriber); ok {
-			ebRoutes[ebSub.DetailType()] = ebSub
-		}
+		ebRoutes[subscriber.DetailType()] = subscriber
 	}
 
 	return EventHandler{
 		eventBridgeSubscribers: ebRoutes,
 	}
-}
-
-func (h EventHandler) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
-	for _, record := range event.Records {
-		msgCtx := ctx
-		// Extract tenant slug from message attributes.
-		if attr, ok := record.MessageAttributes["TenantSlug"]; ok && attr.StringValue != nil {
-			msgCtx = tenant.WithTenantID(msgCtx, *attr.StringValue)
-		}
-
-		tenantID, _ := tenant.TenantIDFromContext(msgCtx)
-		log.Printf("sqs message processed: id=%s tenant=%s body=%s", record.MessageId, tenantID, record.Body)
-	}
-
-	return nil
 }
 
 func (h EventHandler) HandleEventBridgeEvent(ctx context.Context, event events.CloudWatchEvent) error {

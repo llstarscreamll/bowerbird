@@ -18,6 +18,13 @@
 ## Backend (`apps/backend`)
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources `apps/backend/.env` if present.
+- Feature architecture: follow the `internal/<feature>` modular layout used in `internal/invoices`:
+  - `domain/`: core business model and pure domain logic (no infra/framework concerns).
+  - `application/`: use cases (`commands`, `queries`) and `ports` interfaces.
+  - `contracts/`: cross-boundary payload contracts (feature jobs/events DTOs).
+  - `adapters/`: HTTP, events/jobs handlers, repository and external provider implementations.
+  - `wire.go`: feature composition root (instantiate adapters and inject into application commands/queries).
+- Dependency rule for backend features: keep dependencies inward (`adapters -> application -> domain`), with contracts shared across boundaries; do not import adapters from `domain` or `application`.
 - Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
 - Domain Errors: Wrap or create errors using `appErrors.Wrap(err, appErrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
 - Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.

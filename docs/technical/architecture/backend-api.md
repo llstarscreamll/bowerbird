@@ -20,7 +20,8 @@ No contiene lógica de negocio. Es una estructura plana de librerías y utilitar
 - `platform/awsconfig`: Adaptador del AWS SDK.
 - `platform/config`: Carga del `.env` y lectura de secretos en SSM.
 - `platform/database`: Conexión genérica de `pgxpool`.
-- `platform/events`: Los "handlers" y "pollers" nativos de AWS (Lambda/SQS).
+- `platform/events`: Publicación/suscripción de eventos de dominio (EventBridge).
+- `platform/jobs`: Encolado/procesamiento de trabajo asíncrono (SQS jobs).
 
 ### 2. Bounded Contexts (Verticales de Negocio)
 
@@ -65,5 +66,5 @@ En desarrollo local, LocalStack inicializa un parámetro simulado en SSM gracias
 
 - Servicios emulados en LocalStack: S3, SQS, EventBridge, SSM.
 - No se hace deploy de Lambdas a LocalStack para el loop diario de desarrollo.
-- En su lugar, `cmd/api/main.go` activa un event loop local que consume colas SQS de LocalStack y ejecuta los mismos handlers usados por las Lambdas (`HandleSQSEvent` y `HandleEventBridgeEvent`).
+- En su lugar, `cmd/api/main.go` activa un event loop local con dos pollers separados: uno para eventos EventBridge y otro para jobs SQS, reutilizando los mismos handlers usados por las Lambdas.
 - Resultado: alta fidelidad de infraestructura AWS con ciclo de desarrollo rápido (`air`) y baja complejidad operativa.

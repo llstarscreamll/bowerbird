@@ -12,7 +12,7 @@ func TestMarshalUnmarshalInboxMessageReceived(t *testing.T) {
 	event := InboxMessageReceived{
 		EventID:           "01JWEVENT1234567890ABCDEFG",
 		OccurredAt:        "2026-05-25T12:00:00Z",
-		TenantSlug:        "tenant-acme",
+		TenantID:          "tenant-acme",
 		AccountID:         "01JWACCOUNT123456789ABCDE",
 		Provider:          "gmail",
 		ProviderMessageID: "msg_123",
@@ -44,8 +44,8 @@ func TestMarshalUnmarshalInboxMessageReceived(t *testing.T) {
 		t.Fatalf("expected event id %q, got %q", event.EventID, decoded.EventID)
 	}
 
-	if decoded.TenantSlug != event.TenantSlug {
-		t.Fatalf("expected tenant slug %q, got %q", event.TenantSlug, decoded.TenantSlug)
+	if decoded.TenantID != event.TenantID {
+		t.Fatalf("expected tenant slug %q, got %q", event.TenantID, decoded.TenantID)
 	}
 
 	if decoded.ProviderMessageID != event.ProviderMessageID {
@@ -67,7 +67,7 @@ func TestMarshalInboxMessageReceivedMissingRequiredField(t *testing.T) {
 func TestDecodeInboxMessageReceivedFromCloudWatchEvent(t *testing.T) {
 	detail, err := json.Marshal(InboxMessageReceived{
 		EventID:           "01JWEVENT1234567890ABCDEFG",
-		TenantSlug:        "tenant-acme",
+		TenantID:          "tenant-acme",
 		AccountID:         "01JWACCOUNT123456789ABCDE",
 		Provider:          "gmail",
 		ProviderMessageID: "msg_123",

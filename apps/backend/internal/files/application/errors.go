@@ -1,5 +1,5 @@
 package application
 
-import "errors"
+import "github.com/bowerbird/internal/files/application/commands"
 
-var ErrFileNotFound = errors.New("file not found")
+var ErrFileNotFound = commands.ErrFileNotFound

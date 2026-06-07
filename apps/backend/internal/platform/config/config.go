@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/money-path/bowerbird/apps/backend/internal/platform/awsconfig"
+	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
 )
 
 type Config struct {
@@ -28,6 +29,7 @@ type Config struct {
 	SSMParameterName              string    `json:"ssm_parameter_name"`
 	EnableLocalEventLoop          bool      `json:"enable_local_event_loop"`
 	AllowedOrigins                string    `json:"allowed_origins"`
+	Debug                         bool      `json:"debug"`
 	GoogleClientID                string    `json:"google_client_id"`
 	GoogleClientSecret            string    `json:"google_client_secret"`
 	MicrosoftClientID             string    `json:"microsoft_client_id"`
@@ -49,7 +51,7 @@ type JWTConfig struct {
 }
 
 func Load(ctx context.Context) (Config, error) {
-	// 1. Load base env vars
+	// Load base env vars
 	cfg := Config{
 		AppEnv:               getEnv("APP_ENV", "development"),
 		Port:                 getEnv("PORT", "8080"),
@@ -65,13 +67,16 @@ func Load(ctx context.Context) (Config, error) {
 		BackendURL:           getEnv("BACKEND_URL", "http://localhost:8080"),
 	}
 
-	// 2. Load AWS Config to fetch SSM
-	awsCfg, err := awsconfig.Load(ctx, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
+	defaultDebug := cfg.AppEnv == "development" || cfg.AppEnv == "local"
+	cfg.Debug = getEnvAsBool("DEBUG", defaultDebug)
+
+	// Load AWS Config to fetch SSM
+	awsCfg, err := awsConfig.Load(ctx, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
 	if err != nil {
 		return cfg, fmt.Errorf("load aws config for ssm: %w", err)
 	}
 
-	// 3. Fetch and merge secrets from SSM
+	// Fetch and merge secrets from SSM
 	if cfg.SSMParameterName != "" {
 		if err := loadSSMSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
 			return cfg, fmt.Errorf("load ssm secrets: %w", err)
@@ -97,10 +102,19 @@ func Load(ctx context.Context) (Config, error) {
 	}
 
 	if cfg.DatabaseURL == "" {
-		return Config{}, fmt.Errorf("DATABASE_URL is required (from SSM or env)")
+		panic("DATABASE_URL is required (from SSM or env)")
 	}
 	if cfg.InboxCredentialsEncryptionKey == "" {
-		return Config{}, fmt.Errorf("inbox_credentials_encryption_key is required from SSM")
+		panic("inbox_credentials_encryption_key is required from SSM or env")
+	}
+	if cfg.EventBusName == "" {
+		panic("EVENT_BUS_NAME is required (from SSM or env)")
+	}
+	if cfg.S3BucketName == "" {
+		panic("S3_BUCKET_NAME is required (from SSM or env)")
+	}
+	if cfg.GeminiAPIKey == "" {
+		panic("GEMINI_API_KEY is required (from SSM or env)")
 	}
 
 	accessSecret := os.Getenv("JWT_ACCESS_SECRET")
@@ -108,7 +122,7 @@ func Load(ctx context.Context) (Config, error) {
 		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
 			accessSecret = "local-dev-access-secret-do-not-use-in-prod"
 		} else {
-			return Config{}, fmt.Errorf("JWT_ACCESS_SECRET is required")
+			panic("JWT_ACCESS_SECRET is required")
 		}
 	}
 
@@ -117,7 +131,7 @@ func Load(ctx context.Context) (Config, error) {
 		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
 			refreshSecret = "local-dev-refresh-secret-do-not-use-in-prod"
 		} else {
-			return Config{}, fmt.Errorf("JWT_REFRESH_SECRET is required")
+			panic("JWT_REFRESH_SECRET is required")
 		}
 	}
 
@@ -161,4 +175,18 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getEnvAsBool(key string, fallback bool) bool {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+
+	return parsed
 }

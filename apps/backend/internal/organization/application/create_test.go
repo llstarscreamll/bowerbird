@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/money-path/bowerbird/apps/backend/internal/organization/domain"
+	"github.com/bowerbird/internal/organization/domain"
 )
 
 type fakeOrganizationRepo struct {
