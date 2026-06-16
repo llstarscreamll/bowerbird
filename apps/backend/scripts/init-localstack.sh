@@ -46,29 +46,14 @@ awslocal s3api put-bucket-cors \
   }' >/dev/null
 
 # Configurar secretos en un SecureString
-SECRETS_FILE="/tmp/local-secrets.json"
-if [ -f "$SECRETS_FILE" ]; then
-  SECRETS_JSON=$(cat "$SECRETS_FILE")
-  echo "Cargando secretos desde $SECRETS_FILE"
-else
-  # Fallback si no hay archivo
-  echo "Archivo $SECRETS_FILE no encontrado, usando secretos dummy por defecto"
-  SECRETS_JSON=$(cat <<EOF
-{
-  "database_url": "postgres://bowerbird:bowerbird@postgres:5432/bowerbird?sslmode=disable",
-  "sqs_queue_url": "http://localhost:4566/000000000000/bowerbird-local-sqs",
-  "eventbridge_queue_url": "http://localhost:4566/000000000000/bowerbird-local-eventbridge",
-  "event_bus_name": "bowerbird-local-bus",
-  "s3_bucket_name": "bowerbird-local-bucket",
-  "third_party_api_key": "dummy-api-key",
-  "google_client_id": "dummy-google-client-id",
-  "google_client_secret": "dummy-google-client-secret",
-  "microsoft_client_id": "dummy-microsoft-client-id",
-  "microsoft_client_secret": "dummy-microsoft-client-secret"
-}
-EOF
-)
+SECRETS_FILE="/tmp/secrets.json"
+if [ ! -f "$SECRETS_FILE" ]; then
+  echo "Error: archivo requerido no encontrado: $SECRETS_FILE" >&2
+  exit 1
 fi
+
+SECRETS_JSON=$(cat "$SECRETS_FILE")
+echo "Cargando secretos desde $SECRETS_FILE"
 
 awslocal ssm put-parameter \
   --name "$SSM_PARAMETER_NAME" \
