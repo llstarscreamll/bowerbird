@@ -3,3 +3,5 @@ node = "24"
 go = "1.25"
 pnpm = "11.5"
 air = "latest"
+pipx = "latest"
+awscli-local = { version = "0.22.2", extras = "ver1" }
