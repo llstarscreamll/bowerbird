@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
 import { ModalComponent } from '../../../../core/presentation/components/modal/modal.component';
 import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload/file-upload.component';
@@ -8,7 +9,7 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
 @Component({
   selector: 'app-master-invoices',
   standalone: true,
-  imports: [CommonModule, ModalComponent, FileUploadComponent],
+  imports: [CommonModule, ReactiveFormsModule, ModalComponent, FileUploadComponent],
   host: {
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
@@ -55,6 +56,11 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
 
     <app-modal [isOpen]="isImportModalOpen()" title="Importar historico de facturas" [showDefaultFooter]="false" (close)="closeImportModal()">
       <div class="space-y-4">
+        <form [formGroup]="importForm">
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="import-request-id">ID de solicitud</label>
+          <input id="import-request-id" class="input-field mt-1" formControlName="id" readonly />
+        </form>
+
         <app-file-upload
           [accept]="historyImportAccept"
           [items]="uploadQueueItems()"
@@ -85,6 +91,7 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
 })
 export class MasterInvoicesComponent {
   private readonly importStore = inject(InvoiceHistoryImportStore);
+  private readonly formBuilder = inject(FormBuilder);
 
   readonly historyImportAccept = INVOICE_HISTORY_ACCEPT;
   readonly isImportModalOpen = this.importStore.isImportModalOpen;
@@ -92,6 +99,9 @@ export class MasterInvoicesComponent {
   readonly isAnalyzing = this.importStore.analyzing;
   readonly errorMessage = this.importStore.errorMessage;
   readonly queuedFiles = this.importStore.queuedFiles;
+  readonly importForm = this.formBuilder.nonNullable.group({
+    id: ['', [Validators.required, Validators.pattern(/^[0-9A-HJKMNPQRSTVWXYZ]{26}$/)]],
+  });
   readonly uploadQueueItems = computed<FileUploadQueueItem[]>(() =>
     this.queuedFiles().map((queued) => ({
       id: queued.id,
@@ -103,7 +113,12 @@ export class MasterInvoicesComponent {
   );
   readonly canAnalyze = this.importStore.canAnalyze;
 
+  constructor() {
+    this.resetRequestId();
+  }
+
   openImportModal(): void {
+    this.resetRequestId();
     this.importStore.openImportModal();
   }
 
@@ -124,6 +139,49 @@ export class MasterInvoicesComponent {
   }
 
   analyzeFiles(): void {
-    this.importStore.analyzeUploadedFiles();
+    const id = this.importForm.controls.id.value;
+    if (!this.importForm.valid || !id) {
+      return;
+    }
+
+    this.importStore.analyzeUploadedFiles(id);
+  }
+
+  private resetRequestId(): void {
+    this.importForm.patchValue({ id: this.generateUlid() });
+  }
+
+  private generateUlid(): string {
+    const ulidAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+    const timestamp = Date.now();
+    const timePart: string[] = new Array(10);
+
+    let value = timestamp;
+    for (let index = 9; index >= 0; index -= 1) {
+      timePart[index] = ulidAlphabet[value % 32] ?? '0';
+      value = Math.floor(value / 32);
+    }
+
+    const randomBytes = crypto.getRandomValues(new Uint8Array(10));
+    let randomPart = '';
+    let bitBuffer = 0;
+    let bitCount = 0;
+
+    for (const byte of randomBytes) {
+      bitBuffer = (bitBuffer << 8) | byte;
+      bitCount += 8;
+
+      while (bitCount >= 5 && randomPart.length < 16) {
+        bitCount -= 5;
+        const randomIndex = (bitBuffer >> bitCount) & 31;
+        randomPart += ulidAlphabet[randomIndex] ?? '0';
+      }
+
+      if (randomPart.length === 16) {
+        break;
+      }
+    }
+
+    return `${timePart.join('')}${randomPart}`;
   }
 }

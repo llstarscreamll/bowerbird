@@ -15,19 +15,23 @@ type File struct {
 	MimeType string `json:"mime_type"`
 }
 
-type InvoiceExtractionRequested struct {
-	JobID    string `json:"job_id"`
-	Source   string `json:"source"`
-	Files    []File `json:"files"`
-	QueuedAt string `json:"requested_at"`
+type ExtractInvoicesFromFilesJob struct {
+	ID         string `json:"job_id"`
+	SourceName string `json:"source_name"`
+	SourceID   string `json:"source_id"`
+	Files      []File `json:"files"`
+	QueuedAt   string `json:"requested_at"`
 }
 
-func (j InvoiceExtractionRequested) Validate() error {
-	if j.JobID == "" {
+func (j ExtractInvoicesFromFilesJob) Validate() error {
+	if j.ID == "" {
 		return errors.New("job_id is required")
 	}
-	if j.Source == "" {
-		return errors.New("source is required")
+	if j.SourceName == "" {
+		return errors.New("source_name is required")
+	}
+	if j.SourceID == "" {
+		return errors.New("source_id is required")
 	}
 	if len(j.Files) == 0 {
 		return errors.New("files is required")
@@ -36,7 +40,7 @@ func (j InvoiceExtractionRequested) Validate() error {
 	return nil
 }
 
-func MarshalInvoiceExtractionRequested(job InvoiceExtractionRequested) ([]byte, error) {
+func MarshalInvoiceExtractionRequested(job ExtractInvoicesFromFilesJob) ([]byte, error) {
 	if err := job.Validate(); err != nil {
 		return nil, err
 	}
@@ -44,14 +48,14 @@ func MarshalInvoiceExtractionRequested(job InvoiceExtractionRequested) ([]byte, 
 	return json.Marshal(job)
 }
 
-func UnmarshalInvoiceExtractionRequested(data []byte) (InvoiceExtractionRequested, error) {
-	var job InvoiceExtractionRequested
+func UnmarshalInvoiceExtractionRequested(data []byte) (ExtractInvoicesFromFilesJob, error) {
+	var job ExtractInvoicesFromFilesJob
 	if err := json.Unmarshal(data, &job); err != nil {
-		return InvoiceExtractionRequested{}, err
+		return ExtractInvoicesFromFilesJob{}, err
 	}
 
 	if err := job.Validate(); err != nil {
-		return InvoiceExtractionRequested{}, err
+		return ExtractInvoicesFromFilesJob{}, err
 	}
 
 	return job, nil

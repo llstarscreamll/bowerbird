@@ -39,7 +39,7 @@ services:
     volumes:
       - localstack_data:/var/lib/localstack
       - ./apps/backend/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
-      - ./apps/backend/secrets.json:/tmp/local-secrets.json:ro
+      - ./apps/backend/secrets.json:/tmp/secrets.json:ro
 
   caddy:
     image: caddy:2-alpine

@@ -49,11 +49,12 @@ func (cmd *CreateInvoicesFromInboxMessageCommand) Execute(ctx context.Context, e
 		return nil
 	}
 
-	job := contractJobs.InvoiceExtractionRequested{
-		JobID:    cmd.newID(),
-		Source:   "inbox-message",
-		Files:    mapAttachmentRefs(event.AttachmentRefs),
-		QueuedAt: cmd.now().UTC().Format(time.RFC3339Nano),
+	job := contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         cmd.newID(),
+		SourceName: "inbox-message",
+		SourceID:   event.MessageInternalID,
+		Files:      mapAttachmentRefs(event.AttachmentRefs),
+		QueuedAt:   cmd.now().UTC().Format(time.RFC3339Nano),
 	}
 
 	payload, err := contractJobs.MarshalInvoiceExtractionRequested(job)
@@ -87,9 +88,10 @@ func mapAttachmentRefs(refs []contractEvents.AttachmentRef) []contractJobs.File 
 }
 
 type CreateInvoiceInput struct {
-	SourceMessageID  string
+	SourceName       string
+	SourceID         string
 	ExtractionSource string
-	DocumentRefS3Key string
+	StorageKey       string
 	Invoice          *domain.InvoiceDocument
 }
 
@@ -122,14 +124,15 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 
 	now := cmd.now().UTC()
 	headerID := cmd.newID()
-	headerRawData := input.Invoice.RawData
-	if len(headerRawData) == 0 {
-		headerRawData = []byte("{}")
+	headerRawData, err := normalizeInvoiceRawData(input.Invoice.RawData)
+	if err != nil {
+		return nil, fmt.Errorf("normalize invoice raw data: %w", err)
 	}
 
 	header := domain.InvoiceHeaderRecord{
 		ID:               headerID,
-		SourceMessageID:  input.SourceMessageID,
+		SourceName:       input.SourceName,
+		SourceID:         input.SourceID,
 		CUFE:             input.Invoice.CUFE,
 		InvoiceNumber:    input.Invoice.InvoiceID,
 		IssuerName:       input.Invoice.Issuer.Name,
@@ -142,7 +145,7 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 		Subtotal:         input.Invoice.LineExtension,
 		TaxTotal:         input.Invoice.TaxAmountTotal(),
 		GrandTotal:       input.Invoice.PayableAmount,
-		DocumentRefS3Key: input.DocumentRefS3Key,
+		DocumentRefS3Key: input.StorageKey,
 		ExtractionSource: input.ExtractionSource,
 		RawData:          headerRawData,
 		CreatedAt:        now,
@@ -182,6 +185,22 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 	cmd.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
 
 	return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil
+}
+
+func normalizeInvoiceRawData(raw []byte) ([]byte, error) {
+	if len(raw) == 0 {
+		return []byte("{}"), nil
+	}
+	if json.Valid(raw) {
+		return raw, nil
+	}
+
+	normalized, err := json.Marshal(string(raw))
+	if err != nil {
+		return nil, err
+	}
+
+	return normalized, nil
 }
 
 func hasSupportedAttachment(refs []contractEvents.AttachmentRef) bool {

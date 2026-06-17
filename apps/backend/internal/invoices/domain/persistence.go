@@ -6,7 +6,8 @@ import (
 
 type InvoiceHeaderRecord struct {
 	ID               string
-	SourceMessageID  string
+	SourceName       string
+	SourceID         string
 	CUFE             string
 	InvoiceNumber    string
 	IssuerName       string

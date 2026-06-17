@@ -4,6 +4,18 @@ export interface InvoiceHistoryAnalyzeFileReference {
   url: string;
 }
 
+export interface QueueInvoiceExtractionFile {
+  name: string;
+  path: string;
+  mime_type: string;
+}
+
 export interface StartInvoiceHistoryAnalysisRequest {
-  files: InvoiceHistoryAnalyzeFileReference[];
+  data: {
+    id: string;
+    type: 'queue-invoice-extraction';
+    attributes: {
+      files: QueueInvoiceExtractionFile[];
+    };
+  };
 }

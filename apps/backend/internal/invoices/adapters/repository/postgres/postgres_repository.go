@@ -17,16 +17,16 @@ func NewRepository(registry *database.Registry) *PostgresRepository {
 	return &PostgresRepository{registry: registry}
 }
 
-func (r *PostgresRepository) ExistsInvoiceBySourceMessageID(ctx context.Context, sourceMessageID string) (bool, error) {
+func (r *PostgresRepository) ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get tenant db pool: %w", err)
 	}
 
 	var exists bool
-	err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM invoice_headers WHERE source_message_id = $1)`, sourceMessageID).Scan(&exists)
+	err = pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM invoice_headers WHERE source_name = $1 AND source_id = $2)`, sourceName, sourceID).Scan(&exists)
 	if err != nil {
-		return false, fmt.Errorf("check invoice by source message id: %w", err)
+		return false, fmt.Errorf("check invoice by source: %w", err)
 	}
 
 	return exists, nil
@@ -66,19 +66,20 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO invoice_headers (
-			id, source_message_id, cufe, invoice_number, issuer_name, issuer_tax_id,
-			receiver_name, receiver_tax_id, currency_code, issue_date, due_date,
-			payment_code, subtotal, tax_total, grand_total, document_ref_s3_key,
-			extraction_source, raw_data, created_at, updated_at
+			id, source_name, source_id, cufe, invoice_number, issuer_name,
+			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
+			due_date, payment_code, subtotal, tax_total, grand_total,
+			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10, $11,
 			$12, $13, $14, $15, $16,
-			$17, $18, $19, $20
+			$17, $18, $19, $20, $21
 		)
 	`,
 		header.ID,
-		header.SourceMessageID,
+		header.SourceName,
+		header.SourceID,
 		header.CUFE,
 		header.InvoiceNumber,
 		header.IssuerName,

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path"
 	"strings"
+
+	"github.com/bowerbird/internal/platform/id"
 )
 
 const queueInvoiceExtractionDataType = "queue-invoice-extraction"
@@ -19,6 +21,14 @@ type jsonApiRequestDocument[T requestAttributes] struct {
 func (r *jsonApiRequestDocument[T]) Validate(expectedDataType string) error {
 	if strings.TrimSpace(r.Data.Type) != expectedDataType {
 		return fmt.Errorf("data.type must be %s", expectedDataType)
+	}
+
+	if strings.TrimSpace(r.Data.ID) == "" {
+		return fmt.Errorf("data.id is required")
+	}
+
+	if !id.IsValidULID(r.Data.ID) {
+		return fmt.Errorf("data.id must be a valid ULID")
 	}
 
 	if err := r.Data.Attributes.Validate(); err != nil {

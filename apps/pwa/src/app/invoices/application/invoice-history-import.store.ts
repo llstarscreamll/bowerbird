@@ -123,7 +123,7 @@ export class InvoiceHistoryImportStore {
     }
 
     if (this.queuedFiles().length === 0) {
-      this.errorMessage.set('Selecciona archivos XML, PDF o ZIP para importar el historico.');
+      this.errorMessage.set('Selecciona archivos XML, PDF o ZIP para importar el histórico.');
       return;
     }
 
@@ -215,7 +215,7 @@ export class InvoiceHistoryImportStore {
     }
   }
 
-  analyzeUploadedFiles(): void {
+  analyzeUploadedFiles(id: string): void {
     if (!this.canAnalyze()) {
       return;
     }
@@ -224,17 +224,17 @@ export class InvoiceHistoryImportStore {
     this.errorMessage.set('');
 
     this.invoiceHistoryHttp
-      .startAnalysis(this.uploadedFiles())
+      .startAnalysis(id, this.uploadedFiles())
       .pipe(finalize(() => this.analyzing.set(false)))
       .subscribe({
         next: () => {
-          this.toast.showSuccess('Listo. Iniciamos el analisis en segundo plano y te avisaremos cuando termine.');
+          this.toast.showSuccess('Listo. Iniciamos el análisis en segundo plano y te avisaremos cuando termine.');
           this.isImportModalOpen.set(false);
           this.resetState();
         },
         error: () => {
-          this.errorMessage.set('No fue posible iniciar el analisis del historico. Intenta nuevamente.');
-          this.toast.showError('No fue posible iniciar el analisis en este momento.');
+          this.errorMessage.set('No fue posible iniciar el análisis del histórico. Intenta nuevamente.');
+          this.toast.showError('No fue posible iniciar el análisis en este momento.');
         },
       });
   }
@@ -325,7 +325,7 @@ export class InvoiceHistoryImportStore {
       this.toast.showSuccess(`Se subieron ${uploadedCount} archivo(s) correctamente.`);
     }
     if (failedCount > 0) {
-      this.errorMessage.set('Algunos archivos no se pudieron subir. Eliminalos y vuelve a intentarlo.');
+      this.errorMessage.set('Algunos archivos no se pudieron subir. Elimínalos y vuelve a intentarlo.');
       this.toast.showWarning(`No se pudieron subir ${failedCount} archivo(s).`);
     }
 

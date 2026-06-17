@@ -13,7 +13,7 @@ type Application struct {
 type Commands struct {
 	CreateInvoicesFromInboxMessage  *commands.CreateInvoicesFromInboxMessageCommand
 	QueueInvoiceExtractionFromFiles *commands.QueueInvoiceExtractionFromFilesCommand
-	ProcessInvoiceExtractionJob     *commands.ProcessInvoiceExtractionJobCommand
+	ProcessInvoiceExtractionJob     *commands.CreateInvoicesFromFilesCommand
 	CreateInvoice                   *commands.CreateInvoiceCommand
 }
 

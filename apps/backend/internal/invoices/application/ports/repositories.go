@@ -12,6 +12,6 @@ type InvoiceWriteRepository interface {
 
 type InvoiceRepository interface {
 	InvoiceWriteRepository
-	ExistsInvoiceBySourceMessageID(ctx context.Context, sourceMessageID string) (bool, error)
+	ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error)
 	ExistsInvoiceByCUFE(ctx context.Context, cufe string) (bool, error)
 }

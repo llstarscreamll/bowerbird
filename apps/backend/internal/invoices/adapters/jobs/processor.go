@@ -5,6 +5,6 @@ import (
 	commands "github.com/bowerbird/internal/invoices/application/commands"
 )
 
-func NewInvoiceExtractionRequestedProcessor(command *commands.ProcessInvoiceExtractionJobCommand) *handlers.ProcessInvoiceExtractionRequested {
-	return handlers.NewProcessInvoiceExtractionRequested(command)
+func NewInvoiceExtractionRequestedProcessor(command *commands.CreateInvoicesFromFilesCommand) *handlers.ProcessInvoiceExtractionFromFiles {
+	return handlers.NewProcessInvoiceExtractionFromFiles(command)
 }

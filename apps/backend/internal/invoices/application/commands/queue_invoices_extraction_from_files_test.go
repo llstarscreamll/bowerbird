@@ -42,9 +42,10 @@ func TestQueueInvoiceExtractionFromUploadedFilesCommandQueuesJob(t *testing.T) {
 	require.Len(t, publisher.jobs, 1)
 	assert.Equal(t, contractJobs.InvoiceExtractionRequestedType, publisher.jobs[0].Type)
 
-	var queued contractJobs.InvoiceExtractionRequested
+	var queued contractJobs.ExtractInvoicesFromFilesJob
 	require.NoError(t, json.Unmarshal(publisher.jobs[0].Payload, &queued))
-	assert.Equal(t, "files-uploaded-by-user", queued.Source)
+	assert.Equal(t, "files-uploaded-by-user", queued.SourceName)
+	assert.Equal(t, "evt_123", queued.SourceID)
 	require.Len(t, queued.Files, 2)
 	assert.Equal(t, "PDF", queued.Files[0].MimeType)
 }

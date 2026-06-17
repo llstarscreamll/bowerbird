@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -18,7 +20,7 @@ type fakeInvoiceRepo struct {
 	persistedHeaders []domain.InvoiceHeaderRecord
 }
 
-func (r *fakeInvoiceRepo) ExistsInvoiceBySourceMessageID(ctx context.Context, sourceMessageID string) (bool, error) {
+func (r *fakeInvoiceRepo) ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error) {
 	return r.messageProcessed, nil
 }
 
@@ -93,49 +95,29 @@ func (e *fakeLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (
 }
 
 func TestExtractSkipsWhenMessageAlreadyProcessed(t *testing.T) {
-	store := &fakeExtractFileStore{data: map[string][]byte{"k1": []byte("<Invoice></Invoice>")}}
+	store := &fakeExtractFileStore{data: map[string][]byte{"k1": []byte("zipdata")}}
 	xmlExtractor := &fakeXMLExtractor{}
 	llmExtractor := &fakeLLMExtractor{}
 	repo := &fakeInvoiceRepo{messageProcessed: true}
 
-	uc := NewProcessInvoiceExtractionJobCommand(store, xmlExtractor, llmExtractor, repo)
-	res, err := uc.Execute(context.Background(), contractJobs.InvoiceExtractionRequested{
-		JobID:  "job-1",
-		Source: "msg-1",
-		Files: []contractJobs.File{
-			{Path: "k1", Filename: "inv.xml"},
-		},
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
+	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "inbox-message",
+		SourceID:   "msg-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, ProcessInvoiceExtractionJobStatusSkipped, res.Status)
-	assert.Equal(t, SkipReasonMessageAlreadyProcessed, res.SkipReason)
 	assert.Equal(t, 0, xmlExtractor.called)
 	assert.Equal(t, 0, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 0)
 }
 
-func TestExtractUsesXMLFirstAndSkipsWhenCUFEExists(t *testing.T) {
-	store := &fakeExtractFileStore{data: map[string][]byte{"k1": []byte("<Invoice></Invoice>")}}
-	xmlExtractor := &fakeXMLExtractor{invoice: &domain.InvoiceDocument{CUFE: "CUFE-1"}}
-	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{CUFE: "LLM-CUFE"}}
-	repo := &fakeInvoiceRepo{cufeExists: true}
-
-	uc := NewProcessInvoiceExtractionJobCommand(store, xmlExtractor, llmExtractor, repo)
-	res, err := uc.Execute(context.Background(), contractJobs.InvoiceExtractionRequested{
-		JobID:  "job-1",
-		Source: "msg-1",
-		Files: []contractJobs.File{
-			{Path: "k1", Filename: "inv.xml"},
-		},
+func TestExtractProcessesZIPPDFAndPersistsInvoice(t *testing.T) {
+	archive := makeTestZip(t, map[string][]byte{
+		"inv.pdf": []byte("%PDF-1.4 file"),
 	})
-	require.NoError(t, err)
-	assert.Equal(t, ProcessInvoiceExtractionJobStatusSkipped, res.Status)
-	assert.Equal(t, SkipReasonCUFEAlreadyExists, res.SkipReason)
-	assert.Equal(t, 1, xmlExtractor.called)
-	assert.Equal(t, 0, llmExtractor.called)
-}
-
-func TestExtractFallsBackToLLMAndReturnsReady(t *testing.T) {
-	store := &fakeExtractFileStore{data: map[string][]byte{"k1": []byte("%PDF-1.4 file")}}
+	store := &fakeExtractFileStore{data: map[string][]byte{"k1": archive}}
 	xmlExtractor := &fakeXMLExtractor{}
 	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{
 		CUFE:          "CUFE-LLM",
@@ -148,19 +130,84 @@ func TestExtractFallsBackToLLMAndReturnsReady(t *testing.T) {
 	}}
 	repo := &fakeInvoiceRepo{}
 
-	uc := NewProcessInvoiceExtractionJobCommand(store, xmlExtractor, llmExtractor, repo)
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	uc.create.newID = func() string { return "id_1" }
-	res, err := uc.Execute(context.Background(), contractJobs.InvoiceExtractionRequested{
-		JobID:  "job-1",
-		Source: "msg-1",
-		Files: []contractJobs.File{
-			{Path: "k1", Filename: "inv.pdf"},
-		},
+	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, ProcessInvoiceExtractionJobStatusReady, res.Status)
-	assert.Equal(t, "llm", res.Source)
-	require.NotNil(t, res.Invoice)
+	assert.Equal(t, 0, xmlExtractor.called)
 	assert.Equal(t, 1, llmExtractor.called)
 	assert.Len(t, repo.persistedHeaders, 1)
+}
+
+func TestExtractSkipsWhenZIPHasNoSupportedFiles(t *testing.T) {
+	archive := makeTestZip(t, map[string][]byte{"ignored.txt": []byte("notes")})
+	store := &fakeExtractFileStore{data: map[string][]byte{"k1": archive}}
+	xmlExtractor := &fakeXMLExtractor{}
+	llmExtractor := &fakeLLMExtractor{}
+	repo := &fakeInvoiceRepo{}
+
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
+	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-2",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, xmlExtractor.called)
+	assert.Equal(t, 0, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 0)
+}
+
+func TestExtractSkipsWhenCUFEAlreadyExists(t *testing.T) {
+	archive := makeTestZip(t, map[string][]byte{"inv.pdf": []byte("%PDF-1.4 file")})
+	store := &fakeExtractFileStore{data: map[string][]byte{"k1": archive}}
+	xmlExtractor := &fakeXMLExtractor{}
+	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{
+		CUFE:          "CUFE-LLM",
+		InvoiceID:     "INV-1",
+		Issuer:        domain.Party{Name: "Issuer", CompanyID: "123"},
+		Receiver:      domain.Party{Name: "Receiver", CompanyID: "456"},
+		Lines:         []domain.InvoiceLine{{LineID: "1", ItemDescription: "x", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
+		CurrencyCode:  "COP",
+		PayableAmount: 10,
+	}}
+	repo := &fakeInvoiceRepo{cufeExists: true}
+
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
+	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-3",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 0)
+}
+
+func makeTestZip(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	for name, data := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create zip file: %v", err)
+		}
+		if _, err := w.Write(data); err != nil {
+			t.Fatalf("write zip file: %v", err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+
+	return buf.Bytes()
 }

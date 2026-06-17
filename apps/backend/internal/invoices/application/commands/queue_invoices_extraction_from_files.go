@@ -16,6 +16,7 @@ type File struct {
 }
 
 type QueueInvoiceExtractionFromFilesInput struct {
+	ID    string
 	Files []File
 }
 
@@ -52,12 +53,12 @@ func (cmd *QueueInvoiceExtractionFromFilesCommand) Execute(ctx context.Context, 
 		})
 	}
 
-	jobID := cmd.newID()
-	job := contractJobs.InvoiceExtractionRequested{
-		JobID:    jobID,
-		Source:   "files-uploaded-by-user",
-		Files:    files,
-		QueuedAt: cmd.now().UTC().Format(time.RFC3339Nano),
+	job := contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         input.ID,
+		SourceName: "files-uploaded-by-user",
+		SourceID:   input.ID,
+		Files:      files,
+		QueuedAt:   cmd.now().UTC().Format(time.RFC3339Nano),
 	}
 
 	payload, err := contractJobs.MarshalInvoiceExtractionRequested(job)
@@ -74,7 +75,7 @@ func (cmd *QueueInvoiceExtractionFromFilesCommand) Execute(ctx context.Context, 
 	}
 
 	return &QueueInvoiceExtractionFromFilesResult{
-		JobID:            jobID,
+		JobID:            job.ID,
 		QueuedFilesCount: len(files),
 	}, nil
 }

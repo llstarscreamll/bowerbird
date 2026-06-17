@@ -14,8 +14,6 @@ import (
 	"github.com/bowerbird/internal/invoices/domain"
 )
 
-const defaultGeminiEndpoint = "https://generativelanguage.googleapis.com"
-
 type GeminiExtractor struct {
 	apiKey     string
 	model      string
@@ -32,18 +30,24 @@ type GeminiExtractorConfig struct {
 
 func NewGeminiExtractor(cfg GeminiExtractorConfig) (*GeminiExtractor, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
-		return nil, fmt.Errorf("gemini api key is required")
+		panic("gemini api key is required")
 	}
+
+	if cfg.Model == "" {
+		panic("gemini model is required")
+	}
+
+	if cfg.Endpoint == "" {
+		panic("gemini endpoint is required")
+	}
+
+	fmt.Println("cfg.APIKey", cfg.APIKey)
+	fmt.Println("cfg.Model", cfg.Model)
+	fmt.Println("cfg.Endpoint", cfg.Endpoint)
 
 	model := strings.TrimSpace(cfg.Model)
-	if model == "" {
-		model = "gemini-2.0-flash"
-	}
-
+	apiKey := strings.TrimSpace(cfg.APIKey)
 	endpoint := strings.TrimSpace(cfg.Endpoint)
-	if endpoint == "" {
-		endpoint = defaultGeminiEndpoint
-	}
 
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
@@ -51,7 +55,7 @@ func NewGeminiExtractor(cfg GeminiExtractorConfig) (*GeminiExtractor, error) {
 	}
 
 	return &GeminiExtractor{
-		apiKey:     cfg.APIKey,
+		apiKey:     apiKey,
 		model:      model,
 		endpoint:   strings.TrimRight(endpoint, "/"),
 		httpClient: httpClient,
@@ -66,7 +70,7 @@ func (e *GeminiExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (*
 	body, err := json.Marshal(geminiRequest{
 		Contents: []geminiContent{{
 			Parts: []geminiPart{
-				{Text: geminiPrompt},
+				{Text: prompt},
 				{InlineData: &geminiInlineData{MimeType: "application/pdf", Data: base64.StdEncoding.EncodeToString(pdfData)}},
 			},
 		}},
@@ -351,6 +355,6 @@ var geminiResponseSchema = map[string]any{
 	},
 }
 
-const geminiPrompt = `Eres un extractor de facturas electronicas colombianas. Analiza el PDF y responde SOLO JSON estricto siguiendo el schema. Incluye CUFE/UUID, emisor, receptor, codigos de pago, impuestos y lineas de detalle.`
+const prompt = `Eres un extractor de facturas electrónicas colombianas. Analiza el PDF y responde SOLO JSON estricto siguiendo el schema. Incluye CUFE/UUID, emisor, receptor, códigos de pago, impuestos y lineas de detalle.`
 
 var _ ports.InvoiceLLMExtractor = (*GeminiExtractor)(nil)

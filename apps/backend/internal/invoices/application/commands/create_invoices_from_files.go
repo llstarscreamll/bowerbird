@@ -1,0 +1,289 @@
+package commands
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"fmt"
+	"log/slog"
+	"path/filepath"
+	"strings"
+
+	"github.com/bowerbird/internal/invoices/application/ports"
+	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
+	"github.com/bowerbird/internal/invoices/domain"
+	platformStorage "github.com/bowerbird/internal/platform/storage"
+)
+
+type CreateInvoicesFromFilesCommand struct {
+	fileStore    platformStorage.FileStore
+	xmlExtractor ports.InvoiceXMLExtractor
+	llmExtractor ports.InvoiceLLMExtractor
+	repo         ports.InvoiceRepository
+	create       *CreateInvoiceCommand
+	logger       *slog.Logger
+}
+
+func NewCreateInvoicesFromFilesCommand(
+	fileStore platformStorage.FileStore,
+	xmlExtractor ports.InvoiceXMLExtractor,
+	llmExtractor ports.InvoiceLLMExtractor,
+	repo ports.InvoiceRepository,
+) *CreateInvoicesFromFilesCommand {
+	if fileStore == nil {
+		panic("file store is required")
+	}
+	if xmlExtractor == nil {
+		panic("xml extractor is required")
+	}
+	if llmExtractor == nil {
+		panic("llm extractor is required")
+	}
+	if repo == nil {
+		panic("invoice repository is required")
+	}
+
+	return &CreateInvoicesFromFilesCommand{
+		fileStore:    fileStore,
+		xmlExtractor: xmlExtractor,
+		llmExtractor: llmExtractor,
+		repo:         repo,
+		create:       NewCreateInvoiceCommand(repo),
+		logger:       slog.Default(),
+	}
+}
+
+func (cmd *CreateInvoicesFromFilesCommand) Execute(ctx context.Context, input contractJobs.ExtractInvoicesFromFilesJob) error {
+	alreadyProcessed, err := cmd.repo.ExistsBySource(ctx, input.SourceName, input.SourceID)
+	if err != nil {
+		return fmt.Errorf("check invoice by source: %w", err)
+	}
+	if alreadyProcessed {
+		cmd.logger.Info("invoice extraction skipped by source", "source_name", input.SourceName, "source_id", input.SourceID)
+		return nil
+	}
+
+	supportedFiles := make([]contractJobs.File, 0)
+	for _, file := range input.Files {
+		if file.MimeType == "application/zip" {
+			supportedFiles = append(supportedFiles, file)
+		}
+	}
+
+	if len(supportedFiles) == 0 {
+		return nil
+	}
+
+	downloadedFiles, err := cmd.downloadFiles(ctx, supportedFiles)
+	if err != nil {
+		return err
+	}
+
+	if len(downloadedFiles) == 0 {
+		return nil
+	}
+
+	for _, file := range downloadedFiles {
+		files := make([]extractedDocument, 0)
+
+		if file.Kind == documentKindZIP {
+			extractedFiles, err := extractSupportedFromZIP(file.S3Key, file.Data)
+			if err != nil {
+				cmd.logger.Warn("failed to extract files from zip", "filename", file.Filename, "error", err)
+				continue
+			}
+
+			if len(extractedFiles) == 0 {
+				cmd.logger.Warn("no supported files found in zip", "filename", file.Filename)
+				continue
+			}
+
+			files = append(files, extractedFiles...)
+		} else {
+			files = append(files, file)
+		}
+
+		sortedFiles := sortFiles(files)
+
+		for _, xmlOrPdf := range sortedFiles {
+			invoice, extractionSource, storageKey, err := cmd.extractInvoiceDocument(ctx, xmlOrPdf)
+			if err != nil {
+				cmd.logger.Warn("invoice extraction failed for document", "filename", xmlOrPdf.Filename, "kind", xmlOrPdf.Kind, "error", err)
+				continue
+			}
+			if invoice == nil {
+				continue
+			}
+
+			duplicated, err := cmd.repo.ExistsInvoiceByCUFE(ctx, invoice.CUFE)
+			if err != nil {
+				return fmt.Errorf("check invoice by cufe: %w", err)
+			}
+			if duplicated {
+				cmd.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
+				continue
+			}
+
+			persisted, err := cmd.create.Execute(ctx, CreateInvoiceInput{
+				SourceName:       input.SourceName,
+				SourceID:         input.SourceID,
+				ExtractionSource: extractionSource,
+				StorageKey:       storageKey,
+				Invoice:          invoice,
+			})
+			if err != nil {
+				return fmt.Errorf("persist invoice: %w", err)
+			}
+
+			cmd.logger.Info("invoice extracted and persisted", "source", extractionSource, "cufe", invoice.CUFE, "header_id", persisted.HeaderID)
+		}
+	}
+
+	return nil
+}
+
+func sortFiles(files []extractedDocument) []extractedDocument {
+	ordered := make([]extractedDocument, 0, len(files))
+
+	for _, file := range files {
+		if file.Kind == documentKindXML {
+			ordered = append(ordered, file)
+		}
+	}
+
+	for _, file := range files {
+		if file.Kind == documentKindPDF {
+			ordered = append(ordered, file)
+		}
+	}
+
+	return ordered
+}
+
+type documentKind string
+
+const (
+	documentKindZIP   documentKind = "zip"
+	documentKindXML   documentKind = "xml"
+	documentKindPDF   documentKind = "pdf"
+	documentKindOther documentKind = "other"
+)
+
+type extractedDocument struct {
+	Filename string
+	S3Key    string
+	Kind     documentKind
+	Data     []byte
+}
+
+func (cmd *CreateInvoicesFromFilesCommand) downloadFiles(ctx context.Context, refs []contractJobs.File) ([]extractedDocument, error) {
+	documents := make([]extractedDocument, 0, len(refs))
+	for _, ref := range refs {
+		if ref.Path == "" {
+			continue
+		}
+
+		data, err := cmd.fileStore.ReadFile(ctx, platformStorage.ReadFileInput{Path: ref.Path})
+		if err != nil {
+			return nil, fmt.Errorf("read attachment from key %s: %w", ref.Path, err)
+		}
+		kind := detectDocumentKind(ref.Filename, data)
+		if kind == documentKindXML || kind == documentKindPDF || kind == documentKindZIP {
+			documents = append(documents, extractedDocument{Filename: ref.Filename, S3Key: ref.Path, Kind: kind, Data: data})
+			continue
+		}
+	}
+
+	return documents, nil
+}
+
+func extractSupportedFromZIP(s3Key string, data []byte) ([]extractedDocument, error) {
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]extractedDocument, 0, len(reader.File))
+	for _, f := range reader.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
+		contentReader, err := f.Open()
+		if err != nil {
+			return nil, err
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err := buf.ReadFrom(contentReader); err != nil {
+			_ = contentReader.Close()
+			return nil, err
+		}
+		_ = contentReader.Close()
+
+		name := filepath.Base(f.Name)
+		kind := detectDocumentKind(name, buf.Bytes())
+		if kind != documentKindXML && kind != documentKindPDF {
+			continue
+		}
+
+		files = append(files, extractedDocument{
+			Filename: name,
+			S3Key:    s3Key,
+			Kind:     kind,
+			Data:     buf.Bytes(),
+		})
+	}
+
+	return files, nil
+}
+
+func detectDocumentKind(filename string, data []byte) documentKind {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".zip":
+		return documentKindZIP
+	case ".xml":
+		return documentKindXML
+	case ".pdf":
+		return documentKindPDF
+	}
+
+	if len(data) >= 4 {
+		if data[0] == 'P' && data[1] == 'K' {
+			return documentKindZIP
+		}
+		if bytes.HasPrefix(data, []byte("%PDF")) {
+			return documentKindPDF
+		}
+	}
+
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > 0 && trimmed[0] == '<' {
+		return documentKindXML
+	}
+
+	return documentKindOther
+}
+
+func (cmd *CreateInvoicesFromFilesCommand) extractInvoiceDocument(ctx context.Context, document extractedDocument) (*domain.InvoiceDocument, string, string, error) {
+	if document.Kind == documentKindXML {
+		invoice, err := cmd.xmlExtractor.ParseInvoiceXML(document.Data)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("extract invoice from xml: %w", err)
+		}
+
+		return invoice, "xml", document.S3Key, nil
+	}
+
+	if document.Kind == documentKindPDF {
+		invoice, err := cmd.llmExtractor.ExtractFromPDF(ctx, document.Data)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("extract invoice from pdf with llm: %w", err)
+		}
+
+		return invoice, "llm", document.S3Key, nil
+	}
+
+	return nil, "", "", nil
+}

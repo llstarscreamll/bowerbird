@@ -2,9 +2,12 @@ package v1
 
 import "testing"
 
+const testULID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+
 func TestQueueInvoiceExtractionRequestDocumentValidateSuccess(t *testing.T) {
 	req := queueInvoiceExtractionRequestDocument{
 		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
 			Type: queueInvoiceExtractionDataType,
 			Attributes: queueInvoiceExtractionRequestDataAttrs{
 				Files: []file{
@@ -22,6 +25,7 @@ func TestQueueInvoiceExtractionRequestDocumentValidateSuccess(t *testing.T) {
 func TestQueueInvoiceExtractionRequestDocumentValidateInvalidType(t *testing.T) {
 	req := queueInvoiceExtractionRequestDocument{
 		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
 			Type: queueInvoiceExtractionDataType,
 			Attributes: queueInvoiceExtractionRequestDataAttrs{
 				Files: []file{
@@ -44,6 +48,7 @@ func TestQueueInvoiceExtractionRequestDocumentValidateTooManyFiles(t *testing.T)
 
 	req := queueInvoiceExtractionRequestDocument{
 		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
 			Type: queueInvoiceExtractionDataType,
 			Attributes: queueInvoiceExtractionRequestDataAttrs{
 				Files: files,
@@ -59,6 +64,7 @@ func TestQueueInvoiceExtractionRequestDocumentValidateTooManyFiles(t *testing.T)
 func TestQueueInvoiceExtractionRequestDocumentValidateMimeAndExtensionMismatch(t *testing.T) {
 	req := queueInvoiceExtractionRequestDocument{
 		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
 			Type: queueInvoiceExtractionDataType,
 			Attributes: queueInvoiceExtractionRequestDataAttrs{
 				Files: []file{
@@ -76,6 +82,7 @@ func TestQueueInvoiceExtractionRequestDocumentValidateMimeAndExtensionMismatch(t
 func TestQueueInvoiceExtractionRequestDocumentValidateAcceptsTextXML(t *testing.T) {
 	req := queueInvoiceExtractionRequestDocument{
 		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
 			Type: queueInvoiceExtractionDataType,
 			Attributes: queueInvoiceExtractionRequestDataAttrs{
 				Files: []file{

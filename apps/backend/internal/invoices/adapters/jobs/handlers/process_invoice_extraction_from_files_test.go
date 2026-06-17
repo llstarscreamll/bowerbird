@@ -40,7 +40,7 @@ func (s *processorFileStore) PresignDownload(ctx context.Context, input platform
 
 type processorRepo struct{}
 
-func (r *processorRepo) ExistsInvoiceBySourceMessageID(ctx context.Context, sourceMessageID string) (bool, error) {
+func (r *processorRepo) ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error) {
 	return false, nil
 }
 
@@ -73,12 +73,13 @@ func (e *processorLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []by
 }
 
 func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
-	cmd := invoicingCommands.NewProcessInvoiceExtractionJobCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
-	processor := NewProcessInvoiceExtractionRequested(cmd)
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
+	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
-	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.InvoiceExtractionRequested{
-		JobID:  "job_1",
-		Source: "msg_1",
+	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job_1",
+		SourceName: "inbox-message",
+		SourceID:   "msg_1",
 		Files: []contractJobs.File{
 			{Path: "k1", Filename: "factura.xml"},
 		},
@@ -95,12 +96,13 @@ func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
 }
 
 func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) {
-	cmd := invoicingCommands.NewProcessInvoiceExtractionJobCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
-	processor := NewProcessInvoiceExtractionRequested(cmd)
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
+	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
-	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.InvoiceExtractionRequested{
-		JobID:  "job_1",
-		Source: "msg_1",
+	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job_1",
+		SourceName: "inbox-message",
+		SourceID:   "msg_1",
 		Files: []contractJobs.File{
 			{Path: "k1", Filename: "factura.xml"},
 		},

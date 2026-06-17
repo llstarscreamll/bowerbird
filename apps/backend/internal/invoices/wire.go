@@ -56,7 +56,7 @@ func NewApplication(
 		Commands: application.Commands{
 			CreateInvoicesFromInboxMessage:  commands.NewCreateInvoicesFromInboxMessageCommand(jobQueue),
 			QueueInvoiceExtractionFromFiles: commands.NewQueueInvoiceExtractionFromFilesCommand(jobQueue),
-			ProcessInvoiceExtractionJob: commands.NewProcessInvoiceExtractionJobCommand(
+			ProcessInvoiceExtractionJob: commands.NewCreateInvoicesFromFilesCommand(
 				fileStore,
 				xmlExtractor,
 				llmExtractor,

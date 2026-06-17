@@ -7,13 +7,23 @@ import { InvoiceHistoryAnalyzeFileReference, StartInvoiceHistoryAnalysisRequest 
 @Injectable({ providedIn: 'root' })
 export class InvoiceHistoryHttpService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.apiUrl}/api/v1/invoices/history`;
+  private readonly apiDomain = environment.apiUrl;
 
-  startAnalysis(files: readonly InvoiceHistoryAnalyzeFileReference[]): Observable<void> {
+  startAnalysis(requestId: string, files: readonly InvoiceHistoryAnalyzeFileReference[]): Observable<void> {
     const payload: StartInvoiceHistoryAnalysisRequest = {
-      files: [...files],
+      data: {
+        id: requestId,
+        type: 'queue-invoice-extraction',
+        attributes: {
+          files: files.map((file) => ({
+            name: file.name,
+            path: file.url,
+            mime_type: file.type,
+          })),
+        },
+      },
     };
 
-    return this.http.post(`${this.baseUrl}/analyze`, payload, { responseType: 'text' }).pipe(map(() => void 0));
+    return this.http.post(`${this.apiDomain}/api/v1/invoicing/extractions`, payload, { responseType: 'text' }).pipe(map(() => void 0));
   }
 }
