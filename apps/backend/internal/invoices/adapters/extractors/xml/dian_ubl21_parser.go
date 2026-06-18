@@ -42,6 +42,7 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 	for _, line := range invoice.InvoiceLines {
 		mapped := domain.InvoiceLine{
 			LineID:          strings.TrimSpace(line.ID.Value),
+			ItemCode:        firstNonEmpty(line.Item.StandardItemIdentification.ID.Value, line.Item.SellersItemIdentification.ID.Value),
 			ItemDescription: firstNonEmpty(firstNonEmpty(line.Item.Descriptions...), strings.TrimSpace(line.Item.Name)),
 			Quantity:        parseFloat(line.InvoicedQuantity.Value),
 			UnitCode:        strings.TrimSpace(line.InvoicedQuantity.UnitCode),

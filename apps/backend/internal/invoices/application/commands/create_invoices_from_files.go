@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
@@ -63,9 +64,10 @@ func (cmd *CreateInvoicesFromFilesCommand) Execute(ctx context.Context, input co
 		return nil
 	}
 
+	supportedMimeTypes := []string{"application/zip", "application/xml", "application/pdf", "text/xml", "text/pdf", "application/x-zip-compressed", "multipart/x-zip"}
 	supportedFiles := make([]contractJobs.File, 0)
 	for _, file := range input.Files {
-		if file.MimeType == "application/zip" {
+		if slices.Contains(supportedMimeTypes, file.MimeType) {
 			supportedFiles = append(supportedFiles, file)
 		}
 	}

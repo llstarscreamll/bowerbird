@@ -5,28 +5,48 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/domain"
 )
 
 type GeminiExtractor struct {
-	apiKey     string
-	model      string
-	endpoint   string
-	httpClient *http.Client
+	apiKey      string
+	model       string
+	endpoint    string
+	httpClient  *http.Client
+	maxAttempts int
+	baseBackoff time.Duration
+	maxBackoff  time.Duration
+	sleep       func(context.Context, time.Duration) error
+	logger      *slog.Logger
 }
 
 type GeminiExtractorConfig struct {
-	APIKey     string
-	Model      string
-	Endpoint   string
-	HTTPClient *http.Client
+	APIKey      string
+	Model       string
+	Endpoint    string
+	HTTPClient  *http.Client
+	MaxAttempts int
+	BaseBackoff time.Duration
+	MaxBackoff  time.Duration
+	Sleep       func(context.Context, time.Duration) error
+	Logger      *slog.Logger
 }
+
+const (
+	defaultMaxAttempts = 3
+	defaultBaseBackoff = 1 * time.Second
+	defaultMaxBackoff  = 8 * time.Second
+)
 
 func NewGeminiExtractor(cfg GeminiExtractorConfig) (*GeminiExtractor, error) {
 	if strings.TrimSpace(cfg.APIKey) == "" {
@@ -41,10 +61,6 @@ func NewGeminiExtractor(cfg GeminiExtractorConfig) (*GeminiExtractor, error) {
 		panic("gemini endpoint is required")
 	}
 
-	fmt.Println("cfg.APIKey", cfg.APIKey)
-	fmt.Println("cfg.Model", cfg.Model)
-	fmt.Println("cfg.Endpoint", cfg.Endpoint)
-
 	model := strings.TrimSpace(cfg.Model)
 	apiKey := strings.TrimSpace(cfg.APIKey)
 	endpoint := strings.TrimSpace(cfg.Endpoint)
@@ -54,11 +70,41 @@ func NewGeminiExtractor(cfg GeminiExtractorConfig) (*GeminiExtractor, error) {
 		httpClient = http.DefaultClient
 	}
 
+	maxAttempts := cfg.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = defaultMaxAttempts
+	}
+
+	baseBackoff := cfg.BaseBackoff
+	if baseBackoff <= 0 {
+		baseBackoff = defaultBaseBackoff
+	}
+
+	maxBackoff := cfg.MaxBackoff
+	if maxBackoff <= 0 {
+		maxBackoff = defaultMaxBackoff
+	}
+
+	sleep := cfg.Sleep
+	if sleep == nil {
+		sleep = sleepWithContext
+	}
+
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &GeminiExtractor{
-		apiKey:     apiKey,
-		model:      model,
-		endpoint:   strings.TrimRight(endpoint, "/"),
-		httpClient: httpClient,
+		apiKey:      apiKey,
+		model:       model,
+		endpoint:    strings.TrimRight(endpoint, "/"),
+		httpClient:  httpClient,
+		maxAttempts: maxAttempts,
+		baseBackoff: baseBackoff,
+		maxBackoff:  maxBackoff,
+		sleep:       sleep,
+		logger:      logger,
 	}, nil
 }
 
@@ -85,25 +131,61 @@ func (e *GeminiExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (*
 	}
 
 	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", e.endpoint, e.model, e.apiKey)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("build gemini request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("gemini request failed: %w", err)
-	}
-	defer resp.Body.Close()
+	var respData []byte
+	var statusCode int
 
-	respData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read gemini response: %w", err)
+	for attempt := 1; attempt <= e.maxAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("build gemini request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, reqErr := e.httpClient.Do(req)
+		if reqErr != nil {
+			if !isRetryableRequestError(reqErr) || attempt == e.maxAttempts {
+				return nil, fmt.Errorf("gemini request failed: %w", reqErr)
+			}
+
+			delay := e.backoffDuration(attempt)
+			e.logger.Warn("retrying gemini request due to network error", "attempt", attempt, "max_attempts", e.maxAttempts, "delay", delay, "error", reqErr.Error())
+
+			if err := e.sleep(ctx, delay); err != nil {
+				return nil, fmt.Errorf("gemini request failed: %w", reqErr)
+			}
+			continue
+		}
+
+		respData, err = io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read gemini response: %w", err)
+		}
+
+		statusCode = resp.StatusCode
+		if statusCode >= 200 && statusCode < 300 {
+			break
+		}
+
+		if !isRetryableResponse(statusCode, respData) || attempt == e.maxAttempts {
+			return nil, fmt.Errorf("gemini response status=%d body=%s", statusCode, string(respData))
+		}
+
+		delay := retryDelayFromResponse(resp.Header.Get("Retry-After"), respData)
+		if delay <= 0 {
+			delay = e.backoffDuration(attempt)
+		}
+
+		e.logger.Warn("retrying gemini request due to response status", "attempt", attempt, "max_attempts", e.maxAttempts, "delay", delay, "status", statusCode)
+
+		if err := e.sleep(ctx, delay); err != nil {
+			return nil, fmt.Errorf("gemini response status=%d body=%s", statusCode, string(respData))
+		}
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("gemini response status=%d body=%s", resp.StatusCode, string(respData))
+	if statusCode < 200 || statusCode >= 300 {
+		return nil, fmt.Errorf("gemini response status=%d body=%s", statusCode, string(respData))
 	}
 
 	var payload geminiResponse
@@ -139,6 +221,123 @@ func (e *GeminiExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (*
 	return invoice, nil
 }
 
+func (e *GeminiExtractor) backoffDuration(attempt int) time.Duration {
+	if attempt <= 1 {
+		return e.baseBackoff
+	}
+
+	delay := e.baseBackoff << (attempt - 1)
+	if delay > e.maxBackoff {
+		return e.maxBackoff
+	}
+
+	return delay
+}
+
+func isRetryableRequestError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+
+	return true
+}
+
+func isRetryableResponse(statusCode int, body []byte) bool {
+	if statusCode >= 500 {
+		return true
+	}
+
+	if statusCode != http.StatusTooManyRequests {
+		return false
+	}
+
+	bodyText := strings.ToLower(string(body))
+	if strings.Contains(bodyText, "limit: 0") {
+		return false
+	}
+
+	return true
+}
+
+func retryDelayFromResponse(retryAfterHeader string, body []byte) time.Duration {
+	if delay := parseRetryAfterHeader(retryAfterHeader); delay > 0 {
+		return delay
+	}
+
+	return parseRetryDelayFromBody(body)
+}
+
+func parseRetryAfterHeader(header string) time.Duration {
+	retryAfter := strings.TrimSpace(header)
+	if retryAfter == "" {
+		return 0
+	}
+
+	if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second
+	}
+
+	if retryAt, err := http.ParseTime(retryAfter); err == nil {
+		delay := time.Until(retryAt)
+		if delay > 0 {
+			return delay
+		}
+	}
+
+	return 0
+}
+
+func parseRetryDelayFromBody(body []byte) time.Duration {
+	var payload struct {
+		Error struct {
+			Details []struct {
+				Type       string `json:"@type"`
+				RetryDelay string `json:"retryDelay"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0
+	}
+
+	for _, detail := range payload.Error.Details {
+		if detail.Type != "type.googleapis.com/google.rpc.RetryInfo" {
+			continue
+		}
+
+		retryDelay := strings.TrimSpace(detail.RetryDelay)
+		if retryDelay == "" {
+			continue
+		}
+
+		delay, err := time.ParseDuration(retryDelay)
+		if err != nil || delay <= 0 {
+			continue
+		}
+
+		return delay
+	}
+
+	return 0
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -162,6 +361,7 @@ func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 	for _, l := range out.Lines {
 		lines = append(lines, domain.InvoiceLine{
 			LineID:          l.LineID,
+			ItemCode:        l.ItemCode,
 			ItemDescription: l.ItemDescription,
 			Quantity:        l.Quantity,
 			UnitCode:        l.UnitCode,
@@ -284,6 +484,7 @@ type llmInvoiceOutput struct {
 	PayableAmount float64 `json:"payable_amount"`
 	Lines         []struct {
 		LineID          string  `json:"line_id"`
+		ItemCode        string  `json:"item_code"`
 		ItemDescription string  `json:"item_description"`
 		Quantity        float64 `json:"quantity"`
 		UnitCode        string  `json:"unit_code"`
@@ -343,6 +544,7 @@ var geminiResponseSchema = map[string]any{
 				"required": []string{"line_id", "item_description"},
 				"properties": map[string]any{
 					"line_id":          map[string]any{"type": "string"},
+					"item_code":        map[string]any{"type": "string"},
 					"item_description": map[string]any{"type": "string"},
 					"quantity":         map[string]any{"type": "number"},
 					"unit_code":        map[string]any{"type": "string"},

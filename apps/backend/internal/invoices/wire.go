@@ -10,6 +10,7 @@ import (
 	invoicingRepo "github.com/bowerbird/internal/invoices/adapters/repository/postgres"
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
+	"github.com/bowerbird/internal/invoices/application/queries"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
@@ -63,6 +64,10 @@ func NewApplication(
 				invoiceRepository,
 			),
 			CreateInvoice: commands.NewCreateInvoiceCommand(invoiceRepository),
+		},
+		Queries: application.Queries{
+			GetInvoiceByID: queries.NewGetInvoiceByIDQuery(invoiceRepository),
+			ListInvoices:   queries.NewListInvoicesQuery(invoiceRepository),
 		},
 	}
 }

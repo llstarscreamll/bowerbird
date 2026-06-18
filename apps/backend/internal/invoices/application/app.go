@@ -18,5 +18,6 @@ type Commands struct {
 }
 
 type Queries struct {
-	GetInvoiceByID queries.GetInvoiceByIDQuery
+	GetInvoiceByID *queries.GetInvoiceByIDQuery
+	ListInvoices   *queries.ListInvoicesQuery
 }

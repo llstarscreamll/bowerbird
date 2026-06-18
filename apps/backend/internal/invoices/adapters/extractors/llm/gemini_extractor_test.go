@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/bowerbird/internal/invoices/domain"
 )
@@ -67,7 +69,7 @@ func TestGeminiExtractorExtractFromPDFFailsOnMissingCUFE(t *testing.T) {
 	}))
 	defer server.Close()
 
-	extractor, _ := NewGeminiExtractor(GeminiExtractorConfig{APIKey: "test-key", Endpoint: server.URL, HTTPClient: server.Client()})
+	extractor, _ := NewGeminiExtractor(GeminiExtractorConfig{APIKey: "test-key", Model: "gemini-test", Endpoint: server.URL, HTTPClient: server.Client()})
 	_, err := extractor.ExtractFromPDF(context.Background(), []byte("%PDF-1.4 sample"))
 	if err == nil || !errorsIs(err, domain.ErrMissingCUFE) {
 		t.Fatalf("expected missing CUFE error, got %v", err)
@@ -80,10 +82,84 @@ func TestGeminiExtractorRejectsUnknownJSONFields(t *testing.T) {
 	}))
 	defer server.Close()
 
-	extractor, _ := NewGeminiExtractor(GeminiExtractorConfig{APIKey: "test-key", Endpoint: server.URL, HTTPClient: server.Client()})
+	extractor, _ := NewGeminiExtractor(GeminiExtractorConfig{APIKey: "test-key", Model: "gemini-test", Endpoint: server.URL, HTTPClient: server.Client()})
 	_, err := extractor.ExtractFromPDF(context.Background(), []byte("%PDF-1.4 sample"))
 	if err == nil || !strings.Contains(err.Error(), "decode structured invoice output") {
 		t.Fatalf("expected strict decode error, got %v", err)
+	}
+}
+
+func TestGeminiExtractorExtractFromPDFRetriesOn429AndThenSucceeds(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		call := calls.Add(1)
+		if call < 3 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"code":429,"status":"RESOURCE_EXHAUSTED","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"1ms"}]}}`))
+			return
+		}
+
+		_, _ = w.Write([]byte(`{
+			"candidates":[
+				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"company_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"company_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	extractor, err := NewGeminiExtractor(GeminiExtractorConfig{
+		APIKey:      "test-key",
+		Model:       "gemini-test",
+		Endpoint:    server.URL,
+		HTTPClient:  server.Client(),
+		BaseBackoff: time.Millisecond,
+		MaxBackoff:  2 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("new extractor failed: %v", err)
+	}
+
+	doc, err := extractor.ExtractFromPDF(context.Background(), []byte("%PDF-1.4 sample"))
+	if err != nil {
+		t.Fatalf("extract failed: %v", err)
+	}
+	if doc.CUFE != "CUFE-1" {
+		t.Fatalf("expected CUFE-1, got %q", doc.CUFE)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("expected 3 attempts, got %d", got)
+	}
+}
+
+func TestGeminiExtractorExtractFromPDFDoesNotRetryHardQuota429(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"code":429,"message":"Quota exceeded ... limit: 0"}}`))
+	}))
+	defer server.Close()
+
+	extractor, err := NewGeminiExtractor(GeminiExtractorConfig{
+		APIKey:      "test-key",
+		Model:       "gemini-test",
+		Endpoint:    server.URL,
+		HTTPClient:  server.Client(),
+		BaseBackoff: time.Millisecond,
+		MaxBackoff:  2 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("new extractor failed: %v", err)
+	}
+
+	_, err = extractor.ExtractFromPDF(context.Background(), []byte("%PDF-1.4 sample"))
+	if err == nil || !strings.Contains(err.Error(), "status=429") {
+		t.Fatalf("expected 429 error, got %v", err)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("expected 1 attempt, got %d", got)
 	}
 }
 

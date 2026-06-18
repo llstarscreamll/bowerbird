@@ -10,8 +10,14 @@ type InvoiceWriteRepository interface {
 	PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error
 }
 
+type InvoiceQueryRepository interface {
+	GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error)
+	ListInvoices(ctx context.Context, limit int, cursor string) ([]domain.InvoiceHeaderRecord, bool, error)
+}
+
 type InvoiceRepository interface {
 	InvoiceWriteRepository
+	InvoiceQueryRepository
 	ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error)
 	ExistsInvoiceByCUFE(ctx context.Context, cufe string) (bool, error)
 }

@@ -48,6 +48,14 @@ func (r *processorRepo) ExistsInvoiceByCUFE(ctx context.Context, cufe string) (b
 	return false, nil
 }
 
+func (r *processorRepo) GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error) {
+	return nil, nil, nil
+}
+
+func (r *processorRepo) ListInvoices(ctx context.Context, limit int, query string) ([]domain.InvoiceHeaderRecord, bool, error) {
+	return nil, false, nil
+}
+
 func (r *processorRepo) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	return nil
 }

@@ -28,6 +28,14 @@ func (r *fakeInvoiceRepo) ExistsInvoiceByCUFE(ctx context.Context, cufe string) 
 	return r.cufeExists, nil
 }
 
+func (r *fakeInvoiceRepo) GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error) {
+	return nil, nil, nil
+}
+
+func (r *fakeInvoiceRepo) ListInvoices(ctx context.Context, limit int, query string) ([]domain.InvoiceHeaderRecord, bool, error) {
+	return nil, false, nil
+}
+
 func (r *fakeInvoiceRepo) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	r.persistedHeaders = append(r.persistedHeaders, header)
 	return nil

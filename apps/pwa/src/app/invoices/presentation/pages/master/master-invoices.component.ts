@@ -1,7 +1,9 @@
-import { CommonModule } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
+import { InvoicesStore } from '../../../application/invoices.store';
 import { ModalComponent } from '../../../../core/presentation/components/modal/modal.component';
 import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload/file-upload.component';
 import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.model';
@@ -9,7 +11,7 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
 @Component({
   selector: 'app-master-invoices',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ModalComponent, FileUploadComponent],
+  imports: [CommonModule, ReactiveFormsModule, ModalComponent, FileUploadComponent, CurrencyPipe, DatePipe, RouterLink],
   host: {
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
@@ -20,9 +22,13 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">Facturas</h2>
-            <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Gestiona, filtra y revisa todas tus facturas electrónicas.</p>
+            <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Gestiona tus facturas electrónicas.</p>
           </div>
           <div class="flex items-center gap-3">
+            <button class="btn-secondary" *ngIf="hasInvoices()" (click)="openImportModal()">
+              <span class="material-icons-outlined text-[18px] mr-1.5">cloud_download</span>
+              Importar
+            </button>
             <button class="btn-secondary">
               <span class="material-icons-outlined text-[18px] mr-1.5">filter_list</span>
               Filtrar
@@ -34,8 +40,14 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
           </div>
         </div>
 
+        <ng-container *ngIf="isLoading() && !hasInvoices()">
+          <div class="flex justify-center items-center py-20">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          </div>
+        </ng-container>
+
         <!-- Empty State Master -->
-        <div class="card flex flex-col items-center justify-center py-20 text-center shadow-sm">
+        <div *ngIf="!isLoading() && !hasInvoices()" class="card flex flex-col items-center justify-center py-20 text-center shadow-sm">
           <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-colors">
             <span class="material-icons-outlined text-slate-300 dark:text-slate-600 text-4xl">receipt_long</span>
           </div>
@@ -51,16 +63,56 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
 
           <p *ngIf="errorMessage()" class="mt-3 text-sm text-rose-600 dark:text-rose-300">{{ errorMessage() }}</p>
         </div>
+
+        <!-- Invoices Table -->
+        <div *ngIf="hasInvoices()" class="card !p-0 overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+              <thead class="bg-slate-50 dark:bg-slate-800/50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Número</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Emisor</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
+                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha Emisión</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
+                <tr *ngFor="let invoice of invoices()" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
+                    <a [routerLink]="[invoice.id]" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer">
+                      {{ invoice.invoice_number || 'N/A' }}
+                    </a>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                    <div class="font-medium text-slate-900 dark:text-white truncate max-w-[200px]" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
+                    <div class="text-xs">{{ invoice.issuer_tax_id }}</div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-left font-medium text-slate-900 dark:text-white">
+                    {{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500 dark:text-slate-400">
+                    {{ invoice.issue_date | date: 'mediumDate' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 sm:px-6">
+            <div class="flex-1 flex justify-center">
+              <button *ngIf="hasMore()" (click)="loadMore()" [disabled]="isLoadingMore()" class="btn-secondary text-sm disabled:opacity-50">
+                {{ isLoadingMore() ? 'Cargando...' : 'Cargar más' }}
+              </button>
+              <p *ngIf="!hasMore() && hasInvoices()" class="text-sm text-slate-500 dark:text-slate-400">Has llegado al final de la lista.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <app-modal [isOpen]="isImportModalOpen()" title="Importar historico de facturas" [showDefaultFooter]="false" (close)="closeImportModal()">
       <div class="space-y-4">
-        <form [formGroup]="importForm">
-          <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="import-request-id">ID de solicitud</label>
-          <input id="import-request-id" class="input-field mt-1" formControlName="id" readonly />
-        </form>
-
         <app-file-upload
           [accept]="historyImportAccept"
           [items]="uploadQueueItems()"
@@ -89,8 +141,9 @@ import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.m
     </app-modal>
   `,
 })
-export class MasterInvoicesComponent {
+export class MasterInvoicesComponent implements OnInit {
   private readonly importStore = inject(InvoiceHistoryImportStore);
+  private readonly invoicesStore = inject(InvoicesStore);
   private readonly formBuilder = inject(FormBuilder);
 
   readonly historyImportAccept = INVOICE_HISTORY_ACCEPT;
@@ -99,6 +152,15 @@ export class MasterInvoicesComponent {
   readonly isAnalyzing = this.importStore.analyzing;
   readonly errorMessage = this.importStore.errorMessage;
   readonly queuedFiles = this.importStore.queuedFiles;
+
+  // Invoices Store signals
+  readonly invoices = this.invoicesStore.invoices;
+  readonly hasInvoices = this.invoicesStore.hasInvoices;
+  readonly isLoading = this.invoicesStore.isLoading;
+  readonly isLoadingMore = this.invoicesStore.isLoadingMore;
+  readonly hasMore = this.invoicesStore.hasMore;
+  readonly limit = this.invoicesStore.limit;
+
   readonly importForm = this.formBuilder.nonNullable.group({
     id: ['', [Validators.required, Validators.pattern(/^[0-9A-HJKMNPQRSTVWXYZ]{26}$/)]],
   });
@@ -115,6 +177,14 @@ export class MasterInvoicesComponent {
 
   constructor() {
     this.resetRequestId();
+  }
+
+  ngOnInit(): void {
+    this.invoicesStore.loadInvoices();
+  }
+
+  loadMore(): void {
+    this.invoicesStore.loadMore();
   }
 
   openImportModal(): void {

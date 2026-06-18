@@ -166,7 +166,7 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 			ID:              lineID,
 			InvoiceHeaderID: headerID,
 			LineNumber:      lineNumber,
-			ItemCode:        "",
+			ItemCode:        line.ItemCode,
 			Description:     line.ItemDescription,
 			Quantity:        line.Quantity,
 			UnitPrice:       line.UnitPrice,

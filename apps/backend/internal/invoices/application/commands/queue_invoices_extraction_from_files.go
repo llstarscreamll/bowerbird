@@ -53,10 +53,15 @@ func (cmd *QueueInvoiceExtractionFromFilesCommand) Execute(ctx context.Context, 
 		})
 	}
 
+	jobID := input.ID
+	if jobID == "" {
+		jobID = cmd.newID()
+	}
+
 	job := contractJobs.ExtractInvoicesFromFilesJob{
-		ID:         input.ID,
+		ID:         jobID,
 		SourceName: "files-uploaded-by-user",
-		SourceID:   input.ID,
+		SourceID:   jobID,
 		Files:      files,
 		QueuedAt:   cmd.now().UTC().Format(time.RFC3339Nano),
 	}

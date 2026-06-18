@@ -29,6 +29,14 @@ func (r *createFilesRepoStub) ExistsInvoiceByCUFE(ctx context.Context, cufe stri
 	return r.cufeExists, nil
 }
 
+func (r *createFilesRepoStub) GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error) {
+	return nil, nil, nil
+}
+
+func (r *createFilesRepoStub) ListInvoices(ctx context.Context, limit int, query string) ([]domain.InvoiceHeaderRecord, bool, error) {
+	return nil, false, nil
+}
+
 func (r *createFilesRepoStub) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	r.persistedHeaders = append(r.persistedHeaders, header)
 	return nil
@@ -117,8 +125,8 @@ func TestCreateInvoicesFromFilesSkipsAlreadyProcessedSource(t *testing.T) {
 	assert.Len(t, repo.persistedHeaders, 0)
 }
 
-func TestCreateInvoicesFromFilesSkipsNonZipInputFiles(t *testing.T) {
-	store := &createFilesStoreStub{data: map[string][]byte{"k1": []byte("<Invoice></Invoice>")}}
+func TestCreateInvoicesFromFilesSkipsUnsupportedInputFiles(t *testing.T) {
+	store := &createFilesStoreStub{data: map[string][]byte{"k1": []byte("some text content")}}
 	xmlExtractor := &createFilesXMLExtractorStub{invoice: validInvoiceDoc("CUFE-1")}
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
@@ -128,7 +136,7 @@ func TestCreateInvoicesFromFilesSkipsNonZipInputFiles(t *testing.T) {
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
 		SourceID:   "upload-1",
-		Files:      []contractJobs.File{{Path: "k1", Filename: "inv.xml", MimeType: "application/xml"}},
+		Files:      []contractJobs.File{{Path: "k1", Filename: "notes.txt", MimeType: "text/plain"}},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 0, xmlExtractor.called)

@@ -47,6 +47,10 @@ export const routes: Routes = [
         path: 'invoices',
         loadComponent: () => import('./invoices/presentation/pages/master/master-invoices.component').then((c) => c.MasterInvoicesComponent),
       },
+      {
+        path: 'invoices/:invoiceId',
+        loadComponent: () => import('./invoices/presentation/pages/detail/invoice-detail.component').then((c) => c.InvoiceDetailComponent),
+      },
     ],
   },
 ];
