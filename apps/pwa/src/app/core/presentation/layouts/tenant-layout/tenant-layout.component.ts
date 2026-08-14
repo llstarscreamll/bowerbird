@@ -21,7 +21,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
     <div hlmSidebarWrapper class="h-screen w-full overflow-hidden">
       <hlm-sidebar collapsible="icon" side="left">
         <hlm-sidebar-header class="border-b border-sidebar-border">
-          <div class="flex items-center gap-3 px-2 py-2">
+          <div class="flex items-center gap-3 px-2 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
             <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <ng-icon name="lucideBird" class="text-lg" />
             </div>
@@ -31,20 +31,20 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 
         <hlm-sidebar-content>
           <hlm-sidebar-group class="group-data-[collapsible=icon]:hidden">
-            <button hlmBtn variant="outline" class="w-full justify-between gap-2 px-2" [hlmDropdownMenuTrigger]="tenantMenu">
-              <div class="flex min-w-0 items-center gap-3">
-                <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <ng-icon name="lucideBuilding2" />
+            <button hlmBtn variant="outline" class="h-auto w-full min-w-0 justify-between gap-2 overflow-hidden px-2.5 py-2" [hlmDropdownMenuTrigger]="tenantMenu">
+              <div class="flex min-w-0 flex-1 items-center gap-2.5">
+                <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <ng-icon name="lucideBuilding2" class="text-base" />
                 </div>
-                <div class="min-w-0 text-left">
-                  <div class="truncate text-sm font-semibold">{{ tenantName() }}</div>
-                  <div class="flex items-center gap-1 text-xs text-muted-foreground">
-                    <ng-icon name="lucideUsers" class="text-sm" />
-                    {{ tenantMembers() }} Miembro{{ tenantMembers() !== 1 ? 's' : '' }}
+                <div class="min-w-0 flex-1 text-left leading-tight">
+                  <div class="truncate text-sm font-semibold [text-box:trim-both_cap_alphabetic]">{{ tenantName() }}</div>
+                  <div class="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                    <ng-icon name="lucideUsers" class="shrink-0 text-xs" />
+                    <span class="truncate [text-box:trim-both_cap_alphabetic]">{{ tenantMembers() }} Miembro{{ tenantMembers() !== 1 ? 's' : '' }}</span>
                   </div>
                 </div>
               </div>
-              <ng-icon name="lucideChevronsUpDown" class="shrink-0 text-muted-foreground" />
+              <ng-icon name="lucideChevronsUpDown" class="size-4 shrink-0 text-muted-foreground" />
             </button>
             <ng-template #tenantMenu>
               <hlm-dropdown-menu class="w-56">
