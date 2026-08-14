@@ -158,34 +158,38 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 	state := r.FormValue("state")
 	slog.Info("Received Identity Google login callback", "state", state, "error", r.FormValue("error"))
 
-	redirectOnError := func(reason string) error {
-		slog.Error("Identity Google login callback failed", "reason", reason)
+	redirectOnError := func(reason string, cause error) error {
+		if cause != nil {
+			slog.Error("Identity Google login callback failed", "reason", reason, "error", cause)
+		} else {
+			slog.Error("Identity Google login callback failed", "reason", reason)
+		}
 		http.Redirect(w, r, h.frontendURL+"/login?error=google_auth_failed", http.StatusTemporaryRedirect)
 		return nil
 	}
 
 	if h.googleConfig == nil {
-		return redirectOnError("google oauth not configured")
+		return redirectOnError("google oauth not configured", nil)
 	}
 
 	if state != "state-token" {
-		return redirectOnError("invalid oauth state")
+		return redirectOnError("invalid oauth state", nil)
 	}
 
 	code := r.FormValue("code")
 	if code == "" {
-		return redirectOnError("missing code parameter")
+		return redirectOnError("missing code parameter", nil)
 	}
 
 	token, err := h.googleConfig.Exchange(r.Context(), code)
 	if err != nil {
-		return redirectOnError("code exchange failed")
+		return redirectOnError("code exchange failed", err)
 	}
 
 	client := h.googleConfig.Client(r.Context(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
-		return redirectOnError("failed getting user info")
+		return redirectOnError("failed getting user info", err)
 	}
 	defer resp.Body.Close()
 
@@ -196,14 +200,14 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 		Picture string `json:"picture"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return redirectOnError("failed parsing user info")
+		return redirectOnError("failed parsing user info", err)
 	}
 
 	slog.Info("Fetched Identity Google user info", "email", userInfo.Email, "provider_id", userInfo.ID)
 
 	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "google", userInfo.ID, userInfo.Name, userInfo.Picture)
 	if err != nil {
-		return redirectOnError("oauth login failed")
+		return redirectOnError("oauth login failed", err)
 	}
 
 	slog.Info("Identity Google login successful", "email", userInfo.Email)
@@ -227,34 +231,38 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	state := r.FormValue("state")
 	slog.Info("Received Identity Microsoft login callback", "state", state, "error", r.FormValue("error"))
 
-	redirectOnError := func(reason string) error {
-		slog.Error("Identity Microsoft login callback failed", "reason", reason)
+	redirectOnError := func(reason string, cause error) error {
+		if cause != nil {
+			slog.Error("Identity Microsoft login callback failed", "reason", reason, "error", cause)
+		} else {
+			slog.Error("Identity Microsoft login callback failed", "reason", reason)
+		}
 		http.Redirect(w, r, h.frontendURL+"/login?error=microsoft_auth_failed", http.StatusTemporaryRedirect)
 		return nil
 	}
 
 	if h.microsoftConfig == nil {
-		return redirectOnError("microsoft oauth not configured")
+		return redirectOnError("microsoft oauth not configured", nil)
 	}
 
 	if state != "state-token" {
-		return redirectOnError("invalid oauth state")
+		return redirectOnError("invalid oauth state", nil)
 	}
 
 	code := r.FormValue("code")
 	if code == "" {
-		return redirectOnError("missing code parameter")
+		return redirectOnError("missing code parameter", nil)
 	}
 
 	token, err := h.microsoftConfig.Exchange(r.Context(), code)
 	if err != nil {
-		return redirectOnError("code exchange failed")
+		return redirectOnError("code exchange failed", err)
 	}
 
 	client := h.microsoftConfig.Client(r.Context(), token)
 	resp, err := client.Get("https://graph.microsoft.com/v1.0/me")
 	if err != nil {
-		return redirectOnError("failed getting user info")
+		return redirectOnError("failed getting user info", err)
 	}
 	defer resp.Body.Close()
 
@@ -264,14 +272,14 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 		Name  string `json:"displayName"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return redirectOnError("failed parsing user info")
+		return redirectOnError("failed parsing user info", err)
 	}
 
 	slog.Info("Fetched Identity Microsoft user info", "email", userInfo.Email, "provider_id", userInfo.ID)
 
 	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "microsoft", userInfo.ID, userInfo.Name, "")
 	if err != nil {
-		return redirectOnError("oauth login failed")
+		return redirectOnError("oauth login failed", err)
 	}
 
 	slog.Info("Identity Microsoft login successful", "email", userInfo.Email)
