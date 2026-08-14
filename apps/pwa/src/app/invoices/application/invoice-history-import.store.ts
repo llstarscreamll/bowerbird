@@ -4,7 +4,6 @@ import { FileReference } from '../../core/domain/file-storage.model';
 import { FileStorageService } from '../../core/services/file-storage.service';
 import { ToastService } from '../../core/services/toast.service';
 import { InvoiceHistoryAnalyzeFileReference } from '../domain/invoice-history-analysis.model';
-import { supportsInvoiceHistoryFile } from '../domain/invoice-history-import.model';
 import { InvoiceHistoryHttpService } from '../infrastructure/invoice-history.http.service';
 
 type InvoiceHistoryQueueStatus = 'pending' | 'uploading' | 'uploaded' | 'failed';
@@ -80,52 +79,17 @@ export class InvoiceHistoryImportStore {
       return;
     }
 
-    const existingFingerprints = new Set(this.queuedFiles().map((entry) => this.fileFingerprint(entry.file)));
-
     this.errorMessage.set('');
 
-    const newEntries: InvoiceHistoryQueuedFile[] = [];
-    const invalidFiles: string[] = [];
-    const duplicatedFiles: string[] = [];
+    const newEntries = files.map((file) => ({
+      id: String(this.nextId++),
+      file,
+      status: 'pending' as const,
+      uploadProgress: 0,
+      uploadedReference: null,
+    }));
 
-    for (const file of files) {
-      if (!supportsInvoiceHistoryFile(file)) {
-        invalidFiles.push(file.name);
-        continue;
-      }
-
-      const fingerprint = this.fileFingerprint(file);
-      if (existingFingerprints.has(fingerprint)) {
-        duplicatedFiles.push(file.name);
-        continue;
-      }
-
-      existingFingerprints.add(fingerprint);
-      newEntries.push({
-        id: String(this.nextId++),
-        file,
-        status: 'pending',
-        uploadProgress: 0,
-        uploadedReference: null,
-      });
-    }
-
-    if (invalidFiles.length > 0) {
-      this.toast.showWarning(`Se omitieron archivos no soportados: ${invalidFiles.join(', ')}.`);
-    }
-
-    if (duplicatedFiles.length > 0) {
-      this.toast.showWarning(`Se omitieron archivos duplicados: ${duplicatedFiles.join(', ')}.`);
-    }
-
-    if (newEntries.length > 0) {
-      this.queuedFiles.update((entries) => [...entries, ...newEntries]);
-    }
-
-    if (this.queuedFiles().length === 0) {
-      this.errorMessage.set('Selecciona archivos XML, PDF o ZIP para importar el histórico.');
-      return;
-    }
+    this.queuedFiles.update((entries) => [...entries, ...newEntries]);
 
     if (!this.uploading()) {
       this.uploadPendingFiles();
@@ -133,12 +97,66 @@ export class InvoiceHistoryImportStore {
   }
 
   removeFile(fileId: string): void {
-    if (this.uploading() || this.analyzing()) {
+    if (this.analyzing()) {
+      return;
+    }
+
+    const entry = this.queuedFiles().find((item) => item.id === fileId);
+    if (!entry) {
+      return;
+    }
+
+    if (entry.status === 'uploading' || entry.status === 'pending') {
+      this.cancelFileUpload(fileId);
       return;
     }
 
     this.queuedFiles.update((entries) => entries.filter((entry) => entry.id !== fileId));
     this.errorMessage.set('');
+  }
+
+  clearAllFiles(): void {
+    if (this.analyzing()) {
+      return;
+    }
+
+    for (const subscription of this.activeUploads.values()) {
+      subscription.unsubscribe();
+    }
+    this.activeUploads.clear();
+    this.currentBatch = null;
+    this.uploading.set(false);
+    this.queuedFiles.set([]);
+    this.errorMessage.set('');
+  }
+
+  retryFileUpload(fileId: string): void {
+    if (this.analyzing()) {
+      return;
+    }
+
+    const entry = this.queuedFiles().find((item) => item.id === fileId);
+    if (!entry || entry.status !== 'failed') {
+      return;
+    }
+
+    this.queuedFiles.update((entries) =>
+      entries.map((item) =>
+        item.id === fileId
+          ? {
+              ...item,
+              status: 'pending',
+              uploadProgress: 0,
+              uploadedReference: null,
+            }
+          : item,
+      ),
+    );
+    this.errorMessage.set('');
+
+    if (!this.uploading()) {
+      this.uploadPendingFiles();
+    }
   }
 
   cancelFileUpload(fileId: string): void {
@@ -242,10 +260,6 @@ export class InvoiceHistoryImportStore {
   private resetState(): void {
     this.errorMessage.set('');
     this.queuedFiles.set([]);
-  }
-
-  private fileFingerprint(file: File): string {
-    return `${file.name}::${file.size}::${file.lastModified}`;
   }
 
   private updateFileProgress(fileId: string, progress: number): void {

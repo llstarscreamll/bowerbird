@@ -1,9 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
+import { toast } from '@spartan-ng/brain/sonner';
 
 export type ToastType = 'info' | 'warning' | 'error' | 'success';
 
-export interface Toast {
-  id: string;
+interface ToastPayload {
   type: ToastType;
   title?: string;
   message: string;
@@ -14,17 +14,28 @@ export interface Toast {
   providedIn: 'root',
 })
 export class ToastService {
-  private toastsSignal = signal<Toast[]>([]);
-  public readonly toasts = this.toastsSignal.asReadonly();
+  show(toastPayload: ToastPayload) {
+    const { type, message, title, duration } = toastPayload;
+    const options = {
+      description: title ? message : undefined,
+      duration: duration ?? (type === 'error' ? 7000 : 5000),
+    };
+    const content = title ?? message;
 
-  show(toast: Omit<Toast, 'id'>) {
-    const id = Math.random().toString(36).substring(2, 9);
-    const newToast = { ...toast, id };
-
-    this.toastsSignal.update((toasts) => [...toasts, newToast]);
-
-    if (toast.duration !== 0) {
-      setTimeout(() => this.remove(id), toast.duration || 5000);
+    switch (type) {
+      case 'success':
+        toast.success(content, options);
+        break;
+      case 'error':
+        toast.error(content, options);
+        break;
+      case 'warning':
+        toast.warning(content, options);
+        break;
+      case 'info':
+      default:
+        toast.info(content, options);
+        break;
     }
   }
 
@@ -42,9 +53,5 @@ export class ToastService {
 
   showWarning(message: string, title?: string) {
     this.show({ type: 'warning', message, title });
-  }
-
-  remove(id: string) {
-    this.toastsSignal.update((toasts) => toasts.filter((t) => t.id !== id));
   }
 }

@@ -38,7 +38,7 @@ Para mantener la consistencia visual y fomentar la reutilización bajo principio
 
 - **Componentes Angular:** Ubicados en `apps/pwa/src/app/core/presentation/components/`.
 - **Layouts Angular:** Ubicados en `apps/pwa/src/app/core/presentation/layouts/`.
-- **Estilos globales (Primitivas):** Definidos vía Tailwind (`@apply`) en `apps/pwa/src/styles.css` (Ej. `.card`, `.btn-primary`, `.input-field`).
+- **Estilos globales:** Tailwind + variables CSS Spartan en `apps/pwa/src/styles.css` (`--primary`, `--background`, etc.). Usar tokens semánticos (`bg-background`, `text-muted-foreground`, `border-border`) en lugar de paletas hardcodeadas (`slate-*`, `indigo-*`).
 
 ### Manejo de Errores y Retroalimentación UI
 
@@ -46,19 +46,18 @@ La arquitectura frontend distingue entre dos patrones visuales para comunicar re
 
 #### Toast (`ToastService`)
 
-Servicio inyectable para emitir mensajes globales y efímeros (transitorios).
+Servicio inyectable para mensajes globales y efímeros (Sonner vía `@spartan-ng/brain/sonner`).
 
-- **Responsabilidad Global:** El `error.interceptor.ts` se encarga de dispararlos automáticamente para errores severos como **5xx (Server Error)** y **0 (Network Error)**.
-- **Uso desde Componentes:** Debe utilizarse para notificaciones de **éxito** tras completar un flujo importante (ej. _"Organización creada correctamente"_) o para avisos informativos no bloqueantes.
-- **Comportamiento:** Flotan sobre la interfaz y desaparecen solos luego de un par de segundos.
+- **API:** `showSuccess`, `showError`, `showWarning`, `showInfo` (no hay dismiss por id).
+- **Responsabilidad global:** `error.interceptor.ts` dispara toasts para **5xx** y **0 (Network Error)**.
+- **Uso desde componentes/stores:** éxito tras flujos importantes o avisos no bloqueantes.
 
-#### Alert (`<app-alert>`)
+#### Alert inline (`<hlm-alert>`)
 
-Componente presentacional (Callout) para mensajes contextuales estáticos e incrustados.
+Componente Spartan para mensajes contextuales estáticos dentro de la página o un formulario.
 
-- **Responsabilidad Local:** Se debe renderizar de forma _inline_ dentro del contexto afectado (arriba de un formulario, al tope de una lista vacía, o cerca del botón de acción).
-- **Uso desde Componentes:** Diseñado para mostrar errores **4xx (Bad Request / Validation)** o problemas de dominio ("El email ya está registrado"). El componente de vista es responsable de atrapar el error mapeado por el interceptor y asignarlo al componente Alert.
-- **Comportamiento:** Permanece en pantalla obligando al usuario a leerlo y, opcionalmente, ofrece un botón para cerrarlo. Soporta contenido HTML interno (ej. listar viñetas de errores de campos de un formulario) a través de proyección (`<ng-content>`).
+- **Responsabilidad local:** errores **4xx**, validación de dominio, avisos informativos (ej. modal de importación de facturas).
+- **Comportamiento:** permanece visible hasta que el usuario actúe o cierre; usar `variant="destructive"` para errores.
 
 ### Layouts Principales
 

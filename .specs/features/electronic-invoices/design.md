@@ -109,8 +109,8 @@ No responsabilidades:
   - UI de conexión OAuth por proveedor/cuenta.
 - `src/app/features/unified-inbox/*`
   - Bandeja unificada responsive multi-proveedor.
-- `src/app/features/unified-inbox/components/account-status-chip/*`
-  - Indicadores de estado por cuenta.
+- `src/app/core/presentation/components/connection-status-chip/*`
+  - Indicadores de estado por cuenta (compartido entre conexiones e inbox).
 - `src/app/features/invoices/*`
   - Vista de facturas extraídas (iterativo).
 

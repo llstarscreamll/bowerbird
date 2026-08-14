@@ -1,140 +1,125 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { DatePipe, NgClass } from '@angular/common';
 import { Router } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { HealthStore } from '../../../application/health.store';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [DatePipe, NgClass],
+  imports: [DatePipe, NgClass, NgIcon, HlmCardImports, HlmButtonImports, HlmSpinnerImports],
   template: `
-    <div class="min-h-screen flex flex-col">
-      <!-- Top Navigation -->
-      <nav class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800/80">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex justify-between h-16">
+    <div class="flex min-h-screen flex-col">
+      <nav class="border-b border-border bg-card">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="flex h-16 justify-between">
             <div class="flex items-center gap-3">
-              <div class="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-                <span class="material-icons-outlined text-white text-lg">flight_takeoff</span>
+              <div class="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm">
+                <ng-icon name="lucidePlaneTakeoff" class="text-primary-foreground" />
               </div>
-              <span class="font-semibold text-lg tracking-tight text-slate-900 dark:text-white">Bowerbird</span>
+              <span class="text-lg font-semibold tracking-tight">Bowerbird</span>
             </div>
-
             <div class="flex items-center gap-4">
-              <button class="p-2 text-slate-400 hover:text-slate-500 dark:hover:text-slate-300 transition-colors">
-                <span class="material-icons-outlined">notifications</span>
+              <button hlmBtn variant="ghost" size="icon">
+                <ng-icon name="lucideBell" />
               </button>
-
-              <div class="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-slate-300 dark:border-slate-700 cursor-pointer overflow-hidden">
-                <span class="material-icons-outlined text-slate-500 text-sm">person</span>
+              <div class="flex size-8 items-center justify-center overflow-hidden rounded-full border bg-muted">
+                <ng-icon name="lucideUser" class="text-muted-foreground" />
               </div>
             </div>
           </div>
         </div>
       </nav>
 
-      <!-- Main Content -->
-      <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Page Header -->
-        <div class="md:flex md:items-center md:justify-between mb-8">
-          <div class="min-w-0 flex-1">
-            <h2 class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">Dashboard Overview</h2>
-          </div>
-          <div class="mt-4 flex md:ml-4 md:mt-0 gap-3">
-            <button (click)="goLobby()" class="btn-secondary gap-2">
-              <span class="material-icons-outlined text-sm">domain</span>
+      <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <div class="mb-8 md:flex md:items-center md:justify-between">
+          <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard Overview</h2>
+          <div class="mt-4 flex gap-3 md:ml-4 md:mt-0">
+            <button hlmBtn variant="outline" (click)="goLobby()">
+              <ng-icon name="lucideBuilding2" />
               Switch Organization
             </button>
-            <button (click)="healthStore.checkHealth()" [disabled]="healthStore.isLoading()" class="btn-primary gap-2">
-              <span class="material-icons-outlined text-sm" [class.animate-spin]="healthStore.isLoading()">refresh</span>
+            <button hlmBtn (click)="healthStore.checkHealth()" [disabled]="healthStore.isLoading()">
+              <ng-icon name="lucideRefreshCw" [class.animate-spin]="healthStore.isLoading()" />
               Refresh Status
             </button>
           </div>
         </div>
 
-        <!-- Metrics Grid -->
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <!-- System Health Card -->
-          <div class="card flex flex-col justify-between">
+          <hlm-card class="flex flex-col justify-between p-6">
             <div>
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">API Health Status</p>
-                <div class="p-2 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
-                  <span class="material-icons-outlined text-indigo-600 dark:text-indigo-400 text-sm">dns</span>
+                <p class="truncate text-sm font-medium text-muted-foreground">API Health Status</p>
+                <div class="rounded-lg bg-primary/10 p-2">
+                  <ng-icon name="lucideServer" class="text-primary" />
                 </div>
               </div>
-
               <div class="mt-4 flex items-center gap-3">
-                <span class="relative flex h-4 w-4">
+                <span class="relative flex size-4">
                   @if (healthStore.isHealthy() && !healthStore.isLoading()) {
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   }
                   <span
-                    class="relative inline-flex rounded-full h-4 w-4"
+                    class="relative inline-flex size-4 rounded-full"
                     [ngClass]="{
                       'bg-emerald-500': healthStore.isHealthy() && !healthStore.isLoading(),
                       'bg-amber-500': !healthStore.isHealthy() && healthStore.status() !== 'checking...' && !healthStore.isLoading(),
-                      'bg-slate-400': healthStore.status() === 'checking...' || healthStore.isLoading(),
+                      'bg-muted-foreground': healthStore.status() === 'checking...' || healthStore.isLoading(),
                     }"
                   ></span>
                 </span>
-
-                <p class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+                <p class="text-2xl font-semibold tracking-tight">
                   {{ healthStore.isLoading() ? 'Checking...' : healthStore.isHealthy() ? 'Operational' : 'Degraded' }}
                 </p>
               </div>
             </div>
+            <p class="mt-6 flex items-center gap-1 text-sm text-muted-foreground">
+              <ng-icon name="lucideClock" class="text-xs" />
+              Last checked:
+              <span class="font-medium text-foreground">{{ healthStore.lastChecked() ? (healthStore.lastChecked() | date: 'shortTime') : 'Never' }}</span>
+            </p>
+          </hlm-card>
 
-            <div class="mt-6 text-sm">
-              <p class="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                <span class="material-icons-outlined text-xs">schedule</span>
-                Last checked:
-                <span class="font-medium text-slate-700 dark:text-slate-300">
-                  {{ healthStore.lastChecked() ? (healthStore.lastChecked() | date: 'shortTime') : 'Never' }}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <!-- Placeholder Metric 1 -->
-          <div class="card flex flex-col justify-between">
+          <hlm-card class="flex flex-col justify-between p-6">
             <div>
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">Active Users</p>
-                <div class="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">
-                  <span class="material-icons-outlined text-emerald-600 dark:text-emerald-400 text-sm">people</span>
+                <p class="truncate text-sm font-medium text-muted-foreground">Active Users</p>
+                <div class="rounded-lg bg-emerald-500/10 p-2">
+                  <ng-icon name="lucideUsers" class="text-emerald-600 dark:text-emerald-400" />
                 </div>
               </div>
               <div class="mt-4 flex items-baseline gap-2">
-                <p class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">1,204</p>
-                <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center">
-                  <span class="material-icons-outlined text-xs">arrow_upward</span>
+                <p class="text-3xl font-semibold tracking-tight">1,204</p>
+                <p class="flex items-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  <ng-icon name="lucideArrowUp" class="text-xs" />
                   12%
                 </p>
               </div>
             </div>
-            <div class="mt-6 text-sm text-slate-500 dark:text-slate-400">Compared to last week</div>
-          </div>
+            <div class="mt-6 text-sm text-muted-foreground">Compared to last week</div>
+          </hlm-card>
 
-          <!-- Placeholder Metric 2 -->
-          <div class="card flex flex-col justify-between">
+          <hlm-card class="flex flex-col justify-between p-6">
             <div>
               <div class="flex items-center justify-between">
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">Compute Usage</p>
-                <div class="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
-                  <span class="material-icons-outlined text-amber-600 dark:text-amber-400 text-sm">memory</span>
+                <p class="truncate text-sm font-medium text-muted-foreground">Compute Usage</p>
+                <div class="rounded-lg bg-amber-500/10 p-2">
+                  <ng-icon name="lucideCpu" class="text-amber-600 dark:text-amber-400" />
                 </div>
               </div>
               <div class="mt-4 flex items-baseline gap-2">
-                <p class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">42%</p>
-                <p class="text-sm font-medium text-slate-500 dark:text-slate-500 flex items-center">Stable</p>
+                <p class="text-3xl font-semibold tracking-tight">42%</p>
+                <p class="text-sm font-medium text-muted-foreground">Stable</p>
               </div>
             </div>
-
-            <div class="mt-6 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 mb-1 overflow-hidden">
-              <div class="bg-amber-500 h-1.5 rounded-full" style="width: 42%"></div>
+            <div class="mt-6 mb-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div class="h-1.5 rounded-full bg-amber-500" style="width: 42%"></div>
             </div>
-          </div>
+          </hlm-card>
         </div>
       </main>
     </div>
