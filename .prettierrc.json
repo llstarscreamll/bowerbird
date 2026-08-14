@@ -9,6 +9,7 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "endOfLine": "lf",
+  "tailwindFunctions": ["hlm", "cva", "classes"],
   "overrides": [
     {
       "files": "*.md",

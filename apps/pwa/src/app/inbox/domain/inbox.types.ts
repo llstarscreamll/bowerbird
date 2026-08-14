@@ -1,6 +1,6 @@
 export type MailProvider = 'gmail' | 'microsoft' | 'outlook' | 'yahoo' | 'hotmail';
 
-export type ConnectionStatus = 'active' | 'requires_reconnect' | 'paused' | 'error';
+export type { ConnectionStatus } from '../../core/domain/connection-status.model';
 export type SyncStatus = 'idle' | 'syncing' | 'error';
 
 export const MAIL_PROVIDERS: MailProvider[] = ['gmail', 'microsoft', 'outlook', 'yahoo', 'hotmail'];

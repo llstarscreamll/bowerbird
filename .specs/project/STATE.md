@@ -4,7 +4,7 @@
 
 - Use JSON:API with `meta._debug` containing raw error/stacktrace for local/dev observability.
 - Standardize backend error propagation using `appErrors.Wrap` and a central HTTP adapter (`api.Wrap`).
-- Implement a dual UI feedback pattern in frontend: `AlertComponent` for contextual 4xx errors, `ToastService` for global 5xx/network errors.
+- Implement a dual UI feedback pattern in frontend: `hlm-alert` for contextual 4xx/validation errors, `ToastService` + Sonner for global 5xx/network errors.
 - For PROD-SYNC-089, do not implement tenant-specific DLQs; implement controlled-failure resilience in workers (payload limits, timeout, panic recovery, and continue processing).
 
 ## Memory

@@ -42,12 +42,14 @@
 - Tenant routing: Tenant pages are children of the `/:tenantId` route and wrapped by `TenantLayoutComponent`.
 - Tenant header is derived from the `tenantId` param via `core/interceptors/tenant.interceptor.ts`.
 - Error Handling & UI Feedback: `error.interceptor.ts` globally handles JSON:API responses and logs `meta._debug` to the console.
-  - **Toast (`ToastService`)**: Use for global, transient messages like 5xx server errors, network drops, or success notifications ("Saved successfully"). The interceptor handles 5xx/network toasts automatically.
-  - **Alert (`AlertComponent`)**: Use inline within forms or pages for contextual, actionable 4xx validation errors (e.g., "Email already in use"). Components should handle these manually.
+  - **Toast (`ToastService`)**: Sonner-backed; `<hlm-toaster />` in `app.component.ts`. Use for global transient messages (5xx, network, success). The interceptor handles 5xx/network toasts automatically.
+  - **Inline alerts**: Use `hlm-alert` within forms or pages for contextual 4xx validation errors.
 - Auth refresh behavior is in `core/interceptors/auth.interceptor.ts` (401 -> refresh -> retry).
 - Feature convention: keep business/data orchestration in `*/application/*store.ts`; keep `presentation` components thin.
-- Shared inbox/provider primitives now live in `src/app/core/domain/inbox-types.ts` (avoid cross-feature domain imports for these types).
-- Shared visual primitives are in `src/styles.css` (`.card`, `.input-field`, `.btn-primary`, `.btn-secondary`).
+- Shared cross-feature types: `ConnectionStatus` in `src/app/core/domain/connection-status.model.ts`; mail provider helpers in `src/app/inbox/domain/inbox.types.ts`.
+- Shared presentation: `app-connection-status-chip` and `app-file-upload` under `src/app/core/presentation/components/`.
+- `ThemeService` in `src/app/core/services/theme.service.ts` for dark-mode-aware embedded views.
+- **Spartan UI**: Helm components in `src/app/shared/ui/`; icons via Lucide + `src/app/shared/icons/app-icons.ts`. See `docs/technical/frontend/spartan-ui.md`.
 
 ## E2E Testing (`apps/e2e`)
 

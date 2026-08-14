@@ -2,143 +2,169 @@ import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
+import { BrnDialogClose, BrnDialogContent } from '@spartan-ng/brain/dialog';
 import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
 import { InvoicesStore } from '../../../application/invoices.store';
-import { ModalComponent } from '../../../../core/presentation/components/modal/modal.component';
-import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload/file-upload.component';
-import { INVOICE_HISTORY_ACCEPT } from '../../../domain/invoice-history-import.model';
+import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload';
+import { INVOICE_HISTORY_ACCEPT, INVOICE_HISTORY_MAX_FILE_SIZE_BYTES, supportsInvoiceHistoryFile } from '../../../domain/invoice-history-import.model';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { HlmEmptyImports } from '@spartan-ng/helm/empty';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 @Component({
   selector: 'app-master-invoices',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ModalComponent, FileUploadComponent, CurrencyPipe, DatePipe, RouterLink],
-  host: {
-    class: 'flex-1 flex flex-col min-h-0 w-full',
-  },
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    NgIcon,
+    FileUploadComponent,
+    CurrencyPipe,
+    DatePipe,
+    RouterLink,
+    HlmCardImports,
+    HlmButtonImports,
+    HlmDialogImports,
+    HlmSpinnerImports,
+    HlmEmptyImports,
+    HlmTableImports,
+    HlmAlertImports,
+    BrnDialogContent,
+    BrnDialogClose,
+  ],
+  host: { class: 'flex-1 flex flex-col min-h-0 w-full' },
   template: `
-    <div class="h-full w-full bg-slate-50 dark:bg-slate-950 p-8 overflow-y-auto transition-colors duration-200 flex-1 flex flex-col">
-      <div class="mx-auto space-y-6 w-full">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="h-full w-full flex-1 overflow-y-auto p-8">
+      <div class="mx-auto w-full space-y-6">
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h2 class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">Facturas</h2>
-            <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Gestiona tus facturas electrónicas.</p>
+            <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Facturas</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Gestiona tus facturas electrónicas.</p>
           </div>
           <div class="flex items-center gap-3">
-            <button class="btn-secondary" *ngIf="hasInvoices()" (click)="openImportModal()">
-              <span class="material-icons-outlined text-[18px] mr-1.5">cloud_download</span>
-              Importar
-            </button>
-            <button class="btn-secondary">
-              <span class="material-icons-outlined text-[18px] mr-1.5">filter_list</span>
+            @if (hasInvoices()) {
+              <button hlmBtn variant="outline" (click)="openImportModal()">
+                <ng-icon name="lucideCloudDownload" />
+                Importar
+              </button>
+            }
+            <button hlmBtn variant="outline">
+              <ng-icon name="lucideFilter" />
               Filtrar
             </button>
-            <button class="btn-primary">
-              <span class="material-icons-outlined text-[18px] mr-1.5">add</span>
+            <button hlmBtn>
+              <ng-icon name="lucidePlus" />
               Nueva Factura
             </button>
           </div>
         </div>
 
-        <ng-container *ngIf="isLoading() && !hasInvoices()">
-          <div class="flex justify-center items-center py-20">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        @if (isLoading() && !hasInvoices()) {
+          <div class="flex items-center justify-center py-20">
+            <hlm-spinner class="size-8 text-primary" />
           </div>
-        </ng-container>
+        }
 
-        <!-- Empty State Master -->
-        <div *ngIf="!isLoading() && !hasInvoices()" class="card flex flex-col items-center justify-center py-20 text-center shadow-sm">
-          <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] transition-colors">
-            <span class="material-icons-outlined text-slate-300 dark:text-slate-600 text-4xl">receipt_long</span>
-          </div>
-          <h3 class="text-lg font-medium text-slate-900 dark:text-white">Aún no hay facturas</h3>
-          <p class="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-            No se han encontrado facturas en este entorno. Pronto podrás sincronizarlas desde tu bandeja o crearlas manualmente.
-          </p>
+        @if (!isLoading() && !hasInvoices()) {
+          <hlm-empty class="py-20">
+            <ng-icon hlm name="lucideReceipt" class="text-4xl text-muted-foreground/40" />
+            <h3 hlmEmptyTitle>Aún no hay facturas</h3>
+            <p hlmEmptyDescription>No se han encontrado facturas en este entorno. Pronto podrás sincronizarlas desde tu bandeja o crearlas manualmente.</p>
+            <button hlmBtn variant="outline" class="mt-6" [disabled]="isUploading() || isAnalyzing()" (click)="openImportModal()">
+              <ng-icon name="lucideCloudDownload" />
+              {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
+            </button>
+            @if (errorMessage()) {
+              <p class="mt-3 text-sm text-destructive">{{ errorMessage() }}</p>
+            }
+          </hlm-empty>
+        }
 
-          <button class="btn-secondary" [disabled]="isUploading() || isAnalyzing()" (click)="openImportModal()">
-            <span class="material-icons-outlined text-[18px] mr-1.5">cloud_download</span>
-            {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
-          </button>
-
-          <p *ngIf="errorMessage()" class="mt-3 text-sm text-rose-600 dark:text-rose-300">{{ errorMessage() }}</p>
-        </div>
-
-        <!-- Invoices Table -->
-        <div *ngIf="hasInvoices()" class="card !p-0 overflow-hidden shadow-sm">
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead class="bg-slate-50 dark:bg-slate-800/50">
-                <tr>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Número</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Emisor</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha Emisión</th>
-                </tr>
-              </thead>
-              <tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
-                <tr *ngFor="let invoice of invoices()" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
-                    <a [routerLink]="[invoice.id]" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 hover:underline cursor-pointer">
-                      {{ invoice.invoice_number || 'N/A' }}
-                    </a>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                    <div class="font-medium text-slate-900 dark:text-white truncate max-w-[200px]" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
-                    <div class="text-xs">{{ invoice.issuer_tax_id }}</div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-left font-medium text-slate-900 dark:text-white">
-                    {{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500 dark:text-slate-400">
-                    {{ invoice.issue_date | date: 'mediumDate' }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Pagination -->
-          <div class="bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-t border-slate-200 dark:border-slate-800 sm:px-6">
-            <div class="flex-1 flex justify-center">
-              <button *ngIf="hasMore()" (click)="loadMore()" [disabled]="isLoadingMore()" class="btn-secondary text-sm disabled:opacity-50">
-                {{ isLoadingMore() ? 'Cargando...' : 'Cargar más' }}
-              </button>
-              <p *ngIf="!hasMore() && hasInvoices()" class="text-sm text-slate-500 dark:text-slate-400">Has llegado al final de la lista.</p>
+        @if (hasInvoices()) {
+          <hlm-card class="overflow-hidden p-0">
+            <div class="overflow-x-auto">
+              <table hlmTable>
+                <thead hlmTHead>
+                  <tr hlmTr>
+                    <th hlmTh>Número</th>
+                    <th hlmTh>Emisor</th>
+                    <th hlmTh>Total</th>
+                    <th hlmTh class="text-right">Fecha Emisión</th>
+                  </tr>
+                </thead>
+                <tbody hlmTBody>
+                  @for (invoice of invoices(); track invoice.id) {
+                    <tr hlmTr>
+                      <td hlmTd class="font-medium">
+                        <a [routerLink]="[invoice.id]" class="text-primary hover:underline">{{ invoice.invoice_number || 'N/A' }}</a>
+                      </td>
+                      <td hlmTd>
+                        <div class="max-w-[200px] truncate font-medium" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
+                        <div class="text-xs text-muted-foreground">{{ invoice.issuer_tax_id }}</div>
+                      </td>
+                      <td hlmTd class="font-medium">{{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}</td>
+                      <td hlmTd class="text-right text-muted-foreground">{{ invoice.issue_date | date: 'mediumDate' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
             </div>
-          </div>
-        </div>
+            <div class="flex items-center justify-center border-t px-4 py-3 sm:px-6">
+              @if (hasMore()) {
+                <button hlmBtn variant="outline" (click)="loadMore()" [disabled]="isLoadingMore()">
+                  {{ isLoadingMore() ? 'Cargando...' : 'Cargar más' }}
+                </button>
+              } @else if (hasInvoices()) {
+                <p class="text-sm text-muted-foreground">Has llegado al final de la lista.</p>
+              }
+            </div>
+          </hlm-card>
+        }
       </div>
     </div>
 
-    <app-modal [isOpen]="isImportModalOpen()" title="Importar historico de facturas" [showDefaultFooter]="false" (close)="closeImportModal()">
-      <div class="space-y-4">
-        <app-file-upload
-          [accept]="historyImportAccept"
-          [items]="uploadQueueItems()"
-          [isPickerDisabled]="isUploading() || isAnalyzing()"
-          [disableActions]="isAnalyzing()"
-          (filesSelected)="onFilesAdded($event)"
-          (cancelRequested)="cancelUpload($event)"
-          (removeRequested)="removeFile($event)"
-        />
-
-        <p *ngIf="errorMessage()" class="text-sm text-rose-600 dark:text-rose-300">{{ errorMessage() }}</p>
-
-        <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 mt-4 text-sm text-sky-800 dark:border-sky-800/70 dark:bg-sky-950/30 dark:text-sky-100">
-          <p class="font-medium">El análisis se ejecuta en segundo plano.</p>
-          <p class="mt-1">Cuando presiones Analizar, enviaremos todos los archivos cargados y el proceso continuará de forma asíncrona.</p>
+    <hlm-dialog [state]="isImportModalOpen() ? 'open' : 'closed'" (closed)="closeImportModal()">
+      <hlm-dialog-content *brnDialogContent class="sm:max-w-lg">
+        <hlm-dialog-header>
+          <h2 hlmDialogTitle>Importar historico de facturas</h2>
+        </hlm-dialog-header>
+        <div class="space-y-4">
+          <app-file-upload
+            [accept]="historyImportAccept"
+            [validateFile]="validateHistoryFile"
+            [maxFileSizeBytes]="historyMaxFileSizeBytes"
+            [items]="uploadQueueItems()"
+            [isPickerDisabled]="isUploading() || isAnalyzing()"
+            [disableActions]="isAnalyzing()"
+            (filesSelected)="onFilesAdded($event)"
+            (cancelRequested)="cancelUpload($event)"
+            (removeRequested)="removeFile($event)"
+            (retryRequested)="retryUpload($event)"
+            (clearAllRequested)="clearAllFiles()"
+          />
+          @if (errorMessage()) {
+            <p class="text-sm text-destructive">{{ errorMessage() }}</p>
+          }
+          <hlm-alert>
+            <ng-icon hlm name="lucideInfo" />
+            <h4 hlmAlertTitle>El análisis se ejecuta en segundo plano.</h4>
+            <p hlmAlertDescription>Cuando presiones Analizar, enviaremos todos los archivos cargados y el proceso continuará de forma asíncrona.</p>
+          </hlm-alert>
         </div>
-      </div>
-
-      <ng-container modal-footer>
-        <button type="button" class="btn-primary w-full sm:w-auto" [disabled]="!canAnalyze()" (click)="analyzeFiles()">
-          <span class="material-icons-outlined text-[18px] mr-1.5">auto_awesome</span>
-          {{ isAnalyzing() ? 'Encolando...' : 'Analizar' }}
-        </button>
-        <button type="button" class="btn-secondary mt-3 w-full sm:mt-0 sm:w-auto" [disabled]="isUploading() || isAnalyzing()" (click)="closeImportModal()">Cancelar</button>
-      </ng-container>
-    </app-modal>
+        <hlm-dialog-footer>
+          <button hlmBtn variant="outline" brnDialogClose [disabled]="isUploading() || isAnalyzing()">Cancelar</button>
+          <button hlmBtn [disabled]="!canAnalyze()" (click)="analyzeFiles()">
+            <ng-icon name="lucideSparkles" />
+            {{ isAnalyzing() ? 'Encolando...' : 'Analizar' }}
+          </button>
+        </hlm-dialog-footer>
+      </hlm-dialog-content>
+    </hlm-dialog>
   `,
 })
 export class MasterInvoicesComponent implements OnInit {
@@ -147,13 +173,13 @@ export class MasterInvoicesComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
 
   readonly historyImportAccept = INVOICE_HISTORY_ACCEPT;
+  readonly historyMaxFileSizeBytes = INVOICE_HISTORY_MAX_FILE_SIZE_BYTES;
+  readonly validateHistoryFile = supportsInvoiceHistoryFile;
   readonly isImportModalOpen = this.importStore.isImportModalOpen;
   readonly isUploading = this.importStore.uploading;
   readonly isAnalyzing = this.importStore.analyzing;
   readonly errorMessage = this.importStore.errorMessage;
   readonly queuedFiles = this.importStore.queuedFiles;
-
-  // Invoices Store signals
   readonly invoices = this.invoicesStore.invoices;
   readonly hasInvoices = this.invoicesStore.hasInvoices;
   readonly isLoading = this.invoicesStore.isLoading;
@@ -208,12 +234,17 @@ export class MasterInvoicesComponent implements OnInit {
     this.importStore.cancelFileUpload(fileId);
   }
 
+  retryUpload(fileId: string): void {
+    this.importStore.retryFileUpload(fileId);
+  }
+
+  clearAllFiles(): void {
+    this.importStore.clearAllFiles();
+  }
+
   analyzeFiles(): void {
     const id = this.importForm.controls.id.value;
-    if (!this.importForm.valid || !id) {
-      return;
-    }
-
+    if (!this.importForm.valid || !id) return;
     this.importStore.analyzeUploadedFiles(id);
   }
 
@@ -225,33 +256,24 @@ export class MasterInvoicesComponent implements OnInit {
     const ulidAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
     const timestamp = Date.now();
     const timePart: string[] = new Array(10);
-
     let value = timestamp;
     for (let index = 9; index >= 0; index -= 1) {
       timePart[index] = ulidAlphabet[value % 32] ?? '0';
       value = Math.floor(value / 32);
     }
-
     const randomBytes = crypto.getRandomValues(new Uint8Array(10));
     let randomPart = '';
     let bitBuffer = 0;
     let bitCount = 0;
-
     for (const byte of randomBytes) {
       bitBuffer = (bitBuffer << 8) | byte;
       bitCount += 8;
-
       while (bitCount >= 5 && randomPart.length < 16) {
         bitCount -= 5;
-        const randomIndex = (bitBuffer >> bitCount) & 31;
-        randomPart += ulidAlphabet[randomIndex] ?? '0';
+        randomPart += ulidAlphabet[(bitBuffer >> bitCount) & 31] ?? '0';
       }
-
-      if (randomPart.length === 16) {
-        break;
-      }
+      if (randomPart.length === 16) break;
     }
-
     return `${timePart.join('')}${randomPart}`;
   }
 }

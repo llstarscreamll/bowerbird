@@ -14,6 +14,7 @@ import { CONNECTIONS_REPOSITORY } from './connections/domain/connections.reposit
 import { ConnectionsHttpRepository } from './connections/infrastructure/connections.http.repository';
 import { UNIFIED_INBOX_REPOSITORY } from './inbox/domain/unified-inbox.repository';
 import { UnifiedInboxHttpRepository } from './inbox/infrastructure/unified-inbox.http.repository';
+import { appIcons } from './shared/icons/app-icons';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,6 +25,7 @@ export const appConfig: ApplicationConfig = {
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpService },
     { provide: CONNECTIONS_REPOSITORY, useClass: ConnectionsHttpRepository },
     { provide: UNIFIED_INBOX_REPOSITORY, useClass: UnifiedInboxHttpRepository },
+    appIcons,
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

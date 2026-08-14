@@ -45,7 +45,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
             toastService.showError(friendlyMessage, err.title || 'Error del Servidor');
           }
 
-          // Let the component handle 4xx errors via AlertComponent,
+          // Let the component handle 4xx errors via hlm-alert,
           // but throw an enriched error object for easier catching.
           err.detail = friendlyMessage; // Swap the detail with the translated message so components can just show it
         });

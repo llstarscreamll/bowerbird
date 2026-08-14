@@ -1,152 +1,142 @@
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { NgIcon } from '@ng-icons/core';
 import { InvoiceDetailsStore } from '../../../application/invoice-details.store';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmSeparatorImports } from '@spartan-ng/helm/separator';
+import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 @Component({
   selector: 'app-invoice-detail',
   standalone: true,
-  imports: [CommonModule, CurrencyPipe, DatePipe, RouterLink],
-  host: {
-    class: 'flex-1 flex flex-col min-h-0 w-full bg-slate-50 dark:bg-slate-950 p-4 sm:p-8 overflow-y-auto',
-  },
+  imports: [CommonModule, CurrencyPipe, DatePipe, RouterLink, NgIcon, HlmCardImports, HlmButtonImports, HlmSpinnerImports, HlmTableImports, HlmSeparatorImports],
+  host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto bg-muted/20 p-4 sm:p-8' },
   template: `
-    <div class="mx-auto space-y-6 w-full max-w-5xl">
-      <!-- Loading State -->
-      <div *ngIf="isLoading()" class="flex justify-center items-center py-20">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-      </div>
-
-      <!-- Detail View -->
-      <ng-container *ngIf="invoice() as inv">
-        <!-- Header Actions -->
-        <div class="flex items-center gap-4 mb-2">
-          <a routerLink="../" class="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
-            <span class="material-icons-outlined text-[18px] mr-1">arrow_back</span>
-            Volver a facturas
-          </a>
+    <div class="mx-auto w-full max-w-5xl space-y-6">
+      @if (isLoading()) {
+        <div class="flex items-center justify-center py-20">
+          <hlm-spinner class="size-8 text-primary" />
         </div>
+      }
 
-        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      @if (invoice(); as inv) {
+        <a routerLink="../" class="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground">
+          <ng-icon name="lucideArrowLeft" class="mr-1" />
+          Volver a facturas
+        </a>
+
+        <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
-            <h2 class="text-2xl font-bold leading-7 text-slate-900 dark:text-white sm:truncate sm:text-3xl sm:tracking-tight">Factura {{ inv.invoice_number || 'N/A' }}</h2>
-            <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">Emitida el {{ inv.issue_date | date: 'longDate' }}</p>
+            <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Factura {{ inv.invoice_number || 'N/A' }}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Emitida el {{ inv.issue_date | date: 'longDate' }}</p>
           </div>
-          <div class="flex items-center gap-3">
-            <button class="btn-secondary">
-              <span class="material-icons-outlined text-[18px] mr-1.5">download</span>
-              Descargar
-            </button>
-          </div>
+          <button hlmBtn variant="outline">
+            <ng-icon name="lucideDownload" />
+            Descargar
+          </button>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <!-- Issuer Info -->
-          <div class="card !p-6 flex flex-col justify-between">
+        <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+          <hlm-card class="flex flex-col justify-between p-6">
             <div>
-              <h3 class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Emisor</h3>
-              <p class="text-lg font-semibold text-slate-900 dark:text-white mb-1">{{ inv.issuer_name || 'Desconocido' }}</p>
-              <p class="text-sm text-slate-600 dark:text-slate-300">
-                NIT: <span class="font-medium">{{ inv.issuer_tax_id || 'N/A' }}</span>
+              <h3 class="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">Emisor</h3>
+              <p class="mb-1 text-lg font-semibold">{{ inv.issuer_name || 'Desconocido' }}</p>
+              <p class="text-sm text-muted-foreground">
+                NIT: <span class="font-medium text-foreground">{{ inv.issuer_tax_id || 'N/A' }}</span>
               </p>
             </div>
-            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <p class="text-sm text-slate-500 dark:text-slate-400">CUFE</p>
-              <p class="text-xs text-slate-900 dark:text-white break-all mt-1 font-mono bg-slate-100 dark:bg-slate-800 p-2 rounded">{{ inv.cufe || 'N/A' }}</p>
+            <div class="mt-4 border-t pt-4">
+              <p class="text-sm text-muted-foreground">CUFE</p>
+              <p class="mt-1 break-all rounded bg-muted p-2 font-mono text-xs">{{ inv.cufe || 'N/A' }}</p>
             </div>
-          </div>
+          </hlm-card>
 
-          <!-- Receiver & Summary Info -->
-          <div class="card !p-6 flex flex-col justify-between">
+          <hlm-card class="flex flex-col justify-between p-6">
             <div>
-              <h3 class="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Receptor</h3>
-              <p class="text-lg font-semibold text-slate-900 dark:text-white mb-1">{{ inv.receiver_name || 'Desconocido' }}</p>
-              <p class="text-sm text-slate-600 dark:text-slate-300">
-                NIT: <span class="font-medium">{{ inv.receiver_tax_id || 'N/A' }}</span>
+              <h3 class="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">Receptor</h3>
+              <p class="mb-1 text-lg font-semibold">{{ inv.receiver_name || 'Desconocido' }}</p>
+              <p class="text-sm text-muted-foreground">
+                NIT: <span class="font-medium text-foreground">{{ inv.receiver_tax_id || 'N/A' }}</span>
               </p>
             </div>
-            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-4">
+            <div class="mt-4 grid grid-cols-2 gap-4 border-t pt-4">
               <div>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Vencimiento</p>
-                <p class="text-sm font-medium text-slate-900 dark:text-white mt-1">{{ inv.due_date ? (inv.due_date | date: 'mediumDate') : 'N/A' }}</p>
+                <p class="text-sm text-muted-foreground">Vencimiento</p>
+                <p class="mt-1 text-sm font-medium">{{ inv.due_date ? (inv.due_date | date: 'mediumDate') : 'N/A' }}</p>
               </div>
               <div>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Método de pago</p>
-                <p class="text-sm font-medium text-slate-900 dark:text-white mt-1">{{ inv.payment_code || 'N/A' }}</p>
+                <p class="text-sm text-muted-foreground">Método de pago</p>
+                <p class="mt-1 text-sm font-medium">{{ inv.payment_code || 'N/A' }}</p>
               </div>
             </div>
-          </div>
+          </hlm-card>
         </div>
 
-        <!-- Lines Table -->
-        <div class="card !p-0 mt-6 overflow-hidden shadow-sm">
-          <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-            <h3 class="text-lg font-medium leading-6 text-slate-900 dark:text-white">Detalle de Productos o Servicios</h3>
+        <hlm-card class="mt-6 overflow-hidden p-0">
+          <div class="border-b px-6 py-4">
+            <h3 class="text-lg font-medium">Detalle de Productos o Servicios</h3>
           </div>
           <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead class="bg-slate-50 dark:bg-slate-800/50">
-                <tr>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Código</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Descripción</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Cantidad</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Precio Unitario</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Impuesto</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
+            <table hlmTable>
+              <thead hlmTHead>
+                <tr hlmTr>
+                  <th hlmTh>Código</th>
+                  <th hlmTh>Descripción</th>
+                  <th hlmTh class="text-right">Cantidad</th>
+                  <th hlmTh class="text-right">Precio Unitario</th>
+                  <th hlmTh class="text-right">Impuesto</th>
+                  <th hlmTh class="text-right">Total</th>
                 </tr>
               </thead>
-              <tbody class="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
-                <tr *ngFor="let line of inv.lines" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                    {{ line.item_code || 'N/A' }}
-                  </td>
-                  <td class="px-6 py-4 text-sm text-slate-900 dark:text-white">
-                    <div class="font-medium max-w-[300px] break-words">{{ line.description }}</div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500 dark:text-slate-400">
-                    {{ line.quantity }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500 dark:text-slate-400">
-                    {{ line.unit_price | currency: inv.currency_code : 'symbol' : '1.2-2' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-slate-500 dark:text-slate-400">
-                    {{ line.line_tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-slate-900 dark:text-white">
-                    {{ line.line_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}
-                  </td>
-                </tr>
-                <tr *ngIf="!inv.lines || inv.lines.length === 0">
-                  <td colspan="6" class="px-6 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No se encontraron líneas de detalle para esta factura.</td>
-                </tr>
+              <tbody hlmTBody>
+                @for (line of inv.lines; track $index) {
+                  <tr hlmTr>
+                    <td hlmTd class="text-muted-foreground">{{ line.item_code || 'N/A' }}</td>
+                    <td hlmTd>
+                      <div class="max-w-[300px] break-words font-medium">{{ line.description }}</div>
+                    </td>
+                    <td hlmTd class="text-right text-muted-foreground">{{ line.quantity }}</td>
+                    <td hlmTd class="text-right text-muted-foreground">{{ line.unit_price | currency: inv.currency_code : 'symbol' : '1.2-2' }}</td>
+                    <td hlmTd class="text-right text-muted-foreground">{{ line.line_tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</td>
+                    <td hlmTd class="text-right font-medium">{{ line.line_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</td>
+                  </tr>
+                }
+                @if (!inv.lines || inv.lines.length === 0) {
+                  <tr hlmTr>
+                    <td hlmTd colspan="6" class="py-8 text-center text-muted-foreground">No se encontraron líneas de detalle para esta factura.</td>
+                  </tr>
+                }
               </tbody>
             </table>
           </div>
-        </div>
+        </hlm-card>
 
-        <!-- Totals Summary -->
-        <div class="flex justify-end mt-6">
-          <div class="card !p-0 w-full sm:w-80 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <h3 class="text-sm font-medium text-slate-900 dark:text-white">Resumen de Totales</h3>
+        <div class="mt-6 flex justify-end">
+          <hlm-card class="w-full overflow-hidden p-0 sm:w-80">
+            <div class="border-b bg-muted/30 px-6 py-4">
+              <h3 class="text-sm font-medium">Resumen de Totales</h3>
             </div>
-            <div class="px-6 py-4 bg-white dark:bg-slate-900 space-y-3">
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-slate-500 dark:text-slate-400">Subtotal</span>
-                <span class="font-medium text-slate-900 dark:text-white">{{ inv.subtotal | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
+            <div class="space-y-3 px-6 py-4">
+              <div class="flex justify-between text-sm">
+                <span class="text-muted-foreground">Subtotal</span>
+                <span class="font-medium">{{ inv.subtotal | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
               </div>
-              <div class="flex justify-between items-center text-sm">
-                <span class="text-slate-500 dark:text-slate-400">Impuestos</span>
-                <span class="font-medium text-slate-900 dark:text-white">{{ inv.tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
+              <div class="flex justify-between text-sm">
+                <span class="text-muted-foreground">Impuestos</span>
+                <span class="font-medium">{{ inv.tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
               </div>
-              <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <span class="text-base font-semibold text-slate-900 dark:text-white">Total a Pagar</span>
-                <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ inv.grand_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
+              <hlm-separator />
+              <div class="flex justify-between items-center">
+                <span class="text-base font-semibold">Total a Pagar</span>
+                <span class="text-lg font-bold text-primary">{{ inv.grand_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
               </div>
             </div>
-          </div>
+          </hlm-card>
         </div>
-      </ng-container>
+      }
     </div>
   `,
 })

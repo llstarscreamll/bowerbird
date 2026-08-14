@@ -4,6 +4,9 @@ const SUPPORTED_MIME_TYPES = new Set(['application/xml', 'text/xml', 'applicatio
 
 export const INVOICE_HISTORY_ACCEPT = '.xml,.pdf,.zip,application/xml,text/xml,application/pdf,application/zip,application/x-zip-compressed,multipart/x-zip';
 
+/** 1 GB per file — matches copy in the import modal dropzone. */
+export const INVOICE_HISTORY_MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024;
+
 export function supportsInvoiceHistoryFile(file: File): boolean {
   const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
 

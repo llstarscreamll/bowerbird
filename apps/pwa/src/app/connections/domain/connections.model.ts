@@ -1,5 +1,7 @@
+import type { ConnectionStatus } from '../../core/domain/connection-status.model';
+
+export type { ConnectionStatus };
 export type SharingPolicy = 'private' | 'tenant_all';
-export type ConnectionStatus = 'active' | 'requires_reconnect' | 'paused' | 'error';
 export type ConnectionProvider = 'gmail' | 'microsoft';
 
 export interface Connection {
