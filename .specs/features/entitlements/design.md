@@ -2,14 +2,14 @@
 
 ## Bounded contexts
 
-- `identity`: `users.platform_role`; lookup en runtime. JWT solo identidad.
-- `organization`: ciclo de vida del tenant; al crear aplica el pack por defecto vía puerto.
-- `entitlements`: catálogo en código + `tenant_entitlements`. Inbox/connections llaman `Checker`, no el repo.
-- `internal/platform` permanece infraestructura. Prefijo HTTP `/api/v1/platform` es fachada del operador.
+- `identity`: `users.platform_role`; lookup at runtime. JWT is identity only.
+- `organization`: tenant lifecycle; on create applies the default pack via a port.
+- `entitlements`: in-code catalog + `tenant_entitlements`. Inbox/connections call `Checker`, not the repo.
+- `internal/platform` stays infrastructure. HTTP prefix `/api/v1/platform` is the operator facade.
 
 ## Evaluation
 
-Un grant es efectivo si `status IN (active, trial)` y `now ∈ [starts_at, ends_at)` (`ends_at` null = abierto).
+A grant is effective if `status IN (active, trial)` and `now ∈ [starts_at, ends_at)` (`ends_at` null = open-ended).
 
 ## Enforcement
 
@@ -19,4 +19,4 @@ Un grant es efectivo si `status IN (active, trial)` y `now ∈ [starts_at, ends_
 | Inbox send                     | `mail.send`                                    |
 | Sync + connections             | `mail.inbox` OR `invoicing.capture_from_email` |
 
-OAuth: sin `mail.send` no se piden `gmail.send` / `Mail.Send`.
+OAuth: without `mail.send`, do not request `gmail.send` / `Mail.Send`.
