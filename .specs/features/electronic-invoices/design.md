@@ -1,124 +1,110 @@
-# Diseño - Gestión de Facturas Electrónicas (EFI)
+# Design — electronic invoice management (EFI)
 
-## 1. Alcance del diseño
+## 1. Design scope
 
-Este diseño cubre:
+Covers:
 
-- Ingesta pull multi-proveedor y multi-cuenta por tenant.
-- Pipeline de adjuntos (descompresión, clasificación, agrupación documental).
-- Extracción híbrida XML DIAN + fallback Gemini.
-- Persistencia e idempotencia.
-- UI de conexiones y bandeja unificada.
+- Multi-provider, multi-account pull ingest per tenant
+- Attachment pipeline (decompress, classify, group documents)
+- Hybrid extraction: DIAN XML first, Gemini PDF fallback
+- Persistence and idempotency
+- Connection UI and unified inbox
 
 ## 2. Bounded contexts
 
-### 2.1 `inbox` (contexto de integración de correo)
+### 2.1 `inbox` (mail integration)
 
-Responsabilidades:
+**Owns**
 
-- Gestión de cuentas conectadas por tenant/proveedor.
-- OAuth2 y refresco de tokens.
-- Pull periódico de mensajes por cuenta activa.
-- Descarga de adjuntos y almacenamiento en S3.
-- Publicación de eventos de dominio de correo.
+- Connected accounts per tenant/provider
+- OAuth2 and token refresh
+- Periodic pull of messages for active accounts
+- Attachment download and S3 storage
+- Mail domain event publication
 
-No responsabilidades:
+**Does not**
 
-- No decide reglas de facturación.
-- No parsea XML DIAN ni ejecuta LLM de facturas.
+- Apply invoicing rules
+- Parse DIAN XML or run invoice LLM extraction
 
-### 2.2 `invoicing` (contexto financiero de facturas)
+### 2.2 `invoicing` (invoice finance)
 
-Responsabilidades:
+**Owns**
 
-- Suscribirse a eventos de correo y filtrar candidatos.
-- Ejecutar pipeline de documentos.
-- Parsear XML UBL 2.1 DIAN.
-- Ejecutar fallback Gemini para PDF.
-- Normalizar, deduplicar y persistir factura + líneas.
+- Subscribe to mail events and filter candidates
+- Run the document pipeline
+- Parse UBL 2.1 DIAN XML
+- Run Gemini PDF fallback
+- Normalize, deduplicate, and persist invoice + lines
 
-No responsabilidades:
+**Does not**
 
-- No gestiona OAuth de correo.
-- No sincroniza bandejas directamente.
+- Manage mail OAuth
+- Sync inboxes directly
 
-## 3. Decisiones de arquitectura
+## 3. Architecture decisions
 
-1. **Coreografía por eventos**: `inbox` publica `InboxMessageReceived`; `invoicing` consume de forma desacoplada.
-2. **Sin contexto orquestador central (por ahora)**: evita acoplamiento y optimización prematura.
-3. **Patrón Adapter/Strategy para LLM**: interfaz estable `InvoiceLLMExtractor` con implementación inicial Gemini.
-4. **Idempotencia multinivel**: por mensaje (provider_message_id), archivo (hash), y factura (CUFE).
-5. **S3 compartido segmentado por prefijos**: aislamiento lógico por tenant/modulo/etapa.
+1. **Event choreography**: `inbox` publishes `InboxMessageReceived`; `invoicing` consumes independently.
+2. **No central orchestrator (for now)**: avoids coupling and premature optimization.
+3. **Adapter/Strategy for LLM**: stable `InvoiceLLMExtractor` interface; initial implementation is Gemini.
+4. **Multi-level idempotency**: message (`provider_message_id`), file (hash), invoice (CUFE).
+5. **Shared S3 with prefix segmentation**: logical isolation by tenant / module / stage.
 
-## 4. Flujo principal end-to-end
+## 4. End-to-end flow
 
-1. Worker de `inbox` obtiene cuentas activas de un tenant.
-2. Por cuenta: ejecuta pull incremental de correos nuevos/no procesados.
-3. Guarda metadatos crudos de correo (`raw_data`) y adjuntos en S3.
-4. Publica evento `InboxMessageReceived` con referencias S3.
-5. Consumer `invoicing` recibe evento y clasifica si aplica a factura.
-6. Si aplica: descomprime, clasifica y agrupa documentos.
-7. Si hay XML válido: parsea UBL 2.1 (prioridad 1).
-8. Si no hay XML: invoca Gemini en PDF (prioridad 2).
-9. Normaliza al modelo interno, valida CUFE e idempotencia.
-10. Persiste cabecera, líneas y `raw_data`, emitiendo logs/métricas.
+1. `inbox` worker loads active accounts for a tenant.
+2. Per account: incremental pull of new / unprocessed mail.
+3. Persist raw mail metadata (`raw_data`) and upload attachments to S3.
+4. Publish `InboxMessageReceived` with S3 refs.
+5. `invoicing` consumer receives the event and decides if it is an invoice candidate.
+6. If yes: decompress, classify, and group documents.
+7. Valid XML → parse UBL 2.1 (priority 1).
+8. No XML → invoke Gemini on PDF (priority 2).
+9. Normalize to the internal model; validate CUFE and idempotency.
+10. Persist header, lines, and `raw_data`; emit logs and metrics.
 
-## 5. Componentes de aplicación
+## 5. Application components
 
-## 5.1 En `apps/backend/internal/inbox`
+### 5.1 `apps/backend/internal/inbox`
 
-- `application/sync_accounts_usecase.go`
-  - Orquesta ciclo de sincronización por cuenta.
-- `domain/connected_account.go`
-  - Entidad de cuenta conectada y estado.
-- `domain/email_message.go`
-  - Entidad de mensaje sincronizado.
-- `domain/attachment.go`
-  - Entidad de adjunto con hash, tipo y S3 key.
-- `domain/events.go`
-  - Evento `InboxMessageReceived`.
-- `infra/provider/gmail_client.go` y `.../outlook_client.go` (iterativo)
-  - Adaptadores por proveedor.
-- `infra/repository/postgres/*.go`
-  - Repositorios tenant para cuentas/mensajes.
+| Path                                                  | Role                                   |
+| ----------------------------------------------------- | -------------------------------------- |
+| `application/sync_accounts_usecase.go`                | Sync cycle per account                 |
+| `domain/connected_account.go`                         | Connected account entity and status    |
+| `domain/email_message.go`                             | Synced message entity                  |
+| `domain/attachment.go`                                | Attachment entity (hash, type, S3 key) |
+| `domain/events.go`                                    | `InboxMessageReceived` event           |
+| `infra/provider/gmail_client.go`, `outlook_client.go` | Provider adapters (iterative)          |
+| `infra/repository/postgres/*.go`                      | Tenant repos for accounts/messages     |
 
-## 5.2 En `apps/backend/internal/invoicing`
+### 5.2 `apps/backend/internal/invoicing`
 
-- `application/process_inbox_event_usecase.go`
-  - Punto de entrada por evento.
-- `application/classify_documents_usecase.go`
-  - Clasificación/agrupación documental.
-- `application/extract_invoice_usecase.go`
-  - Selecciona XML o LLM fallback.
-- `domain/invoice.go`, `invoice_line.go`
-  - Agregado de factura.
-- `domain/extractors.go`
-  - Interfaces `InvoiceXMLExtractor`, `InvoiceLLMExtractor`.
-- `infra/xml/dian_ubl21_parser.go`
-  - Parser nativo UBL 2.1.
-- `infra/llm/gemini_extractor.go`
-  - Implementación Gemini.
-- `infra/storage/s3_reader.go`
-  - Lectura de documentos desde S3.
-- `infra/repository/postgres/*.go`
-  - Persistencia factura y líneas con `raw_data`.
+| Path                                         | Role                                         |
+| -------------------------------------------- | -------------------------------------------- |
+| `application/process_inbox_event_usecase.go` | Event entry point                            |
+| `application/classify_documents_usecase.go`  | Document classification / grouping           |
+| `application/extract_invoice_usecase.go`     | Choose XML or LLM fallback                   |
+| `domain/invoice.go`, `invoice_line.go`       | Invoice aggregate                            |
+| `domain/extractors.go`                       | `InvoiceXMLExtractor`, `InvoiceLLMExtractor` |
+| `infra/xml/dian_ubl21_parser.go`             | Native UBL 2.1 parser                        |
+| `infra/llm/gemini_extractor.go`              | Gemini implementation                        |
+| `infra/storage/s3_reader.go`                 | Read documents from S3                       |
+| `infra/repository/postgres/*.go`             | Persist invoice and lines with `raw_data`    |
 
-## 5.3 En `apps/pwa`
+### 5.3 `apps/pwa`
 
-- `src/app/features/inbox-connections/*`
-  - UI de conexión OAuth por proveedor/cuenta.
-- `src/app/features/unified-inbox/*`
-  - Bandeja unificada responsive multi-proveedor.
-- `src/app/core/presentation/components/connection-status-chip/*`
-  - Indicadores de estado por cuenta (compartido entre conexiones e inbox).
-- `src/app/features/invoices/*`
-  - Vista de facturas extraídas (iterativo).
+| Path                                                            | Role                                    |
+| --------------------------------------------------------------- | --------------------------------------- |
+| `src/app/features/inbox-connections/*`                          | OAuth connect UI per provider/account   |
+| `src/app/features/unified-inbox/*`                              | Responsive multi-provider unified inbox |
+| `src/app/core/presentation/components/connection-status-chip/*` | Shared per-account status chip          |
+| `src/app/features/invoices/*`                                   | Extracted invoices view (iterative)     |
 
-## 6. Esquema de eventos
+## 6. Event schema
 
-### Evento: `InboxMessageReceived`
+### `InboxMessageReceived`
 
-Campos mínimos:
+Minimum fields:
 
 - `event_id`
 - `occurred_at`
@@ -133,75 +119,74 @@ Campos mínimos:
 - `attachment_refs[]` (S3 key, filename, mime, hash)
 - `raw_data_ref`
 
-## 7. Modelo de datos (tenant DB)
+## 7. Data model (tenant DB)
 
-Tablas propuestas (nombres iniciales):
+Proposed tables (initial names):
 
-- `connected_accounts`
-  - `id`, `tenant_id`, `provider`, `email`, `status`, `encrypted_credentials`, `last_sync_at`, `last_error`, `raw_data`, timestamps.
-- `email_messages`
-  - `id`, `tenant_id`, `account_id`, `provider_message_id`, `thread_id`, `subject`, `sender`, `received_at`, `processing_status`, `raw_data`, timestamps.
-- `email_attachments`
-  - `id`, `tenant_id`, `message_id`, `filename`, `mime_type`, `size_bytes`, `sha256`, `s3_key`, `raw_data`, timestamps.
-- `invoice_headers`
-  - `id`, `tenant_id`, `source_message_id`, `cufe`, `invoice_number`, `issuer_name`, `receiver_name`, `currency`, `subtotal`, `tax_total`, `grand_total`, `document_ref_s3_key`, `extraction_source` (`xml`|`llm`), `raw_data`, timestamps.
-- `invoice_lines`
-  - `id`, `tenant_id`, `invoice_header_id`, `line_number`, `description`, `quantity`, `unit_price`, `line_tax_total`, `line_total`, `raw_data`, timestamps.
+| Table                | Key columns                                                                                                                                                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `connected_accounts` | `id`, `tenant_id`, `provider`, `email`, `status`, `encrypted_credentials`, `last_sync_at`, `last_error`, `raw_data`, timestamps                                                                                                         |
+| `email_messages`     | `id`, `tenant_id`, `account_id`, `provider_message_id`, `thread_id`, `subject`, `sender`, `received_at`, `processing_status`, `raw_data`, timestamps                                                                                    |
+| `email_attachments`  | `id`, `tenant_id`, `message_id`, `filename`, `mime_type`, `size_bytes`, `sha256`, `s3_key`, `raw_data`, timestamps                                                                                                                      |
+| `invoice_headers`    | `id`, `tenant_id`, `source_message_id`, `cufe`, `invoice_number`, `issuer_name`, `receiver_name`, `currency`, `subtotal`, `tax_total`, `grand_total`, `document_ref_s3_key`, `extraction_source` (`xml`\|`llm`), `raw_data`, timestamps |
+| `invoice_lines`      | `id`, `tenant_id`, `invoice_header_id`, `line_number`, `description`, `quantity`, `unit_price`, `line_tax_total`, `line_total`, `raw_data`, timestamps                                                                                  |
 
-Índices/constraints claves:
+Key indexes / constraints:
 
-- Unique (`tenant_id`, `provider`, `provider_message_id`) en `email_messages`.
-- Unique (`tenant_id`, `cufe`) en `invoice_headers`.
-- Unique (`tenant_id`, `sha256`, `s3_key_scope`) opcional para estrategia anti-duplicado físico.
+- Unique (`tenant_id`, `provider`, `provider_message_id`) on `email_messages`
+- Unique (`tenant_id`, `cufe`) on `invoice_headers`
+- Optional unique (`tenant_id`, `sha256`, `s3_key_scope`) for physical anti-duplication
 
-## 8. Estrategia S3 y privacidad
+## 8. S3 and privacy
 
-Prefijo recomendado:
+Prefix:
 
 `tenant/{tenant_id}/{module}/{stage}/{yyyy}/{mm}/{dd}/{resource_id}/{filename}`
 
-Ejemplos:
+Examples:
 
 - `tenant/t_123/inbox/raw/2026/05/25/msg_abc/factura.zip`
 - `tenant/t_123/invoicing/normalized/2026/05/25/inv_999/factura.pdf`
 
-Reglas:
+Rules:
 
-- Bucket privado con block public access.
-- Sin ACLs públicas.
-- Descarga solo por URL prefirmada emitida por backend autenticado/autorizado.
+- Private bucket with block public access
+- No public ACLs
+- Downloads only via presigned URL from an authenticated, authorized backend
 
-## 9. Seguridad y secretos
+## 9. Security and secrets
 
-- Tokens de cuentas externas cifrados en BD tenant (`encrypted_credentials`).
-- Clave de cifrado gestionada por entorno seguro (KMS/secret de app).
-- Credenciales LLM obtenidas desde SSM a través de configuración backend.
-- Rotación y manejo de errores de autenticación con estado de cuenta visible en UI.
+- External account tokens encrypted in tenant DB (`encrypted_credentials`)
+- Encryption key from secure environment (KMS / app secret)
+- LLM credentials from SSM via backend config
+- Auth error handling rotates status; UI surfaces reconnect-required accounts
 
-## 10. Confiabilidad, idempotencia y reintentos
+## 10. Reliability, idempotency, and retries
 
-- Retry con backoff exponencial para APIs externas y operaciones transitorias.
-- Dead-letter queue para eventos no procesables tras máximos intentos.
-- Procesamiento idempotente por:
+- Exponential backoff for external APIs and transient failures
+- Dead-letter queue after max attempts for unprocessable events
+- Idempotent keys:
   - (`tenant_id`, `provider`, `provider_message_id`)
   - (`tenant_id`, `cufe`)
-  - (`tenant_id`, `sha256` archivo)
-- Transacciones DB por unidad atómica de factura.
+  - (`tenant_id`, file `sha256`)
+- DB transactions per atomic invoice unit
 
-## 11. Observabilidad
+## 11. Observability
 
-- Logging estructurado con `tenant_id`, `account_id`, `message_id`, `cufe`, `event_id`, `attempt`.
-- Métricas mínimas:
-  - `inbox_sync_messages_total`
-  - `inbox_sync_errors_total`
-  - `invoicing_documents_classified_total`
-  - `invoicing_extraction_xml_total`
-  - `invoicing_extraction_llm_total`
-  - `invoicing_duplicates_skipped_total`
-  - `invoicing_processing_latency_ms`
+Structured logs include `tenant_id`, `account_id`, `message_id`, `cufe`, `event_id`, `attempt`.
 
-## 12. Evolución futura
+Minimum metrics:
 
-- Agregar nuevos consumidores del evento `InboxMessageReceived` (gastos, legal, compras) sin romper `inbox`.
-- Agregar adaptadores LLM adicionales sin cambios en casos de uso.
-- Evaluar un contexto de enrutamiento dedicado solo cuando existan reglas transversales complejas y compartidas entre 3+ dominios consumidores.
+- `inbox_sync_messages_total`
+- `inbox_sync_errors_total`
+- `invoicing_documents_classified_total`
+- `invoicing_extraction_xml_total`
+- `invoicing_extraction_llm_total`
+- `invoicing_duplicates_skipped_total`
+- `invoicing_processing_latency_ms`
+
+## 12. Future evolution
+
+- Add more `InboxMessageReceived` consumers (expenses, legal, purchases) without changing `inbox`
+- Add LLM adapters without changing use cases
+- Consider a dedicated routing context only when 3+ consumer domains share complex cross-cutting rules

@@ -1,111 +1,113 @@
-# Especificación - Gestión de Facturas Electrónicas
+# Spec — electronic invoice management
 
-## Estado
+## Status
 
-- Estado: Aprobada para diseño e implementación
-- Fecha: 2026-05-25
-- Feature ID: EFI
-- Idioma: ES
+| Field      | Value                                  |
+| ---------- | -------------------------------------- |
+| Status     | Approved for design and implementation |
+| Date       | 2026-05-25                             |
+| Feature ID | EFI                                    |
+| Language   | EN                                     |
 
-## Objetivo
+## Goal
 
-Construir una gestión de facturas electrónicas modular, robusta y determinista para tenants multi-cuenta, mediante ingesta pull de correo, extracción híbrida XML/LLM, deduplicación por mensaje y CUFE, y persistencia estructurada para consulta web y métricas.
+Build modular, deterministic electronic invoice management for multi-account tenants: pull-based email ingest, hybrid XML/LLM extraction, deduplication by message and CUFE, and structured persistence for web query and metrics.
 
-## Decisiones cerradas
+## Closed decisions
 
-1. Estrategia de ingesta: `pull` compatible con múltiples proveedores y múltiples cuentas por tenant.
-2. Proveedor LLM inicial: Google Gemini vía API directa.
-3. Extensibilidad LLM: arquitectura por adaptadores para cambiar fácilmente a OpenAI/Anthropic u otros.
-4. Credenciales LLM: obtenidas desde SSM.
-5. Credenciales de cuentas de correo: almacenadas cifradas en Postgres del tenant.
-6. Frontend incluido: conexión de cuentas, bandeja unificada, estado de sincronización/sesión.
-7. Enrutamiento transversal: coreografía por eventos (sin crear un contexto orquestador central por ahora).
+1. Ingest strategy: `pull`, multi-provider, multiple accounts per tenant.
+2. Initial LLM provider: Google Gemini via direct API.
+3. LLM extensibility: adapter architecture (OpenAI, Anthropic, and others).
+4. LLM credentials: from SSM.
+5. Mail account credentials: encrypted in the tenant Postgres database.
+6. Frontend in scope: account connection, unified inbox, sync/session status.
+7. Cross-cutting routing: event choreography (no central orchestrator yet).
 
-## Requisitos funcionales
+## Functional requirements
 
-### RF-INGESTA (Ingesta y monitoreo de correo)
+### RF-INGEST (mail ingest and monitoring)
 
-- [EFI-RF-001] El sistema debe registrar múltiples cuentas de correo por tenant.
-- [EFI-RF-002] El sistema debe permitir múltiples cuentas del mismo proveedor por tenant.
-- [EFI-RF-003] El sistema debe sincronizar por `pull` cada N minutos por cuenta activa.
-- [EFI-RF-004] El sistema debe capturar y guardar metadatos del correo en la BD del tenant.
-- [EFI-RF-005] El sistema debe descargar todos los adjuntos del correo.
-- [EFI-RF-006] El sistema debe subir adjuntos a S3 y guardar referencias en BD.
-- [EFI-RF-007] El sistema debe publicar evento `InboxMessageReceived` por cada correo sincronizado.
+- [EFI-RF-001] Register multiple mail accounts per tenant.
+- [EFI-RF-002] Allow multiple accounts of the same provider per tenant.
+- [EFI-RF-003] Pull-sync every N minutes per active account.
+- [EFI-RF-004] Capture and store mail metadata in the tenant database.
+- [EFI-RF-005] Download all mail attachments.
+- [EFI-RF-006] Upload attachments to S3 and store references in the database.
+- [EFI-RF-007] Publish `InboxMessageReceived` for each synced message.
 
-### RF-PIPELINE (Descompresión y clasificación)
+### RF-PIPELINE (decompress and classify)
 
-- [EFI-RF-008] El pipeline debe detectar tipo de archivo (ZIP/XML/PDF/otros).
-- [EFI-RF-009] El pipeline debe descomprimir ZIP y procesar su contenido.
-- [EFI-RF-010] El pipeline debe agrupar archivos que pertenezcan al mismo documento comercial (pareja XML + PDF cuando exista).
-- [EFI-RF-011] El pipeline debe marcar documentos no clasificables sin bloquear la cola.
+- [EFI-RF-008] Detect file type (ZIP / XML / PDF / other).
+- [EFI-RF-009] Decompress ZIP archives and process contents.
+- [EFI-RF-010] Group files that belong to the same commercial document (XML + PDF pair when present).
+- [EFI-RF-011] Mark unclassifiable documents without blocking the queue.
 
-### RF-EXTRACCION (Motor híbrido)
+### RF-EXTRACT (hybrid engine)
 
-- [EFI-RF-012] El sistema debe priorizar parser XML nativo UBL 2.1 DIAN.
-- [EFI-RF-013] El parser XML debe extraer al menos emisor, receptor, CUFE/UUID, totales, impuestos (TaxTotal), códigos de pago y líneas.
-- [EFI-RF-014] En ausencia de XML válido, el sistema debe usar Gemini sobre PDF con salida estructurada estricta (JSON Schema).
-- [EFI-RF-015] XML y LLM deben normalizar al mismo modelo interno de factura.
-- [EFI-RF-016] Todo dato no mapeado debe persistirse en `raw_data` JSONB para no perder información.
+- [EFI-RF-012] Prefer the native UBL 2.1 DIAN XML parser.
+- [EFI-RF-013] XML parser extracts at least issuer, receiver, CUFE/UUID, totals, taxes (`TaxTotal`), payment codes, and lines.
+- [EFI-RF-014] Without valid XML, use Gemini on PDF with strict structured output (JSON Schema).
+- [EFI-RF-015] XML and LLM normalize to the same internal invoice model.
+- [EFI-RF-016] Persist unmapped data in `raw_data` JSONB so nothing is lost.
 
-### RF-VALIDACION (Negocio y deduplicación)
+### RF-VALIDATE (business rules and deduplication)
 
-- [EFI-RF-017] Debe evitarse duplicación por mensaje de correo ya sincronizado.
-- [EFI-RF-018] Si un correo ya fue procesado para facturación, debe omitirse sin alterar archivos ni tablas financieras.
-- [EFI-RF-019] Antes de persistir factura, debe validarse CUFE único.
-- [EFI-RF-020] Si CUFE ya existe, debe registrarse en logs y omitirse sin efectos secundarios.
+- [EFI-RF-017] Prevent duplicate processing of an already-synced mail message.
+- [EFI-RF-018] If a message was already processed for invoicing, skip it without changing files or financial tables.
+- [EFI-RF-019] Validate CUFE uniqueness before persisting an invoice.
+- [EFI-RF-020] If CUFE already exists, log and skip with no side effects.
 
-### RF-ALMACENAMIENTO (S3 privado multi-tenant)
+### RF-STORAGE (private multi-tenant S3)
 
-- [EFI-RF-021] El bucket compartido debe segmentar por tenant y módulo con prefijos estandarizados.
-- [EFI-RF-022] Los objetos deben permanecer privados y sin acceso público.
-- [EFI-RF-023] El acceso a archivos debe ser vía URL prefirmada emitida por backend autenticado y autorizado por tenant.
-- [EFI-RF-024] Debe existir estrategia de idempotencia para evitar cargas duplicadas físicamente.
+- [EFI-RF-021] Shared bucket uses standardized prefixes by tenant and module.
+- [EFI-RF-022] Objects stay private with no public access.
+- [EFI-RF-023] File access uses presigned URLs from an authenticated, tenant-authorized backend.
+- [EFI-RF-024] Idempotency strategy avoids duplicate physical uploads.
 
-### RF-PERSISTENCIA (Modelo de datos)
+### RF-PERSIST (data model)
 
-- [EFI-RF-025] La información de correo, pipeline y extracción debe persistirse en tablas del tenant.
-- [EFI-RF-026] Cada entidad externa debe incluir columna `raw_data` JSONB.
-- [EFI-RF-027] Factura debe persistir cabecera con CUFE, totales, impuestos, referencias de soporte y estado de extracción.
-- [EFI-RF-028] Factura debe persistir líneas de detalle vinculadas a cabecera.
+- [EFI-RF-025] Persist mail, pipeline, and extraction data in tenant tables.
+- [EFI-RF-026] Every external entity includes a `raw_data` JSONB column.
+- [EFI-RF-027] Invoice header stores CUFE, totals, taxes, support refs, and extraction status.
+- [EFI-RF-028] Invoice detail lines link to the header.
 
-### RF-FRONTEND (Autorización y bandeja unificada)
+### RF-FRONTEND (auth and unified inbox)
 
-- [EFI-RF-029] Debe existir flujo UI para conectar nuevas cuentas (OAuth2 por proveedor).
-- [EFI-RF-030] Debe existir vista unificada de correos sincronizados de todas las cuentas conectadas del tenant.
-- [EFI-RF-031] La vista debe mostrar estado por cuenta (activa, error de token, requiere reconexión, pausada).
-- [EFI-RF-032] La vista debe ser responsive y con UX moderna tipo bandeja global unificada.
+- [EFI-RF-029] UI flow to connect accounts (OAuth2 per provider).
+- [EFI-RF-030] Unified view of synced mail from all connected tenant accounts.
+- [EFI-RF-031] Show per-account status (active, token error, reconnect required, paused).
+- [EFI-RF-032] Responsive unified-inbox UX.
 
-## Requisitos no funcionales
+## Non-functional requirements
 
-- [EFI-RNF-001] Arquitectura limpia y modular por bounded contexts (`inbox`, `invoicing`).
-- [EFI-RNF-002] Comunicación entre módulos por eventos (coreografía), minimizando acoplamiento.
-- [EFI-RNF-003] Reintentos con backoff para APIs externas (proveedores de correo, Gemini, S3 cuando aplique).
-- [EFI-RNF-004] Procesamiento idempotente y determinista por claves de negocio (provider_message_id, cufe, hash adjunto).
-- [EFI-RNF-005] Logging estructurado y trazable por tenant, cuenta, mensaje y documento.
-- [EFI-RNF-006] Observabilidad con métricas de sincronización, clasificación, extracción, errores y deduplicación.
-- [EFI-RNF-007] Seguridad de secretos vía SSM y cifrado en reposo de tokens de cuentas externas en BD tenant.
-- [EFI-RNF-008] Escalabilidad horizontal de workers sin romper atomicidad por mensaje/documento.
+- [EFI-RNF-001] Clean, modular architecture by bounded context (`inbox`, `invoicing`).
+- [EFI-RNF-002] Inter-module communication via events (choreography); minimize coupling.
+- [EFI-RNF-003] Retries with backoff for external APIs (mail providers, Gemini, S3 when applicable).
+- [EFI-RNF-004] Idempotent, deterministic processing by business keys (`provider_message_id`, CUFE, attachment hash).
+- [EFI-RNF-005] Structured logging traceable by tenant, account, message, and document.
+- [EFI-RNF-006] Observability metrics for sync, classification, extraction, errors, and deduplication.
+- [EFI-RNF-007] Secrets via SSM; encrypt external account tokens at rest in the tenant database.
+- [EFI-RNF-008] Horizontal worker scaling without breaking per-message / per-document atomicity.
 
-## Casos de uso (alto nivel)
+## Use cases (high level)
 
-- [EFI-UC-001] Usuario conecta dos cuentas Gmail y una Outlook en un tenant; el sistema sincroniza todas sin mezclar datos entre tenants.
-- [EFI-UC-002] Correo con ZIP que contiene XML+PDF: se descomprime, se prioriza XML, se persiste factura y líneas.
-- [EFI-UC-003] Correo con solo PDF: se usa Gemini, se normaliza y se persiste.
-- [EFI-UC-004] Correo repetido: se detecta duplicado y se omite.
-- [EFI-UC-005] Factura con CUFE ya existente: se registra evento de deduplicación y se omite escritura financiera.
-- [EFI-UC-006] Token de una cuenta expira: UI muestra estado requiere reconexión.
+- [EFI-UC-001] User connects two Gmail accounts and one Outlook account in a tenant; the system syncs all without mixing tenant data.
+- [EFI-UC-002] Mail with ZIP containing XML + PDF: decompress, prefer XML, persist invoice and lines.
+- [EFI-UC-003] Mail with PDF only: use Gemini, normalize, and persist.
+- [EFI-UC-004] Repeated mail: detect duplicate and skip.
+- [EFI-UC-005] Invoice with existing CUFE: log deduplication and skip financial writes.
+- [EFI-UC-006] Account token expires: UI shows reconnect-required status.
 
-## Criterios de aceptación
+## Acceptance criteria
 
-1. Todos los RF y RNF tienen trazabilidad a tareas de implementación.
-2. El flujo completo correo -> evento -> pipeline -> extracción -> persistencia funciona en entorno local con LocalStack.
-3. Existe cobertura de pruebas unitarias para parser XML DIAN y normalizador LLM.
-4. Existe al menos una prueba de integración del flujo idempotente con deduplicación por CUFE.
-5. La UI permite conectar cuentas, revisar estados y listar correos en vista unificada responsive.
+1. Every RF and RNF traces to implementation tasks.
+2. Full flow mail → event → pipeline → extraction → persistence works locally with LocalStack.
+3. Unit tests cover the DIAN XML parser and LLM normalizer.
+4. At least one integration test covers the idempotent CUFE deduplication path.
+5. UI connects accounts, shows statuses, and lists mail in a responsive unified view.
 
-## Fuera de alcance (esta entrega)
+## Out of scope (this delivery)
 
-- Integración push/webhooks nativos de proveedores de correo.
-- Procesamiento de otros tipos documentales (gastos no factura, notificaciones legales, compras) más allá de dejar la arquitectura preparada por eventos.
-- Motor avanzado de reglas ML para clasificación semántica de correo.
+- Native push / webhook integrations from mail providers.
+- Other document types (non-invoice expenses, legal notices, purchases) beyond event-ready architecture.
+- Advanced ML rules for semantic mail classification.
