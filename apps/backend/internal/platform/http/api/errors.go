@@ -150,6 +150,8 @@ func statusFromCode(code string) (int, string) {
 		return http.StatusNotFound, "Not Found"
 	case appErrors.CodeConflict:
 		return http.StatusConflict, "Conflict"
+	case appErrors.CodeRateLimited:
+		return http.StatusTooManyRequests, "Too Many Requests"
 	case appErrors.CodeNotImplemented:
 		return http.StatusNotImplemented, "Not Implemented"
 	case appErrors.CodeInternal:

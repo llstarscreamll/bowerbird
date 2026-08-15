@@ -25,10 +25,16 @@ type Queries struct {
 	ListUserTenants *queries.ListUserTenantsQuery
 }
 
-func NewApplication(repo domain.Repository, tokenGen *auth.TokenGenerator, appEnv string, operatorEmails []string) *Application {
+func NewApplication(
+	repo domain.Repository,
+	tokenGen *auth.TokenGenerator,
+	refreshStore auth.RefreshTokenStore,
+	appEnv string,
+	operatorEmails []string,
+) *Application {
 	return &Application{
 		Commands: Commands{
-			Auth:          commands.NewAuthService(repo, tokenGen, appEnv, operatorEmails),
+			Auth:          commands.NewAuthService(repo, tokenGen, refreshStore, appEnv, operatorEmails),
 			LeaveTenant:   commands.NewLeaveTenantCommand(repo),
 			DeleteAccount: commands.NewDeleteAccountCommand(repo),
 		},

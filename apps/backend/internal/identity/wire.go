@@ -28,8 +28,9 @@ func NewApplication(cfg config.Config, controlDB *pgxpool.Pool, tenantRegistry *
 	}
 
 	identityRepo := identityinfra.NewPostgresRepository(controlDB, tenantRegistry)
+	refreshStore := identityinfra.NewRefreshTokenRepository(controlDB)
 
-	return application.NewApplication(identityRepo, tokenGen, cfg.AppEnv, cfg.PlatformOperatorEmails)
+	return application.NewApplication(identityRepo, tokenGen, refreshStore, cfg.AppEnv, cfg.PlatformOperatorEmails)
 }
 
 func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB *pgxpool.Pool, tenantRegistry *database.Registry, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *identityhttp.AuthHandler {
@@ -74,6 +75,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 		googleConfig,
 		microsoftConfig,
 		strings.TrimRight(cfg.FrontendURL, "/"),
+		cfg.JWT.RefreshTTL,
 	)
 	handler.Register(mux, authMiddleware, cfg)
 

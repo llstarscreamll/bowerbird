@@ -2,15 +2,19 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bowerbird/internal/identity/application"
+	"github.com/bowerbird/internal/identity/application/commands"
 	"github.com/bowerbird/internal/platform/auth"
 	"github.com/bowerbird/internal/platform/config"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
+	"github.com/bowerbird/internal/platform/http/ratelimit"
 	"golang.org/x/oauth2"
 )
 
@@ -20,6 +24,8 @@ type AuthHandler struct {
 	googleConfig    *oauth2.Config
 	microsoftConfig *oauth2.Config
 	frontendURL     string
+	refreshTTL      time.Duration
+	authLimiter     *ratelimit.Limiter
 }
 
 func NewAuthHandler(
@@ -28,6 +34,7 @@ func NewAuthHandler(
 	googleConfig *oauth2.Config,
 	microsoftConfig *oauth2.Config,
 	frontendURL string,
+	refreshTTL time.Duration,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:     authService,
@@ -35,20 +42,21 @@ func NewAuthHandler(
 		googleConfig:    googleConfig,
 		microsoftConfig: microsoftConfig,
 		frontendURL:     frontendURL,
+		refreshTTL:      refreshTTL,
+		authLimiter:     ratelimit.New(20, time.Minute),
 	}
 }
 
 func (h *AuthHandler) Register(mux *http.ServeMux, authMiddleware func(http.Handler) http.Handler, cfg config.Config) {
-	mux.HandleFunc("POST /api/v1/auth/register-local", api.Wrap(h.RegisterLocal, cfg))
-	mux.HandleFunc("POST /api/v1/auth/login-local", api.Wrap(h.LoginLocal, cfg))
-	mux.HandleFunc("POST /api/v1/auth/refresh", api.Wrap(h.RefreshToken, cfg))
+	mux.HandleFunc("POST /api/v1/auth/register-local", api.Wrap(h.authLimiter.Protect(h.RegisterLocal), cfg))
+	mux.HandleFunc("POST /api/v1/auth/login-local", api.Wrap(h.authLimiter.Protect(h.LoginLocal), cfg))
+	mux.HandleFunc("POST /api/v1/auth/refresh", api.Wrap(h.authLimiter.Protect(h.RefreshToken), cfg))
 	mux.HandleFunc("POST /api/v1/auth/logout", api.Wrap(h.Logout, cfg))
 	mux.HandleFunc("GET /api/v1/auth/google/login", api.Wrap(h.OAuthGoogleLogin, cfg))
 	mux.HandleFunc("GET /api/v1/auth/google/callback", api.Wrap(h.OAuthGoogleCallback, cfg))
 	mux.HandleFunc("GET /api/v1/auth/microsoft/login", api.Wrap(h.OAuthMicrosoftLogin, cfg))
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", api.Wrap(h.OAuthMicrosoftCallback, cfg))
 
-	// Protected routes
 	mux.Handle("GET /api/v1/identity/me", authMiddleware(api.Wrap(h.GetMe, cfg)))
 	mux.Handle("GET /api/v1/identity/tenants", authMiddleware(api.Wrap(h.ListUserTenants, cfg)))
 	mux.Handle("POST /api/v1/identity/tenants/{tenant_id}/leave", authMiddleware(api.Wrap(h.LeaveTenant, cfg)))
@@ -66,15 +74,52 @@ type AuthResponse struct {
 }
 
 func (h *AuthHandler) setRefreshTokenCookie(w http.ResponseWriter, token string) {
+	ttl := h.refreshTTL
+	if ttl <= 0 {
+		ttl = 7 * 24 * time.Hour
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    token,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  time.Now().Add(7 * 24 * time.Hour), // Must match config
+		Path:     "/api/v1/auth",
+		Expires:  time.Now().Add(ttl),
+		MaxAge:   int(ttl.Seconds()),
 	})
+}
+
+func (h *AuthHandler) clearRefreshTokenCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/api/v1/auth",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+	})
+}
+
+func mapAuthError(err error) error {
+	switch {
+	case errors.Is(err, commands.ErrInvalidCredentials):
+		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid credentials")
+	case errors.Is(err, commands.ErrLocalAuthDisabled):
+		return appErrors.Wrap(err, appErrors.CodeForbidden, "local auth is disabled")
+	case errors.Is(err, commands.ErrEmailNotVerified), errors.Is(err, commands.ErrInvalidEmail):
+		return appErrors.Wrap(err, appErrors.CodeValidation, err.Error())
+	case errors.Is(err, auth.ErrPasswordTooShort), errors.Is(err, auth.ErrPasswordTooLong):
+		return appErrors.Wrap(err, appErrors.CodeValidation, err.Error())
+	case errors.Is(err, auth.ErrRefreshNotFound), errors.Is(err, auth.ErrRefreshRevoked),
+		errors.Is(err, auth.ErrRefreshExpired), errors.Is(err, auth.ErrInvalidToken),
+		errors.Is(err, auth.ErrExpiredToken):
+		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid refresh token")
+	default:
+		return appErrors.Wrap(err, appErrors.CodeInternal, "authentication failed")
+	}
 }
 
 func (h *AuthHandler) RegisterLocal(w http.ResponseWriter, r *http.Request) error {
@@ -85,7 +130,7 @@ func (h *AuthHandler) RegisterLocal(w http.ResponseWriter, r *http.Request) erro
 
 	tokens, err := h.authService.RegisterLocal(r.Context(), req.Email, req.Password)
 	if err != nil {
-		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to register")
+		return mapAuthError(err)
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -103,7 +148,7 @@ func (h *AuthHandler) LoginLocal(w http.ResponseWriter, r *http.Request) error {
 
 	tokens, err := h.authService.LoginLocal(r.Context(), req.Email, req.Password)
 	if err != nil {
-		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid credentials")
+		return mapAuthError(err)
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -121,7 +166,8 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) error
 
 	tokens, err := h.authService.RefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "invalid refresh token")
+		h.clearRefreshTokenCookie(w)
+		return mapAuthError(err)
 	}
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
@@ -132,32 +178,30 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) error
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) error {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    "",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  time.Unix(0, 0),
-	})
+	if cookie, err := r.Cookie("refresh_token"); err == nil && cookie.Value != "" {
+		_ = h.authService.RevokeRefreshToken(r.Context(), cookie.Value)
+	}
+	h.clearRefreshTokenCookie(w)
 	w.WriteHeader(http.StatusOK)
 	return nil
 }
 
 func (h *AuthHandler) OAuthGoogleLogin(w http.ResponseWriter, r *http.Request) error {
-	slog.Info("Starting Identity Google login flow", "state", "state-token")
 	if h.googleConfig == nil {
 		return appErrors.New(appErrors.CodeNotImplemented, "google oauth not configured")
 	}
-	url := h.googleConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	state, err := auth.NewOAuthState(w)
+	if err != nil {
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to start oauth")
+	}
+	url := h.googleConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	return nil
 }
 
 func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request) error {
 	state := r.FormValue("state")
-	slog.Info("Received Identity Google login callback", "state", state, "error", r.FormValue("error"))
+	slog.Info("Received Identity Google login callback", "error", r.FormValue("error"))
 
 	redirectOnError := func(reason string, cause error) error {
 		if cause != nil {
@@ -172,8 +216,7 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 	if h.googleConfig == nil {
 		return redirectOnError("google oauth not configured", nil)
 	}
-
-	if state != "state-token" {
+	if !auth.ConsumeOAuthState(w, r, state) {
 		return redirectOnError("invalid oauth state", nil)
 	}
 
@@ -195,23 +238,28 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 	defer resp.Body.Close()
 
 	var userInfo struct {
-		ID      string `json:"id"`
-		Email   string `json:"email"`
-		Name    string `json:"name"`
-		Picture string `json:"picture"`
+		ID            string `json:"id"`
+		Email         string `json:"email"`
+		VerifiedEmail bool   `json:"verified_email"`
+		Name          string `json:"name"`
+		Picture       string `json:"picture"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		return redirectOnError("failed parsing user info", err)
 	}
 
-	slog.Info("Fetched Identity Google user info", "email", userInfo.Email, "provider_id", userInfo.ID)
-
-	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "google", userInfo.ID, userInfo.Name, userInfo.Picture)
+	tokens, err := h.authService.OAuthLogin(
+		r.Context(),
+		userInfo.Email,
+		"google",
+		userInfo.ID,
+		userInfo.Name,
+		userInfo.Picture,
+		userInfo.VerifiedEmail,
+	)
 	if err != nil {
 		return redirectOnError("oauth login failed", err)
 	}
-
-	slog.Info("Identity Google login successful", "email", userInfo.Email)
 
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
@@ -219,18 +267,21 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 }
 
 func (h *AuthHandler) OAuthMicrosoftLogin(w http.ResponseWriter, r *http.Request) error {
-	slog.Info("Starting Identity Microsoft login flow", "state", "state-token")
 	if h.microsoftConfig == nil {
 		return appErrors.New(appErrors.CodeNotImplemented, "microsoft oauth not configured")
 	}
-	url := h.microsoftConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	state, err := auth.NewOAuthState(w)
+	if err != nil {
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to start oauth")
+	}
+	url := h.microsoftConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	return nil
 }
 
 func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Request) error {
 	state := r.FormValue("state")
-	slog.Info("Received Identity Microsoft login callback", "state", state, "error", r.FormValue("error"))
+	slog.Info("Received Identity Microsoft login callback", "error", r.FormValue("error"))
 
 	redirectOnError := func(reason string, cause error) error {
 		if cause != nil {
@@ -245,8 +296,7 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	if h.microsoftConfig == nil {
 		return redirectOnError("microsoft oauth not configured", nil)
 	}
-
-	if state != "state-token" {
+	if !auth.ConsumeOAuthState(w, r, state) {
 		return redirectOnError("invalid oauth state", nil)
 	}
 
@@ -261,33 +311,44 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	}
 
 	client := h.microsoftConfig.Client(r.Context(), token)
-	resp, err := client.Get("https://graph.microsoft.com/v1.0/me")
+	resp, err := client.Get("https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName")
 	if err != nil {
 		return redirectOnError("failed getting user info", err)
 	}
 	defer resp.Body.Close()
 
 	var userInfo struct {
-		ID    string `json:"id"`
-		Email string `json:"userPrincipalName"`
-		Name  string `json:"displayName"`
+		ID                string `json:"id"`
+		Mail              string `json:"mail"`
+		UserPrincipalName string `json:"userPrincipalName"`
+		Name              string `json:"displayName"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
 		return redirectOnError("failed parsing user info", err)
 	}
 
-	slog.Info("Fetched Identity Microsoft user info", "email", userInfo.Email, "provider_id", userInfo.ID)
-
-	tokens, err := h.authService.OAuthLogin(r.Context(), userInfo.Email, "microsoft", userInfo.ID, userInfo.Name, "")
+	email, verified := microsoftEmail(userInfo.Mail, userInfo.UserPrincipalName)
+	tokens, err := h.authService.OAuthLogin(r.Context(), email, "microsoft", userInfo.ID, userInfo.Name, "", verified)
 	if err != nil {
 		return redirectOnError("oauth login failed", err)
 	}
 
-	slog.Info("Identity Microsoft login successful", "email", userInfo.Email)
-
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
 	return nil
+}
+
+func microsoftEmail(mail, upn string) (email string, verified bool) {
+	mail = strings.TrimSpace(mail)
+	upn = strings.TrimSpace(upn)
+	if mail != "" && strings.Contains(mail, "@") {
+		return mail, true
+	}
+	// Prefer mail; UPN is accepted only when it looks like an email (typical for Microsoft accounts).
+	if strings.Contains(upn, "@") {
+		return upn, true
+	}
+	return "", false
 }
 
 func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) error {
@@ -343,6 +404,8 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) erro
 	if !ok {
 		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
+
+	_ = h.authService.RevokeAllRefreshTokens(r.Context(), claims.UserID)
 
 	err := h.identityService.DeleteAccount(r.Context(), claims.UserID)
 	if err != nil {

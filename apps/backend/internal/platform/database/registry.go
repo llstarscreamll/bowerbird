@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/bowerbird/internal/platform/auth"
 	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,26 +35,27 @@ func (r *Registry) GetPool(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 
-	// Fast path: read lock
+	// Always re-check membership for authenticated callers (do not trust pool cache alone).
+	dbName, err := r.resolveTenantDatabase(ctx, tenantSlug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve tenant db: %w", err)
+	}
+
+	// Prefer caching by physical db name so id/slug aliases share one pool.
+	cacheKey := dbName
+
 	r.mu.RLock()
-	pool, exists := r.pools[tenantSlug]
+	pool, exists := r.pools[cacheKey]
 	r.mu.RUnlock()
 	if exists {
 		return pool, nil
 	}
 
-	// Slow path: resolve from control plane and initialize
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Double check
-	if pool, exists := r.pools[tenantSlug]; exists {
+	if pool, exists := r.pools[cacheKey]; exists {
 		return pool, nil
-	}
-
-	dbName, err := r.resolveTenantDatabase(ctx, tenantSlug)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tenant db: %w", err)
 	}
 
 	dbURL := fmt.Sprintf(r.baseConfigURL, dbName)
@@ -62,7 +64,7 @@ func (r *Registry) GetPool(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to connect to tenant db %s: %w", tenantSlug, err)
 	}
 
-	r.pools[tenantSlug] = newPool
+	r.pools[cacheKey] = newPool
 	return newPool, nil
 }
 
@@ -97,10 +99,28 @@ func (r *Registry) GetPoolByDBName(ctx context.Context, dbName string) (*pgxpool
 	return newPool, nil
 }
 
-// resolveTenantDatabase looks up the database name for a given tenant identifier (ID or slug) in the control plane.
+// resolveTenantDatabase looks up the database name for a given tenant identifier (ID or slug).
+// When the request carries authenticated user claims, membership is required (blocks cross-tenant IDOR).
+// Background workers set tenant context without claims and keep the unrestricted lookup.
 func (r *Registry) resolveTenantDatabase(ctx context.Context, identifier string) (string, error) {
 	var dbName string
-	// Allow resolving by either ID or slug, as X-Tenant-ID may contain the ULID
+	if claims, ok := auth.ClaimsFromContext(ctx); ok {
+		query := `
+			SELECT t.db_name
+			FROM tenants t
+			INNER JOIN tenant_memberships m
+				ON m.tenant_id = t.id
+				AND m.user_id = $2
+				AND m.deleted_at IS NULL
+			WHERE (t.id = $1 OR t.slug = $1) AND t.status = 'active'
+		`
+		err := r.controlDB.QueryRow(ctx, query, identifier, claims.UserID).Scan(&dbName)
+		if err != nil {
+			return "", fmt.Errorf("tenant access denied: %w", err)
+		}
+		return dbName, nil
+	}
+
 	query := `SELECT db_name FROM tenants WHERE (id = $1 OR slug = $1) AND status = 'active'`
 	err := r.controlDB.QueryRow(ctx, query, identifier).Scan(&dbName)
 	if err != nil {

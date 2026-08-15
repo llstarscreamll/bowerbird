@@ -64,9 +64,9 @@ func Load(ctx context.Context) (Config, error) {
 		AWSSecretAccessKey:     getEnv("AWS_SECRET_ACCESS_KEY", "test"),
 		SSMParameterName:       getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets"),
 		EnableLocalEventLoop:   getEnv("ENABLE_LOCAL_EVENT_LOOP", "true") == "true",
-		AllowedOrigins:         getEnv("ALLOWED_ORIGINS", "*"),
-		FrontendURL:            getEnv("FRONTEND_URL", "http://localhost:4200"),
-		BackendURL:             getEnv("BACKEND_URL", "http://localhost:8080"),
+		AllowedOrigins:         getEnv("ALLOWED_ORIGINS", "https://app.bowerbird.dev,http://app.bowerbird.dev,http://localhost:4200"),
+		FrontendURL:            getEnv("FRONTEND_URL", "https://app.bowerbird.dev"),
+		BackendURL:             getEnv("BACKEND_URL", "https://api.bowerbird.dev"),
 		PlatformOperatorEmails: parseCSVList(os.Getenv("PLATFORM_OPERATOR_EMAILS")),
 	}
 

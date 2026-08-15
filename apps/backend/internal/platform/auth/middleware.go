@@ -4,6 +4,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
+
+	appErrors "github.com/bowerbird/internal/platform/errors"
+	"github.com/bowerbird/internal/platform/http/api"
 )
 
 type contextKey string
@@ -15,20 +18,19 @@ func Middleware(tokenGen *TokenGenerator) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				http.Error(w, "missing authorization header", http.StatusUnauthorized)
+				writeUnauthorized(w, r)
 				return
 			}
 
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-				http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
+			scheme, token, ok := strings.Cut(authHeader, " ")
+			if !ok || !strings.EqualFold(scheme, "Bearer") || token == "" {
+				writeUnauthorized(w, r)
 				return
 			}
 
-			tokenString := parts[1]
-			claims, err := tokenGen.ValidateAccessToken(tokenString)
+			claims, err := tokenGen.ValidateAccessToken(token)
 			if err != nil {
-				http.Error(w, "invalid token: "+err.Error(), http.StatusUnauthorized)
+				writeUnauthorized(w, r)
 				return
 			}
 
@@ -41,4 +43,8 @@ func Middleware(tokenGen *TokenGenerator) func(http.Handler) http.Handler {
 func ClaimsFromContext(ctx context.Context) (*CustomClaims, bool) {
 	claims, ok := ctx.Value(userContextKey).(*CustomClaims)
 	return claims, ok
+}
+
+func writeUnauthorized(w http.ResponseWriter, r *http.Request) {
+	api.RespondWithError(w, r, appErrors.New(appErrors.CodeUnauthorized, "unauthorized"), false)
 }

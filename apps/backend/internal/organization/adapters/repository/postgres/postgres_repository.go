@@ -44,10 +44,11 @@ func (r *PostgresRepository) ExistsBySlug(ctx context.Context, slug string) (boo
 func (r *PostgresRepository) GetByID(ctx context.Context, id, userID string) (*domain.Organization, error) {
 	query := `
 		SELECT t.id, t.organization_name, t.slug, t.db_name, t.status, t.created_at, t.updated_at,
-		       (SELECT COUNT(*) FROM tenant_memberships WHERE tenant_id = t.id) as members_count,
+		       (SELECT COUNT(*) FROM tenant_memberships WHERE tenant_id = t.id AND deleted_at IS NULL) as members_count,
 			   tm.role
 		FROM tenants t
-		LEFT JOIN tenant_memberships tm ON tm.tenant_id = t.id AND tm.user_id = $2
+		INNER JOIN tenant_memberships tm
+			ON tm.tenant_id = t.id AND tm.user_id = $2 AND tm.deleted_at IS NULL
 		WHERE t.id = $1
 	`
 	org := &domain.Organization{}

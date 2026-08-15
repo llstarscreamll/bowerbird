@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -177,17 +178,25 @@ func withSecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		next.ServeHTTP(w, r)
 	})
 }
 
-func withCORS(next http.Handler, allowedOrigins string) http.Handler {
+func withCORS(next http.Handler, allowedOriginsCSV string) http.Handler {
+	allowed := parseOrigins(allowedOriginsCSV)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigins)
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if match, ok := allowed[origin]; ok {
+				w.Header().Set("Access-Control-Allow-Origin", match)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Vary", "Origin")
+			}
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Tenant-ID")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -196,4 +205,16 @@ func withCORS(next http.Handler, allowedOrigins string) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func parseOrigins(csv string) map[string]string {
+	out := make(map[string]string)
+	for _, part := range strings.Split(csv, ",") {
+		origin := strings.TrimSpace(part)
+		if origin == "" || origin == "*" {
+			continue
+		}
+		out[origin] = origin
+	}
+	return out
 }

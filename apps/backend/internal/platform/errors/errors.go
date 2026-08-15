@@ -62,4 +62,5 @@ const (
 	CodeForbidden      = "ERR_FORBIDDEN"
 	CodeConflict       = "ERR_CONFLICT"
 	CodeNotImplemented = "ERR_NOT_IMPLEMENTED"
+	CodeRateLimited    = "ERR_RATE_LIMITED"
 )
