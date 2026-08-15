@@ -17,7 +17,7 @@ type CreateOrganizationUseCase struct {
 }
 
 func NewCreateOrganizationUseCase(repo ports.OrganizationRepository, provisioner ports.Provisioner) *CreateOrganizationUseCase {
-	return &CreateOrganizationUseCase{command: commands.NewCreateOrganizationCommand(repo, provisioner)}
+	return &CreateOrganizationUseCase{command: commands.NewCreateOrganizationCommand(repo, provisioner, nil)}
 }
 
 func NewCreateOrganizationUseCaseFromCommand(command *commands.CreateOrganizationCommand) *CreateOrganizationUseCase {

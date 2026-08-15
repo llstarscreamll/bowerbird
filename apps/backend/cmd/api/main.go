@@ -11,6 +11,7 @@ import (
 
 	connectionsModule "github.com/bowerbird/internal/connections"
 	connectionsApp "github.com/bowerbird/internal/connections/application"
+	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	filesModule "github.com/bowerbird/internal/files"
 	"github.com/bowerbird/internal/health"
 	identityModule "github.com/bowerbird/internal/identity"
@@ -56,6 +57,9 @@ func main() {
 	identityApp := identityModule.NewApplication(cfg, pool, tenantsDbRegistry, tokenGen)
 	identityModule.NewHTTPHandler(mux, identityApp, pool, tenantsDbRegistry, authMiddleware, cfg)
 
+	entitlementsApp := entitlementsModule.NewApplication(pool)
+	entitlementsModule.NewHTTPHandler(mux, entitlementsApp, identityApp, pool, authMiddleware, cfg)
+
 	// Setup Organization Context
 	// Provide the root directory for migrations relative to the running binary (or use an env var)
 	migrationsDir := os.Getenv("TENANT_MIGRATIONS_DIR")
@@ -65,7 +69,7 @@ func main() {
 			migrationsDir = "apps/backend/migrations/tenant"
 		}
 	}
-	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir)
+	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsApp)
 	organizationModule.NewHTTPHandler(mux, organizationApp, authMiddleware, cfg)
 
 	// Setup AWS Config
@@ -92,11 +96,11 @@ func main() {
 		}
 		connectionsApp := connectionsModule.NewApplication(tenantsDbRegistry, cipher)
 		connectionsService = connectionsModule.NewInternalService(connectionsApp)
-		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, cipher, tokenGen, cipher, connectionsEventBus, authMiddleware)
+		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, cipher, tokenGen, cipher, connectionsEventBus, authMiddleware, entitlementsApp)
 	} else {
 		connectionsApp := connectionsModule.NewApplication(tenantsDbRegistry, nil)
 		connectionsService = connectionsModule.NewInternalService(connectionsApp)
-		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, nil, tokenGen, nil, connectionsEventBus, authMiddleware)
+		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, nil, tokenGen, nil, connectionsEventBus, authMiddleware, entitlementsApp)
 	}
 
 	// Setup Inbox Context
@@ -110,8 +114,9 @@ func main() {
 		platformModule.EventBus,
 		platformModule.FileStore,
 		tenantsDbRegistry,
+		platformModule.JobQueue,
 	)
-	inboxModule.NewHTTPHandler(mux, inboxApp, authMiddleware, cfg)
+	inboxModule.NewHTTPHandler(mux, inboxApp, authMiddleware, cfg, entitlementsApp)
 
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
@@ -125,9 +130,10 @@ func main() {
 	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
 	invoiceExtractionProcessor := invoicesJobs.NewInvoiceExtractionRequestedProcessor(invoicingApp.Commands.ProcessInvoiceExtractionJob)
 
-	inboxEventsSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp)
+	inboxEventsSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp, entitlementsApp)
+	inboxSyncProcessor := inboxModule.NewSyncAccountProcessor(inboxApp, entitlementsApp)
 	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
-	jobHandler := platformJobs.NewHandler(invoiceExtractionProcessor)
+	jobHandler := platformJobs.NewHandler(invoiceExtractionProcessor, inboxSyncProcessor)
 
 	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
 		sqsClient := awsConfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)

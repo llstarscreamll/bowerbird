@@ -24,6 +24,11 @@ services:
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   localstack:
     image: localstack/localstack:3.8
@@ -40,6 +45,12 @@ services:
       - localstack_data:/var/lib/localstack
       - ./apps/backend/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
       - ./apps/backend/secrets.json:/tmp/secrets.json:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'awslocal ssm get-parameter --name /bowerbird/local/secrets >/dev/null']
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 20s
 
   caddy:
     image: caddy:2-alpine
@@ -53,6 +64,11 @@ services:
       - caddy_config:/config
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 80 && nc -z 127.0.0.1 443']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

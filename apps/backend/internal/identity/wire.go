@@ -29,7 +29,7 @@ func NewApplication(cfg config.Config, controlDB *pgxpool.Pool, tenantRegistry *
 
 	identityRepo := identityinfra.NewPostgresRepository(controlDB, tenantRegistry)
 
-	return application.NewApplication(identityRepo, tokenGen, cfg.AppEnv)
+	return application.NewApplication(identityRepo, tokenGen, cfg.AppEnv, cfg.PlatformOperatorEmails)
 }
 
 func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB *pgxpool.Pool, tenantRegistry *database.Registry, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *identityhttp.AuthHandler {
@@ -45,8 +45,6 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 	if tenantRegistry == nil {
 		panic("tenant registry is required")
 	}
-
-	repo := identityinfra.NewPostgresRepository(controlDB, tenantRegistry)
 
 	var googleConfig *oauth2.Config
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -72,7 +70,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 
 	handler := identityhttp.NewAuthHandler(
 		app.Commands.Auth,
-		application.NewIdentityService(repo),
+		app.Identity,
 		googleConfig,
 		microsoftConfig,
 		strings.TrimRight(cfg.FrontendURL, "/"),

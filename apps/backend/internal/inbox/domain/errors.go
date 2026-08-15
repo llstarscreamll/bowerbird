@@ -12,4 +12,6 @@ var (
 	ErrMessageAttachmentFilenameRequired  = errors.New("message attachment filename is required")
 	ErrMessageAttachmentSHARequired       = errors.New("message attachment SHA256 is required")
 	ErrMessageAttachmentS3KeyRequired     = errors.New("message attachment S3 key is required")
+	ErrOutgoingMailToRequired             = errors.New("outgoing mail requires at least one recipient")
+	ErrHistoryExpired                     = errors.New("provider history id expired")
 )

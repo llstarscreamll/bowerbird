@@ -12,6 +12,7 @@ type Repository interface {
 	FindUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindUserIdentityByProvider(ctx context.Context, userID, provider string) (*domain.UserIdentity, error)
 	FindUserByID(ctx context.Context, userID string) (*domain.User, error)
+	SetPlatformRole(ctx context.Context, userID, role string) error
 	FindTenantMemberships(ctx context.Context, userID string) ([]*domain.TenantMembership, error)
 	RemoveTenantMembership(ctx context.Context, userID, tenantID string) error
 	GetTenantDBName(ctx context.Context, tenantID string) (string, error)

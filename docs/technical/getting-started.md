@@ -182,6 +182,8 @@ Una vez levantado, en lugar de acceder a localhost, debes acceder a través de l
 
 LocalStack inicializa automáticamente recursos con `apps/backend/scripts/init-localstack.sh` al arrancar Docker.
 
+`pnpm run infra:up` (y por tanto `pnpm run dev`) espera a que los healthchecks pasen antes de continuar: Postgres ready, Redis ping, el parámetro SSM `/bowerbird/local/secrets`, y Caddy escuchando en 80/443. Si el wait hace timeout, el fallo es de infra, no del API.
+
 ## Comandos principales
 
 - `pnpm run infra:up`

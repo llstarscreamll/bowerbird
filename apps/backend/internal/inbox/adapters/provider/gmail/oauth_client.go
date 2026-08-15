@@ -32,7 +32,9 @@ func NewOAuthHTTPClient(ctx context.Context, cfg OAuthConfig, credentialsJSON []
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		Scopes: []string{
-			"https://www.googleapis.com/auth/gmail.readonly",
+			"email",
+			"https://www.googleapis.com/auth/gmail.modify",
+			"https://www.googleapis.com/auth/gmail.send",
 		},
 		Endpoint: google.Endpoint,
 	}

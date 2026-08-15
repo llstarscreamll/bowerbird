@@ -24,37 +24,41 @@ func NewPostgresRepository(controlDB *pgxpool.Pool, registry *database.Registry)
 }
 
 func (r *PostgresRepository) FindUserByEmail(ctx context.Context, email string) (*domain.User, error) {
-	query := `SELECT id, email, first_name, last_name, picture_url, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL`
+	query := `SELECT id, email, first_name, last_name, picture_url, platform_role, created_at, updated_at, deleted_at FROM users WHERE email = $1 AND deleted_at IS NULL`
+	return r.scanUser(r.controlDB.QueryRow(ctx, query, email))
+}
+
+func (r *PostgresRepository) FindUserByID(ctx context.Context, id string) (*domain.User, error) {
+	query := `SELECT id, email, first_name, last_name, picture_url, platform_role, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL`
+	return r.scanUser(r.controlDB.QueryRow(ctx, query, id))
+}
+
+func (r *PostgresRepository) scanUser(row pgx.Row) (*domain.User, error) {
 	var user domain.User
 	var pictureURL *string
-	err := r.controlDB.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &pictureURL, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
+	var platformRole *string
+	err := row.Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &pictureURL, &platformRole, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+		return nil, fmt.Errorf("failed to scan user: %w", err)
 	}
 	if pictureURL != nil {
 		user.PictureURL = *pictureURL
+	}
+	if platformRole != nil {
+		user.PlatformRole = *platformRole
 	}
 	return &user, nil
 }
 
-func (r *PostgresRepository) FindUserByID(ctx context.Context, id string) (*domain.User, error) {
-	query := `SELECT id, email, first_name, last_name, picture_url, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL`
-	var user domain.User
-	var pictureURL *string
-	err := r.controlDB.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.FirstName, &user.LastName, &pictureURL, &user.CreatedAt, &user.UpdatedAt, &user.DeletedAt)
+func (r *PostgresRepository) SetPlatformRole(ctx context.Context, userID, role string) error {
+	_, err := r.controlDB.Exec(ctx, `UPDATE users SET platform_role = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`, userID, role)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
-		}
-		return nil, fmt.Errorf("failed to find user by id: %w", err)
+		return fmt.Errorf("failed to set platform role: %w", err)
 	}
-	if pictureURL != nil {
-		user.PictureURL = *pictureURL
-	}
-	return &user, nil
+	return nil
 }
 
 func (r *PostgresRepository) CreateUser(ctx context.Context, user *domain.User) error {

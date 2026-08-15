@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bowerbird/internal/inbox/adapters/provider/gmail"
+	"github.com/bowerbird/internal/inbox/adapters/provider/microsoft"
 	"github.com/bowerbird/internal/inbox/domain"
 )
 
@@ -19,11 +20,30 @@ func NewFactory() *Factory {
 	return &Factory{builders: map[string]BuildClientFunc{}}
 }
 
+type DefaultFactoryConfig struct {
+	Gmail     gmail.OAuthConfig
+	Microsoft microsoft.OAuthConfig
+}
+
 func NewDefaultFactory(gmailOAuthConfig gmail.OAuthConfig) *Factory {
+	return NewDefaultFactoryWithConfig(DefaultFactoryConfig{Gmail: gmailOAuthConfig})
+}
+
+func NewDefaultFactoryWithConfig(cfg DefaultFactoryConfig) *Factory {
 	factory := NewFactory()
-	factory.Register(domain.ProviderGmail, func(ctx context.Context, credentialsJSON []byte) (domain.MailProviderClient, error) {
-		return gmail.NewOAuthHTTPClient(ctx, gmailOAuthConfig, credentialsJSON)
-	})
+	if cfg.Gmail.ClientID != "" {
+		factory.Register(domain.ProviderGmail, func(ctx context.Context, credentialsJSON []byte) (domain.MailProviderClient, error) {
+			return gmail.NewOAuthHTTPClient(ctx, cfg.Gmail, credentialsJSON)
+		})
+	}
+	if cfg.Microsoft.ClientID != "" {
+		builder := func(ctx context.Context, credentialsJSON []byte) (domain.MailProviderClient, error) {
+			return microsoft.NewOAuthHTTPClient(ctx, cfg.Microsoft, credentialsJSON)
+		}
+		factory.Register(domain.ProviderMicrosoft, builder)
+		factory.Register(domain.ProviderOutlook, builder)
+		factory.Register(domain.ProviderHotmail, builder)
+	}
 	return factory
 }
 

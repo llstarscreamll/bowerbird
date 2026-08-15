@@ -14,6 +14,7 @@ import (
 	"github.com/bowerbird/internal/platform/events"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/microsoft"
 )
 
 type internalService struct {
@@ -55,7 +56,7 @@ func (s *internalService) GetSharingPolicy(ctx context.Context, connectionID str
 	return s.app.Queries.GetSharingPolicy.Execute(ctx, connectionID)
 }
 
-func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Registry, cipher application.CredentialsCipher, tokenValidator httpV1.TokenValidator, stateProtector httpV1.StateProtector, eventBus events.EventBus, authMiddleware func(http.Handler) http.Handler) *httpV1.Router {
+func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Registry, cipher application.CredentialsCipher, tokenValidator httpV1.TokenValidator, stateProtector httpV1.StateProtector, eventBus events.EventBus, authMiddleware func(http.Handler) http.Handler, features httpV1.FeatureChecker) *httpV1.Router {
 	if mux == nil {
 		panic("http mux is required")
 	}
@@ -75,8 +76,19 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  strings.TrimRight(cfg.BackendURL, "/") + "/api/v1/connections/google/callback",
-			Scopes:       []string{"email", "https://www.googleapis.com/auth/gmail.modify"},
+			Scopes:       []string{"email", "https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/gmail.send"},
 			Endpoint:     google.Endpoint,
+		}
+	}
+
+	var microsoftConfig *oauth2.Config
+	if cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != "" {
+		microsoftConfig = &oauth2.Config{
+			ClientID:     cfg.MicrosoftClientID,
+			ClientSecret: cfg.MicrosoftClientSecret,
+			RedirectURL:  strings.TrimRight(cfg.BackendURL, "/") + "/api/v1/connections/microsoft/callback",
+			Scopes:       []string{"offline_access", "User.Read", "Mail.ReadWrite", "Mail.Send"},
+			Endpoint:     microsoft.AzureADEndpoint("common"),
 		}
 	}
 
@@ -89,10 +101,12 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 		repo,
 		credentialsService,
 		googleConfig,
+		microsoftConfig,
 		tokenValidator,
 		stateProtector,
 		eventPublisher,
 		strings.TrimRight(cfg.FrontendURL, "/"),
+		features,
 	)
 	router := httpV1.NewRouter(controller)
 	router.Register(mux, cfg, authMiddleware)

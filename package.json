@@ -24,7 +24,7 @@
     "lint": "turbo run lint",
     "format": "prettier \"**/*.{ts,tsx,md,mdx}\" --write",
     "format:check": "prettier \"**/*.{ts,tsx,md,mdx}\" --check",
-    "infra:up": "docker compose up -d",
+    "infra:up": "docker compose up -d --wait --wait-timeout 180",
     "infra:down": "docker compose down",
     "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
     "prepare": "husky"

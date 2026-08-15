@@ -13,3 +13,12 @@ export interface TenantMembership {
   name: string;
   role: string;
 }
+
+export interface CurrentUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  picture_url: string;
+  platform_operator: boolean;
+}

@@ -1,4 +1,4 @@
-export const GLOBAL_ROUTES = new Set(['', 'login', 'lobby', 'workspaces', 'onboarding', 'profile']);
+export const GLOBAL_ROUTES = new Set(['', 'login', 'lobby', 'platform', 'workspaces', 'onboarding', 'profile']);
 
 const AUTH_COOKIE_ENDPOINT_PATHS = ['/refresh', '/logout'];
 

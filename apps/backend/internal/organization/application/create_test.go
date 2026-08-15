@@ -54,6 +54,14 @@ func (r *fakeOrganizationRepo) AddMembership(ctx context.Context, userID, tenant
 	return nil
 }
 
+func (r *fakeOrganizationRepo) ListAll(ctx context.Context) ([]domain.Organization, error) {
+	return nil, nil
+}
+
+func (r *fakeOrganizationRepo) ExistsByID(ctx context.Context, id string) (bool, error) {
+	return false, nil
+}
+
 type fakeProvisioner struct {
 	createDatabaseErr  error
 	migrateDatabaseErr error

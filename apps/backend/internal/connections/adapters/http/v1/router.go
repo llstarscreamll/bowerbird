@@ -23,5 +23,7 @@ func (h *Router) Register(mux *http.ServeMux, cfg config.Config, authMiddleware 
 	mux.Handle("GET /api/v1/connections", authMiddleware(api.Wrap(h.controller.ListConnections, cfg)))
 	mux.Handle("GET /api/v1/connections/google", authMiddleware(api.Wrap(h.controller.GoogleConnect, cfg)))
 	mux.Handle("GET /api/v1/connections/google/callback", api.Wrap(h.controller.GoogleCallback, cfg))
+	mux.Handle("GET /api/v1/connections/microsoft", authMiddleware(api.Wrap(h.controller.MicrosoftConnect, cfg)))
+	mux.Handle("GET /api/v1/connections/microsoft/callback", api.Wrap(h.controller.MicrosoftCallback, cfg))
 	mux.Handle("DELETE /api/v1/connections/{id}", authMiddleware(api.Wrap(h.controller.DeleteConnection, cfg)))
 }

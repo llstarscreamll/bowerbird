@@ -144,6 +144,72 @@ func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 	assert.Equal(t, "sender@example.com", *persisted.SenderEmail)
 }
 
+func TestSyncAccountCommand_DoesNotRepublishExistingMessage(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	mail := &domain.MailMessage{
+		ID:            "m-1",
+		ThreadID:      "t-1",
+		Subject:       "ok",
+		Sender:        "sender@example.com",
+		PlainTextBody: "hello",
+	}
+	providerClient := &fakeProviderClient{
+		refs:     []domain.MessageRef{{ID: "m-1"}},
+		messages: map[string]*domain.MailMessage{"m-1": mail},
+	}
+	publisher := &fakeInboxEventPublisher{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, &fakeFileStore{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	require.Len(t, publisher.published, 1)
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Len(t, publisher.published, 1)
+}
+
+func TestSyncAccountCommand_UsesHistoryWhenCursorHasHistoryID(t *testing.T) {
+	historyID := "hist-1"
+	now := time.Now().UTC()
+	cursor, err := domain.NewSyncCursor("acc-1", &now)
+	require.NoError(t, err)
+	cursor.SetHistoryID(historyID)
+
+	repo := newFakeInboxRepo()
+	repo.cursors["acc-1"] = cursor
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	mail := &domain.MailMessage{
+		ID:            "m-hist",
+		ThreadID:      "t-1",
+		Subject:       "from history",
+		Sender:        "sender@example.com",
+		PlainTextBody: "hello",
+	}
+	providerClient := &fakeProviderClient{
+		historyID: "hist-2",
+		historyPage: domain.HistoryPage{
+			Changes:      []domain.HistoryChange{{Type: domain.HistoryChangeAdded, MessageID: "m-hist"}},
+			NewHistoryID: "hist-2",
+		},
+		messages: map[string]*domain.MailMessage{"m-hist": mail},
+	}
+	publisher := &fakeInboxEventPublisher{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, &fakeFileStore{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Equal(t, []string{historyID}, providerClient.listHistoryCalls)
+	assert.Empty(t, providerClient.listQueries)
+	require.Len(t, publisher.published, 1)
+	require.NotNil(t, repo.cursors["acc-1"].HistoryID)
+	assert.Equal(t, "hist-2", *repo.cursors["acc-1"].HistoryID)
+}
+
 func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
@@ -241,10 +307,16 @@ type fakeInboxRepo struct {
 	upsertedCursors     []*domain.SyncCursor
 	upsertedMessages    []*domain.InboxMessage
 	upsertedAttachments []*domain.MessageAttachment
+	messagesByKey       map[string]*domain.InboxMessage
+	messagesByID        map[string]*domain.InboxMessage
 }
 
 func newFakeInboxRepo() *fakeInboxRepo {
-	return &fakeInboxRepo{cursors: map[string]*domain.SyncCursor{}}
+	return &fakeInboxRepo{
+		cursors:       map[string]*domain.SyncCursor{},
+		messagesByKey: map[string]*domain.InboxMessage{},
+		messagesByID:  map[string]*domain.InboxMessage{},
+	}
 }
 
 func (f *fakeInboxRepo) GetSyncCursor(ctx context.Context, connectionID string) (*domain.SyncCursor, error) {
@@ -259,8 +331,33 @@ func (f *fakeInboxRepo) UpsertSyncCursor(ctx context.Context, cursor *domain.Syn
 }
 
 func (f *fakeInboxRepo) UpsertInboxMessage(ctx context.Context, msg *domain.InboxMessage) (bool, error) {
+	key := msg.ConnectionID + ":" + msg.ProviderMessageID
+	_, exists := f.messagesByKey[key]
+	f.messagesByKey[key] = msg
+	f.messagesByID[msg.ID] = msg
 	f.upsertedMessages = append(f.upsertedMessages, msg)
-	return true, nil
+	return !exists, nil
+}
+
+func (f *fakeInboxRepo) GetInboxMessageByID(ctx context.Context, messageID string) (*domain.InboxMessage, error) {
+	msg, ok := f.messagesByID[messageID]
+	if !ok {
+		return nil, domain.ErrInboxMessageNotFound
+	}
+	return msg, nil
+}
+
+func (f *fakeInboxRepo) UpdateInboxMessageFlags(ctx context.Context, message *domain.InboxMessage) error {
+	f.messagesByID[message.ID] = message
+	return nil
+}
+
+func (f *fakeInboxRepo) GetMessageAttachment(ctx context.Context, messageID, attachmentID string) (*domain.MessageAttachment, error) {
+	return nil, domain.ErrInboxMessageNotFound
+}
+
+func (f *fakeInboxRepo) ListMessageAttachments(ctx context.Context, messageID string) ([]*domain.MessageAttachment, error) {
+	return nil, nil
 }
 
 func (f *fakeInboxRepo) UpsertMessageAttachment(ctx context.Context, attachment *domain.MessageAttachment) (bool, error) {
@@ -310,6 +407,17 @@ type fakeProviderClient struct {
 	getMessageCalls         []string
 	downloadAttachmentCalls []attachmentDownloadCall
 	downloadAttachmentErr   error
+	historyID               string
+	historyPage             domain.HistoryPage
+	historyExpired          bool
+	listHistoryCalls        []string
+	modifyCalls             []domain.MessageMutation
+	modifyErr               error
+	trashCalls              []string
+	trashErr                error
+	sendCalls               []domain.OutgoingMail
+	sendErr                 error
+	sendID                  string
 }
 
 func (f *fakeProviderClient) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
@@ -350,6 +458,39 @@ func (f *fakeProviderClient) CreateLabel(ctx context.Context, userID, labelName 
 
 func (f *fakeProviderClient) AddLabelToMessage(ctx context.Context, userID, messageID, labelID string) error {
 	return nil
+}
+
+func (f *fakeProviderClient) GetHistoryID(ctx context.Context, userID string) (string, error) {
+	return f.historyID, nil
+}
+
+func (f *fakeProviderClient) ListHistory(ctx context.Context, userID, startHistoryID string) (domain.HistoryPage, error) {
+	f.listHistoryCalls = append(f.listHistoryCalls, startHistoryID)
+	if f.historyExpired {
+		return domain.HistoryPage{Expired: true}, nil
+	}
+	return f.historyPage, nil
+}
+
+func (f *fakeProviderClient) ModifyMessage(ctx context.Context, userID, messageID string, mutation domain.MessageMutation) error {
+	f.modifyCalls = append(f.modifyCalls, mutation)
+	return f.modifyErr
+}
+
+func (f *fakeProviderClient) TrashMessage(ctx context.Context, userID, messageID string) error {
+	f.trashCalls = append(f.trashCalls, messageID)
+	return f.trashErr
+}
+
+func (f *fakeProviderClient) SendMessage(ctx context.Context, userID string, message domain.OutgoingMail) (string, error) {
+	f.sendCalls = append(f.sendCalls, message)
+	if f.sendErr != nil {
+		return "", f.sendErr
+	}
+	if f.sendID != "" {
+		return f.sendID, nil
+	}
+	return "sent-1", nil
 }
 
 type fakeInboxEventPublisher struct {

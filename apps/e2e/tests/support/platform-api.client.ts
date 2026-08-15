@@ -152,6 +152,13 @@ export class PlatformApiClient {
     });
   }
 
+  sendInboxMessage(auth: AuthSession, tenant: TenantContext, payload: Record<string, unknown>, traceId?: string): Promise<APIResponse> {
+    return this.request.post(`${this.apiBaseUrl}/api/v1/inbox/messages`, {
+      headers: this.authHeaders(auth, tenant, traceId),
+      data: payload,
+    });
+  }
+
   private authHeaders(auth: AuthSession, tenant: TenantContext, traceId?: string): Record<string, string> {
     return {
       Authorization: `Bearer ${auth.accessToken}`,

@@ -4,13 +4,25 @@ import { resolveConnectionStatus } from '../../core/domain/connection-status.mod
 import { MailProvider, MAIL_PROVIDERS } from '../domain/inbox.types';
 import { extractSyncActionError, SyncActionError } from './sync-error-parser';
 import { UNIFIED_INBOX_REPOSITORY } from '../domain/unified-inbox.repository';
-import { AccountHealthSummary, AccountSyncStatus, MessageProcessingStatus, UnifiedInboxFilters, UnifiedInboxMessage, UnifiedInboxMessageDetail } from '../domain/unified-inbox.model';
+import {
+  AccountHealthSummary,
+  AccountSyncStatus,
+  MailFolder,
+  MessageProcessingStatus,
+  SendMessagePayload,
+  UnifiedInboxFilters,
+  UnifiedInboxMessage,
+  UnifiedInboxMessageDetail,
+} from '../domain/unified-inbox.model';
 
 @Injectable({ providedIn: 'root' })
 export class UnifiedInboxStore {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly messages = signal<UnifiedInboxMessage[]>([]);
+  readonly totalMessages = signal(0);
+  readonly composeOpen = signal(false);
+  readonly sending = signal(false);
   readonly accountHealth = signal<AccountHealthSummary[]>([]);
   readonly detailError = signal<string | null>(null);
   readonly loadingMessageId = signal<string | null>(null);
@@ -24,6 +36,7 @@ export class UnifiedInboxStore {
     provider: 'all',
     accountId: 'all',
     status: 'all',
+    folder: 'inbox',
     onlyInvoices: false,
     search: '',
   });
@@ -39,31 +52,24 @@ export class UnifiedInboxStore {
 
   readonly filteredMessages = computed(() => {
     const activeFilters = this.filters();
-    const normalizedSearch = activeFilters.search.trim().toLowerCase();
+    const latestByThread = new Map<string, UnifiedInboxMessage>();
 
-    return this.messages().filter((message) => {
+    for (const message of this.messages()) {
       if (activeFilters.provider !== 'all' && message.provider !== activeFilters.provider) {
-        return false;
+        continue;
       }
-
-      if (activeFilters.accountId !== 'all' && message.account_id !== activeFilters.accountId) {
-        return false;
-      }
-
       if (activeFilters.status !== 'all' && message.processing_status !== activeFilters.status) {
-        return false;
+        continue;
       }
 
-      if (activeFilters.onlyInvoices && !message.has_xml && !message.has_pdf) {
-        return false;
+      const threadKey = message.thread_id || message.id;
+      const current = latestByThread.get(threadKey);
+      if (!current || current.received_at < message.received_at) {
+        latestByThread.set(threadKey, message);
       }
+    }
 
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      return [message.subject, message.sender, message.account_email].some((value) => (value || '').toLowerCase().includes(normalizedSearch));
-    });
+    return Array.from(latestByThread.values());
   });
 
   private readonly repository = inject(UNIFIED_INBOX_REPOSITORY);
@@ -143,6 +149,66 @@ export class UnifiedInboxStore {
 
   patchFilters(partial: Partial<UnifiedInboxFilters>): void {
     this.filters.update((current) => ({ ...current, ...partial }));
+    if (partial.folder || partial.accountId || partial.search !== undefined || partial.onlyInvoices !== undefined) {
+      this.reloadMessages();
+    }
+  }
+
+  setFolder(folder: MailFolder): void {
+    this.patchFilters({ folder });
+  }
+
+  modifyMessage(messageId: string, action: 'read' | 'unread' | 'star' | 'unstar' | 'archive' | 'trash'): void {
+    this.repository.modifyMessage(messageId, action).subscribe({
+      next: () => this.reloadMessages(),
+      error: () => this.error.set('No se pudo actualizar el mensaje.'),
+    });
+  }
+
+  sendMessage(payload: SendMessagePayload): void {
+    this.sending.set(true);
+    this.repository
+      .sendMessage(payload)
+      .pipe(finalize(() => this.sending.set(false)))
+      .subscribe({
+        next: () => {
+          this.composeOpen.set(false);
+          this.reloadMessages();
+        },
+        error: () => this.error.set('No se pudo enviar el correo.'),
+      });
+  }
+
+  downloadAttachment(messageId: string, attachmentId: string, filename: string): void {
+    this.repository.downloadAttachment(messageId, attachmentId).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.error.set('No se pudo descargar el adjunto.'),
+    });
+  }
+
+  private reloadMessages(): void {
+    const filters = this.filters();
+    this.repository
+      .listMessages({
+        folder: filters.folder,
+        accountId: filters.accountId,
+        q: filters.search,
+        onlyInvoices: filters.onlyInvoices,
+        limit: 50,
+        offset: 0,
+      })
+      .pipe(catchError(() => of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 })))
+      .subscribe((page) => {
+        this.messages.set(page.data ?? []);
+        this.totalMessages.set(page.total ?? 0);
+      });
   }
 
   clearError(): void {
@@ -220,10 +286,10 @@ export class UnifiedInboxStore {
     this.error.set(null);
 
     forkJoin({
-      messages: this.repository.listMessages().pipe(
+      messages: this.repository.listMessages({ folder: this.filters().folder, limit: 50, offset: 0 }).pipe(
         catchError((err) => {
           this.error.set('No se pudieron cargar los mensajes. Por favor, inténtelo de nuevo más tarde.');
-          return of([] as UnifiedInboxMessage[]);
+          return of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 });
         }),
       ),
       accounts: this.repository.listAccountHealth().pipe(
@@ -236,7 +302,8 @@ export class UnifiedInboxStore {
     })
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe(({ messages, accounts, syncStatus }) => {
-        this.messages.set(messages);
+        this.messages.set(messages.data ?? []);
+        this.totalMessages.set(messages.total ?? 0);
         this.accountHealth.set(this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
 
         this.triggerSync();
@@ -270,16 +337,19 @@ export class UnifiedInboxStore {
     this.messagePollSub = interval(30000)
       .pipe(
         switchMap(() =>
-          this.repository.listMessages().pipe(
-            catchError((err) => {
-              return of([] as UnifiedInboxMessage[]);
-            }),
-          ),
+          this.repository
+            .listMessages({ folder: this.filters().folder, accountId: this.filters().accountId, q: this.filters().search, onlyInvoices: this.filters().onlyInvoices, limit: 50, offset: 0 })
+            .pipe(
+              catchError(() => {
+                return of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 });
+              }),
+            ),
         ),
       )
-      .subscribe((messages) => {
-        if (messages.length > 0) {
-          this.messages.set(messages);
+      .subscribe((page) => {
+        if ((page.data ?? []).length > 0 || page.total === 0) {
+          this.messages.set(page.data ?? []);
+          this.totalMessages.set(page.total ?? 0);
         }
       });
   }

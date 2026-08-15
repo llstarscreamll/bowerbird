@@ -9,6 +9,7 @@ type AppError struct {
 	Code    string
 	Message string
 	Err     error
+	Meta    map[string]any
 }
 
 // Error implements the error interface.
@@ -22,6 +23,14 @@ func (e *AppError) Error() string {
 // Unwrap allows errors.Is and errors.As to work with the wrapped error.
 func (e *AppError) Unwrap() error {
 	return e.Err
+}
+
+func (e *AppError) WithMeta(key string, value any) *AppError {
+	if e.Meta == nil {
+		e.Meta = map[string]any{}
+	}
+	e.Meta[key] = value
+	return e
 }
 
 // New creates a new AppError with a code and a message.

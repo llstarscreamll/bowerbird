@@ -11,9 +11,10 @@ test.describe('HTTP Contract: inbox sync endpoints', () => {
       const response = await platformApi.listInboxMessages(context.auth, context.tenant);
 
       expect(response.status()).toBe(200);
-      const payload = (await response.json()) as unknown[];
-      expect(Array.isArray(payload)).toBeTruthy();
-      expect(payload).toHaveLength(0);
+      const payload = (await response.json()) as { data?: unknown[]; total?: number; limit?: number; offset?: number };
+      expect(Array.isArray(payload.data)).toBeTruthy();
+      expect(payload.data).toHaveLength(0);
+      expect(payload.total).toBe(0);
     });
 
     await test.step('GET /api/v1/inbox/sync-status retorna lista vacia', async () => {
@@ -36,20 +37,37 @@ test.describe('HTTP Contract: inbox sync endpoints', () => {
     expect(payload.message).toBe('Sync triggered');
   });
 
-  test('POST /api/v1/inbox/sync con account_id invalido retorna JSON:API error validacion', async ({ newUser, platformApi }) => {
+  test('POST /api/v1/inbox/sync con account_id desconocido sigue encolando sync del tenant', async ({ newUser, platformApi }) => {
     const context = await bootstrapAuthenticatedTenantContext(newUser, platformApi);
-    const traceId = `e2e-sync-validation-${Date.now()}`;
 
-    const response = await platformApi.triggerInboxSync(context.auth, context.tenant, 'missing-account-id', traceId);
-    expect(response.status()).toBe(400);
+    const response = await platformApi.triggerInboxSync(context.auth, context.tenant, 'missing-account-id');
+    expect(response.status()).toBe(202);
+
+    const payload = (await response.json()) as { message?: string };
+    expect(payload.message).toBe('Sync triggered');
+  });
+
+  test('POST /api/v1/inbox/messages retorna 403 sin mail.send', async ({ newUser, platformApi }) => {
+    const context = await bootstrapAuthenticatedTenantContext(newUser, platformApi);
+    const traceId = `e2e-send-forbidden-${Date.now()}`;
+
+    const response = await platformApi.sendInboxMessage(
+      context.auth,
+      context.tenant,
+      {
+        account_id: 'missing-account',
+        to: ['someone@example.com'],
+        subject: 'Hello',
+        body_text: 'Hi',
+      },
+      traceId,
+    );
+    expect(response.status()).toBe(403);
 
     const payload = await expectJsonApiError(response);
     const firstError = payload.errors[0];
-
-    expect(firstError.id).toBe(traceId);
-    expect(firstError.status).toBe('400');
-    expect(firstError.code).toBe('ERR_VALIDATION');
-    expect(firstError.detail).toContain('active connection not found');
+    expect(firstError.code).toBe('ERR_FORBIDDEN');
+    expect(firstError.meta?.feature_key).toBe('mail.send');
   });
 
   test('GET /api/v1/inbox/messages/{id} inexistente retorna JSON:API not found', async ({ newUser, platformApi }) => {

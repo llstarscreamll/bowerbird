@@ -14,17 +14,26 @@ import (
 )
 
 type AuthService struct {
-	repo         ports.Repository
-	tokenGen     *auth.TokenGenerator
-	localEnabled bool
+	repo           ports.Repository
+	tokenGen       *auth.TokenGenerator
+	localEnabled   bool
+	operatorEmails []string
 }
 
-func NewAuthService(repo ports.Repository, tokenGen *auth.TokenGenerator, appEnv string) *AuthService {
+func NewAuthService(repo ports.Repository, tokenGen *auth.TokenGenerator, appEnv string, operatorEmails []string) *AuthService {
 	return &AuthService{
-		repo:         repo,
-		tokenGen:     tokenGen,
-		localEnabled: appEnv == "local" || appEnv == "development",
+		repo:           repo,
+		tokenGen:       tokenGen,
+		localEnabled:   appEnv == "local" || appEnv == "development",
+		operatorEmails: operatorEmails,
 	}
+}
+
+func (s *AuthService) issueTokens(ctx context.Context, user *domain.User) (*auth.TokenPair, error) {
+	if err := EnsureOperatorRole(ctx, s.repo, s.operatorEmails, user); err != nil {
+		return nil, err
+	}
+	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
 }
 
 func (s *AuthService) RegisterLocal(ctx context.Context, email, password string) (*auth.TokenPair, error) {
@@ -49,7 +58,7 @@ func (s *AuthService) RegisterLocal(ctx context.Context, email, password string)
 		return nil, err
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
+	return s.issueTokens(ctx, user)
 }
 
 func (s *AuthService) LoginLocal(ctx context.Context, email, password string) (*auth.TokenPair, error) {
@@ -72,7 +81,7 @@ func (s *AuthService) LoginLocal(ctx context.Context, email, password string) (*
 		return nil, errors.New("invalid credentials")
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
+	return s.issueTokens(ctx, user)
 }
 
 func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerID, name, pictureURL string) (*auth.TokenPair, error) {
@@ -114,7 +123,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email, provider, providerI
 		}
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
+	return s.issueTokens(ctx, user)
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*auth.TokenPair, error) {
@@ -128,5 +137,5 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*a
 		return nil, err
 	}
 
-	return s.tokenGen.GenerateTokens(user.ID, user.Email, user.FirstName, user.LastName, user.PictureURL)
+	return s.issueTokens(ctx, user)
 }

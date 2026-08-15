@@ -11,8 +11,11 @@ type Application struct {
 }
 
 type Commands struct {
-	SyncAccount     *commands.SyncAccountCommand
-	SyncAllAccounts *commands.SyncAllAccountsCommand
+	SyncAccount        *commands.SyncAccountCommand
+	SyncAllAccounts    *commands.SyncAllAccountsCommand
+	ModifyMessage      *commands.ModifyMessageCommand
+	SendMessage        *commands.SendMessageCommand
+	DownloadAttachment *commands.DownloadAttachmentCommand
 }
 
 type Queries struct {

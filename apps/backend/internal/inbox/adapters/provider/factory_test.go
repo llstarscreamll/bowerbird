@@ -34,6 +34,26 @@ func (c fakeClient) AddLabelToMessage(ctx context.Context, userID, messageID, la
 	return nil
 }
 
+func (c fakeClient) GetHistoryID(ctx context.Context, userID string) (string, error) {
+	return "", nil
+}
+
+func (c fakeClient) ListHistory(ctx context.Context, userID, startHistoryID string) (domain.HistoryPage, error) {
+	return domain.HistoryPage{}, nil
+}
+
+func (c fakeClient) ModifyMessage(ctx context.Context, userID, messageID string, mutation domain.MessageMutation) error {
+	return nil
+}
+
+func (c fakeClient) TrashMessage(ctx context.Context, userID, messageID string) error {
+	return nil
+}
+
+func (c fakeClient) SendMessage(ctx context.Context, userID string, message domain.OutgoingMail) (string, error) {
+	return "", nil
+}
+
 func TestFactoryBuildUsesRegisteredProvider(t *testing.T) {
 	f := NewFactory()
 	f.Register(domain.ProviderGmail, func(ctx context.Context, credentialsJSON []byte) (domain.MailProviderClient, error) {

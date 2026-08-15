@@ -23,7 +23,6 @@ export class ConnectionsHttpRepository implements ConnectionsRepository {
   }
 
   connectProvider(provider: ConnectionProvider): Observable<ConnectAccountResponse> {
-    // Only google is supported right now in backend, adapt as needed.
     const backendProvider = provider === 'gmail' ? 'google' : provider;
     return this.http.get<{ data: ConnectAccountResponse }>(`${this.baseUrl}/${encodeURIComponent(backendProvider)}`).pipe(map((res) => res.data));
   }

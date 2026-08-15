@@ -7,11 +7,12 @@ import (
 	provisionerpostgres "github.com/bowerbird/internal/organization/adapters/provisioner/postgres"
 	repositorypostgres "github.com/bowerbird/internal/organization/adapters/repository/postgres"
 	"github.com/bowerbird/internal/organization/application"
+	"github.com/bowerbird/internal/organization/application/ports"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewApplication(pool *pgxpool.Pool, databaseURL, migrationsDir string) *application.Application {
+func NewApplication(pool *pgxpool.Pool, databaseURL, migrationsDir string, defaults ports.DefaultPackApplier) *application.Application {
 	if pool == nil {
 		panic("control plane db pool is required")
 	}
@@ -25,7 +26,7 @@ func NewApplication(pool *pgxpool.Pool, databaseURL, migrationsDir string) *appl
 	organizationRepo := repositorypostgres.NewPostgresRepository(pool)
 	organizationProvisioner := provisionerpostgres.NewPostgresProvisioner(pool, databaseURL, migrationsDir)
 
-	return application.NewApplication(organizationRepo, organizationProvisioner)
+	return application.NewApplication(organizationRepo, organizationProvisioner, defaults)
 }
 
 func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *httpV1.Router {

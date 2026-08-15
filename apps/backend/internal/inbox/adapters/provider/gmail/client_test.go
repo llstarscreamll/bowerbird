@@ -20,7 +20,7 @@ func TestListMessagesWithIncrementalQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/gmail/v1/users/me/messages", r.URL.Path)
 
-		assert.Equal(t, "after:1716633600 -in:spam -in:sent", r.URL.Query().Get("q"))
+		assert.Equal(t, "after:1716633600", r.URL.Query().Get("q"))
 
 		_, _ = w.Write([]byte(`{"messages":[{"id":"m1","threadId":"t1"}],"nextPageToken":"nxt"}`))
 	}))
@@ -41,9 +41,9 @@ func TestListMessagesWithIncrementalQuery(t *testing.T) {
 	assert.Equal(t, "nxt", nextPageToken)
 }
 
-func TestListMessagesDefaultsToSpamExclusionQuery(t *testing.T) {
+func TestListMessagesOmitsEmptyQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "-in:spam -in:sent", r.URL.Query().Get("q"))
+		assert.Equal(t, "", r.URL.Query().Get("q"))
 		_, _ = w.Write([]byte(`{"messages":[]}`))
 	}))
 	defer server.Close()
@@ -54,6 +54,12 @@ func TestListMessagesDefaultsToSpamExclusionQuery(t *testing.T) {
 	_, _, err := client.ListMessages(context.Background(), domain.ListMessagesOptions{UserID: "me"})
 
 	require.NoError(t, err)
+}
+
+func TestSendMessageRequiresRecipient(t *testing.T) {
+	client := NewClient(http.DefaultClient)
+	_, err := client.SendMessage(context.Background(), "me", domain.OutgoingMail{Subject: "Hi"})
+	require.ErrorIs(t, err, domain.ErrOutgoingMailToRequired)
 }
 
 func TestGetMessageExtractsHeadersAndAttachments(t *testing.T) {

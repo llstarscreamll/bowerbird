@@ -68,6 +68,9 @@ func MapError(err error, traceID string, isDev bool) (JSONAPIErrorDocument, int)
 		detail = appErr.Message
 		httpStatus, title = statusFromCode(appErr.Code)
 		helpURL = appErrors.HelpURLForCode(appErr.Code)
+		for key, value := range filterAllowedErrorMeta(appErr.Meta) {
+			meta[key] = value
+		}
 	} else {
 		// Generic or unexpected error
 		code = appErrors.CodeInternal
@@ -166,6 +169,7 @@ func filterAllowedErrorMeta(meta map[string]any) map[string]any {
 		"provider":            {},
 		"retry_after_seconds": {},
 		"account_email":       {},
+		"feature_key":         {},
 	}
 
 	out := map[string]any{}

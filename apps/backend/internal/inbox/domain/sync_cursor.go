@@ -13,6 +13,7 @@ const (
 type SyncCursor struct {
 	ConnectionID string
 	LastSyncedAt *time.Time
+	HistoryID    *string
 	LastError    *string
 	Status       SyncCursorStatus
 }
@@ -62,4 +63,12 @@ func (c *SyncCursor) MarkSyncSucceeded(at time.Time) {
 	c.LastError = nil
 	syncedAt := at.UTC()
 	c.LastSyncedAt = &syncedAt
+}
+
+func (c *SyncCursor) SetHistoryID(historyID string) {
+	if historyID == "" {
+		return
+	}
+	id := historyID
+	c.HistoryID = &id
 }

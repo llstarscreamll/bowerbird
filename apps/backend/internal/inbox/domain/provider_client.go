@@ -59,6 +59,9 @@ type MailMessage struct {
 	LabelIDs      []string            `json:"label_ids,omitempty"`
 	Subject       string              `json:"subject"`
 	Sender        string              `json:"sender"`
+	To            []string            `json:"to,omitempty"`
+	Cc            []string            `json:"cc,omitempty"`
+	Bcc           []string            `json:"bcc,omitempty"`
 	Snippet       string              `json:"snippet"`
 	PlainTextBody string              `json:"plain_text_body"`
 	HTMLBody      string              `json:"html_body,omitempty"`
@@ -76,6 +79,41 @@ type DownloadedMailAttachment struct {
 	Data []byte
 }
 
+type OutgoingMail struct {
+	To        []string
+	Cc        []string
+	Bcc       []string
+	Subject   string
+	BodyText  string
+	BodyHTML  string
+	ThreadID  string
+	InReplyTo string
+}
+
+type HistoryChangeType string
+
+const (
+	HistoryChangeAdded   HistoryChangeType = "added"
+	HistoryChangeDeleted HistoryChangeType = "deleted"
+	HistoryChangeUpdated HistoryChangeType = "updated"
+)
+
+type HistoryChange struct {
+	Type      HistoryChangeType
+	MessageID string
+}
+
+type HistoryPage struct {
+	Changes      []HistoryChange
+	NewHistoryID string
+	Expired      bool
+}
+
+type MessageMutation struct {
+	AddLabelIDs    []string
+	RemoveLabelIDs []string
+}
+
 // MailProviderClient is the provider-agnostic inbox port implemented by each provider adapter.
 type MailProviderClient interface {
 	ListMessages(ctx context.Context, opts ListMessagesOptions) ([]MessageRef, string, error)
@@ -84,4 +122,9 @@ type MailProviderClient interface {
 	DownloadMessageAttachments(ctx context.Context, userID, messageID string, refs []MailAttachmentRef) ([]DownloadedMailAttachment, error)
 	CreateLabel(ctx context.Context, userID, labelName string) (string, error)
 	AddLabelToMessage(ctx context.Context, userID, messageID, labelID string) error
+	GetHistoryID(ctx context.Context, userID string) (string, error)
+	ListHistory(ctx context.Context, userID, startHistoryID string) (HistoryPage, error)
+	ModifyMessage(ctx context.Context, userID, messageID string, mutation MessageMutation) error
+	TrashMessage(ctx context.Context, userID, messageID string) error
+	SendMessage(ctx context.Context, userID string, message OutgoingMail) (string, error)
 }

@@ -2,19 +2,25 @@ package events
 
 import (
 	"context"
+	"errors"
+	"log"
 
 	awsevents "github.com/aws/aws-lambda-go/events"
 	contractevents "github.com/bowerbird/internal/contracts/events"
+	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
+	inboxPorts "github.com/bowerbird/internal/inbox/application/ports"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/tenant"
 )
 
 type ConnectionAddedSubscriber struct {
-	command *inboxCommands.SyncAccountCommand
+	command  *inboxCommands.SyncAccountCommand
+	features inboxPorts.FeatureChecker
 }
 
-func NewConnectionAddedSubscriber(command *inboxCommands.SyncAccountCommand) *ConnectionAddedSubscriber {
-	return &ConnectionAddedSubscriber{command: command}
+func NewConnectionAddedSubscriber(command *inboxCommands.SyncAccountCommand, features inboxPorts.FeatureChecker) *ConnectionAddedSubscriber {
+	return &ConnectionAddedSubscriber{command: command, features: features}
 }
 
 func (s *ConnectionAddedSubscriber) DetailType() string {
@@ -32,5 +38,15 @@ func (s *ConnectionAddedSubscriber) HandleEventBridge(ctx context.Context, event
 	}
 
 	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
+	if s.features != nil {
+		if err := s.features.RequireAny(msgCtx, entitlementsDomain.FeatureMailInbox, entitlementsDomain.FeatureInvoicingCaptureFromEmail); err != nil {
+			var appErr *appErrors.AppError
+			if errors.As(err, &appErr) && appErr.Code == appErrors.CodeForbidden {
+				log.Printf("skipping inbox sync after connection added: feature not available")
+				return nil
+			}
+			return err
+		}
+	}
 	return s.command.Execute(msgCtx, inboxCommands.SyncAccountCommandInput{AccountID: decoded.ConnectionID})
 }

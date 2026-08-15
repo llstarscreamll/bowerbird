@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	"github.com/bowerbird/internal/identity/domain"
 	idinfra "github.com/bowerbird/internal/identity/infrastructure"
 	organizationModule "github.com/bowerbird/internal/organization"
@@ -34,7 +35,7 @@ func main() {
 		}
 	}
 
-	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir)
+	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsModule.NewApplication(pool))
 	orgUseCase := application.NewCreateOrganizationUseCaseFromCommand(organizationApp.Commands.CreateOrganization)
 
 	// We also need the user to exist in the Control Plane identity tables before we create the tenant.

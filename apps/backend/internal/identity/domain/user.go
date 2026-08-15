@@ -12,14 +12,21 @@ var (
 
 // User represents the identity in the Control Plane
 type User struct {
-	ID         string
-	Email      string
-	FirstName  string
-	LastName   string
-	PictureURL string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  *time.Time
+	ID           string
+	Email        string
+	FirstName    string
+	LastName     string
+	PictureURL   string
+	PlatformRole string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+}
+
+const PlatformRoleOperator = "operator"
+
+func (u *User) IsPlatformOperator() bool {
+	return u != nil && u.PlatformRole == PlatformRoleOperator
 }
 
 // UserIdentity represents a linked authentication provider for a user

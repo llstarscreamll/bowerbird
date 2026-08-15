@@ -25,10 +25,11 @@ type CreateOrganizationInput struct {
 type CreateOrganizationCommand struct {
 	repo        ports.OrganizationRepository
 	provisioner ports.Provisioner
+	defaults    ports.DefaultPackApplier
 }
 
-func NewCreateOrganizationCommand(repo ports.OrganizationRepository, provisioner ports.Provisioner) *CreateOrganizationCommand {
-	return &CreateOrganizationCommand{repo: repo, provisioner: provisioner}
+func NewCreateOrganizationCommand(repo ports.OrganizationRepository, provisioner ports.Provisioner, defaults ports.DefaultPackApplier) *CreateOrganizationCommand {
+	return &CreateOrganizationCommand{repo: repo, provisioner: provisioner, defaults: defaults}
 }
 
 func (cmd *CreateOrganizationCommand) failProvisioning(ctx context.Context, orgID, slug string, cause error, step string) error {
@@ -87,6 +88,12 @@ func (cmd *CreateOrganizationCommand) Execute(ctx context.Context, input CreateO
 		return nil, fmt.Errorf("failed to mark organization as active: %w", err)
 	}
 	org.Status = domain.StatusActive
+
+	if cmd.defaults != nil {
+		if err := cmd.defaults.ApplyDefaultPack(ctx, org.ID, input.OwnerID); err != nil {
+			return nil, fmt.Errorf("failed to apply default entitlements: %w", err)
+		}
+	}
 
 	return org, nil
 }

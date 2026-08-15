@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { BrnAlertDialogContent } from '@spartan-ng/brain/alert-dialog';
-import { BrnDialogClose, BrnDialogContent } from '@spartan-ng/brain/dialog';
+import { BrnDialogContent } from '@spartan-ng/brain/dialog';
 import { ConnectionsStore } from '../../../application/connections.store';
 import { TenantContextStore } from '../../../../core/store/tenant-context.store';
 import { Connection, ConnectionProvider, ConnectionStatus } from '../../../domain/connections.model';
@@ -39,7 +39,6 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     HlmEmptyImports,
     BrnDialogContent,
     BrnAlertDialogContent,
-    BrnDialogClose,
   ],
   host: {
     class: 'flex-1 flex flex-col min-h-0 w-full',
@@ -173,8 +172,8 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
           <p hlmAlertDialogDescription>Se desvinculará la cuenta {{ disconnectTarget()?.provider_account_email }}. ¿Deseas continuar?</p>
         </hlm-alert-dialog-header>
         <hlm-alert-dialog-footer>
-          <button hlmAlertDialogCancel brnDialogClose>Cancelar</button>
-          <button hlmAlertDialogAction brnDialogClose (click)="confirmDisconnect()">Desvincular</button>
+          <button hlmAlertDialogCancel>Cancelar</button>
+          <button hlmAlertDialogAction variant="destructive" (click)="confirmDisconnect()">Desvincular</button>
         </hlm-alert-dialog-footer>
       </hlm-alert-dialog-content>
     </hlm-alert-dialog>

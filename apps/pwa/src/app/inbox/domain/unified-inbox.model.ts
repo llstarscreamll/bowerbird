@@ -2,6 +2,15 @@ import { ConnectionStatus, MailProvider, SyncStatus } from './inbox.types';
 
 export type MessageProcessingStatus = 'new' | 'processed' | 'skipped' | 'error';
 
+export type MailFolder = 'inbox' | 'sent' | 'drafts' | 'trash' | 'spam' | 'archive' | 'starred';
+
+export interface MailAttachment {
+  id: string;
+  filename: string;
+  mime_type?: string;
+  size_bytes?: number;
+}
+
 export interface UnifiedInboxMessage {
   id: string;
   provider: MailProvider;
@@ -10,6 +19,12 @@ export interface UnifiedInboxMessage {
   subject: string;
   sender: string;
   snippet?: string;
+  to?: string[];
+  thread_id?: string;
+  folder: MailFolder;
+  is_read: boolean;
+  is_starred: boolean;
+  is_draft: boolean;
   received_at: string;
   processing_status: MessageProcessingStatus;
   has_xml: boolean;
@@ -19,7 +34,29 @@ export interface UnifiedInboxMessage {
 export interface UnifiedInboxMessageDetail extends UnifiedInboxMessage {
   body_text?: string;
   body_html?: string;
+  cc?: string[];
+  bcc?: string[];
+  attachments?: MailAttachment[];
   provider_message?: ProviderMailMessage;
+}
+
+export interface MessageListPage {
+  data: UnifiedInboxMessage[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SendMessagePayload {
+  account_id: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body_text?: string;
+  body_html?: string;
+  thread_id?: string;
+  in_reply_to?: string;
 }
 
 export interface ProviderMailHeader {
@@ -71,6 +108,7 @@ export interface UnifiedInboxFilters {
   provider: 'all' | MailProvider;
   accountId: string | 'all';
   status: 'all' | MessageProcessingStatus;
+  folder: MailFolder;
   onlyInvoices: boolean;
   search: string;
 }

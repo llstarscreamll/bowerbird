@@ -1,5 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { NgIcon } from '@ng-icons/core';
 import { AuthStore } from '../../../application/auth.store';
@@ -21,6 +22,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     FormsModule,
     NgIcon,
     HlmCardImports,
@@ -42,10 +44,18 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
             <h1 class="text-2xl font-semibold tracking-tight">Bienvenido</h1>
             <p class="mt-1 text-sm text-muted-foreground">Selecciona una organización para continuar</p>
           </div>
-          <button hlmBtn variant="outline" (click)="logout()">
-            <ng-icon name="lucideLogOut" />
-            <span class="hidden sm:inline">Cerrar sesión</span>
-          </button>
+          <div class="flex items-center gap-2">
+            @if (store.currentUser()?.platform_operator) {
+              <a hlmBtn variant="outline" routerLink="/platform">
+                <ng-icon name="lucideShield" />
+                <span class="hidden sm:inline">Panel de plataforma</span>
+              </a>
+            }
+            <button hlmBtn variant="outline" (click)="logout()">
+              <ng-icon name="lucideLogOut" />
+              <span class="hidden sm:inline">Cerrar sesión</span>
+            </button>
+          </div>
         </header>
 
         <hlm-card class="overflow-hidden p-0">
@@ -139,6 +149,7 @@ export class LobbyComponent implements OnInit {
   readonly createError = this.lobbyStore.createError;
 
   ngOnInit() {
+    this.store.loadMe();
     this.lobbyStore.init();
   }
 

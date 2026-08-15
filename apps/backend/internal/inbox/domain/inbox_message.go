@@ -13,6 +13,14 @@ type InboxMessage struct {
 	ProviderThreadID  *string
 	Subject           *string
 	SenderEmail       *string
+	ToEmails          []string
+	CcEmails          []string
+	BccEmails         []string
+	Snippet           *string
+	Folder            MailFolder
+	IsRead            bool
+	IsStarred         bool
+	IsDraft           bool
 	ReceivedAt        *time.Time
 	SyncStatus        MessageSyncStatus
 	RawData           []byte
@@ -27,6 +35,14 @@ type NewInboxMessageInput struct {
 	ProviderThreadID  *string
 	Subject           *string
 	SenderEmail       *string
+	ToEmails          []string
+	CcEmails          []string
+	BccEmails         []string
+	Snippet           *string
+	Folder            MailFolder
+	IsRead            bool
+	IsStarred         bool
+	IsDraft           bool
 	ReceivedAt        *time.Time
 	RawData           []byte
 	CreatedAt         time.Time
@@ -53,6 +69,11 @@ func NewInboxMessageAsSynced(input NewInboxMessageInput) (*InboxMessage, error) 
 		return nil, ErrInboxMessageProviderIDRequired
 	}
 
+	folder := input.Folder
+	if folder == "" {
+		folder = MailFolderInbox
+	}
+
 	return &InboxMessage{
 		ID:                input.ID,
 		ConnectionID:      input.ConnectionID,
@@ -60,6 +81,14 @@ func NewInboxMessageAsSynced(input NewInboxMessageInput) (*InboxMessage, error) 
 		ProviderThreadID:  input.ProviderThreadID,
 		Subject:           input.Subject,
 		SenderEmail:       input.SenderEmail,
+		ToEmails:          input.ToEmails,
+		CcEmails:          input.CcEmails,
+		BccEmails:         input.BccEmails,
+		Snippet:           input.Snippet,
+		Folder:            folder,
+		IsRead:            input.IsRead,
+		IsStarred:         input.IsStarred,
+		IsDraft:           input.IsDraft,
 		ReceivedAt:        input.ReceivedAt,
 		SyncStatus:        MessageSyncStatusSynced,
 		RawData:           input.RawData,
@@ -73,6 +102,8 @@ func NewInboxMessageFromProvider(input NewInboxMessageFromProviderInput) (*Inbox
 		return nil, ErrInboxMessageProviderIDRequired
 	}
 
+	flags := FlagsFromProviderLabels(input.ProviderMessage.LabelIDs)
+
 	return NewInboxMessageAsSynced(NewInboxMessageInput{
 		ID:                input.ID,
 		ConnectionID:      input.ConnectionID,
@@ -80,6 +111,14 @@ func NewInboxMessageFromProvider(input NewInboxMessageFromProviderInput) (*Inbox
 		ProviderThreadID:  optionalStringPointer(input.ProviderMessage.ThreadID),
 		Subject:           optionalStringPointer(input.ProviderMessage.Subject),
 		SenderEmail:       optionalStringPointer(input.ProviderMessage.Sender),
+		ToEmails:          firstNonEmptyStrings(input.ProviderMessage.To, ParseAddressList(headerValueFromMail(input.ProviderMessage, "to"))),
+		CcEmails:          firstNonEmptyStrings(input.ProviderMessage.Cc, ParseAddressList(headerValueFromMail(input.ProviderMessage, "cc"))),
+		BccEmails:         firstNonEmptyStrings(input.ProviderMessage.Bcc, ParseAddressList(headerValueFromMail(input.ProviderMessage, "bcc"))),
+		Snippet:           optionalStringPointer(input.ProviderMessage.Snippet),
+		Folder:            flags.Folder,
+		IsRead:            flags.IsRead,
+		IsStarred:         flags.IsStarred,
+		IsDraft:           flags.IsDraft,
 		ReceivedAt:        input.ProviderMessage.ReceivedAt,
 		RawData:           input.RawData,
 		CreatedAt:         input.CreatedAt,
@@ -94,4 +133,42 @@ func optionalStringPointer(value string) *string {
 
 	v := value
 	return &v
+}
+
+func headerValueFromMail(message *MailMessage, name string) string {
+	if message == nil {
+		return ""
+	}
+	for _, header := range message.Headers {
+		if equalFoldASCII(header.Name, name) {
+			return header.Value
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyStrings(primary, fallback []string) []string {
+	if len(primary) > 0 {
+		return primary
+	}
+	return fallback
+}
+
+func equalFoldASCII(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		ac, bc := a[i], b[i]
+		if ac >= 'A' && ac <= 'Z' {
+			ac += 'a' - 'A'
+		}
+		if bc >= 'A' && bc <= 'Z' {
+			bc += 'a' - 'A'
+		}
+		if ac != bc {
+			return false
+		}
+	}
+	return true
 }

@@ -49,6 +49,7 @@ func (h *AuthHandler) Register(mux *http.ServeMux, authMiddleware func(http.Hand
 	mux.HandleFunc("GET /api/v1/auth/microsoft/callback", api.Wrap(h.OAuthMicrosoftCallback, cfg))
 
 	// Protected routes
+	mux.Handle("GET /api/v1/identity/me", authMiddleware(api.Wrap(h.GetMe, cfg)))
 	mux.Handle("GET /api/v1/identity/tenants", authMiddleware(api.Wrap(h.ListUserTenants, cfg)))
 	mux.Handle("POST /api/v1/identity/tenants/{tenant_id}/leave", authMiddleware(api.Wrap(h.LeaveTenant, cfg)))
 	mux.Handle("DELETE /api/v1/identity/account", authMiddleware(api.Wrap(h.DeleteAccount, cfg)))
@@ -287,6 +288,20 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	h.setRefreshTokenCookie(w, tokens.RefreshToken)
 	http.Redirect(w, r, h.frontendURL+"/lobby", http.StatusTemporaryRedirect)
 	return nil
+}
+
+func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) error {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok {
+		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
+	}
+
+	me, err := h.identityService.GetMe(r.Context(), claims.UserID)
+	if err != nil {
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to load profile")
+	}
+
+	return api.Success(w, http.StatusOK, me)
 }
 
 func (h *AuthHandler) ListUserTenants(w http.ResponseWriter, r *http.Request) error {

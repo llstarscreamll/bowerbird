@@ -8,6 +8,7 @@ type Repository interface {
 	// Identity Operations (Control Plane)
 	FindUserByEmail(ctx context.Context, email string) (*User, error)
 	FindUserByID(ctx context.Context, id string) (*User, error)
+	SetPlatformRole(ctx context.Context, userID, role string) error
 	CreateUser(ctx context.Context, user *User) error
 
 	FindUserIdentity(ctx context.Context, provider, providerID string) (*UserIdentity, error)

@@ -6,6 +6,7 @@ import { filter } from 'rxjs';
 import { OrganizationHttpService } from '../../../../organization/infrastructure/organization.http.service';
 import { AuthStore } from '../../../../auth/application/auth.store';
 import { TenantContextStore } from '../../../store/tenant-context.store';
+import { EntitlementsStore } from '../../../../entitlements/application/entitlements.store';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
@@ -70,26 +71,46 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
                   <span>Dashboard</span>
                 </a>
               </li>
-              <li hlmSidebarMenuItem>
-                <a
-                  hlmSidebarMenuButton
-                  [routerLink]="['/', tenantId(), 'inbox', 'master']"
-                  routerLinkActive
-                  #inboxLink="routerLinkActive"
-                  [routerLinkActiveOptions]="{ exact: false }"
-                  [isActive]="inboxLink.isActive"
-                  [tooltip]="'Mails'"
-                >
-                  <ng-icon name="lucideInbox" />
-                  <span>Mails</span>
-                </a>
-              </li>
-              <li hlmSidebarMenuItem>
-                <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'invoices']" routerLinkActive #invoicesLink="routerLinkActive" [isActive]="invoicesLink.isActive" [tooltip]="'Facturas'">
-                  <ng-icon name="lucideReceipt" />
-                  <span>Facturas</span>
-                </a>
-              </li>
+              @if (entitlements.hasMailInbox()) {
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', tenantId(), 'inbox', 'master']"
+                    routerLinkActive
+                    #inboxLink="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: false }"
+                    [isActive]="inboxLink.isActive"
+                    [tooltip]="'Mails'"
+                  >
+                    <ng-icon name="lucideInbox" />
+                    <span>Mails</span>
+                  </a>
+                </li>
+              }
+              @if (entitlements.hasInvoicing()) {
+                <li hlmSidebarMenuItem>
+                  <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'invoices']" routerLinkActive #invoicesLink="routerLinkActive" [isActive]="invoicesLink.isActive" [tooltip]="'Facturas'">
+                    <ng-icon name="lucideReceipt" />
+                    <span>Facturas</span>
+                  </a>
+                </li>
+              }
+              @if (entitlements.showConnections()) {
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', tenantId(), 'connections']"
+                    routerLinkActive
+                    #connectionsLink="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: false }"
+                    [isActive]="connectionsLink.isActive"
+                    [tooltip]="'Cuentas asociadas'"
+                  >
+                    <ng-icon name="lucideLink" />
+                    <span>Cuentas</span>
+                  </a>
+                </li>
+              }
             </ul>
           </hlm-sidebar-group>
         </hlm-sidebar-content>
@@ -152,6 +173,7 @@ export class TenantLayoutComponent implements OnInit {
   private organizationService = inject(OrganizationHttpService);
   private authStore = inject(AuthStore);
   private tenantContextStore = inject(TenantContextStore);
+  readonly entitlements = inject(EntitlementsStore);
   readonly sidebarService = inject(HlmSidebarService);
 
   themeMode = signal<'system' | 'light' | 'dark'>('system');
@@ -272,6 +294,9 @@ export class TenantLayoutComponent implements OnInit {
 
     if (newTenantId && newTenantId !== this.tenantId()) {
       this.tenantContextStore.setTenantId(newTenantId);
+      this.entitlements.load(newTenantId).subscribe();
+    } else if (newTenantId && this.entitlements.loadedTenantId() !== newTenantId) {
+      this.entitlements.load(newTenantId).subscribe();
     }
   }
 }

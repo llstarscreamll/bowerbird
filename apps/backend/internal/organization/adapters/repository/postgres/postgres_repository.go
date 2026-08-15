@@ -83,3 +83,31 @@ func (r *PostgresRepository) AddMembership(ctx context.Context, userID, tenantID
 	_, err := r.pool.Exec(ctx, query, userID, tenantID, role)
 	return err
 }
+
+func (r *PostgresRepository) ListAll(ctx context.Context) ([]domain.Organization, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, organization_name, slug, db_name, status, created_at, updated_at
+		FROM tenants
+		ORDER BY organization_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.Organization, 0)
+	for rows.Next() {
+		var org domain.Organization
+		if err := rows.Scan(&org.ID, &org.Name, &org.Slug, &org.DBName, &org.Status, &org.CreatedAt, &org.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, org)
+	}
+	return items, rows.Err()
+}
+
+func (r *PostgresRepository) ExistsByID(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tenants WHERE id = $1)`, id).Scan(&exists)
+	return exists, err
+}

@@ -12,7 +12,8 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSeparatorImports } from '@spartan-ng/helm/separator';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { UnifiedInboxStore } from '../../../application/unified-inbox.store';
-import { AccountHealthSummary, UnifiedInboxMessage } from '../../../domain/unified-inbox.model';
+import { EntitlementsStore } from '../../../../entitlements/application/entitlements.store';
+import { AccountHealthSummary, MailFolder, UnifiedInboxMessage } from '../../../domain/unified-inbox.model';
 import { MailProvider, providerLabel } from '../../../domain/inbox.types';
 import { connectionStatusDetailLabel, connectionStatusIcon, connectionStatusIconClasses } from '../../../../core/presentation/connection-status';
 import { resolveConnectionStatus } from '../../../../core/domain/connection-status.model';
@@ -41,7 +42,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
   template: `
-    <div class="flex h-full w-full bg-background text-foreground">
+    <div class="relative flex h-full w-full bg-background text-foreground">
       <aside class="flex w-[380px] shrink-0 flex-col border-r border-border bg-card">
         <div class="space-y-4 border-b border-border p-4">
           <div class="flex items-center justify-between">
@@ -108,19 +109,26 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
           </div>
 
           <div class="flex items-center gap-2">
-            <button type="button" hlmBtn class="flex-1 gap-1.5" (click)="setOnlyInvoicesFilter(false)"><ng-icon name="lucideZap" class="text-[16px]" /> Principal</button>
-            <button type="button" hlmBtn variant="outline" size="icon-sm" [class.bg-muted]="filters().onlyInvoices" (click)="setOnlyInvoicesFilter(!filters().onlyInvoices)">
+            <button type="button" hlmBtn class="flex-1 gap-1.5" (click)="setFolder('inbox')"><ng-icon name="lucideInbox" class="text-[16px]" /> Inbox</button>
+            @if (canSend()) {
+              <button type="button" hlmBtn variant="outline" size="icon-sm" (click)="openCompose()" title="Redactar">
+                <ng-icon name="lucidePenLine" class="text-[16px]" />
+              </button>
+            }
+            <button type="button" hlmBtn variant="outline" size="icon-sm" [class.bg-muted]="filters().onlyInvoices" (click)="setOnlyInvoicesFilter(!filters().onlyInvoices)" title="Solo facturas">
               <ng-icon name="lucideReceipt" class="text-[16px]" />
-            </button>
-            <button type="button" hlmBtn variant="outline" size="icon-sm">
-              <ng-icon name="lucideUser" class="text-[16px]" />
-            </button>
-            <button type="button" hlmBtn variant="outline" size="icon-sm">
-              <ng-icon name="lucideBell" class="text-[16px]" />
             </button>
             <button type="button" hlmBtn variant="outline" size="icon-sm" [disabled]="isSyncing() || syncRetrySecondsLeft() > 0" (click)="triggerSync()" title="Sincronizar correos">
               <ng-icon name="lucideRefreshCw" class="text-[16px]" [class.animate-spin]="isSyncing()" />
             </button>
+          </div>
+
+          <div class="flex flex-wrap gap-1">
+            @for (folder of folders; track folder.id) {
+              <button type="button" hlmBtn size="sm" [variant]="filters().folder === folder.id ? 'default' : 'ghost'" (click)="setFolder(folder.id)">
+                {{ folder.label }}
+              </button>
+            }
           </div>
         </div>
 
@@ -179,7 +187,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
             </div>
           } @else if (filteredMessages().length > 0) {
             <div class="flex items-center justify-between px-4 py-3 text-xs font-medium text-muted-foreground">
-              <span>Principal [{{ filteredMessages().length }}]</span>
+              <span>{{ currentFolderLabel() }} [{{ filteredMessages().length }}]</span>
             </div>
 
             <ul class="divide-y divide-border" role="listbox" aria-label="Mensajes del inbox">
@@ -203,17 +211,17 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                     } @else {
                       {{ message.sender.charAt(0) | uppercase }}
                     }
-                    @if (message.processing_status === 'new') {
+                    @if (!message.is_read) {
                       <div class="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-background bg-primary"></div>
                     }
                   </div>
 
                   <div class="min-w-0 flex-1">
                     <div class="mb-0.5 flex items-baseline justify-between">
-                      <span class="truncate pr-2 text-sm font-semibold text-foreground">{{ message.sender }}</span>
+                      <span class="truncate pr-2 text-sm text-foreground" [class.font-semibold]="!message.is_read">{{ message.sender }}</span>
                       <span class="shrink-0 text-[11px] text-muted-foreground">{{ message.received_at | date: 'MMM d' }}</span>
                     </div>
-                    <p class="truncate text-sm text-muted-foreground" [class.font-medium]="message.processing_status === 'new'" [class.text-foreground]="message.processing_status === 'new'">
+                    <p class="truncate text-sm text-muted-foreground" [class.font-medium]="!message.is_read" [class.text-foreground]="!message.is_read">
                       {{ message.subject || '(Sin asunto)' }}
                     </p>
 
@@ -227,10 +235,12 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                         }
                       </div>
                       <div class="flex items-center gap-1 text-muted-foreground">
+                        @if (message.is_starred) {
+                          <ng-icon name="lucideStar" class="text-[14px] text-amber-500" />
+                        }
                         @if (message.processing_status === 'error') {
                           <ng-icon name="lucideTriangleAlert" class="text-[14px] text-amber-500" />
                         }
-                        <ng-icon name="lucideUser" class="text-[14px]" [class.text-primary]="message.processing_status === 'processed'" />
                       </div>
                     </div>
                   </div>
@@ -249,12 +259,20 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                 <ng-icon name="lucideArrowLeft" />
               </button>
               <hlm-separator orientation="vertical" class="h-4" />
-              <button type="button" hlmBtn variant="ghost" size="icon-sm" title="Marcar como procesado">
-                <ng-icon name="lucideCircleCheck" class="text-[20px]" />
+              <button type="button" hlmBtn variant="ghost" size="icon-sm" title="Archivar" (click)="archiveMessage(message)">
+                <ng-icon name="lucideArchive" class="text-[20px]" />
               </button>
-              <button type="button" hlmBtn variant="ghost" size="icon-sm" title="Descargar adjuntos">
-                <ng-icon name="lucideDownload" class="text-[20px]" />
+              <button type="button" hlmBtn variant="ghost" size="icon-sm" title="Eliminar" (click)="trashMessage(message)">
+                <ng-icon name="lucideTrash2" class="text-[20px]" />
               </button>
+              <button type="button" hlmBtn variant="ghost" size="icon-sm" [title]="message.is_read ? 'Marcar no leído' : 'Marcar leído'" (click)="toggleRead(message)">
+                <ng-icon [name]="message.is_read ? 'lucideMail' : 'lucideMailOpen'" class="text-[20px]" />
+              </button>
+              @if (canSend()) {
+                <button type="button" hlmBtn variant="ghost" size="icon-sm" title="Responder" (click)="openReply(message)">
+                  <ng-icon name="lucidePenLine" class="text-[20px]" />
+                </button>
+              }
             </div>
 
             <div class="min-h-full w-full px-8 py-10">
@@ -274,7 +292,9 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                 </div>
                 <div class="flex items-center gap-2 text-sm text-muted-foreground">
                   {{ message.received_at | date: 'medium' }}
-                  <ng-icon name="lucideStar" class="text-[18px]" />
+                  <button type="button" hlmBtn variant="ghost" size="icon-sm" [title]="message.is_starred ? 'Quitar estrella' : 'Destacar'" (click)="toggleStar(message)">
+                    <ng-icon name="lucideStar" class="text-[18px]" [class.text-amber-500]="message.is_starred" />
+                  </button>
                 </div>
               </div>
 
@@ -292,31 +312,24 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                 <p class="mt-3 text-sm text-destructive">{{ detailError() }}</p>
               }
 
-              @if (message.has_xml || message.has_pdf) {
+              @if (selectedAttachments().length > 0) {
                 <hlm-card class="mt-10 p-4">
                   <h3 class="mb-3 text-sm font-semibold">Adjuntos</h3>
                   <div class="flex flex-wrap gap-3">
-                    @if (message.has_xml) {
-                      <div class="flex w-64 cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 shadow-sm transition-colors hover:border-border/80">
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <ng-icon name="lucideCode" class="text-[20px]" />
+                    @for (attachment of selectedAttachments(); track attachment.id) {
+                      <button
+                        type="button"
+                        class="flex w-64 items-center gap-3 rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:border-border/80"
+                        (click)="downloadAttachment(message.id, attachment.id, attachment.filename)"
+                      >
+                        <div class="flex size-10 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
+                          <ng-icon name="lucidePaperclip" class="text-[20px]" />
                         </div>
                         <div class="min-w-0">
-                          <p class="truncate text-sm font-medium">factura.xml</p>
-                          <p class="text-xs text-muted-foreground">Documento electrónico</p>
+                          <p class="truncate text-sm font-medium">{{ attachment.filename }}</p>
+                          <p class="text-xs text-muted-foreground">{{ attachment.mime_type || 'Adjunto' }}</p>
                         </div>
-                      </div>
-                    }
-                    @if (message.has_pdf) {
-                      <div class="flex w-64 cursor-pointer items-center gap-3 rounded-lg border bg-card p-3 shadow-sm transition-colors hover:border-border/80">
-                        <div class="flex size-10 shrink-0 items-center justify-center rounded bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                          <ng-icon name="lucideFileText" class="text-[20px]" />
-                        </div>
-                        <div class="min-w-0">
-                          <p class="truncate text-sm font-medium">representacion.pdf</p>
-                          <p class="text-xs text-muted-foreground">Representación gráfica</p>
-                        </div>
-                      </div>
+                      </button>
                     }
                   </div>
                 </hlm-card>
@@ -354,6 +367,35 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
           </div>
         }
       </main>
+
+      @if (canSend() && composeOpen()) {
+        <div class="absolute bottom-4 right-4 z-20 w-[420px] rounded-xl border border-border bg-card shadow-lg">
+          <div class="flex items-center justify-between border-b border-border px-4 py-3">
+            <h3 class="text-sm font-semibold">{{ replyToMessage() ? 'Responder' : 'Redactar' }}</h3>
+            <button type="button" hlmBtn variant="ghost" size="icon-sm" (click)="closeCompose()">
+              <ng-icon name="lucideX" />
+            </button>
+          </div>
+          <form class="space-y-3 p-4" (submit)="submitCompose($event)">
+            @if (accountHealth().length > 1) {
+              <select hlmInput class="w-full" [ngModel]="composeAccountId()" (ngModelChange)="composeAccountId.set($event)" name="composeAccount">
+                @for (account of accountHealth(); track account.id) {
+                  <option [value]="account.id">{{ account.email_address }}</option>
+                }
+              </select>
+            }
+            <input hlmInput type="text" placeholder="Para" class="w-full" [ngModel]="composeTo()" (ngModelChange)="composeTo.set($event)" name="composeTo" required />
+            <input hlmInput type="text" placeholder="Asunto" class="w-full" [ngModel]="composeSubject()" (ngModelChange)="composeSubject.set($event)" name="composeSubject" />
+            <textarea hlmInput placeholder="Mensaje" class="min-h-32 w-full" [ngModel]="composeBody()" (ngModelChange)="composeBody.set($event)" name="composeBody"></textarea>
+            <div class="flex justify-end">
+              <button type="submit" hlmBtn class="gap-2" [disabled]="sending()">
+                <ng-icon name="lucideSend" class="text-[16px]" />
+                Enviar
+              </button>
+            </div>
+          </form>
+        </div>
+      }
     </div>
   `,
 })
@@ -361,6 +403,8 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly store = inject(UnifiedInboxStore);
+  private readonly entitlements = inject(EntitlementsStore);
+  readonly canSend = this.entitlements.hasMailSend;
 
   readonly loading = this.store.loading;
   readonly error = this.store.error;
@@ -373,8 +417,24 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   readonly isSyncing = this.store.isSyncing;
   readonly syncActionError = this.store.syncActionError;
   readonly syncRetrySecondsLeft = this.store.syncRetrySecondsLeft;
+  readonly composeOpen = this.store.composeOpen;
+  readonly sending = this.store.sending;
+
+  readonly folders: { id: MailFolder; label: string }[] = [
+    { id: 'inbox', label: 'Inbox' },
+    { id: 'starred', label: 'Destacados' },
+    { id: 'sent', label: 'Enviados' },
+    { id: 'drafts', label: 'Borradores' },
+    { id: 'archive', label: 'Archivo' },
+    { id: 'trash', label: 'Papelera' },
+  ];
 
   readonly selectedMessage = signal<UnifiedInboxMessage | null>(null);
+  readonly replyToMessage = signal<UnifiedInboxMessage | null>(null);
+  readonly composeTo = signal('');
+  readonly composeSubject = signal('');
+  readonly composeBody = signal('');
+  readonly composeAccountId = signal('');
   readonly selectedMessageBody = computed(() => {
     const selected = this.selectedMessage();
     if (!selected) {
@@ -400,6 +460,14 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   readonly isDetailLoading = computed(() => {
     const selected = this.selectedMessage();
     return !!selected && this.loadingMessageId() === selected.id;
+  });
+  readonly selectedAttachments = computed(() => {
+    const selected = this.selectedMessage();
+    if (!selected) {
+      return [];
+    }
+
+    return this.store.getMessageDetail(selected.id)?.attachments ?? [];
   });
 
   readonly currentAccountLabel = computed(() => {
@@ -435,6 +503,15 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
     }
 
     return providerLabel(normalized);
+  }
+
+  currentFolderLabel(): string {
+    return this.folders.find((folder) => folder.id === this.filters().folder)?.label ?? 'Inbox';
+  }
+
+  setFolder(folder: MailFolder): void {
+    this.store.setFolder(folder);
+    this.selectedMessage.set(null);
   }
 
   setSearchFilter(search: string): void {
@@ -484,6 +561,89 @@ export class MasterInboxComponent implements OnInit, OnDestroy {
   selectMessage(message: UnifiedInboxMessage): void {
     this.selectedMessage.set(message);
     this.store.loadMessageDetail(message.id);
+    if (!message.is_read) {
+      this.store.modifyMessage(message.id, 'read');
+      this.selectedMessage.update((current) => (current ? { ...current, is_read: true } : current));
+    }
+  }
+
+  toggleStar(message: UnifiedInboxMessage): void {
+    this.store.modifyMessage(message.id, message.is_starred ? 'unstar' : 'star');
+    this.selectedMessage.update((current) => (current?.id === message.id ? { ...current, is_starred: !message.is_starred } : current));
+  }
+
+  toggleRead(message: UnifiedInboxMessage): void {
+    this.store.modifyMessage(message.id, message.is_read ? 'unread' : 'read');
+    this.selectedMessage.update((current) => (current?.id === message.id ? { ...current, is_read: !message.is_read } : current));
+  }
+
+  archiveMessage(message: UnifiedInboxMessage): void {
+    this.store.modifyMessage(message.id, 'archive');
+    this.selectedMessage.set(null);
+  }
+
+  trashMessage(message: UnifiedInboxMessage): void {
+    this.store.modifyMessage(message.id, 'trash');
+    this.selectedMessage.set(null);
+  }
+
+  downloadAttachment(messageId: string, attachmentId: string, filename: string): void {
+    this.store.downloadAttachment(messageId, attachmentId, filename);
+  }
+
+  openCompose(): void {
+    this.replyToMessage.set(null);
+    this.composeTo.set('');
+    this.composeSubject.set('');
+    this.composeBody.set('');
+    this.composeAccountId.set(this.defaultComposeAccountId());
+    this.store.composeOpen.set(true);
+  }
+
+  openReply(message: UnifiedInboxMessage): void {
+    const subject = message.subject || '';
+    this.replyToMessage.set(message);
+    this.composeTo.set(message.sender);
+    this.composeSubject.set(subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`.trim());
+    this.composeBody.set('');
+    this.composeAccountId.set(message.account_id);
+    this.store.composeOpen.set(true);
+  }
+
+  closeCompose(): void {
+    this.store.composeOpen.set(false);
+    this.replyToMessage.set(null);
+  }
+
+  submitCompose(event: Event): void {
+    event.preventDefault();
+    const accountId = this.composeAccountId() || this.defaultComposeAccountId();
+    const to = this.composeTo()
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (!accountId || to.length === 0) {
+      return;
+    }
+
+    const reply = this.replyToMessage();
+    this.store.sendMessage({
+      account_id: accountId,
+      to,
+      subject: this.composeSubject(),
+      body_text: this.composeBody(),
+      thread_id: reply?.thread_id,
+      in_reply_to: reply?.id,
+    });
+  }
+
+  private defaultComposeAccountId(): string {
+    const selected = this.filters().accountId;
+    if (selected && selected !== 'all') {
+      return selected;
+    }
+
+    return this.accountHealth()[0]?.id ?? '';
   }
 
   onMessageKeydown(event: KeyboardEvent, message: UnifiedInboxMessage): void {

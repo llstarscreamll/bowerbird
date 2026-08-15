@@ -171,33 +171,19 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 		return fmt.Errorf("build provider client: %w", err)
 	}
 
-	query := incrementalQuery(cursor.LastSyncedAt)
-	pageToken := ""
-	for {
-		refs, nextPageToken, err := mailClient.ListMessages(ctx, domain.ListMessagesOptions{
-			UserID:     "me",
-			Query:      query,
-			PageToken:  pageToken,
-			MaxResults: 100,
-		})
-		if err != nil {
-			return fmt.Errorf("list provider messages: %w", err)
+	if cursor.HistoryID != nil && *cursor.HistoryID != "" {
+		if err := c.syncAccountFromHistory(ctx, tenantID, account, cursor, mailClient); err != nil {
+			return err
 		}
-
-		for _, ref := range refs {
-			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient); err != nil {
-				if errors.Is(err, errPayloadRejected) {
-					continue
-				}
-
-				return err
-			}
+	} else {
+		if err := c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient); err != nil {
+			return err
 		}
+	}
 
-		pageToken = nextPageToken
-		if pageToken == "" {
-			break
-		}
+	historyID, histErr := mailClient.GetHistoryID(ctx, "me")
+	if histErr == nil {
+		cursor.SetHistoryID(historyID)
 	}
 
 	now := time.Now().UTC()
@@ -252,7 +238,8 @@ func (c *SyncAccountCommand) processSingleMessage(
 		return fmt.Errorf("build internal message: %w", err)
 	}
 
-	if _, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage); err != nil {
+	inserted, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage)
+	if err != nil {
 		return fmt.Errorf("save internal message: %w", err)
 	}
 
@@ -270,6 +257,10 @@ func (c *SyncAccountCommand) processSingleMessage(
 		if err != nil {
 			return err
 		}
+	}
+
+	if !inserted {
+		return nil
 	}
 
 	if err := c.publishInboxMessageReceivedEvent(ctx, tenantID, account, message, inboxMessage, attachmentRefs); err != nil {
@@ -446,4 +437,77 @@ func incrementalQuery(lastSyncedAt *time.Time) string {
 	}
 
 	return fmt.Sprintf("after:%d", lastSyncedAt.Unix())
+}
+
+func (c *SyncAccountCommand) syncAccountFromList(
+	ctx context.Context,
+	tenantID string,
+	account connectionsApp.ConnectionInfo,
+	cursor *domain.SyncCursor,
+	mailClient domain.MailProviderClient,
+) error {
+	query := incrementalQuery(cursor.LastSyncedAt)
+	pageToken := ""
+	for {
+		refs, nextPageToken, err := mailClient.ListMessages(ctx, domain.ListMessagesOptions{
+			UserID:     "me",
+			Query:      query,
+			PageToken:  pageToken,
+			MaxResults: 100,
+		})
+		if err != nil {
+			return fmt.Errorf("list provider messages: %w", err)
+		}
+
+		for _, ref := range refs {
+			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient); err != nil {
+				if errors.Is(err, errPayloadRejected) {
+					continue
+				}
+
+				return err
+			}
+		}
+
+		pageToken = nextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (c *SyncAccountCommand) syncAccountFromHistory(
+	ctx context.Context,
+	tenantID string,
+	account connectionsApp.ConnectionInfo,
+	cursor *domain.SyncCursor,
+	mailClient domain.MailProviderClient,
+) error {
+	page, err := mailClient.ListHistory(ctx, "me", *cursor.HistoryID)
+	if err != nil {
+		return fmt.Errorf("list provider history: %w", err)
+	}
+	if page.Expired {
+		return c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient)
+	}
+
+	for _, change := range page.Changes {
+		if change.Type == domain.HistoryChangeDeleted {
+			continue
+		}
+		if err := c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: change.MessageID}, mailClient); err != nil {
+			if errors.Is(err, errPayloadRejected) {
+				continue
+			}
+			return err
+		}
+	}
+
+	if page.NewHistoryID != "" {
+		cursor.SetHistoryID(page.NewHistoryID)
+	}
+
+	return nil
 }

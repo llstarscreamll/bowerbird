@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AuthTokens, TenantMembership } from '../domain/auth.model';
+import { AuthTokens, CurrentUser, TenantMembership } from '../domain/auth.model';
 import { AuthRepository } from '../domain/auth.repository';
 import { environment } from '../../../environments/environment';
 
@@ -25,6 +25,10 @@ export class AuthHttpService implements AuthRepository {
 
   logout(): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/logout`, {});
+  }
+
+  getMe(): Observable<CurrentUser> {
+    return this.http.get<CurrentUser>(`${this.identityUrl}/me`);
   }
 
   getUserTenants(): Observable<TenantMembership[]> {

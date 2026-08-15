@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -40,6 +41,7 @@ type Config struct {
 	InboxCredentialsEncryptionKey string    `json:"inbox_credentials_encryption_key"`
 	FrontendURL                   string    `json:"frontend_url"`
 	BackendURL                    string    `json:"backend_url"`
+	PlatformOperatorEmails        []string  `json:"-"`
 	JWT                           JWTConfig `json:"-"`
 }
 
@@ -53,18 +55,19 @@ type JWTConfig struct {
 func Load(ctx context.Context) (Config, error) {
 	// Load base env vars
 	cfg := Config{
-		AppEnv:               getEnv("APP_ENV", "development"),
-		Port:                 getEnv("PORT", "8080"),
-		AWSRegion:            getEnv("AWS_REGION", "us-east-1"),
-		AWSEndpointURL:       os.Getenv("AWS_ENDPOINT_URL"),
-		S3PresignEndpointURL: os.Getenv("S3_PRESIGN_ENDPOINT_URL"),
-		AWSAccessKeyID:       getEnv("AWS_ACCESS_KEY_ID", "test"),
-		AWSSecretAccessKey:   getEnv("AWS_SECRET_ACCESS_KEY", "test"),
-		SSMParameterName:     getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets"),
-		EnableLocalEventLoop: getEnv("ENABLE_LOCAL_EVENT_LOOP", "true") == "true",
-		AllowedOrigins:       getEnv("ALLOWED_ORIGINS", "*"),
-		FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:4200"),
-		BackendURL:           getEnv("BACKEND_URL", "http://localhost:8080"),
+		AppEnv:                 getEnv("APP_ENV", "development"),
+		Port:                   getEnv("PORT", "8080"),
+		AWSRegion:              getEnv("AWS_REGION", "us-east-1"),
+		AWSEndpointURL:         os.Getenv("AWS_ENDPOINT_URL"),
+		S3PresignEndpointURL:   os.Getenv("S3_PRESIGN_ENDPOINT_URL"),
+		AWSAccessKeyID:         getEnv("AWS_ACCESS_KEY_ID", "test"),
+		AWSSecretAccessKey:     getEnv("AWS_SECRET_ACCESS_KEY", "test"),
+		SSMParameterName:       getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets"),
+		EnableLocalEventLoop:   getEnv("ENABLE_LOCAL_EVENT_LOOP", "true") == "true",
+		AllowedOrigins:         getEnv("ALLOWED_ORIGINS", "*"),
+		FrontendURL:            getEnv("FRONTEND_URL", "http://localhost:4200"),
+		BackendURL:             getEnv("BACKEND_URL", "http://localhost:8080"),
+		PlatformOperatorEmails: parseCSVList(os.Getenv("PLATFORM_OPERATOR_EMAILS")),
 	}
 
 	defaultDebug := cfg.AppEnv == "development" || cfg.AppEnv == "local"
@@ -168,6 +171,21 @@ func loadSSMSecrets(ctx context.Context, awsCfg aws.Config, endpointURL string, 
 	}
 
 	return json.Unmarshal([]byte(*param.Parameter.Value), cfg)
+}
+
+func parseCSVList(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized := strings.ToLower(strings.TrimSpace(part))
+		if normalized != "" {
+			out = append(out, normalized)
+		}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {

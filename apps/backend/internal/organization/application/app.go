@@ -19,10 +19,10 @@ type Queries struct {
 	GetOrganization *queries.GetOrganizationQuery
 }
 
-func NewApplication(repo ports.OrganizationRepository, provisioner ports.Provisioner) *Application {
+func NewApplication(repo ports.OrganizationRepository, provisioner ports.Provisioner, defaults ports.DefaultPackApplier) *Application {
 	return &Application{
 		Commands: Commands{
-			CreateOrganization: commands.NewCreateOrganizationCommand(repo, provisioner),
+			CreateOrganization: commands.NewCreateOrganizationCommand(repo, provisioner, defaults),
 		},
 		Queries: Queries{
 			GetOrganization: queries.NewGetOrganizationQuery(repo),

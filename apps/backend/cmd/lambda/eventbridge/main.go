@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	connectionsModule "github.com/bowerbird/internal/connections"
+	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
 	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
@@ -24,6 +25,7 @@ func init() {
 	}
 
 	cfg := platformModule.Config
+	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
@@ -47,8 +49,9 @@ func init() {
 		platformModule.EventBus,
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
+		platformModule.JobQueue,
 	)
-	connectionAddedSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp)
+	connectionAddedSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp, entitlementsApp)
 	eventHandler = platformEvents.NewEventHandler(inboxMessageSubscriber, connectionAddedSubscriber)
 }
 

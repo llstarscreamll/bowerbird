@@ -2,13 +2,14 @@ import { inject } from '@angular/core';
 import { patchState, signalStore, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { Observable, catchError, map, of, pipe, switchMap, tap } from 'rxjs';
-import { TenantMembership } from '../domain/auth.model';
+import { TenantMembership, CurrentUser } from '../domain/auth.model';
 import { AUTH_REPOSITORY } from '../domain/auth.repository';
 
 interface AuthState {
   accessToken: string | null;
   isAuthenticated: boolean;
   tenants: TenantMembership[];
+  currentUser: CurrentUser | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -17,6 +18,7 @@ const initialState: AuthState = {
   accessToken: null,
   isAuthenticated: false,
   tenants: [],
+  currentUser: null,
   isLoading: false,
   error: null,
 };
@@ -29,7 +31,7 @@ export const AuthStore = signalStore(
       patchState(store, { accessToken: token, isAuthenticated: true, error: null });
     },
     clearToken() {
-      patchState(store, { accessToken: null, isAuthenticated: false, tenants: [] });
+      patchState(store, { accessToken: null, isAuthenticated: false, tenants: [], currentUser: null });
     },
     refreshSession(): Observable<string | null> {
       return authRepo.refreshToken().pipe(
@@ -42,7 +44,7 @@ export const AuthStore = signalStore(
         }),
         map((res) => res.access_token),
         catchError(() => {
-          patchState(store, { accessToken: null, isAuthenticated: false, tenants: [] });
+          patchState(store, { accessToken: null, isAuthenticated: false, tenants: [], currentUser: null });
           return of(null);
         }),
       );
@@ -62,6 +64,30 @@ export const AuthStore = signalStore(
             }),
             catchError(() => {
               patchState(store, { error: 'Login failed', isLoading: false });
+              return of(null);
+            }),
+          ),
+        ),
+      ),
+    ),
+    fetchMe(): Observable<CurrentUser | null> {
+      return authRepo.getMe().pipe(
+        tap((currentUser) => patchState(store, { currentUser })),
+        catchError(() => {
+          patchState(store, { currentUser: null });
+          return of(null);
+        }),
+      );
+    },
+    loadMe: rxMethod<void>(
+      pipe(
+        switchMap(() =>
+          authRepo.getMe().pipe(
+            tap((currentUser) => {
+              patchState(store, { currentUser });
+            }),
+            catchError(() => {
+              patchState(store, { currentUser: null });
               return of(null);
             }),
           ),
@@ -94,6 +120,7 @@ export const AuthStore = signalStore(
                 accessToken: null,
                 isAuthenticated: false,
                 tenants: [],
+                currentUser: null,
                 isLoading: false,
               });
               options.onFinish?.();

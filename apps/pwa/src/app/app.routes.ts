@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { publicGuard } from './core/guards/public.guard';
+import { platformOperatorGuard } from './core/guards/platform-operator.guard';
 
 export const routes: Routes = [
   {
@@ -16,6 +17,11 @@ export const routes: Routes = [
     path: 'lobby',
     canActivate: [authGuard],
     loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
+  },
+  {
+    path: 'platform',
+    canActivate: [authGuard, platformOperatorGuard],
+    loadComponent: () => import('./entitlements/presentation/pages/platform/platform-operators.component').then((c) => c.PlatformOperatorsComponent),
   },
   {
     path: ':tenantId',

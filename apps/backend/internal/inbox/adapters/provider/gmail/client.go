@@ -178,6 +178,9 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 		LabelIDs:      payload.LabelIDs,
 		Subject:       headerValue(headers, "subject"),
 		Sender:        headerValue(headers, "from"),
+		To:            domain.ParseAddressList(headerValue(headers, "to")),
+		Cc:            domain.ParseAddressList(headerValue(headers, "cc")),
+		Bcc:           domain.ParseAddressList(headerValue(headers, "bcc")),
 		Snippet:       payload.Snippet,
 		PlainTextBody: extractPlainTextBody(payload.Payload),
 		HTMLBody:      extractHTMLBody(payload.Payload),
@@ -330,6 +333,265 @@ func (c *Client) AddLabelToMessage(ctx context.Context, userID, messageID, label
 	}
 
 	return nil
+}
+
+func (c *Client) GetHistoryID(ctx context.Context, userID string) (string, error) {
+	if userID == "" {
+		userID = "me"
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/profile", c.baseURL, url.PathEscape(userID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("build get profile request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("get profile request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", c.requestStatusError("get profile request failed", resp)
+	}
+
+	var payload struct {
+		HistoryID string `json:"historyId"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode profile response: %w", err)
+	}
+
+	return payload.HistoryID, nil
+}
+
+func (c *Client) ListHistory(ctx context.Context, userID, startHistoryID string) (domain.HistoryPage, error) {
+	if userID == "" {
+		userID = "me"
+	}
+	if startHistoryID == "" {
+		return domain.HistoryPage{}, fmt.Errorf("start history id is required")
+	}
+
+	values := url.Values{}
+	values.Set("startHistoryId", startHistoryID)
+	values.Add("historyTypes", "messageAdded")
+	values.Add("historyTypes", "messageDeleted")
+	values.Add("historyTypes", "labelAdded")
+	values.Add("historyTypes", "labelRemoved")
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/history?%s", c.baseURL, url.PathEscape(userID), values.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return domain.HistoryPage{}, fmt.Errorf("build list history request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.HistoryPage{}, fmt.Errorf("list history request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return domain.HistoryPage{Expired: true}, nil
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return domain.HistoryPage{}, c.requestStatusError("list history request failed", resp)
+	}
+
+	var payload struct {
+		History []struct {
+			MessagesAdded []struct {
+				Message struct {
+					ID string `json:"id"`
+				} `json:"message"`
+			} `json:"messagesAdded"`
+			MessagesDeleted []struct {
+				Message struct {
+					ID string `json:"id"`
+				} `json:"message"`
+			} `json:"messagesDeleted"`
+			LabelsAdded []struct {
+				Message struct {
+					ID string `json:"id"`
+				} `json:"message"`
+			} `json:"labelsAdded"`
+			LabelsRemoved []struct {
+				Message struct {
+					ID string `json:"id"`
+				} `json:"message"`
+			} `json:"labelsRemoved"`
+		} `json:"history"`
+		HistoryID string `json:"historyId"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.HistoryPage{}, fmt.Errorf("decode list history response: %w", err)
+	}
+
+	page := domain.HistoryPage{NewHistoryID: payload.HistoryID}
+	seen := map[string]domain.HistoryChangeType{}
+	appendChange := func(changeType domain.HistoryChangeType, messageID string) {
+		if messageID == "" {
+			return
+		}
+		if existing, ok := seen[messageID]; ok && existing == domain.HistoryChangeAdded && changeType == domain.HistoryChangeUpdated {
+			return
+		}
+		seen[messageID] = changeType
+	}
+	for _, item := range payload.History {
+		for _, added := range item.MessagesAdded {
+			appendChange(domain.HistoryChangeAdded, added.Message.ID)
+		}
+		for _, deleted := range item.MessagesDeleted {
+			appendChange(domain.HistoryChangeDeleted, deleted.Message.ID)
+		}
+		for _, labeled := range item.LabelsAdded {
+			appendChange(domain.HistoryChangeUpdated, labeled.Message.ID)
+		}
+		for _, labeled := range item.LabelsRemoved {
+			appendChange(domain.HistoryChangeUpdated, labeled.Message.ID)
+		}
+	}
+	for messageID, changeType := range seen {
+		page.Changes = append(page.Changes, domain.HistoryChange{Type: changeType, MessageID: messageID})
+	}
+
+	return page, nil
+}
+
+func (c *Client) ModifyMessage(ctx context.Context, userID, messageID string, mutation domain.MessageMutation) error {
+	if userID == "" {
+		userID = "me"
+	}
+
+	payload := map[string]interface{}{}
+	if len(mutation.AddLabelIDs) > 0 {
+		payload["addLabelIds"] = mutation.AddLabelIDs
+	}
+	if len(mutation.RemoveLabelIDs) > 0 {
+		payload["removeLabelIds"] = mutation.RemoveLabelIDs
+	}
+
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal modify message payload: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/%s/modify", c.baseURL, url.PathEscape(userID), url.PathEscape(messageID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return fmt.Errorf("build modify message request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("modify message request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return c.requestStatusError("modify message request failed", resp)
+	}
+
+	return nil
+}
+
+func (c *Client) TrashMessage(ctx context.Context, userID, messageID string) error {
+	if userID == "" {
+		userID = "me"
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/%s/trash", c.baseURL, url.PathEscape(userID), url.PathEscape(messageID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, http.NoBody)
+	if err != nil {
+		return fmt.Errorf("build trash message request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("trash message request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return c.requestStatusError("trash message request failed", resp)
+	}
+
+	return nil
+}
+
+func (c *Client) SendMessage(ctx context.Context, userID string, message domain.OutgoingMail) (string, error) {
+	if userID == "" {
+		userID = "me"
+	}
+	if len(message.To) == 0 {
+		return "", domain.ErrOutgoingMailToRequired
+	}
+
+	raw, err := encodeOutgoingRFC2822(message)
+	if err != nil {
+		return "", err
+	}
+
+	bodyBytes, err := json.Marshal(map[string]string{"raw": raw})
+	if err != nil {
+		return "", fmt.Errorf("marshal send message payload: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/send", c.baseURL, url.PathEscape(userID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		return "", fmt.Errorf("build send message request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send message request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", c.requestStatusError("send message request failed", resp)
+	}
+
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode send message response: %w", err)
+	}
+
+	return result.ID, nil
+}
+
+func encodeOutgoingRFC2822(message domain.OutgoingMail) (string, error) {
+	var builder strings.Builder
+	builder.WriteString("To: " + strings.Join(message.To, ", ") + "\r\n")
+	if len(message.Cc) > 0 {
+		builder.WriteString("Cc: " + strings.Join(message.Cc, ", ") + "\r\n")
+	}
+	if len(message.Bcc) > 0 {
+		builder.WriteString("Bcc: " + strings.Join(message.Bcc, ", ") + "\r\n")
+	}
+	builder.WriteString("Subject: " + message.Subject + "\r\n")
+	if message.InReplyTo != "" {
+		builder.WriteString("In-Reply-To: " + message.InReplyTo + "\r\n")
+		builder.WriteString("References: " + message.InReplyTo + "\r\n")
+	}
+	builder.WriteString("MIME-Version: 1.0\r\n")
+	if strings.TrimSpace(message.BodyHTML) != "" {
+		builder.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
+		builder.WriteString(message.BodyHTML)
+	} else {
+		builder.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
+		builder.WriteString(message.BodyText)
+	}
+
+	return base64.RawURLEncoding.EncodeToString([]byte(builder.String())), nil
 }
 
 type gmailMessageResponse struct {
@@ -538,19 +800,5 @@ func decodeBase64URL(value string) ([]byte, error) {
 }
 
 func withInboxExclusions(query string) string {
-	trimmed := strings.TrimSpace(query)
-	if trimmed == "" {
-		return "-in:spam -in:sent"
-	}
-
-	lower := strings.ToLower(trimmed)
-	if !strings.Contains(lower, "in:spam") {
-		trimmed += " -in:spam"
-	}
-
-	if !strings.Contains(lower, "in:sent") {
-		trimmed += " -in:sent"
-	}
-
-	return trimmed
+	return strings.TrimSpace(query)
 }
