@@ -399,7 +399,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
     </div>
   `,
 })
-export class MasterInboxComponent implements OnInit, OnDestroy {
+export class MasterInboxPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly store = inject(UnifiedInboxStore);

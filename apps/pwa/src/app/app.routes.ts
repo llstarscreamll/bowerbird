@@ -12,17 +12,17 @@ export const routes: Routes = [
   {
     path: 'login',
     canActivate: [publicGuard],
-    loadComponent: () => import('./auth/presentation/pages/login/login.component').then((c) => c.LoginComponent),
+    loadComponent: () => import('./auth/presentation/pages/login/login.page').then((c) => c.LoginPage),
   },
   {
     path: 'lobby',
     canActivate: [authGuard],
-    loadComponent: () => import('./auth/presentation/pages/lobby/lobby.component').then((c) => c.LobbyComponent),
+    loadComponent: () => import('./auth/presentation/pages/lobby/lobby.page').then((c) => c.LobbyPage),
   },
   {
     path: 'platform',
     canActivate: [authGuard, platformOperatorGuard],
-    loadComponent: () => import('./entitlements/presentation/pages/platform/platform-operators.component').then((c) => c.PlatformOperatorsComponent),
+    loadComponent: () => import('./entitlements/presentation/pages/platform/platform-operators.page').then((c) => c.PlatformOperatorsPage),
   },
   {
     path: ':tenantId',
@@ -36,27 +36,27 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
-        loadComponent: () => import('./dashboard/presentation/pages/dashboard/dashboard.component').then((c) => c.DashboardComponent),
+        loadComponent: () => import('./dashboard/presentation/pages/dashboard/dashboard.page').then((c) => c.DashboardPage),
       },
       {
         path: 'inbox/master',
-        loadComponent: () => import('./inbox/presentation/pages/master/master-inbox.component').then((c) => c.MasterInboxComponent),
+        loadComponent: () => import('./inbox/presentation/pages/master/master.page').then((c) => c.MasterInboxPage),
       },
       {
         path: 'connections',
-        loadComponent: () => import('./connections/presentation/pages/connections-list/connections-list.component').then((c) => c.ConnectionsListComponent),
+        loadComponent: () => import('./connections/presentation/pages/connections-list/connections-list.page').then((c) => c.ConnectionsListPage),
       },
       {
         path: 'connections/:connectionId',
-        loadComponent: () => import('./connections/presentation/pages/connection-details/connection-details.component').then((c) => c.ConnectionDetailsComponent),
+        loadComponent: () => import('./connections/presentation/pages/connection-details/connection-details.page').then((c) => c.ConnectionDetailsPage),
       },
       {
         path: 'invoices',
-        loadComponent: () => import('./invoices/presentation/pages/master/master-invoices.component').then((c) => c.MasterInvoicesComponent),
+        loadComponent: () => import('./invoices/presentation/pages/master/master.page').then((c) => c.MasterInvoicesPage),
       },
       {
         path: 'invoices/:invoiceId',
-        loadComponent: () => import('./invoices/presentation/pages/detail/invoice-detail.component').then((c) => c.InvoiceDetailComponent),
+        loadComponent: () => import('./invoices/presentation/pages/detail/invoice-detail.page').then((c) => c.InvoiceDetailPage),
       },
     ],
   },

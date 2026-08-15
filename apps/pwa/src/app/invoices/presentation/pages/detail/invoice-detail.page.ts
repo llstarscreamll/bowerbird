@@ -140,7 +140,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     </div>
   `,
 })
-export class InvoiceDetailComponent implements OnInit {
+export class InvoiceDetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(InvoiceDetailsStore);
 

@@ -115,7 +115,7 @@ import { ToastService } from '../../../../core/services/toast.service';
     </div>
   `,
 })
-export class PlatformOperatorsComponent implements OnInit {
+export class PlatformOperatorsPage implements OnInit {
   private readonly repo = inject(EntitlementsHttpRepository);
   private readonly toast = inject(ToastService);
 

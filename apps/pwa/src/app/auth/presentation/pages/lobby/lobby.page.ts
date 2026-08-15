@@ -138,7 +138,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     </div>
   `,
 })
-export class LobbyComponent implements OnInit {
+export class LobbyPage implements OnInit {
   readonly store = inject(AuthStore);
   private readonly lobbyStore = inject(LobbyStore);
 

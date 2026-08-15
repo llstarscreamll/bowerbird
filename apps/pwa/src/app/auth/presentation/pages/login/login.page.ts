@@ -103,7 +103,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     </div>
   `,
 })
-export class LoginComponent {
+export class LoginPage {
   readonly store = inject(AuthStore);
   private router = inject(Router);
 

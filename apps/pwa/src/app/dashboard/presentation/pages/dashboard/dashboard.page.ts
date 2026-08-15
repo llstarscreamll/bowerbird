@@ -27,4 +27,4 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
     </div>
   `,
 })
-export class DashboardComponent {}
+export class DashboardPage {}

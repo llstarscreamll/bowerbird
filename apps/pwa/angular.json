@@ -73,12 +73,22 @@
           "builder": "@angular/build:unit-test"
         },
         "lint": {
-          "builder": "@angular/build:noop"
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html", "src/**/*.page.ts", "src/**/*.page.html"]
+          }
         }
       }
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "schematicCollections": ["angular-eslint"]
+  },
+  "schematics": {
+    "@schematics/angular:component": {
+      "typeSeparator": ".",
+      "style": "css"
+    }
   }
 }

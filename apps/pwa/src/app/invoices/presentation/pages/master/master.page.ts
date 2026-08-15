@@ -167,7 +167,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     </hlm-dialog>
   `,
 })
-export class MasterInvoicesComponent implements OnInit {
+export class MasterInvoicesPage implements OnInit {
   private readonly importStore = inject(InvoiceHistoryImportStore);
   private readonly invoicesStore = inject(InvoicesStore);
   private readonly formBuilder = inject(FormBuilder);

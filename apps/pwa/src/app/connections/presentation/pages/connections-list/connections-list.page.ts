@@ -179,7 +179,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     </hlm-alert-dialog>
   `,
 })
-export class ConnectionsListComponent implements OnInit {
+export class ConnectionsListPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   readonly store = inject(ConnectionsStore);
   private readonly tenantContext = inject(TenantContextStore);
