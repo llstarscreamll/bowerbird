@@ -1,50 +1,50 @@
 # Product entitlements
 
-## Problem Statement
+## Problem statement
 
-Bowerbird necesita prender y apagar productos y funciones por tenant, administrado por operadores de plataforma (por encima de toda organización). El primer corte: producto Correo, y la función Enviar, sin cortar la captura de facturas.
+Bowerbird must enable and disable products and features per tenant, managed by platform operators (above any organization). First cut: Mail product and Send feature, without cutting invoice capture.
 
 ## Goals
 
-- [ ] Un operador habilita o deshabilita el producto Correo para un tenant, con vigencia opcional (prueba).
-- [ ] Con Correo on, el operador puede apagar Enviar; archivar/etiquetar/leído siguen.
-- [ ] Con Correo off, Facturas sigue sincronizando correo entrante.
-- [ ] JWT no lleva roles ni features; operador y accesos se resuelven en runtime.
+- [ ] An operator enables or disables the Mail product for a tenant, with optional end date (trial).
+- [ ] With Mail on, the operator can turn off Send; archive/label/read still work.
+- [ ] With Mail off, Invoicing keeps syncing incoming mail.
+- [ ] JWT carries neither roles nor features; operator and access resolve at runtime.
 
-## Out of Scope
+## Out of scope
 
-| Feature                    | Reason                                       |
-| -------------------------- | -------------------------------------------- |
-| Toggle de Facturas en UI   | Catálogo sí; UI en corte posterior           |
-| Billing / Stripe / seats   | Entitlements son el modelo; cobro es otro BC |
-| UI para nominar operadores | `PLATFORM_OPERATOR_EMAILS` basta             |
-| Feature flags de deploy    | Otro problema                                |
+| Feature                  | Reason                                            |
+| ------------------------ | ------------------------------------------------- |
+| Invoicing toggle in UI   | Catalog yes; UI in a later cut                    |
+| Billing / Stripe / seats | Entitlements are the model; billing is another BC |
+| UI to nominate operators | `PLATFORM_OPERATOR_EMAILS` is enough              |
+| Deploy feature flags     | Separate problem                                  |
 
 ## Catalog
 
-| Product     | Feature                        | Required | UI                                                |
-| ----------- | ------------------------------ | -------- | ------------------------------------------------- |
-| `invoicing` | `invoicing.workspace`          | yes      | Facturas                                          |
-| `invoicing` | `invoicing.capture_from_email` | yes      | (ingesta; no es UI de Mails)                      |
-| `mail`      | `mail.inbox`                   | yes      | Correo: leer el buzón                             |
-| `mail`      | `mail.organize`                | yes      | Archivar, etiquetar, leído, destacar              |
-| `mail`      | `mail.send`                    | no       | Enviar: redactar/responder en nombre de la cuenta |
+| Product     | Feature                        | Required | UI                                 |
+| ----------- | ------------------------------ | -------- | ---------------------------------- |
+| `invoicing` | `invoicing.workspace`          | yes      | Invoices                           |
+| `invoicing` | `invoicing.capture_from_email` | yes      | (ingest; not Mail UI)              |
+| `mail`      | `mail.inbox`                   | yes      | Mail: read mailbox                 |
+| `mail`      | `mail.organize`                | yes      | Archive, label, read, star         |
+| `mail`      | `mail.send`                    | no       | Send: compose/reply as the account |
 
-Pack por defecto (todos los tenants): invoicing.\* + mail.inbox + mail.organize. Sin mail.send.
+Default pack (all tenants): invoicing.\* + mail.inbox + mail.organize. No mail.send.
 
-## User Stories
+## User stories
 
-### P1: Operador administra accesos ⭐ MVP
+### P1: Operator manages access ⭐ MVP
 
-**User Story**: Como operador, quiero prender/apagar Correo y Enviar por organización, y dar una prueba con fecha de fin.
+**User story**: As an operator, I want to turn Mail and Send on/off per organization, and grant a trial with an end date.
 
-**Acceptance Criteria**:
+**Acceptance criteria**:
 
-1. WHEN el operador apaga Correo THEN la API de cliente de correo SHALL devolver `ERR_FORBIDDEN` y la nav Mails SHALL ocultarse.
-2. WHEN Correo está apagado AND Facturas está activa THEN sync, conexiones e `InboxMessageReceived` SHALL seguir.
-3. WHEN Correo está on AND Enviar off THEN `POST /inbox/messages` SHALL ser 403 AND modify/archive SHALL funcionar.
-4. WHEN un acceso tiene `ends_at` en el pasado THEN SHALL evaluarse como apagado.
-5. WHEN un usuario sin `platform_role=operator` llama `/api/v1/platform/*` THEN SHALL recibir 403 aunque el JWT sea válido.
-6. JWT SHALL NOT incluir `platform_role` ni feature keys.
+1. WHEN the operator turns Mail off THEN the mail-client API SHALL return `ERR_FORBIDDEN` and the Mails nav SHALL hide.
+2. WHEN Mail is off AND Invoicing is active THEN sync, connections, and `InboxMessageReceived` SHALL continue.
+3. WHEN Mail is on AND Send is off THEN `POST /inbox/messages` SHALL be 403 AND modify/archive SHALL work.
+4. WHEN an entitlement has `ends_at` in the past THEN it SHALL evaluate as off.
+5. WHEN a user without `platform_role=operator` calls `/api/v1/platform/*` THEN they SHALL get 403 even with a valid JWT.
+6. JWT SHALL NOT include `platform_role` or feature keys.
 
-**Independent Test**: Evaluate de trial expirado no incluye `mail.inbox`; ingest `invoicing.capture_from_email` sigue true.
+**Independent test**: Evaluate of expired trial excludes `mail.inbox`; ingest `invoicing.capture_from_email` stays true.

@@ -1,45 +1,45 @@
-# [ID] Nombre de la funcionalidad
+# [ID] Feature name
 
-## 1. Contexto
+## 1. Context
 
-- Problema que se resuelve:
-- Hipótesis de valor:
-- Tipo de usuario afectado:
+- Problem:
+- Value hypothesis:
+- Users affected:
 
-## 2. Objetivo y alcance
+## 2. Goal and scope
 
-- Objetivo principal:
-- Incluye:
-- No incluye:
+- Primary goal:
+- In scope:
+- Out of scope:
 
-## 3. Actores y flujo
+## 3. Actors and flow
 
-- Actor(es):
-- Flujo principal:
-- Flujos alternos / excepciones:
+- Actors:
+- Main flow:
+- Alternates / errors:
 
-## 4. Reglas de negocio
+## 4. Business rules
 
-- Regla 1:
-- Regla 2:
+- Rule 1:
+- Rule 2:
 
-## 5. Criterios de aceptación
+## 5. Acceptance criteria
 
-- [ ] Criterio 1
-- [ ] Criterio 2
+- [ ] Criterion 1
+- [ ] Criterion 2
 
-## 6. Metricas de éxito
+## 6. Success metrics
 
-- KPI principal:
-- KPI secundarios:
+- Primary KPI:
+- Secondary KPIs:
 
-## 7. Riesgos y supuestos
+## 7. Risks and assumptions
 
-- Riesgo:
-- Supuesto:
+- Risk:
+- Assumption:
 
-## 8. Trazabilidad técnica
+## 8. Technical traceability
 
-- RFC/ADR técnico relacionado:
-- Documento técnico relacionado:
-- Epic/Issue:
+- Related RFC/ADR:
+- Related technical doc:
+- Epic/issue:

@@ -1,69 +1,25 @@
-# Gestión de Migraciones (Control Plane y Data Plane)
+# Database migrations
 
-Bowerbird utiliza `github.com/golang-migrate/migrate/v4` para administrar la evolución del esquema de la base de datos de manera programática y automatizada, respetando la arquitectura Multi-Tenant.
+Uses `golang-migrate` with two trees under `apps/backend/migrations/`:
 
-## 1. Estructura de Directorios
+| Folder          | Applies to            |
+| --------------- | --------------------- |
+| `controlplane/` | Shared catalog DB     |
+| `tenant/`       | Every organization DB |
 
-Las migraciones SQL están divididas estrictamente en dos carpetas dentro de `apps/backend/migrations`:
+CLI: `apps/backend/cmd/migrate/main.go`.
 
-- **`controlplane/`**: Contiene las migraciones de la base de datos central compartida (catálogo de organizaciones, configuraciones globales).
-- **`tenant/`**: Contiene el esquema de negocio (usuarios, cartera, contabilidad). Estas migraciones se aplican **a cada base de datos aislada** de las organizaciones.
-
-_Ejemplo:_
-
-```
-apps/backend/migrations/
-├── controlplane/
-│   ├── 000001_create_tenants_table.up.sql
-│   └── 000001_create_tenants_table.down.sql
-└── tenant/
-    ├── 000001_init_tenant_schema.up.sql
-    └── 000001_init_tenant_schema.down.sql
+```bash
+pnpm run migrate:controlplane   # control plane only
+pnpm run migrate:tenants        # all active tenants
+pnpm run migrate:all            # control plane, then tenants
 ```
 
-## 2. Herramienta CLI de Migración (`cmd/migrate`)
+`migrate:tenants` loads `db_name` from `tenants WHERE status = 'active'` and migrates each DB with `migrations/tenant`.
 
-Se ha desarrollado una herramienta en Go (`apps/backend/cmd/migrate/main.go`) que orquesta el proceso.
+Onboarding also runs tenant migrations immediately after `CREATE DATABASE` (see [Onboarding](./onboarding-flow.md)).
 
-### Comandos disponibles (vía `pnpm`):
-
-- **Migrar solo el Control Plane:**
-
-  ```bash
-  pnpm run migrate:controlplane
-  ```
-
-  _Qué hace:_ Lee el `DATABASE_URL` (vía SSM o `.env`) y ejecuta `golang-migrate` sobre esa base de datos utilizando los archivos de la carpeta `controlplane`.
-
-- **Migrar todos los Tenants activos:**
-
-  ```bash
-  pnpm run migrate:tenants
-  ```
-
-  _Qué hace:_
-  1. Se conecta al Control Plane.
-  2. Ejecuta `SELECT db_name FROM tenants WHERE status = 'active'`.
-  3. Itera sobre cada base de datos de la lista (ej. `tenant_acme`, `tenant_stark`).
-  4. Ejecuta las migraciones de la carpeta `tenant/` individualmente sobre cada una.
-
-- **Migrar todo el sistema (Recomendado para despliegues):**
-  ```bash
-  pnpm run migrate:all
-  ```
-  _Qué hace:_ Ejecuta la migración del Control Plane y, si es exitosa, procede a iterar y migrar todos los Tenants.
-
-## 3. Consideraciones para el Ciclo de Vida (Onboarding)
-
-Cuando el sistema registre una nueva Organización (Tenant) en el futuro, el flujo backend deberá:
-
-1. Crear el registro en el Control Plane (tabla `tenants`).
-2. Ejecutar físicamente `CREATE DATABASE {db_name}` en PostgreSQL.
-3. Importar y llamar a la función `database.RunMigrations(tenantURL, "migrations/tenant")` de manera programática en Go para que esa base de datos recién nacida adopte el esquema más actual de negocio inmediatamente.
-
-## 4. Reset completo de bases de datos en local
-
-Si necesitas reiniciar por completo la base principal (Control Plane) y todas las bases de tenants en tu entorno local, usa este flujo:
+## Local full reset
 
 ```bash
 docker compose down -v
@@ -71,21 +27,9 @@ pnpm run infra:up
 pnpm run migrate:all
 ```
 
-Qué hace cada paso:
+Wipes Postgres, Redis, LocalStack, and Caddy volumes. Re-seed with `pnpm run seed` if needed.
 
-1. `docker compose down -v`: apaga contenedores y elimina volúmenes persistentes, incluyendo `postgres_data`.
-2. `pnpm run infra:up`: vuelve a levantar Postgres/Redis/LocalStack/Caddy desde cero.
-3. `pnpm run migrate:all`: reaplica migraciones de `controlplane/` y luego intenta migrar los tenants activos registrados.
-
-Notas importantes:
-
-- Este reset borra tambien los datos persistidos de Redis, LocalStack y Caddy, no solo Postgres.
-- Si no existen tenants activos en `tenants`, la fase de migración de tenants no aplica cambios (comportamiento esperado).
-- Si quieres recrear el tenant demo despues del reset, ejecuta `pnpm run seed`.
-
-### Variante: resetear solo Postgres
-
-Si prefieres no tocar otros servicios, elimina solo el volumen de Postgres y vuelve a levantar infraestructura:
+Postgres-only:
 
 ```bash
 docker compose down

@@ -1,20 +1,18 @@
-# Despliegue AWS (CDK)
+# AWS deployment (CDK)
 
-## Stack desplegado
+## Stack
 
-- Frontend Angular en S3 privado + CloudFront.
-- Backend HTTP en API Gateway + Lambda Go.
-- Lambdas para SQS y EventBridge.
-- Route53 para dominios de app y API.
+- PWA: private S3 + CloudFront
+- HTTP API: API Gateway + Go Lambda
+- Workers: SQS and EventBridge Lambdas
+- DNS: Route53 for app and API hosts
 
-## Dominios
+## Domains
 
-- App: `${APP_SUBDOMAIN}.${ROOT_DOMAIN}` (por defecto `app.money-path.co`)
-- API: `${API_SUBDOMAIN}.${ROOT_DOMAIN}` (por defecto `api.money-path.co`)
+- App: `${APP_SUBDOMAIN}.${ROOT_DOMAIN}` (default `app.money-path.co`)
+- API: `${API_SUBDOMAIN}.${ROOT_DOMAIN}` (default `api.money-path.co`)
 
-## Flujo de deploy
-
-Desde la raíz:
+## Deploy
 
 ```bash
 pnpm run build
@@ -23,18 +21,19 @@ pnpm exec cdk bootstrap aws://$AWS_ACCOUNT_ID/$AWS_REGION
 pnpm exec cdk deploy --all --require-approval never
 ```
 
-## Restricciones importantes
+Or from root: `pnpm run deploy`.
 
-- `AWS_REGION` debe ser `us-east-1` (validado en `packages/infra/bin/infra.ts`).
-- `packages/infra/.env` es obligatorio.
-- El stack espera build web en `apps/pwa/dist/web/browser`.
+## Constraints
 
-## CloudFront + estrategia de cache SPA/PWA
+- `AWS_REGION` must be `us-east-1`.
+- `packages/infra/.env` required (`ENV`, `AWS_ACCOUNT_ID`, …).
+- Web assets from `apps/pwa/dist/pwa/browser` (build PWA first).
 
-- Fallback SPA: `403/404 -> /index.html`.
-- Routing de `https://<app-domain>/api/*` hacia `https://<api-domain>`.
-- Assets hash (`*.js`, `*.css`, etc.): `Cache-Control: public, max-age=31536000, immutable`.
-- Entry points (`index.html`, `ngsw.json`, `ngsw-worker.js`, `safety-worker.js`, `manifest.webmanifest`):
-  `Cache-Control: public, max-age=0, must-revalidate, s-maxage=300`.
-- `prune: false` para mantener bundles antiguos y evitar que `index.html` viejos rompan por assets inexistentes.
-- Invalidacion selectiva solo de entry points en cada deploy.
+## CloudFront / cache
+
+- SPA fallback: `403/404` → `/index.html`
+- `/api/*` on app domain routes to API origin
+- Hashed assets: long-lived immutable cache
+- Entry points (`index.html`, `ngsw*`, manifest): short / must-revalidate
+- S3 deploy `prune: false` so old bundles stay available
+- Invalidate entry points only on deploy

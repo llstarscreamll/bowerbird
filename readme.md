@@ -1,23 +1,8 @@
-# Bowerbird Monorepo
+# Bowerbird
 
-Monorepo para una arquitectura SPA (Angular) + API/Lambda (Golang) + IaC (AWS CDK TypeScript), orquestado con Turborepo.
+Monorepo: Angular PWA + Go API/Lambdas + AWS CDK, orchestrated with Turbo and pnpm.
 
-## Resumen de funcionalidades
-
-- Backend API en Go (`net/http`, `pgx`, Lambda HTTP/SQS/EventBridge): [docs/technical/architecture/backend-api.md](./docs/technical/architecture/backend-api.md)
-- Frontend Angular standalone + PWA (service worker, install prompt, update flow): [docs/technical/architecture/frontend-web.md](./docs/technical/architecture/frontend-web.md)
-- Despliegue AWS con CDK (S3 + CloudFront + API Gateway + Route53): [docs/technical/deployment/aws.md](./docs/technical/deployment/aws.md)
-- Calidad de desarrollo (AI Skills, Prettier): [docs/technical/quality/development-quality.md](./docs/technical/quality/development-quality.md)
-
-## Documentación completa
-
-- Índice de documentación: [docs/README.md](./docs/README.md)
-- Setup y entorno local: [docs/technical/getting-started.md](./docs/technical/getting-started.md)
-- Convenciones de documentación de negocio: [docs/product/README.md](./docs/product/README.md)
-- Tooling de análisis de código (CodeGraph): [docs/technical/tooling/codegraph.md](./docs/technical/tooling/codegraph.md)
-- Suite E2E con Playwright: [apps/e2e/README.md](./apps/e2e/README.md)
-
-## Inicio rápido
+## Quick start
 
 ```bash
 mise install
@@ -25,12 +10,21 @@ pnpm install
 pnpm run dev
 ```
 
-Comandos principales:
+Open `https://app.bowerbird.dev` (see [Getting started](./docs/technical/getting-started.md) for hosts/Caddy).
 
-- `pnpm run build`
-- `pnpm run test`
-- `pnpm run test:e2e`
-- `pnpm run lint`
-- `pnpm run format`
-- `pnpm run format:check`
-- `pnpm run deploy`
+## Docs
+
+- [Docs index](./docs/README.md)
+- [Getting started](./docs/technical/getting-started.md)
+- [Backend](./docs/technical/architecture/backend-api.md) · [Frontend](./docs/technical/architecture/frontend-web.md) · [AWS deploy](./docs/technical/deployment/aws.md)
+
+## Commands
+
+| Command                            | Purpose                           |
+| ---------------------------------- | --------------------------------- |
+| `pnpm run build`                   | Build all packages                |
+| `pnpm run test`                    | Unit/integration tests            |
+| `pnpm run test:e2e`                | Playwright e2e                    |
+| `pnpm run lint`                    | Lint all packages                 |
+| `pnpm run format` / `format:check` | Prettier                          |
+| `pnpm run deploy`                  | Build + deploy `@bowerbird/infra` |

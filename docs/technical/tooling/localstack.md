@@ -1,34 +1,17 @@
-# Tooling: LocalStack
+# LocalStack
 
-## Propósito
+Emulates AWS for local backend work: S3, SQS, EventBridge, SSM.
 
-Emular servicios AWS críticos del backend en local sin montar una infraestructura paralela compleja.
+- Compose service on `http://localhost:4566`
+- Bootstrap: `apps/backend/scripts/init-localstack.sh` (runs on container start)
+- Backend points at it with `AWS_ENDPOINT_URL`
 
-Servicios emulados actualmente:
+Typical resources: `bowerbird-local-sqs`, `bowerbird-local-eventbridge`, bus `bowerbird-local-bus`, rule `bowerbird-local-rule`, bucket `bowerbird-local-bucket`, SSM secrets from `secrets.json`.
 
-- S3
-- SQS
-- EventBridge
-- SSM Parameter Store
+Go still runs locally under Air; Lambda handlers are reused via local pollers instead of deploying to LocalStack.
 
-## Como se usa en este repo
+If `secrets.json` changes:
 
-- LocalStack vive en `docker-compose.yml` y expone `http://localhost:4566`.
-- La inicialización de recursos se hace automáticamente al arrancar con:
-  `apps/backend/scripts/init-localstack.sh`.
-- El backend local usa `AWS_ENDPOINT_URL` para apuntar al endpoint local.
-
-## Recursos inicializados automáticamente
-
-- Cola SQS principal: `bowerbird-local-sqs`
-- Cola SQS para eventos de EventBridge: `bowerbird-local-eventbridge`
-- Event bus: `bowerbird-local-bus`
-- Rule EventBridge: `bowerbird-local-rule` (source `bowerbird.app` -> cola `bowerbird-local-eventbridge`)
-- Bucket S3: `bowerbird-local-bucket`
-- Parámetro SSM: `/bowerbird/local/sample`
-
-## Principio de simplicidad aplicado
-
-- Se emula infraestructura AWS con LocalStack.
-- Se mantiene ejecución del código Go en proceso local con `air`.
-- Los handlers de Lambda se reutilizan en desarrollo mediante pollers locales para evitar dos implementaciones distintas.
+```bash
+docker exec bowerbird-localstack /etc/localstack/init/ready.d/init-localstack.sh
+```

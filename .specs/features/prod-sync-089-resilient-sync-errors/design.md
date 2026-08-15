@@ -1,32 +1,28 @@
-# Diseno Tecnico - PROD-SYNC-089
+# Design — PROD-SYNC-089
 
-## 1. Alcance de arquitectura
+## Architecture scope
 
-Esta feature introduce un contrato de error resiliente y seguro de extremo a extremo para sincronizacion de correo:
+End-to-end resilient, safe error contract for mail sync:
 
-- Backend Go: clasificacion de fallos de proveedor -> mapeo JSON:API consistente -> meta accionable para UI.
-- Frontend Angular: render de alertas contextuales con acciones dinamicas (`reauth`, `retry_after_seconds`).
-- Seguridad: sanitizacion de contenido de correo en backend y frontend, PII masking en errores.
-- Resiliencia de workers: tolerancia a mensajes problematicos sin DLQ por tenant.
+- Backend Go: provider failure → consistent JSON:API → actionable `meta` for UI
+- Frontend Angular: contextual alerts with dynamic actions (`reauth`, `retry_after_seconds`)
+- Security: mail content sanitization (BE + FE); PII masking in errors
+- Workers: tolerate bad messages without per-tenant DLQs
 
-## 2. Principios DDD y modularidad
+## DDD and modularity
 
-### Bounded Contexts impactados
+### Bounded contexts
 
-1. `platform` (shared kernel tecnico)
-   - `apperrors`: taxonomia de errores y payload seguro.
-   - `http/api`: serializacion JSON:API y mapeo HTTP.
-2. `connections`
-   - Traduccion de errores OAuth/provider a codigos semanticos de negocio.
-3. `inbox`
-   - Pipeline de sync, protecciones de parseo y resiliencia de workers.
-4. `apps/pwa` (`core` + feature inbox/connections)
-   - Interceptor + store/component para UX accionable.
+| Context       | Role                                                                   |
+| ------------- | ---------------------------------------------------------------------- |
+| `platform`    | `apperrors` taxonomy + safe payload; `http/api` JSON:API serialization |
+| `connections` | OAuth/provider errors → semantic business codes                        |
+| `inbox`       | Sync pipeline, parse guards, worker resilience                         |
+| `apps/pwa`    | Interceptor + store/component for actionable UX                        |
 
-### Contrato anticorrupcion (ACL)
+### Anti-corruption layer
 
-Los errores crudos de SDK/proveedores (Google, Microsoft, Yahoo) no cruzan al frontend.
-Se traducen a un modelo canonical:
+Raw SDK/provider errors (Google, Microsoft, Yahoo) never reach the frontend. Translate to canonical codes:
 
 - `ERR_SYNC_REAUTH_REQUIRED`
 - `ERR_SYNC_RATE_LIMITED`
@@ -34,121 +30,103 @@ Se traducen a un modelo canonical:
 - `ERR_SYNC_PAYLOAD_REJECTED`
 - `ERR_SYNC_INTERNAL`
 
-## 3. Diseno backend
+## Backend design
 
-## 3.1 Modelo de error canonical
+### Canonical error model
 
-Definir tipo de error enriquecido (en `platform/apperrors` o paquete dedicado de sync errors):
+Enriched error type in `platform/apperrors` (or dedicated sync errors package):
 
-- Campos base: `code`, `message`, `cause`.
-- Campos de contexto seguro: `provider`, `account_email_masked`, `requires_reauth`, `retry_after_seconds`, `help_path`.
-- Politica de redaccion: funciones de masking para secrets/PII.
+- Base: `code`, `message`, `cause`
+- Safe context: `provider`, `account_email_masked`, `requires_reauth`, `retry_after_seconds`, `help_path`
+- Redaction helpers for secrets/PII
 
-Regla: `message/detail` nunca contiene token o payload crudo de proveedor.
+Rule: `message`/`detail` never contain tokens or raw provider payloads.
 
-## 3.2 Adaptador JSON:API
+### JSON:API adapter
 
-Extender `api.MapError`/`api.Wrap` para:
+Extend `api.MapError` / `api.Wrap` to:
 
-- Construir `errors[0].code/title/detail/status`.
-- Emitir `links.about` desde catalogo central de documentacion de errores.
-- Emitir `meta` solo con whitelist permitida.
-- Mantener `id` de correlacion (`sentry-trace` o equivalente).
-- Mantener `meta._debug` solo en local/dev, ya redactado.
+- Build `errors[0].code` / `title` / `detail` / `status`
+- Emit `links.about` from a central error-docs catalog
+- Emit `meta` only via whitelist
+- Keep correlation `id` (`sentry-trace` or equivalent)
+- Keep `meta._debug` only in local/dev, already redacted
 
-## 3.3 Catalogo de errores de sync
+### Sync error catalog
 
-Crear tabla/archivo de mapeo deterministico:
+Deterministic mapping table/file:
 
-- Input: tipo de error proveedor + contexto (HTTP status proveedor, subcode, headers, retry-after).
-- Output: codigo canonical + status HTTP + flags de UX (`requires_reauth`, `retry_after_seconds`).
+- Input: provider error type + context (HTTP status, subcode, headers, retry-after)
+- Output: canonical code + HTTP status + UX flags (`requires_reauth`, `retry_after_seconds`)
 
-Objetivo: agregar nuevo provider sin cambiar frontend core.
+Goal: add providers without changing core frontend.
 
-## 3.4 Resiliencia de workers sin DLQ por tenant
+### Worker resilience (no per-tenant DLQ)
 
-Se implementa estrategia de fallo controlado por mensaje:
+Controlled per-message failure:
 
-1. Guardrails de tamano:
-   - Max bytes por payload MIME/HTML/texto.
-   - Rechazo temprano antes de parseo profundo.
-2. Guardrails de tiempo y memoria:
-   - `context.WithTimeout` por mensaje.
-   - Cancelacion cooperativa en parseadores y llamadas IO.
-3. Guardrails de robustez:
-   - `recover()` por unidad de trabajo para evitar caida del worker.
-   - Clasificacion de error no-retriable para payload malicioso/invalido.
-4. Continuidad operativa:
-   - Registrar incidente estructurado y marcar mensaje fallido.
-   - Continuar inmediatamente con siguiente mensaje de cola.
+1. Size guards — max bytes for MIME/HTML/text; early reject before deep parse
+2. Time/memory — `context.WithTimeout` per message; cooperative cancel in parsers and I/O
+3. Robustness — `recover()` per work unit; classify malicious/invalid payload as non-retriable
+4. Continuity — structured incident log, mark message failed, continue to next queue message
 
-Nota: no se crean DLQs por tenant; se mantiene topologia de colas actual.
+Keep current queue topology; no per-tenant DLQs.
 
-## 3.5 Seguridad de ingesta
+### Ingestion security
 
-- Tokens OAuth cifrados en reposo en infraestructura (`connections` repo layer).
-- MIME crudo en S3 (auditoria), datos operativos saneados en DB.
-- Validacion RFC para campos email/date.
-- Sanitizacion server-side para evitar persistir HTML activo no confiable.
+- OAuth tokens encrypted at rest (`connections` repo layer)
+- Raw MIME in S3 (audit); sanitized operational data in DB
+- RFC validation for email/date fields
+- Server-side sanitization so untrusted active HTML is not persisted for UI
 
-## 4. Diseno frontend Angular
+## Frontend Angular design
 
-## 4.1 Contrato de error tipado
+### Typed error contract
 
-Agregar/ajustar tipo compartido JSON:API error en `core`:
+Shared JSON:API error type in `core` with sync `meta`:
 
-- `JsonApiError` con `meta` tipada para sync:
-  - `requires_reauth?: boolean`
-  - `provider?: 'GMAIL' | 'OUTLOOK' | 'YAHOO' | 'HOTMAIL' | string`
-  - `retry_after_seconds?: number`
-  - `account_email?: string`
+- `requires_reauth?: boolean`
+- `provider?: 'GMAIL' | 'OUTLOOK' | 'YAHOO' | 'HOTMAIL' | string`
+- `retry_after_seconds?: number`
+- `account_email?: string`
 
-## 4.2 Comportamiento UX
+### UX behavior
 
-- 5xx/network: interceptor sigue enviando toast global.
-- 4xx sync business: componente/store muestra alerta contextual persistente.
-- Si `requires_reauth`: render CTA y redireccion a login provider.
-- Si `retry_after_seconds`: countdown visual + disable de reintento.
+- 5xx/network → interceptor toast (unchanged)
+- 4xx sync business → persistent contextual alert in component/store
+- `requires_reauth` → CTA + provider login redirect
+- `retry_after_seconds` → visual countdown + disable retry
 
-## 4.3 Seguridad de render de email
+### Email render security
 
-- Sanitizacion estricta con DOMPurify integrada con seguridad Angular.
-- Hook para reforzar enlaces `target` + `rel`.
-- Bloqueo de imagenes externas por defecto + accion "mostrar imagenes".
-- Render aislado via `iframe sandbox` para contenido enriquecido.
+- Strict DOMPurify sanitization with Angular security hooks
+- Enforce link `target` + `rel`
+- External images blocked by default; “show images” opt-in
+- Isolated render via `iframe sandbox` for enriched content
 
-## 5. Observabilidad y soporte
+## Observability
 
-Registrar eventos estructurados:
+Structured events: `sync_error_classified`, `sync_reauth_required`, `sync_rate_limited`, `sync_payload_rejected`.
 
-- `sync_error_classified`
-- `sync_reauth_required`
-- `sync_rate_limited`
-- `sync_payload_rejected`
+Minimum fields: `tenant_id`, `provider`, `account_id`, `error_code`, `correlation_id`.
 
-Campos minimos: `tenant_id`, `provider`, `account_id`, `error_code`, `correlation_id`.
+## Test strategy
 
-## 6. Estrategia de pruebas
+**Backend**
 
-### Backend
+- Unit: provider error → canonical; redaction of `detail` / `meta._debug`
+- Integration: handler returns strict JSON:API with `links.about` and expected `meta`
+- Worker resilience: oversized/malicious message fails; next message succeeds
 
-- Unit: mapper provider error -> canonical error.
-- Unit: redaction/masking de `detail` y `meta._debug`.
-- Integration: handler retorna JSON:API estricto con `links.about` y `meta` esperada.
-- Worker resilience test: mensaje oversized/malicioso falla y el siguiente mensaje se procesa exitosamente.
+**Frontend**
 
-### Frontend
+- Unit: `meta` parse + branching; countdown disables until 0; sanitization strips scripts/handlers
+- Component/e2e: contextual alert visible; correct CTA per provider
 
-- Unit: parseo de `meta` y branching (`reauth`, `retry_after_seconds`).
-- Unit: countdown deshabilita boton hasta llegar a 0.
-- Unit: sanitizacion elimina scripts/handlers.
-- Component/e2e: alerta contextual visible, CTA correcta por provider.
+## Risks and mitigations
 
-## 7. Riesgos y mitigaciones
-
-- Riesgo: sobreexposicion de datos en errores debug.
-  - Mitigacion: redaction centralizada y pruebas de snapshot de payload.
-- Riesgo: falsos positivos en rechazo de payload por limites.
-  - Mitigacion: limites configurables y metricas para tuning.
-- Riesgo: divergencia de contrato entre backend y frontend.
-  - Mitigacion: contrato tipado compartido + pruebas de contrato.
+| Risk                                | Mitigation                                 |
+| ----------------------------------- | ------------------------------------------ |
+| Over-exposure in debug errors       | Central redaction + payload snapshot tests |
+| False positives from payload limits | Configurable limits + tuning metrics       |
+| BE/FE contract drift                | Shared typed contract + contract tests     |

@@ -2,7 +2,7 @@
 
 ## Toolchain and workspace
 
-- Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `10.16.1` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
+- Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
 - Use `pnpm` only. Workspace roots are `apps/*` and `packages/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
 
 ## Commands that matter
@@ -74,4 +74,4 @@
 - Pre-commit runs `pnpm lint-staged` then `pnpm run lint`, then optional `codegraph sync` (`.husky/pre-commit`).
 - `lint-staged` applies Prettier to staged web/docs files and `gofmt -w` to staged Go files.
 - Root `pnpm run format` only formats `*.{ts,tsx,md,mdx}`.
-- Product/domain specs are under `.specs/features/*` and often in Spanish for DIAN/CUFE context; keep domain terms untranslated.
+- Product/domain specs live under `.specs/features/*` in English. Keep Colombian e-invoicing domain terms as-is (DIAN, CUFE, UBL field names).

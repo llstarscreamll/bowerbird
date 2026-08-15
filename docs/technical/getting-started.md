@@ -1,100 +1,54 @@
-# Getting started técnico y entorno local
+# Getting started
 
-## Requisitos
+## Requirements
 
-- Mise
-- Caddy (para resolución de DNS local y proxy inverso)
-- AWS CLI autenticado (solo para deploy)
+- mise
+- Docker
+- Caddy (via Docker Compose)
+- AWS CLI (deploy only)
 
-Versiones definidas por el repo en `.mise.toml`:
+Pinned in `.mise.toml`: Node `24`, Go `1.25`, pnpm `11.5`, Air `latest`.
 
-- Node.js `24`
-- Go `1.25`
-- pnpm `10.16.1`
-- Air `latest`
-
-## Setup inicial
+## Setup
 
 ```bash
 mise install
 pnpm install
 ```
 
-Si quieres ejecutar comandos con el toolchain del repo sin tocar lo global:
+Optional: `mise x -- pnpm run dev` to use the repo toolchain without changing globals.
 
-```bash
-mise x -- pnpm run dev
-```
+## Environment
 
-## Variables de entorno
+### API (local)
 
-### API local
+1. Copy `apps/backend/.env.example` → `apps/backend/.env`.
+2. Copy `apps/backend/secrets.example.json` → `apps/backend/secrets.json`.
 
-1. Copiar `apps/backend/.env.example` a `apps/backend/.env`.
-2. Copiar `apps/backend/secrets.example.json` a `apps/backend/secrets.json`.
-3. Revisar y ajustar los valores locales.
+| Source         | Use for                                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`         | Process bootstrap: `PORT`, AWS IAM keys, `AWS_REGION`, `AWS_ENDPOINT_URL`, `S3_PRESIGN_ENDPOINT_URL`, `SSM_PARAMETER_NAME`, `ENABLE_LOCAL_EVENT_LOOP` |
+| `secrets.json` | Business secrets and AWS resource names: `database_url`, buckets, queue URLs, API keys, encryption keys                                               |
 
-**¿Cuándo usar `.env` y cuándo `secrets.json`?**
+The API loads config from the SSM parameter named in `.env`. LocalStack injects `secrets.json` into SSM on start.
 
-La regla general del proyecto es que el **`.env` controla el contenedor del proceso** y el **`secrets.json` controla el negocio y la infraestructura sensible**.
-
-Usa **`.env`** únicamente para variables de infraestructura de ejecución que cambian cómo arranca la app:
-
-- Puerto del servidor local (`PORT`).
-- Credenciales AWS de IAM para el SDK (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
-- Región de AWS (`AWS_REGION`).
-- URL de emulación para el SDK (`AWS_ENDPOINT_URL`).
-- URL pública para generar presigned URLs de S3 (`S3_PRESIGN_ENDPOINT_URL`).
-- El path en SSM donde buscar los secretos (`SSM_PARAMETER_NAME`).
-- Flags de ejecución de desarrollo (`ENABLE_LOCAL_EVENT_LOOP`).
-
-Usa **`secrets.json`** para cualquier clave secreta, cadena de conexión o recurso creado _dentro_ de AWS que sea sensible:
-
-- URL de la Base de datos (`database_url`).
-- Nombres de buckets (`s3_bucket_name`).
-- URLs de colas de SQS y EventBridge (`sqs_queue_url`, `eventbridge_queue_url`).
-- API Keys de proveedores terceros (`third_party_api_key`).
-- Tokens o Salts de encriptación.
-
-**Nota:** La API carga su configuración principal leyendo el `SSM_PARAMETER_NAME` definido en el `.env`. En tu entorno local, LocalStack lee automáticamente tu archivo `secrets.json` en disco y lo inyecta como un `SecureString` dentro de SSM para emular el flujo productivo.
-
-4. Exportar variables si vas a ejecutar comandos directos de Go:
-
-```bash
-export $(grep -v '^#' apps/backend/.env | xargs)
-```
-
-Variables clave en `.env` para emulación AWS local:
+Typical local `.env` values:
 
 - `AWS_ENDPOINT_URL=http://localhost:4566`
 - `S3_PRESIGN_ENDPOINT_URL=https://media.bowerbird.dev`
 - `ENABLE_LOCAL_EVENT_LOOP=true`
 - `SSM_PARAMETER_NAME=/bowerbird/local/secrets`
 
-**Nota:** La API carga su configuración principal (base de datos, colas) desde el parámetro de SSM en el boot. LocalStack lee automáticamente tu `secrets.json` y lo inyecta como un SecureString en SSM al inicializarse.
+For raw Go commands: `export $(grep -v '^#' apps/backend/.env | xargs)`.
 
-### Infraestructura CDK
+### CDK
 
-1. Copiar `packages/infra/.env.example` a `packages/infra/.env`.
-2. Variables clave:
+1. Copy `packages/infra/.env.example` → `packages/infra/.env`.
+2. Set `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, `APP_SUBDOMAIN`, `API_SUBDOMAIN`.
 
-- `AWS_ACCOUNT_ID`
-- `AWS_REGION=us-east-1`
-- `ROOT_DOMAIN=money-path.co`
-- `APP_SUBDOMAIN=app`
-- `API_SUBDOMAIN=api`
+## Local DNS and HTTPS
 
-## Configuración de DNS local y HTTPS
-
-Para que el enrutamiento de la PWA y assets funcione correctamente en tu entorno local (ej. `app.bowerbird.dev`, `api.bowerbird.dev` y `media.bowerbird.dev`), utilizamos **Caddy** y configuramos el archivo `/etc/hosts` de tu máquina.
-
-1. Añade los dominios de desarrollo a tu archivo hosts:
-
-```bash
-sudo nano /etc/hosts
-```
-
-Añade las siguientes líneas:
+Add to `/etc/hosts`:
 
 ```text
 127.0.0.1   api.bowerbird.dev
@@ -102,24 +56,22 @@ Añade las siguientes líneas:
 127.0.0.1   media.bowerbird.dev
 ```
 
-2. Caddy ya está configurado en el `docker-compose.yml` utilizando el archivo `Caddyfile` en la raíz del proyecto. Este proxy inverso redirige el tráfico HTTPS de manera local:
+Caddy (Compose) proxies:
 
-- `app.bowerbird.dev` -> Angular (`4200`)
-- `api.bowerbird.dev` -> Go API (`8080`)
-- `media.bowerbird.dev` -> LocalStack S3 (`4566`, bucket `bowerbird-local-bucket`)
+- `app.bowerbird.dev` → Angular `:4200`
+- `api.bowerbird.dev` → Go API `:8080`
+- `media.bowerbird.dev` → LocalStack S3 `:4566`
 
-### Confiar en el certificado SSL local
+### Trust the local CA
 
-Caddy genera certificados HTTPS usando una Autoridad Certificadora (CA) interna. Para que el navegador no te muestre la alerta de "Conexión no segura" (`ERR_CERT_AUTHORITY_INVALID`), debes indicar a tu sistema que confíe en ella.
-
-**En macOS:**
+**macOS:**
 
 ```bash
 docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./bowerbird-local-ca.crt
 ```
 
-**En Fedora Linux:**
+**Fedora:**
 
 ```bash
 docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
@@ -127,77 +79,37 @@ sudo cp ./bowerbird-local-ca.crt /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust
 ```
 
-**En Fedora Linux con Chrome instalado via Flatpak:**
-
-Chrome en Flatpak puede no leer automaticamente el trust store del sistema host. En ese caso, ademas de los pasos de Fedora anteriores, importa la CA tambien en la base NSS del perfil de Flatpak:
+**Chrome Flatpak on Fedora:** also import into the Flatpak NSS DB:
 
 ```bash
 sudo dnf install -y nss-tools
-
-# Exporta la CA actual desde el contenedor de Caddy
 docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
-
-# Crea (si no existe) la base NSS del perfil de Chrome Flatpak
 mkdir -p ~/.var/app/com.google.Chrome/.pki/nssdb
 certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -N --empty-password || true
-
-# Reemplaza una posible entrada previa y agrega la CA como autoridad de confianza
 certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -D -n "Caddy Local Authority - ECC Root" || true
 certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -A -n "Caddy Local Authority - ECC Root" -t "C,," -i /tmp/caddy-root.crt
-
-# Verifica que la CA quedo importada
-certutil -d sql:$HOME/.var/app/com.google.Chrome/.pki/nssdb -L
-
-# Reinicia completamente Chrome Flatpak
-flatpak kill com.google.Chrome
-flatpak run com.google.Chrome
+flatpak kill com.google.Chrome && flatpak run com.google.Chrome
 ```
 
-Si persiste `ERR_CERT_AUTHORITY_INVALID`, normalmente significa que Caddy regenero su CA (por ejemplo, despues de borrar volumenes Docker) y hay que volver a exportar/importar el `root.crt` actual.
+If volumes were wiped, Caddy may regenerate the CA — re-export and re-trust. Firefox: import the cert under Settings → Certificates → Authorities.
 
-_(Opcional) Si utilizas Firefox, importa el archivo `bowerbird-local-ca.crt` manualmente desde Ajustes > Privacidad y Seguridad > Ver certificados > Autoridades > Importar._
-
-Una vez instalado, **reinicia tu navegador**.
-
-## Desarrollo local
-
-Ejecuta todo el stack de desarrollo:
+## Dev
 
 ```bash
 pnpm run dev
 ```
 
-Esto levanta:
+Starts Postgres, Redis, LocalStack, Caddy, Go API (Air), and Angular. Prefer the `*.bowerbird.dev` hosts (cookies/routing).
 
-- Postgres, Redis, LocalStack (S3/SQS/EventBridge/SSM) y **Caddy** en Docker
-- API Go con live reload (`air -c .air.toml`) sirviendo la API
-- Angular dev server sirviendo la web
-
-Una vez levantado, en lugar de acceder a localhost, debes acceder a través de los dominios configurados en tu DNS local para que el enrutamiento y las cookies funcionen correctamente:
-
-- Web (App / Global): `https://app.bowerbird.dev`
-- Web (Tenant): `https://app.bowerbird.dev/acme/dashboard` (ejemplo de enrutamiento por path)
+- App: `https://app.bowerbird.dev`
+- Tenant example: `https://app.bowerbird.dev/acme/dashboard`
 - API: `https://api.bowerbird.dev`
-- Media (S3 local, vía presigned URL): `https://media.bowerbird.dev/bowerbird-local-bucket/<ruta-del-objeto>`
+- Media: `https://media.bowerbird.dev/bowerbird-local-bucket/<key>`
 
-LocalStack inicializa automáticamente recursos con `apps/backend/scripts/init-localstack.sh` al arrancar Docker.
+`infra:up` / `dev` wait on healthchecks (Postgres, Redis, SSM `/bowerbird/local/secrets`, Caddy 80/443).
 
-`pnpm run infra:up` (y por tanto `pnpm run dev`) espera a que los healthchecks pasen antes de continuar: Postgres ready, Redis ping, el parámetro SSM `/bowerbird/local/secrets`, y Caddy escuchando en 80/443. Si el wait hace timeout, el fallo es de infra, no del API.
+## Commands
 
-## Comandos principales
+`infra:up` · `infra:down` · `build` · `test` · `lint` · `format` · `format:check` · `deploy`
 
-- `pnpm run infra:up`
-- `pnpm run infra:down`
-- `pnpm run build`
-- `pnpm run test`
-- `pnpm run lint`
-- `pnpm run format`
-- `pnpm run format:check`
-- `pnpm run deploy`
-
-## Tooling adicional
-
-Para exploración estructural del código y análisis de impacto, revisar CodeGraph:
-
-- [Tooling: CodeGraph](./tooling/codegraph.md)
-- [Tooling: LocalStack](./tooling/localstack.md)
+Also: [CodeGraph](./tooling/codegraph.md) · [LocalStack](./tooling/localstack.md)

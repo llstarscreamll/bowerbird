@@ -1,27 +1,25 @@
-# Documentación de producto (negocio)
+# Product docs
 
-Esta capa documenta el _que_ y el _por que_ de las funcionalidades para negocio y usuarios.
+Capture the _what_ and _why_ for business features. Put implementation detail in `docs/technical/`.
 
-## Estado actual
+## Conventions
 
-Actualmente no hay funcionalidades de negocio formalmente definidas. Esta carpeta deja la estructura lista para crecer con una convención clara.
+- One file per feature under `docs/product/features/`.
+- Prefer names like `YYYY-MM-slug.md`.
+- Include scope, actors, rules, acceptance criteria, and metrics.
+- Link technical docs instead of copying them.
 
-## Convenciones
+## Layout
 
-- Un archivo por funcionalidad de negocio en `docs/product/features/`.
-- Nombres sugeridos: `YYYY-MM-slug-funcionalidad.md`.
-- Toda funcionalidad debe incluir alcance, reglas, actores, eventos, métricas y criterios de aceptación.
-- Referenciar implementación técnica desde aqui, no duplicar detalles de código.
+| Path          | Role                 |
+| ------------- | -------------------- |
+| `features.md` | Living catalog       |
+| `features/`   | Feature specs        |
+| `_templates/` | New-feature template |
 
-## Estructura recomendada
+## New feature flow
 
-- `features.md`: catálogo resumido de funcionalidades y estado.
-- `features/`: especificaciones por funcionalidad.
-- `_templates/`: plantillas para nuevas funcionalidades.
-
-## Flujo recomendado para nuevas funcionalidades
-
-1. Crear spec de negocio desde plantilla `docs/product/_templates/feature-spec.md`.
-2. Acordar criterios de aceptación y métricas.
-3. Enlazar impacto técnico en `docs/technical/`.
-4. Mantener `features.md` como índice vivo.
+1. Copy `_templates/feature-spec.md`.
+2. Agree acceptance criteria and metrics.
+3. Link related `docs/technical/` pages.
+4. Add a row to `features.md`.

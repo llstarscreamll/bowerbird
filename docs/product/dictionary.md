@@ -1,14 +1,17 @@
-# Diccionario de Producto (Ubiquitous Language)
+# Product dictionary
 
-Este documento define la terminología estándar a utilizar en el diseño, desarrollo, y comunicación del producto, asegurando consistencia entre el equipo técnico y de negocio.
+Shared language for product and engineering.
 
-## Términos Centrales (Core)
+| Term (UI / product) | Technical | Meaning                                                          |
+| ------------------- | --------- | ---------------------------------------------------------------- |
+| **Organization**    | `Tenant`  | Customer company. Isolates billing, operational data, and users. |
+| **User**            | `User`    | Person with a role. Belongs to one or more organizations.        |
 
-| Término (UI/Negocio) | Equivalente Técnico | Descripción                                                                                                                                                     |
-| :------------------- | :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Organización**     | `Tenant`            | Representa a una empresa cliente que adquiere el software. Aísla completamente la facturación, los datos operativos (cartera, contabilidad) y los usuarios.     |
-| **Usuario**          | `User`              | Una persona física que accede a la plataforma con un rol específico. Un usuario siempre pertenece a una (o varias) organizaciones.                              |
-| _(Evitar)_ Cuenta    | -                   | **NO UTILIZAR** para referirse a la organización del cliente, ya que causa colisión directa con conceptos del dominio (ej. Cuenta Contable, Cuenta por Cobrar). |
-| _(Evitar)_ Workspace | -                   | **NO UTILIZAR**. Demasiado informal para el rigor financiero y contable esperado en la plataforma.                                                              |
+Avoid:
 
-_Nota Técnica:_ A nivel de infraestructura (AWS), middleware (Go) e interceptores (Angular), el concepto se mantendrá como `Tenant` por ser el estándar de la industria técnica. Sin embargo, cualquier ruta visible al usuario, pantalla, mensaje de error o modelo de dominio expuesto debe utilizar `Organización` o su id/slug.
+- **Account** for an organization (collides with ledger / AR / bank accounts).
+- **Workspace** (too informal for finance).
+
+Infrastructure, middleware, and interceptors keep the industry term `Tenant` (`X-Tenant-ID`, pools, CDK). User-facing copy and product docs use **Organization**.
+
+Colombian e-invoicing domain terms stay in Spanish / official form: **DIAN**, **CUFE**, UBL 2.1 field names as defined by DIAN.
