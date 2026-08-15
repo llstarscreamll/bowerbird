@@ -81,7 +81,7 @@ func (e *processorLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []by
 }
 
 func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil)
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
@@ -104,7 +104,7 @@ func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
 }
 
 func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{})
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil)
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{

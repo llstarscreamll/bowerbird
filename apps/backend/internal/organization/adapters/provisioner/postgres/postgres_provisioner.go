@@ -95,6 +95,18 @@ func (p *PostgresProvisioner) SeedOwner(ctx context.Context, dbName string, owne
 		return fmt.Errorf("insert owner user profile: %w", err)
 	}
 
+	// 2. Assign the system admin role so the owner receives all seeded permissions.
+	_, err = tx.Exec(ctx, `
+		INSERT INTO user_roles (user_id, role_id)
+		SELECT $1, r.id
+		FROM roles r
+		WHERE r.name = 'admin'
+		ON CONFLICT DO NOTHING
+	`, owner.ID)
+	if err != nil {
+		return fmt.Errorf("assign admin role to owner: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit tenant tx: %w", err)
 	}

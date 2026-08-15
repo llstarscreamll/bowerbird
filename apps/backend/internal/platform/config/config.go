@@ -39,6 +39,7 @@ type Config struct {
 	GeminiModel                   string    `json:"gemini_model"`
 	GeminiEndpoint                string    `json:"gemini_endpoint"`
 	InboxCredentialsEncryptionKey string    `json:"inbox_credentials_encryption_key"`
+	TenantSecretsEncryptionKey    string    `json:"tenant_secrets_encryption_key"`
 	FrontendURL                   string    `json:"frontend_url"`
 	BackendURL                    string    `json:"backend_url"`
 	PlatformOperatorEmails        []string  `json:"-"`
@@ -109,6 +110,9 @@ func Load(ctx context.Context) (Config, error) {
 	}
 	if cfg.InboxCredentialsEncryptionKey == "" {
 		panic("inbox_credentials_encryption_key is required from SSM or env")
+	}
+	if cfg.TenantSecretsEncryptionKey == "" {
+		panic("tenant_secrets_encryption_key is required from SSM or env")
 	}
 	if cfg.EventBusName == "" {
 		panic("EVENT_BUS_NAME is required (from SSM or env)")

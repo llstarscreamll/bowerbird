@@ -25,10 +25,10 @@ Optional: `mise x -- pnpm run dev` to use the repo toolchain without changing gl
 1. Copy `apps/backend/.env.example` → `apps/backend/.env`.
 2. Copy `apps/backend/secrets.example.json` → `apps/backend/secrets.json`.
 
-| Source         | Use for                                                                                                                                               |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`         | Process bootstrap: `PORT`, AWS IAM keys, `AWS_REGION`, `AWS_ENDPOINT_URL`, `S3_PRESIGN_ENDPOINT_URL`, `SSM_PARAMETER_NAME`, `ENABLE_LOCAL_EVENT_LOOP` |
-| `secrets.json` | Business secrets and AWS resource names: `database_url`, buckets, queue URLs, API keys, encryption keys                                               |
+| Source         | Use for                                                                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`         | Process bootstrap: `PORT`, AWS IAM keys, `AWS_REGION`, `AWS_ENDPOINT_URL`, `S3_PRESIGN_ENDPOINT_URL`, `SSM_PARAMETER_NAME`, `ENABLE_LOCAL_EVENT_LOOP`       |
+| `secrets.json` | Business secrets and AWS resource names: `database_url`, buckets, queue URLs, API keys, `inbox_credentials_encryption_key`, `tenant_secrets_encryption_key` |
 
 The API loads config from the SSM parameter named in `.env`. LocalStack injects `secrets.json` into SSM on start.
 
@@ -61,6 +61,17 @@ Caddy (Compose) proxies:
 - `app.bowerbird.dev` → Angular `:4200`
 - `api.bowerbird.dev` → Go API `:8080`
 - `media.bowerbird.dev` → LocalStack S3 `:4566`
+
+### Linux + UFW
+
+If Chrome gets **502** and Caddy logs `dial tcp …:4200: i/o timeout`, UFW is blocking Docker → host. Allow the compose bridge range to the host apps:
+
+```bash
+sudo ufw allow from 172.16.0.0/12 to any port 4200 proto tcp comment 'bowerbird pwa'
+sudo ufw allow from 172.16.0.0/12 to any port 8080 proto tcp comment 'bowerbird api'
+sudo ufw allow from 172.16.0.0/12 to any port 4566 proto tcp comment 'bowerbird localstack'
+sudo ufw reload
+```
 
 ### Trust the local CA
 

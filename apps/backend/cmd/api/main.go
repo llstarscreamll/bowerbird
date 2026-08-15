@@ -28,6 +28,8 @@ import (
 	"github.com/bowerbird/internal/platform/events"
 	platformJobs "github.com/bowerbird/internal/platform/jobs"
 	"github.com/bowerbird/internal/platform/tenant"
+	rbacModule "github.com/bowerbird/internal/rbac"
+	secretsModule "github.com/bowerbird/internal/secrets"
 )
 
 func main() {
@@ -119,12 +121,24 @@ func main() {
 	)
 	inboxModule.NewHTTPHandler(mux, inboxApp, authMiddleware, cfg, entitlementsApp)
 
+	rbacService := rbacModule.NewService(tenantsDbRegistry)
+	rbacModule.NewHTTPHandler(mux, rbacService, authMiddleware, cfg)
+
+	secretsCipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.TenantSecretsEncryptionKey)
+	if err != nil {
+		log.Fatalf("new tenant secrets cipher failed: %v", err)
+	}
+	secretsApp := secretsModule.NewApplication(tenantsDbRegistry, secretsCipher)
+	secretsModule.NewHTTPHandler(mux, secretsApp, rbacService, authMiddleware, cfg)
+	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
+
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
 		platformModule.JobQueue,
 		platformModule.FileStore,
 		tenantsDbRegistry,
+		documentPasswordResolver,
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

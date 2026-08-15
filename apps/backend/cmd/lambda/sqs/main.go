@@ -14,6 +14,7 @@ import (
 	"github.com/bowerbird/internal/platform"
 	platformCrypto "github.com/bowerbird/internal/platform/crypto"
 	platformJobs "github.com/bowerbird/internal/platform/jobs"
+	secretsModule "github.com/bowerbird/internal/secrets"
 )
 
 var jobHandler platformJobs.Handler
@@ -26,12 +27,21 @@ func init() {
 
 	cfg := platformModule.Config
 	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
+
+	secretsCipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.TenantSecretsEncryptionKey)
+	if err != nil {
+		log.Fatalf("failed to create tenant secrets cipher at boot: %v", err)
+	}
+	secretsApp := secretsModule.NewApplication(platformModule.TenantRegistry, secretsCipher)
+	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
+
 	invoicesApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
 		platformModule.JobQueue,
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
+		documentPasswordResolver,
 	)
 
 	processorCommand := invoicesJobs.NewInvoiceExtractionRequestedProcessor(

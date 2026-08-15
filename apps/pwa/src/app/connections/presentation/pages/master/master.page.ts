@@ -44,12 +44,12 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     class: 'flex-1 flex flex-col min-h-0 w-full',
   },
   template: `
-    <div class="h-full overflow-y-auto bg-gradient-to-b from-muted/30 to-background px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mx-auto w-full max-w-5xl space-y-8">
+    <div class="h-full w-full flex-1 overflow-y-auto p-8">
+      <div class="mx-auto w-full space-y-6">
         <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Conexiones</h1>
-            <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
+            <p class="mt-1 text-sm text-muted-foreground">
               Gestiona las cuentas de correo vinculadas a la organización
               <span class="font-medium text-foreground">{{ tenantName()?.name || 'actual' }}</span
               >.

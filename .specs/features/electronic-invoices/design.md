@@ -157,6 +157,8 @@ Rules:
 ## 9. Security and secrets
 
 - External account tokens encrypted in tenant DB (`encrypted_credentials`)
+- Tenant document passwords live in the `secrets` vault (`purpose = invoicing.document_password`); extraction tries candidates before Gemini PDF fallback
+- SSM SecureString for app boot secrets (`tenant_secrets_encryption_key`, inbox credential key, provider secrets)
 - Encryption key from secure environment (KMS / app secret)
 - LLM credentials from SSM via backend config
 - Auth error handling rotates status; UI surfaces reconnect-required accounts

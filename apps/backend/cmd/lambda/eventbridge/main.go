@@ -26,12 +26,15 @@ func init() {
 
 	cfg := platformModule.Config
 	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
+
+	// EventBridge only enqueues invoice extraction; PDF unlock runs in the SQS worker.
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
 		platformModule.JobQueue,
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
+		nil,
 	)
 	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
 

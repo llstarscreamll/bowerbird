@@ -7,6 +7,7 @@ import { OrganizationHttpService } from '../../../../organization/infrastructure
 import { AuthStore } from '../../../../auth/application/auth.store';
 import { TenantContextStore } from '../../../store/tenant-context.store';
 import { EntitlementsStore } from '../../../../entitlements/application/entitlements.store';
+import { PermissionsStore } from '../../../../rbac/application/permissions.store';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
@@ -111,6 +112,14 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
                   </a>
                 </li>
               }
+              @if (permissions.canReadSecrets()) {
+                <li hlmSidebarMenuItem>
+                  <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'secrets']" routerLinkActive #secretsLink="routerLinkActive" [isActive]="secretsLink.isActive" [tooltip]="'Credenciales'">
+                    <ng-icon name="lucideKeyRound" />
+                    <span>Credenciales</span>
+                  </a>
+                </li>
+              }
             </ul>
           </hlm-sidebar-group>
         </hlm-sidebar-content>
@@ -174,6 +183,7 @@ export class TenantLayoutComponent implements OnInit {
   private authStore = inject(AuthStore);
   private tenantContextStore = inject(TenantContextStore);
   readonly entitlements = inject(EntitlementsStore);
+  readonly permissions = inject(PermissionsStore);
   readonly sidebarService = inject(HlmSidebarService);
 
   themeMode = signal<'system' | 'light' | 'dark'>('system');
@@ -295,8 +305,12 @@ export class TenantLayoutComponent implements OnInit {
     if (newTenantId && newTenantId !== this.tenantId()) {
       this.tenantContextStore.setTenantId(newTenantId);
       this.entitlements.load(newTenantId).subscribe();
+      this.permissions.load(newTenantId).subscribe();
     } else if (newTenantId && this.entitlements.loadedTenantId() !== newTenantId) {
       this.entitlements.load(newTenantId).subscribe();
+      this.permissions.load(newTenantId).subscribe();
+    } else if (newTenantId && this.permissions.loadedTenantId() !== newTenantId) {
+      this.permissions.load(newTenantId).subscribe();
     }
   }
 }

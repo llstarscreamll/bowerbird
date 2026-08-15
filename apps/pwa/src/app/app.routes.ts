@@ -58,6 +58,10 @@ export const routes: Routes = [
         path: 'invoices/:invoiceId',
         loadComponent: () => import('./invoices/presentation/pages/detail/detail.page').then((c) => c.DetailPage),
       },
+      {
+        path: 'secrets',
+        loadComponent: () => import('./secrets/presentation/pages/master/master.page').then((c) => c.MasterPage),
+      },
     ],
   },
 ];

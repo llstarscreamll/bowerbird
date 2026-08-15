@@ -1,6 +1,7 @@
 package invoices
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -10,12 +11,14 @@ import (
 	invoicingRepo "github.com/bowerbird/internal/invoices/adapters/repository/postgres"
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
+	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/application/queries"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
+	secretsModule "github.com/bowerbird/internal/secrets"
 )
 
 func NewApplication(
@@ -24,6 +27,7 @@ func NewApplication(
 	jobQueue jobs.Queue,
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
+	passwordResolver ports.DocumentPasswordResolver,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -62,6 +66,7 @@ func NewApplication(
 				xmlExtractor,
 				llmExtractor,
 				invoiceRepository,
+				passwordResolver,
 			),
 			CreateInvoice: commands.NewCreateInvoiceCommand(invoiceRepository),
 		},
@@ -86,4 +91,31 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	handler.Register(mux, cfg, authMiddleware)
 
 	return handler
+}
+
+type secretsPasswordAdapter struct {
+	inner *secretsModule.DocumentPasswordResolver
+}
+
+func NewSecretsPasswordAdapter(resolver *secretsModule.DocumentPasswordResolver) ports.DocumentPasswordResolver {
+	if resolver == nil {
+		return nil
+	}
+	return &secretsPasswordAdapter{inner: resolver}
+}
+
+func (a *secretsPasswordAdapter) ResolveCandidates(ctx context.Context) ([]ports.PasswordCandidate, error) {
+	resolved, err := a.inner.ResolveCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ports.PasswordCandidate, 0, len(resolved))
+	for _, item := range resolved {
+		out = append(out, ports.PasswordCandidate{SecretID: item.ID, Value: item.Value})
+	}
+	return out, nil
+}
+
+func (a *secretsPasswordAdapter) MarkUsed(ctx context.Context, secretID string) error {
+	return a.inner.MarkUsed(ctx, secretID)
 }

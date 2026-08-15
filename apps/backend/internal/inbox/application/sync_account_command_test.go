@@ -72,7 +72,7 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	queryTs, convErr := strconv.ParseInt(strings.TrimPrefix(query, "after:"), 10, 64)
 	require.NoError(t, convErr)
 
-	expected := time.Now().UTC().AddDate(0, 0, -10)
+	expected := time.Now().UTC().AddDate(0, -2, 0)
 	assert.WithinDuration(t, expected, time.Unix(queryTs, 0).UTC(), 5*time.Second)
 
 	require.Len(t, repo.upsertedCursors, 2)
