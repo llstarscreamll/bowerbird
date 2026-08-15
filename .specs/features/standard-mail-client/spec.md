@@ -1,191 +1,191 @@
-# Standard Mail Client Specification
+# Standard mail client specification
 
-## Problem Statement
+## Problem statement
 
-El inbox de Bowerbird hoy es un canal de ingesta de facturas: sincroniza Gmail hacia adelante, lista mensajes planos y no permite usar el correo. El producto debe evolucionar a un cliente de correo estándar (carpetas, leído/no leído, hilos, redactar/responder, archivar) sin romper la extracción DIAN existente.
+Bowerbird's inbox is an invoice-ingestion channel: forward Gmail sync, flat message lists, no real mail use. The product must become a standard mail client (folders, read/unread, threads, compose/reply, archive) without breaking existing DIAN extraction.
 
 ## Goals
 
-- [ ] El usuario navega Inbox, Enviados, Borradores, Archivo, Papelera y Destacados de sus cuentas conectadas.
-- [ ] El usuario marca leído/no leído, destaca, archiva o elimina un mensaje y el cambio se refleja en el proveedor.
-- [ ] El usuario redacta, responde y envía correo desde Bowerbird.
-- [ ] La sincronización es incremental (History/delta), asíncrona y no republica eventos de facturación en re-sync.
-- [ ] Gmail y Microsoft Graph sincronizan el mismo modelo de correo.
+- [ ] User navigates Inbox, Sent, Drafts, Archive, Trash, and Starred across connected accounts.
+- [ ] User marks read/unread, stars, archives, or deletes a message; the change syncs to the provider.
+- [ ] User composes, replies, and sends mail from Bowerbird.
+- [ ] Sync is incremental (History/delta), async, and does not republish invoicing events on re-sync.
+- [ ] Gmail and Microsoft Graph sync the same mail model.
 
-## Out of Scope
+## Out of scope
 
-| Feature                                      | Reason                                                          |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| Yahoo / IMAP genérico / iCloud               | Sin OAuth de connections ni adapter; P3                         |
-| Filtros, vacation responder, aliases, snooze | No son MVP de cliente                                           |
-| Calendario, contactos, PGP                   | Otro producto                                                   |
-| Gmail `users.watch` / Graph subscriptions    | Push queda P3; History + jobs cubren P1                         |
-| DLQ por tenant                               | Decisión PROD-SYNC-089                                          |
-| Reemplazar el pipeline de facturas           | `InboxMessageReceived` se conserva, solo se emite en alta nueva |
-
----
-
-## User Stories
-
-### P1: Modelo de correo (folders, flags, destinatarios) ⭐ MVP
-
-**User Story**: Como usuario, quiero ver mis correos organizados por carpeta y estado (leído, destacado) para trabajar el buzón como en Gmail/Outlook.
-
-**Why P1**: Sin modelo local de folders/flags el resto de acciones no tiene dónde persistir.
-
-**Acceptance Criteria**:
-
-1. WHEN el sync descarga un mensaje THEN el sistema SHALL persistir folder (`inbox|sent|drafts|trash|spam|archive`), `is_read`, `is_starred`, `is_draft`, To/Cc/Bcc y `provider_thread_id`.
-2. WHEN Gmail incluye label `UNREAD` THEN el sistema SHALL guardar `is_read=false`.
-3. WHEN el usuario lista mensajes con `folder=inbox` THEN el sistema SHALL devolver solo mensajes de esa carpeta, paginados.
-4. WHEN una connection es `private` THEN el sistema SHALL ocultar sus mensajes a usuarios que no son el owner.
-
-**Independent Test**: Sync de un mensaje Gmail con `INBOX`+`UNREAD` produce una fila con `folder=inbox` e `is_read=false`; `GET /messages?folder=inbox` lo lista.
+| Feature                                      | Reason                                               |
+| -------------------------------------------- | ---------------------------------------------------- |
+| Yahoo / generic IMAP / iCloud                | No OAuth connections or adapter; P3                  |
+| Filters, vacation responder, aliases, snooze | Not client MVP                                       |
+| Calendar, contacts, PGP                      | Separate product                                     |
+| Gmail `users.watch` / Graph subscriptions    | Push is P3; History + jobs cover P1                  |
+| Per-tenant DLQ                               | PROD-SYNC-089 decision                               |
+| Replace invoice pipeline                     | Keep `InboxMessageReceived`; emit only on new insert |
 
 ---
 
-### P1: Acciones bidireccionales ⭐ MVP
+## User stories
 
-**User Story**: Como usuario, quiero marcar leído, destacar, archivar y enviar a papelera para que el cambio exista también en Gmail/Outlook.
+### P1: Mail model (folders, flags, recipients) ⭐ MVP
 
-**Why P1**: Un cliente de correo que no escribe de vuelta al proveedor es un visor.
+**User story**: As a user, I want mail organized by folder and state (read, starred) so I can work the mailbox like Gmail/Outlook.
 
-**Acceptance Criteria**:
+**Why P1**: Without a local folders/flags model, other actions have nowhere to persist.
 
-1. WHEN el usuario marca leído/no leído THEN el sistema SHALL actualizar flags locales y llamar `ModifyMessage` en el proveedor.
-2. WHEN el usuario destaca o quita estrella THEN el sistema SHALL sincronizar `STARRED` (Gmail) o `flag.flagStatus` (Graph).
-3. WHEN el usuario archiva THEN el sistema SHALL quitar INBOX (Gmail) o mover a Archive (Graph) y setear `folder=archive`.
-4. WHEN el usuario envía a papelera THEN el sistema SHALL trash en el proveedor y setear `folder=trash`.
-5. WHEN el proveedor no acepta la acción (token revocado) THEN el sistema SHALL devolver error JSON:API de sync/reauth y no dejar el estado local a medias si el proveedor falló.
+**Acceptance criteria**:
 
-**Independent Test**: Command de archive con fake provider registra `removeLabelIds=[INBOX]` y el mensaje queda `folder=archive`.
+1. WHEN sync downloads a message THEN the system SHALL persist folder (`inbox|sent|drafts|trash|spam|archive`), `is_read`, `is_starred`, `is_draft`, To/Cc/Bcc, and `provider_thread_id`.
+2. WHEN Gmail includes label `UNREAD` THEN the system SHALL store `is_read=false`.
+3. WHEN the user lists messages with `folder=inbox` THEN the system SHALL return only that folder's messages, paginated.
+4. WHEN a connection is `private` THEN the system SHALL hide its messages from non-owners.
 
----
-
-### P1: Redactar y enviar ⭐ MVP
-
-**User Story**: Como usuario, quiero redactar un correo nuevo o responder uno existente y enviarlo desde Bowerbird.
-
-**Why P1**: Sin envío no es un cliente de correo.
-
-**Acceptance Criteria**:
-
-1. WHEN el usuario envía un mensaje con To y asunto THEN el sistema SHALL llamar `SendMessage` del proveedor con scopes de envío.
-2. WHEN el envío tiene éxito THEN el sistema SHALL persistir una copia en `folder=sent` (o esperar el próximo sync de SENT).
-3. WHEN To está vacío THEN el sistema SHALL rechazar con `ERR_VALIDATION`.
-4. WHEN el usuario responde THEN el sistema SHALL incluir `In-Reply-To` / `thread_id` del mensaje origen.
-
-**Independent Test**: `POST /messages` con To válido dispara `SendMessage` en el fake provider.
+**Independent test**: Sync a Gmail message with `INBOX`+`UNREAD` → row with `folder=inbox` and `is_read=false`; `GET /messages?folder=inbox` lists it.
 
 ---
 
-### P1: OAuth scopes de cliente ⭐ MVP
+### P1: Bidirectional actions ⭐ MVP
 
-**User Story**: Como usuario, quiero autorizar lectura, modificación y envío en una sola conexión para no reconectar al usar el cliente.
+**User story**: As a user, I want to mark read, star, archive, and trash so the change also exists in Gmail/Outlook.
 
-**Why P1**: `gmail.readonly` en el HTTP client impide modify/send aunque connections ya pida `gmail.modify`.
+**Why P1**: A mail client that does not write back to the provider is a viewer.
 
-**Acceptance Criteria**:
+**Acceptance criteria**:
 
-1. WHEN se inicia OAuth Google de connections THEN el sistema SHALL pedir `email`, `gmail.modify` y `gmail.send`.
-2. WHEN el adapter Gmail construye el HTTP client THEN SHALL usar esos mismos scopes (no `gmail.readonly`).
-3. WHEN se inicia OAuth Microsoft de connections THEN el sistema SHALL pedir `User.Read`, `Mail.ReadWrite`, `Mail.Send`, `offline_access`.
-4. WHEN `GrantedScopes` se persisten THEN SHALL reflejar los scopes realmente solicitados.
+1. WHEN the user marks read/unread THEN the system SHALL update local flags and call `ModifyMessage` on the provider.
+2. WHEN the user stars or unstars THEN the system SHALL sync `STARRED` (Gmail) or `flag.flagStatus` (Graph).
+3. WHEN the user archives THEN the system SHALL remove INBOX (Gmail) or move to Archive (Graph) and set `folder=archive`.
+4. WHEN the user trashes THEN the system SHALL trash on the provider and set `folder=trash`.
+5. WHEN the provider rejects the action (revoked token) THEN the system SHALL return a JSON:API sync/reauth error and not leave local state half-applied if the provider failed.
 
-**Independent Test**: Config OAuth de connections incluye `gmail.send`; test del oauth client Gmail no usa `gmail.readonly`.
-
----
-
-### P1: Sync fiable (History, jobs, idempotencia) ⭐ MVP
-
-**User Story**: Como operador, quiero que el sync no bloquee HTTP, no pierda mensajes y no reprocese facturas.
-
-**Why P1**: El cursor `after:unix` y el publish en cada upsert rompen un cliente real y el pipeline DIAN.
-
-**Acceptance Criteria**:
-
-1. WHEN existe `history_id` en el cursor Gmail THEN el sistema SHALL usar History API en lugar de `after:unix`.
-2. WHEN History responde 404 (id expirado) THEN the sistema SHALL hacer fallback a listado incremental y guardar un history id nuevo.
-3. WHEN `UpsertInboxMessage` no inserta (ya existía) THEN the sistema SHALL NO publicar `InboxMessageReceived`.
-4. WHEN el usuario dispara `POST /inbox/sync` THEN the sistema SHALL encolar un job SQS por cuenta y responder 202 sin ejecutar el sync inline.
-5. WHEN el job corre THEN SHALL actualizar `inbox_sync_cursors.status`.
-
-**Independent Test**: Segundo sync del mismo provider id no incrementa eventos publicados.
+**Independent test**: Archive command with fake provider records `removeLabelIds=[INBOX]` and message is `folder=archive`.
 
 ---
 
-### P1: Adjuntos reales y lista usable ⭐ MVP
+### P1: Compose and send ⭐ MVP
 
-**User Story**: Como usuario, quiero ver el nombre real de los adjuntos, descargarlos y paginar la bandeja.
+**User story**: As a user, I want to compose a new message or reply and send from Bowerbird.
 
-**Why P1**: La UI actual muestra placeholders y carga todos los mensajes en memoria.
+**Why P1**: Without send it is not a mail client.
 
-**Acceptance Criteria**:
+**Acceptance criteria**:
 
-1. WHEN el detalle de un mensaje tiene adjuntos THEN the sistema SHALL devolver id, filename, mime y size reales.
-2. WHEN el usuario descarga un adjunto THEN the sistema SHALL servir el objeto de S3 autenticado.
-3. WHEN la lista pide `limit`/`offset` THEN the sistema SHALL paginar en SQL, no en el cliente.
-4. WHEN hay búsqueda `q` THEN the sistema SHALL filtrar en servidor por subject/sender/snippet.
+1. WHEN the user sends a message with To and subject THEN the system SHALL call provider `SendMessage` with send scopes.
+2. WHEN send succeeds THEN the system SHALL persist a copy in `folder=sent` (or wait for the next SENT sync).
+3. WHEN To is empty THEN the system SHALL reject with `ERR_VALIDATION`.
+4. WHEN the user replies THEN the system SHALL include `In-Reply-To` / `thread_id` from the source message.
 
-**Independent Test**: `GET /messages?limit=1` con dos filas devuelve un item y `total=2`.
-
----
-
-### P2: Hilos en UI
-
-**User Story**: Como usuario, quiero ver una conversación agrupada por `provider_thread_id`.
-
-**Why P2**: El modelo ya guarda thread id; agrupar en lista/detalle mejora UX pero no bloquea enviar/archivar.
-
-**Acceptance Criteria**:
-
-1. WHEN varios mensajes comparten `thread_id` THEN the lista MAY agruparlos mostrando el más reciente y un conteo.
-2. WHEN el usuario abre un hilo THEN the sistema SHALL listar los mensajes del thread ordenados por fecha.
+**Independent test**: `POST /messages` with valid To triggers `SendMessage` on the fake provider.
 
 ---
 
-### P2: Microsoft Graph (conexión + adapter)
+### P1: Client OAuth scopes ⭐ MVP
 
-**User Story**: Como usuario de Outlook, quiero conectar Microsoft y usar el mismo cliente.
+**User story**: As a user, I want to authorize read, modify, and send in one connection so I do not reconnect to use the client.
 
-**Why P2**: El modelo y puertos son provider-agnostic; Graph es el segundo adapter.
+**Why P1**: `gmail.readonly` on the HTTP client blocks modify/send even when connections already request `gmail.modify`.
 
-**Acceptance Criteria**:
+**Acceptance criteria**:
 
-1. WHEN el usuario pide `GET /connections/microsoft` THEN recibe `auth_url` de Azure AD.
-2. WHEN el callback guarda la connection THEN `provider=microsoft` y el factory construye un cliente Graph.
-3. WHEN sync corre para Microsoft THEN lista/get/download/modify/send funcionan contra Graph.
+1. WHEN Google connections OAuth starts THEN the system SHALL request `email`, `gmail.modify`, and `gmail.send`.
+2. WHEN the Gmail adapter builds the HTTP client THEN it SHALL use those same scopes (not `gmail.readonly`).
+3. WHEN Microsoft connections OAuth starts THEN the system SHALL request `User.Read`, `Mail.ReadWrite`, `Mail.Send`, `offline_access`.
+4. WHEN `GrantedScopes` are persisted THEN they SHALL reflect the scopes actually requested.
+
+**Independent test**: Connections OAuth config includes `gmail.send`; Gmail oauth client test does not use `gmail.readonly`.
+
+---
+
+### P1: Reliable sync (History, jobs, idempotency) ⭐ MVP
+
+**User story**: As an operator, I want sync that does not block HTTP, drop messages, or reprocess invoices.
+
+**Why P1**: The `after:unix` cursor and publish-on-every-upsert break a real client and the DIAN pipeline.
+
+**Acceptance criteria**:
+
+1. WHEN a Gmail cursor has `history_id` THEN the system SHALL use the History API instead of `after:unix`.
+2. WHEN History returns 404 (expired id) THEN the system SHALL fall back to incremental list and store a new history id.
+3. WHEN `UpsertInboxMessage` does not insert (already existed) THEN the system SHALL NOT publish `InboxMessageReceived`.
+4. WHEN the user triggers `POST /inbox/sync` THEN the system SHALL enqueue one SQS job per account and respond 202 without inline sync.
+5. WHEN the job runs THEN it SHALL update `inbox_sync_cursors.status`.
+
+**Independent test**: Second sync of the same provider id does not increase published events.
+
+---
+
+### P1: Real attachments and usable list ⭐ MVP
+
+**User story**: As a user, I want real attachment names, downloads, and a paginated inbox.
+
+**Why P1**: Current UI shows placeholders and loads all messages in memory.
+
+**Acceptance criteria**:
+
+1. WHEN message detail has attachments THEN the system SHALL return real id, filename, mime, and size.
+2. WHEN the user downloads an attachment THEN the system SHALL serve the authenticated S3 object.
+3. WHEN the list requests `limit`/`offset` THEN the system SHALL paginate in SQL, not the client.
+4. WHEN search `q` is present THEN the system SHALL filter server-side by subject/sender/snippet.
+
+**Independent test**: `GET /messages?limit=1` with two rows returns one item and `total=2`.
+
+---
+
+### P2: Threads in UI
+
+**User story**: As a user, I want a conversation grouped by `provider_thread_id`.
+
+**Why P2**: The model already stores thread id; grouping improves UX but does not block send/archive.
+
+**Acceptance criteria**:
+
+1. WHEN several messages share `thread_id` THEN the list MAY group them showing the latest and a count.
+2. WHEN the user opens a thread THEN the system SHALL list thread messages ordered by date.
+
+---
+
+### P2: Microsoft Graph (connection + adapter)
+
+**User story**: As an Outlook user, I want to connect Microsoft and use the same client.
+
+**Why P2**: Model and ports are provider-agnostic; Graph is the second adapter.
+
+**Acceptance criteria**:
+
+1. WHEN the user requests `GET /connections/microsoft` THEN they receive an Azure AD `auth_url`.
+2. WHEN the callback saves the connection THEN `provider=microsoft` and the factory builds a Graph client.
+3. WHEN sync runs for Microsoft THEN list/get/download/modify/send work against Graph.
 
 ---
 
 ### P3: Push (Gmail watch / Graph subscriptions)
 
-Fuera del MVP. History + jobs cubren latencia aceptable.
+Out of MVP. History + jobs cover acceptable latency.
 
 ---
 
-## Edge Cases
+## Edge cases
 
-- WHEN un mensaje está en TRASH e INBOX a la vez THEN folder SHALL ser `trash`.
-- WHEN History omite un mensaje THEN el fallback `after:` no debe duplicar filas (`ON CONFLICT account_id, provider_message_id`).
-- WHEN SendMessage falla AFTER persistir local THEN SHALL devolver error y no marcar sent.
-- WHEN el HTML del correo se muestra THEN SHALL seguir las reglas de sanitización PROD-SYNC-089.
-- WHEN sharing_policy=private THEN list/get/download/modify/send SHALL aplicar el mismo filtro de owner.
+- WHEN a message is in TRASH and INBOX THEN folder SHALL be `trash`.
+- WHEN History omits a message THEN the `after:` fallback MUST NOT duplicate rows (`ON CONFLICT account_id, provider_message_id`).
+- WHEN SendMessage fails AFTER local persist THEN SHALL return error and not mark sent.
+- WHEN mail HTML is shown THEN SHALL follow PROD-SYNC-089 sanitization rules.
+- WHEN `sharing_policy=private` THEN list/get/download/modify/send SHALL apply the same owner filter.
 
 ---
 
-## Requirement Traceability
+## Requirement traceability
 
-| Requirement ID | Story                             | Phase   | Status       |
-| -------------- | --------------------------------- | ------- | ------------ |
-| MAIL-01        | P1: Modelo folders/flags          | Execute | Implementing |
-| MAIL-02        | P1: Acciones bidireccionales      | Execute | Implementing |
-| MAIL-03        | P1: Redactar y enviar             | Execute | Implementing |
-| MAIL-04        | P1: OAuth scopes                  | Execute | Implementing |
-| MAIL-05        | P1: History + jobs + idempotencia | Execute | Implementing |
-| MAIL-06        | P1: Adjuntos y paginación         | Execute | Implementing |
-| MAIL-07        | P2: Hilos UI                      | Execute | Implementing |
-| MAIL-08        | P2: Microsoft Graph               | Execute | Implementing |
+| Requirement ID | Story                            | Phase   | Status       |
+| -------------- | -------------------------------- | ------- | ------------ |
+| MAIL-01        | P1: Folders/flags model          | Execute | Implementing |
+| MAIL-02        | P1: Bidirectional actions        | Execute | Implementing |
+| MAIL-03        | P1: Compose and send             | Execute | Implementing |
+| MAIL-04        | P1: OAuth scopes                 | Execute | Implementing |
+| MAIL-05        | P1: History + jobs + idempotency | Execute | Implementing |
+| MAIL-06        | P1: Attachments and pagination   | Execute | Implementing |
+| MAIL-07        | P2: Threads UI                   | Execute | Implementing |
+| MAIL-08        | P2: Microsoft Graph              | Execute | Implementing |
 
 **ID format:** `MAIL-NN`
 
@@ -193,9 +193,9 @@ Fuera del MVP. History + jobs cubren latencia aceptable.
 
 ---
 
-## Success Criteria
+## Success criteria
 
-- [ ] Un usuario con Gmail puede leer, destacar, archivar, borrar y enviar un correo desde la PWA.
-- [ ] Re-sync no dispara un segundo `InboxMessageReceived` para el mismo provider message id.
-- [ ] `POST /inbox/sync` responde 202 y el trabajo corre en SQS.
-- [ ] Scopes Gmail incluyen modify+send; Microsoft connections existe con Mail.ReadWrite+Mail.Send.
+- [ ] A Gmail user can read, star, archive, delete, and send mail from the PWA.
+- [ ] Re-sync does not fire a second `InboxMessageReceived` for the same provider message id.
+- [ ] `POST /inbox/sync` returns 202 and work runs on SQS.
+- [ ] Gmail scopes include modify+send; Microsoft connections exist with Mail.ReadWrite+Mail.Send.

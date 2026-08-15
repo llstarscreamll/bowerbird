@@ -1,13 +1,13 @@
-# Standard Mail Client Design
+# Standard mail client design
 
 **Spec**: `.specs/features/standard-mail-client/spec.md`
 **Status**: Approved for implementation (MVP)
 
 ---
 
-## Architecture Overview
+## Architecture overview
 
-Inbox deja de ser solo ingesta. El agregado `InboxMessage` pasa a ser un mensaje de correo con folder/flags; `MailProviderClient` escribe de vuelta al proveedor; sync usa History/delta y jobs SQS. Invoicing sigue escuchando `InboxMessageReceived`, emitido **solo** en insert.
+Inbox is no longer ingest-only. The `InboxMessage` aggregate becomes a mail message with folder/flags; `MailProviderClient` writes back to the provider; sync uses History/delta and SQS jobs. Invoicing still listens to `InboxMessageReceived`, emitted **only** on insert.
 
 ```mermaid
 flowchart TD
@@ -27,29 +27,29 @@ flowchart TD
 
 ---
 
-## Code Reuse Analysis
+## Code reuse analysis
 
-### Existing Components to Leverage
+### Existing components to leverage
 
-| Component                               | Location                                     | How to Use                                     |
-| --------------------------------------- | -------------------------------------------- | ---------------------------------------------- |
-| `MailProviderClient`                    | `inbox/domain/provider_client.go`            | Extender con History, Modify, Trash, Send      |
-| `SyncAccountCommand`                    | `inbox/application/commands/sync_account.go` | History cursor + idempotent publish            |
-| `jobs.Queue` / SQS poller               | `platform/jobs`                              | Dispatcher de sync (mismo patrón que invoices) |
-| Gmail `CreateLabel`/`AddLabelToMessage` | `gmail/client.go`                            | Base de `ModifyMessage`                        |
-| Connections OAuth Google                | `connections/adapters/http/v1`               | Añadir `gmail.send`; clonar flujo Microsoft    |
-| `SecureEmailBodyComponent`              | PWA inbox                                    | Sin cambios; compose es texto/HTML propio      |
-| SharingPolicy                           | connections domain                           | Filtrar list/get/modify por owner              |
+| Component                               | Location                                     | How to use                                 |
+| --------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| `MailProviderClient`                    | `inbox/domain/provider_client.go`            | Extend with History, Modify, Trash, Send   |
+| `SyncAccountCommand`                    | `inbox/application/commands/sync_account.go` | History cursor + idempotent publish        |
+| `jobs.Queue` / SQS poller               | `platform/jobs`                              | Sync dispatcher (same pattern as invoices) |
+| Gmail `CreateLabel`/`AddLabelToMessage` | `gmail/client.go`                            | Base for `ModifyMessage`                   |
+| Connections OAuth Google                | `connections/adapters/http/v1`               | Add `gmail.send`; clone Microsoft flow     |
+| `SecureEmailBodyComponent`              | PWA inbox                                    | Unchanged; compose uses its own text/HTML  |
+| SharingPolicy                           | connections domain                           | Filter list/get/modify by owner            |
 
-### Integration Points
+### Integration points
 
-| System          | Integration Method                                               |
+| System          | Integration method                                               |
 | --------------- | ---------------------------------------------------------------- |
 | Gmail           | History + messages.modify/trash/send; scopes modify+send         |
 | Microsoft Graph | messages list/get/sendMail/move; scopes Mail.ReadWrite+Mail.Send |
 | SQS             | JobType `InboxSyncAccount`                                       |
 | EventBridge     | `InboxMessageReceived` unchanged contract                        |
-| S3              | Adjuntos existentes; download via `FileStore.ReadFile`           |
+| S3              | Existing attachments; download via `FileStore.ReadFile`          |
 
 ---
 
@@ -57,37 +57,37 @@ flowchart TD
 
 ### Domain mail model
 
-- **Purpose**: Folder, flags y destinatarios como parte de `InboxMessage`.
+- **Purpose**: Folder, flags, and recipients on `InboxMessage`.
 - **Location**: `apps/backend/internal/inbox/domain/`
 - **Interfaces**: `ApplyProviderLabels`, `MailFolder`, `OutgoingMail`
 - **Reuses**: `NewInboxMessageFromProvider`
 
 ### Provider port
 
-- **Purpose**: Lectura + escritura provider-agnostic.
+- **Purpose**: Provider-agnostic read + write.
 - **Location**: `provider_client.go`
 - **New methods**: `GetHistoryID`, `ListHistory`, `ModifyMessage`, `TrashMessage`, `SendMessage`
 
 ### Sync
 
-- **Purpose**: Incremental correcto e idempotente.
+- **Purpose**: Correct incremental sync and idempotent events.
 - **Location**: `commands/sync_account.go`
-- **Behavior**: Si `cursor.HistoryID` → History; si 404 → list fallback. Publish event only when upsert inserted.
+- **Behavior**: If `cursor.HistoryID` → History; if 404 → list fallback. Publish event only when upsert inserted.
 
 ### SQS dispatcher
 
-- **Purpose**: `POST /sync` no bloquea.
+- **Purpose**: `POST /sync` does not block.
 - **Location**: `commands/sqs_sync_dispatcher.go`, `adapters/jobs/sync_account_processor.go`, `contracts/jobs/`
-- **Fallback**: Si no hay queue, se mantiene inline dispatcher (tests/local sin SQS).
+- **Fallback**: Without a queue, keep the inline dispatcher (tests/local without SQS).
 
 ### Mail commands
 
-- **Purpose**: Acciones de cliente.
+- **Purpose**: Client actions.
 - **Location**: `commands/modify_message.go`, `commands/send_message.go`
 
 ### HTTP / PWA
 
-- **Purpose**: Carpetas, flags, compose, adjuntos reales, paginación.
+- **Purpose**: Folders, flags, compose, real attachments, pagination.
 - **Endpoints**:
   - `GET /messages?folder&q&limit&offset&account_id`
   - `POST /messages` (send)
@@ -96,7 +96,7 @@ flowchart TD
 
 ---
 
-## Data Models
+## Data models
 
 ### InboxMessage (extended)
 
@@ -136,5 +136,5 @@ history_id on inbox_sync_cursors
 - Default list folder is `inbox`.
 - Starred is a virtual folder (`is_starred=true`, not trash).
 - Send persists after provider success; next sync reconciles the SENT copy.
-- Microsoft is implemented in the same MVP slice because the factory already declares the provider.
+- Microsoft ships in the same MVP slice because the factory already declares the provider.
 - Periodic EventBridge cron across tenants is P3; P1 is async jobs per user/connection-added trigger.
