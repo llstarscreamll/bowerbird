@@ -1,81 +1,80 @@
-# Especificacion - UX Resiliente en Fallos de Sincronizacion
+# Spec — resilient UX for sync failures
 
-## Estado
+## Status
 
-- Estado: Aprobada para diseno e implementacion
-- Fecha: 2026-05-27
+- Status: Approved for design and implementation
+- Date: 2026-05-27
 - Epic: PROD-SYNC-089
-- Idioma: ES
 
-## Objetivo
+## Goal
 
-Estandarizar y enriquecer el manejo de errores de sincronizacion de bandejas externas (Gmail, Outlook/Hotmail, Yahoo) para que la UI muestre estados accionables, sin cargas infinitas ni mensajes genericos, bajo contrato JSON:API consistente y seguro.
+Standardize sync errors for external mailboxes (Gmail, Outlook/Hotmail, Yahoo) so the UI shows actionable states—no infinite loaders or generic messages—under a consistent, safe JSON:API contract.
 
-## Contexto de negocio
+## Business context
 
-- El fallo silencioso de sincronizacion incrementa churn y tickets de soporte.
-- El sistema actual responde de forma inconsistente ante revocacion OAuth y rate limiting.
-- Producto requiere un catalogo reusable de estados de error para UX modular.
+- Silent sync failures drive churn and support tickets.
+- OAuth revocation and rate limiting are handled inconsistently today.
+- Product needs a reusable error-state catalog for modular UX.
 
-## Requisitos funcionales
+## Functional requirements
 
-### RF-ERR (Contrato de error y UX accionable)
+### RF-ERR (error contract and actionable UX)
 
-- [PROD-SYNC-089-RF-001] Todo error 4xx/5xx de endpoints de sincronizacion debe responder en formato JSON:API `errors[]`.
-- [PROD-SYNC-089-RF-002] Cada error de sincronizacion debe incluir `links.about` con URL de ayuda autodescriptiva por tipo de error.
-- [PROD-SYNC-089-RF-003] `detail` debe incluir proveedor y cuenta afectada (ej: cuenta Outlook `personal@outlook.com` requiere atencion).
-- [PROD-SYNC-089-RF-004] Si el fallo requiere reconexion OAuth, el error debe incluir `meta.requires_reauth=true` y `meta.provider=<PROVIDER>` para habilitar CTA inmediato en UI.
-- [PROD-SYNC-089-RF-005] Si el fallo es transitorio por bloqueo/rate limit, el error debe incluir `meta.retry_after_seconds` para countdown y bloqueo temporal de reintento.
-- [PROD-SYNC-089-RF-006] Ningun fallo de sync debe dejar estados indeterminados (spinner infinito o pantalla en blanco).
+- [PROD-SYNC-089-RF-001] Every 4xx/5xx sync endpoint error returns JSON:API `errors[]`.
+- [PROD-SYNC-089-RF-002] Each sync error includes `links.about` with a self-describing help URL per error type.
+- [PROD-SYNC-089-RF-003] `detail` names the provider and affected account (e.g. Outlook account `personal@outlook.com` needs attention).
+- [PROD-SYNC-089-RF-004] When OAuth reconnect is required: `meta.requires_reauth=true` and `meta.provider=<PROVIDER>` for an immediate UI CTA.
+- [PROD-SYNC-089-RF-005] When rate-limited or temporarily blocked: `meta.retry_after_seconds` for countdown and temporary retry disable.
+- [PROD-SYNC-089-RF-006] No sync failure leaves indeterminate UI (infinite spinner or blank screen).
 
-### RF-SEC-BE (Seguridad en backend/ingesta)
+### RF-SEC-BE (backend / ingestion security)
 
-- [PROD-SYNC-089-RF-007] Access/Refresh tokens deben persistirse cifrados en reposo (AES-GCM-256 o equivalente) en capa de infraestructura.
-- [PROD-SYNC-089-RF-008] El MIME/EML crudo puede almacenarse en S3 para auditoria, pero los datos operativos para UI deben persistirse saneados.
-- [PROD-SYNC-089-RF-009] Campos estructurales (from/to/date) deben validarse contra formatos RFC; contenido invalido/malicioso se rechaza o limpia.
-- [PROD-SYNC-089-RF-010] Debe limitarse tamano de contenido (texto/HTML) previo a parseo para mitigar agotamiento de memoria por payloads extremos.
-- [PROD-SYNC-089-RF-011] El worker de sincronizacion debe fallar controladamente ante payloads maliciosos/pesados (ej: zip bomb textual), registrar error, ack/nack segun politica, y continuar con procesamiento normal de otros mensajes.
+- [PROD-SYNC-089-RF-007] Access and refresh tokens persist encrypted at rest (AES-GCM-256 or equivalent) in infrastructure.
+- [PROD-SYNC-089-RF-008] Raw MIME/EML may live in S3 for audit; operational UI data persists sanitized.
+- [PROD-SYNC-089-RF-009] Structural fields (from/to/date) validate against RFC formats; invalid or malicious content is rejected or cleaned.
+- [PROD-SYNC-089-RF-010] Cap text/HTML size before parse to mitigate memory exhaustion from extreme payloads.
+- [PROD-SYNC-089-RF-011] Sync worker fails controlled on malicious/heavy payloads (e.g. textual zip bomb): log, ack/nack per policy, continue other messages.
 
-### RF-SEC-FE (Seguridad de visualizacion en Angular)
+### RF-SEC-FE (Angular display security)
 
-- [PROD-SYNC-089-RF-012] El HTML enriquecido de correo debe sanitizarse estrictamente antes de renderizarse (sin scripts/event handlers/iframes no permitidos).
-- [PROD-SYNC-089-RF-013] Imagenes externas deben bloquearse por defecto con mecanismo opt-in explicito del usuario.
-- [PROD-SYNC-089-RF-014] Enlaces en contenido de correo deben forzar `target="_blank"` y `rel="noopener noreferrer"`.
-- [PROD-SYNC-089-RF-015] El render final de correo HTML debe aislarse visualmente con `iframe sandbox` sin permisos de ejecucion de script.
+- [PROD-SYNC-089-RF-012] Sanitize rich email HTML before render (no scripts, event handlers, or disallowed iframes).
+- [PROD-SYNC-089-RF-013] Block external images by default; require explicit user opt-in.
+- [PROD-SYNC-089-RF-014] Mail links use `target="_blank"` and `rel="noopener noreferrer"`.
+- [PROD-SYNC-089-RF-015] Render enriched HTML in a sandboxed `iframe` with no script execution.
 
-### RF-PRIV (Privacidad y opacidad de errores)
+### RF-PRIV (privacy / error opacity)
 
-- [PROD-SYNC-089-RF-016] `detail` y `meta` no deben exponer secretos (tokens, passwords, firmas criptograficas).
-- [PROD-SYNC-089-RF-017] En `meta._debug` (dev/local), aplicar masking de PII/secrets antes de serializar respuesta.
+- [PROD-SYNC-089-RF-016] `detail` and `meta` never expose secrets (tokens, passwords, crypto signatures).
+- [PROD-SYNC-089-RF-017] In `meta._debug` (dev/local), mask PII/secrets before serializing.
 
-## Requisitos no funcionales
+## Non-functional requirements
 
-- [PROD-SYNC-089-RNF-001] Diseno modular por bounded contexts (`connections`, `inbox`, `platform`, `pwa feature stores/components`).
-- [PROD-SYNC-089-RNF-002] Errores de negocio expresados con codigos semanticos estables (no acoplados al proveedor).
-- [PROD-SYNC-089-RNF-003] Extensibilidad para nuevos providers (ej: iCloud) sin cambios en componentes core de alerta UI.
-- [PROD-SYNC-089-RNF-004] Telemetria trazable por tenant, provider, account_id, correlation_id.
+- [PROD-SYNC-089-RNF-001] Modular design by bounded context (`connections`, `inbox`, `platform`, PWA feature stores/components).
+- [PROD-SYNC-089-RNF-002] Business errors use stable semantic codes (not provider-coupled).
+- [PROD-SYNC-089-RNF-003] New providers (e.g. iCloud) extend without changing core alert UI components.
+- [PROD-SYNC-089-RNF-004] Telemetry traceable by tenant, provider, account_id, correlation_id.
 
-## Restriccion de arquitectura confirmada
+## Architecture constraints
 
-- [PROD-SYNC-089-ARC-001] No se implementaran DLQ independientes por tenant por costo operativo.
-- [PROD-SYNC-089-ARC-002] La resiliencia se implementa con aislamiento logico en ejecucion del worker: limites de recursos por mensaje, timeout/cancelacion por contexto, manejo de panics, y descarte controlado del mensaje problematico para evitar degradacion global.
+- [PROD-SYNC-089-ARC-001] No per-tenant DLQs (operational cost).
+- [PROD-SYNC-089-ARC-002] Resilience via logical isolation in the worker: per-message resource limits, timeout/cancel via context, panic handling, and controlled discard of bad messages so the queue is not degraded globally.
 
-## Casos de uso
+## Use cases
 
-- [PROD-SYNC-089-UC-001] Token revocado en Outlook -> API responde JSON:API con `requires_reauth=true` -> UI muestra alerta con CTA de reconexion.
-- [PROD-SYNC-089-UC-002] Rate limit de Yahoo/Microsoft -> API responde `retry_after_seconds=120` -> UI inicia countdown y bloquea reintento.
-- [PROD-SYNC-089-UC-003] Mensaje con payload HTML malicioso -> backend limpia/limita, frontend sanitiza y renderiza aislado sin ejecucion de script.
-- [PROD-SYNC-089-UC-004] Payload de correo excesivo (zip bomb textual) -> worker falla controladamente ese mensaje y sigue procesando la cola normal.
+- [PROD-SYNC-089-UC-001] Revoked Outlook token → JSON:API with `requires_reauth=true` → UI alert with reconnect CTA.
+- [PROD-SYNC-089-UC-002] Yahoo/Microsoft rate limit → `retry_after_seconds=120` → UI countdown and blocked retry.
+- [PROD-SYNC-089-UC-003] Malicious HTML payload → backend cleans/limits; frontend sanitizes and sandboxes without script execution.
+- [PROD-SYNC-089-UC-004] Oversized / textual zip-bomb message → worker fails that message controlled and keeps processing the queue.
 
-## Criterios de aceptacion
+## Acceptance criteria
 
-1. Ningun endpoint de sync retorna errores fuera de JSON:API.
-2. En Stage/UAT no se reproducen estados de carga infinita ante fallos de proveedores.
-3. Flujos de reautenticacion y countdown de rate limit funcionan con datos del contrato `meta`.
-4. Pruebas de seguridad verifican sanitizacion, bloqueo de imagenes externas y enlace seguro.
-5. Pruebas de resiliencia demuestran que un mensaje problematico no bloquea el consumo normal de la cola.
+1. No sync endpoint returns errors outside JSON:API.
+2. Stage/UAT: no infinite loading on provider failures.
+3. Reauth and rate-limit countdown work from `meta` contract fields.
+4. Security tests cover sanitization, external image block, and safe links.
+5. Resilience tests show one bad message does not block normal queue consumption.
 
-## Fuera de alcance
+## Out of scope
 
-- Implementar DLQ dedicada por tenant.
-- Rediseno completo de observabilidad fuera de campos minimos requeridos para trazabilidad de sync.
+- Per-tenant dedicated DLQ.
+- Full observability redesign beyond minimum sync-traceability fields.
