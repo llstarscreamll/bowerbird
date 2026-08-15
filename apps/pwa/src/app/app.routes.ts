@@ -6,7 +6,8 @@ import { platformOperatorGuard } from './core/guards/platform-operator.guard';
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./health/presentation/pages/home/home.component').then((c) => c.HomeComponent),
+    redirectTo: 'login',
+    pathMatch: 'full',
   },
   {
     path: 'login',
