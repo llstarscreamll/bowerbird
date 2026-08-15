@@ -26,7 +26,7 @@ export class UnifiedInboxHttpRepository implements UnifiedInboxRepository {
     if (params?.limit) {
       httpParams = httpParams.set('limit', String(params.limit));
     }
-    if (params?.offset) {
+    if (params?.offset != null && params.offset >= 0) {
       httpParams = httpParams.set('offset', String(params.offset));
     }
     if (params?.onlyInvoices) {

@@ -17,7 +17,10 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class UnifiedInboxStore {
+  private static readonly PAGE_SIZE = 50;
+
   readonly loading = signal(false);
+  readonly isLoadingMore = signal(false);
   readonly error = signal<string | null>(null);
   readonly messages = signal<UnifiedInboxMessage[]>([]);
   readonly totalMessages = signal(0);
@@ -28,6 +31,8 @@ export class UnifiedInboxStore {
   readonly loadingMessageId = signal<string | null>(null);
   readonly syncActionError = signal<SyncActionError | null>(null);
   readonly syncRetrySecondsLeft = signal(0);
+
+  readonly hasMore = computed(() => this.messages().length < this.totalMessages());
 
   readonly providers = MAIL_PROVIDERS;
   readonly statuses: MessageProcessingStatus[] = ['new', 'processed', 'skipped', 'error'];
@@ -193,22 +198,64 @@ export class UnifiedInboxStore {
     });
   }
 
-  private reloadMessages(): void {
-    const filters = this.filters();
+  loadMore(): void {
+    if (!this.hasMore() || this.isLoadingMore() || this.loading()) {
+      return;
+    }
+
+    this.isLoadingMore.set(true);
+    const offset = this.messages().length;
+
     this.repository
-      .listMessages({
-        folder: filters.folder,
-        accountId: filters.accountId,
-        q: filters.search,
-        onlyInvoices: filters.onlyInvoices,
-        limit: 50,
-        offset: 0,
-      })
-      .pipe(catchError(() => of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 })))
+      .listMessages(this.messageListParams(offset))
+      .pipe(
+        catchError(() => of({ data: [] as UnifiedInboxMessage[], total: this.totalMessages(), limit: UnifiedInboxStore.PAGE_SIZE, offset })),
+        finalize(() => this.isLoadingMore.set(false)),
+      )
+      .subscribe((page) => {
+        const incoming = page.data ?? [];
+        if (incoming.length === 0) {
+          this.totalMessages.set(this.messages().length);
+          return;
+        }
+
+        let appended = 0;
+        this.messages.update((current) => {
+          const seen = new Set(current.map((message) => message.id));
+          const unique = incoming.filter((message) => !seen.has(message.id));
+          appended = unique.length;
+          return [...current, ...unique];
+        });
+
+        if (appended === 0) {
+          this.totalMessages.set(this.messages().length);
+          return;
+        }
+
+        this.totalMessages.set(page.total ?? this.totalMessages());
+      });
+  }
+
+  private reloadMessages(): void {
+    this.repository
+      .listMessages(this.messageListParams())
+      .pipe(catchError(() => of({ data: [] as UnifiedInboxMessage[], total: 0, limit: UnifiedInboxStore.PAGE_SIZE, offset: 0 })))
       .subscribe((page) => {
         this.messages.set(page.data ?? []);
         this.totalMessages.set(page.total ?? 0);
       });
+  }
+
+  private messageListParams(offset = 0, limit = UnifiedInboxStore.PAGE_SIZE) {
+    const filters = this.filters();
+    return {
+      folder: filters.folder,
+      accountId: filters.accountId,
+      q: filters.search,
+      onlyInvoices: filters.onlyInvoices,
+      limit,
+      offset,
+    };
   }
 
   clearError(): void {
@@ -286,14 +333,14 @@ export class UnifiedInboxStore {
     this.error.set(null);
 
     forkJoin({
-      messages: this.repository.listMessages({ folder: this.filters().folder, limit: 50, offset: 0 }).pipe(
-        catchError((err) => {
+      messages: this.repository.listMessages(this.messageListParams()).pipe(
+        catchError(() => {
           this.error.set('No se pudieron cargar los mensajes. Por favor, inténtelo de nuevo más tarde.');
-          return of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 });
+          return of({ data: [] as UnifiedInboxMessage[], total: 0, limit: UnifiedInboxStore.PAGE_SIZE, offset: 0 });
         }),
       ),
       accounts: this.repository.listAccountHealth().pipe(
-        catchError((err) => {
+        catchError(() => {
           this.error.set('No se pudieron cargar las cuentas conectadas. Por favor, inténtelo de nuevo más tarde.');
           return of([] as AccountHealthSummary[]);
         }),
@@ -333,25 +380,36 @@ export class UnifiedInboxStore {
         this.accountHealth.set(this.mergeAccountHealthWithSyncStatus(accounts, syncStatus));
       });
 
-    // Poll messages
+    // Poll first page only and merge so pages loaded via infinite scroll are kept.
     this.messagePollSub = interval(30000)
       .pipe(
         switchMap(() =>
-          this.repository
-            .listMessages({ folder: this.filters().folder, accountId: this.filters().accountId, q: this.filters().search, onlyInvoices: this.filters().onlyInvoices, limit: 50, offset: 0 })
-            .pipe(
-              catchError(() => {
-                return of({ data: [] as UnifiedInboxMessage[], total: 0, limit: 50, offset: 0 });
-              }),
-            ),
+          this.repository.listMessages(this.messageListParams()).pipe(
+            catchError(() => {
+              return of({ data: [] as UnifiedInboxMessage[], total: this.totalMessages(), limit: UnifiedInboxStore.PAGE_SIZE, offset: 0 });
+            }),
+          ),
         ),
       )
       .subscribe((page) => {
-        if ((page.data ?? []).length > 0 || page.total === 0) {
-          this.messages.set(page.data ?? []);
-          this.totalMessages.set(page.total ?? 0);
+        const fresh = page.data ?? [];
+        if (fresh.length === 0 && page.total !== 0) {
+          return;
         }
+
+        this.totalMessages.set(page.total ?? 0);
+        this.messages.update((current) => this.mergePolledMessages(current, fresh));
       });
+  }
+
+  private mergePolledMessages(current: UnifiedInboxMessage[], fresh: UnifiedInboxMessage[]): UnifiedInboxMessage[] {
+    if (current.length === 0 || current.length <= UnifiedInboxStore.PAGE_SIZE) {
+      return fresh;
+    }
+
+    const freshIds = new Set(fresh.map((message) => message.id));
+    const olderPages = current.filter((message) => !freshIds.has(message.id));
+    return [...fresh, ...olderPages];
   }
 
   private mergeAccountHealthWithSyncStatus(accounts: AccountHealthSummary[], syncStatus: AccountSyncStatus[]): AccountHealthSummary[] {

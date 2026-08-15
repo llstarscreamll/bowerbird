@@ -132,7 +132,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
           </div>
         </div>
 
-        <div class="relative flex-1 overflow-y-auto">
+        <div class="relative flex-1 overflow-y-auto" (scroll)="onMessageListScroll($event)">
           @if (error()) {
             <div class="sticky top-0 z-10 bg-background/80 p-4 backdrop-blur-sm">
               <hlm-alert variant="destructive">
@@ -247,6 +247,13 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                 </li>
               }
             </ul>
+
+            @if (isLoadingMore()) {
+              <div class="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                <hlm-spinner class="size-4" />
+                Cargando más...
+              </div>
+            }
           }
         </div>
       </aside>
@@ -407,6 +414,7 @@ export class MasterPage implements OnInit, OnDestroy {
   readonly canSend = this.entitlements.hasMailSend;
 
   readonly loading = this.store.loading;
+  readonly isLoadingMore = this.store.isLoadingMore;
   readonly error = this.store.error;
   readonly detailError = this.store.detailError;
   readonly loadingMessageId = this.store.loadingMessageId;
@@ -644,6 +652,18 @@ export class MasterPage implements OnInit, OnDestroy {
     }
 
     return this.accountHealth()[0]?.id ?? '';
+  }
+
+  onMessageListScroll(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const thresholdPx = 160;
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - thresholdPx) {
+      this.store.loadMore();
+    }
   }
 
   onMessageKeydown(event: KeyboardEvent, message: UnifiedInboxMessage): void {
