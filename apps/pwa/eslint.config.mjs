@@ -5,14 +5,15 @@ import angular from 'angular-eslint';
 /**
  * PWA ESLint config.
  *
- * Page components use the Angular type-suffix convention:
- *   *.page.ts / *.page.html / *.page.css  (e.g. master.page.html)
- * with class names ending in `Page`.
+ * Page convention (per feature module):
+ *   presentation/pages/<role>/<role>.page.ts|.html|.css
+ *   e.g. master.page.ts, detail.page.ts, create.page.ts, edit.page.ts
+ *   class suffix: Page
  *
- * Regular UI components keep the `*.component.*` + `Component` suffix.
+ * Reusable UI keeps *.component.* + Component suffix.
  *
  * Generate a new page with:
- *   ng g c path/to/name --type=page
+ *   ng g c path/to/<role> --type=page
  */
 export default tseslint.config(
   {
@@ -23,7 +24,8 @@ export default tseslint.config(
     extends: [...angular.configs.tsRecommended],
     processor: angular.processInlineTemplates,
     rules: {
-      // Allow both routed pages (`LoginPage`) and reusable components (`FileUploadComponent`).
+      // Pages: pages/<role>/<role>.page.ts with class <Role>Page (master, detail, login, …).
+      // Components: *.component.ts with class *Component.
       '@angular-eslint/component-class-suffix': [
         'error',
         {

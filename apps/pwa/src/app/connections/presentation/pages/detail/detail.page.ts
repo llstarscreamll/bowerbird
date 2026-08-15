@@ -17,7 +17,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 @Component({
-  selector: 'app-connection-details',
+  selector: 'app-connections-detail',
   standalone: true,
   imports: [
     CommonModule,
@@ -187,7 +187,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     </hlm-alert-dialog>
   `,
 })
-export class ConnectionDetailsPage implements OnInit {
+export class DetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly location = inject(Location);

@@ -20,7 +20,7 @@ import { resolveConnectionStatus } from '../../../../core/domain/connection-stat
 import { SecureEmailBodyComponent } from '../../components/secure-email-body/secure-email-body.component';
 
 @Component({
-  selector: 'app-master-inbox',
+  selector: 'app-inbox-master',
   standalone: true,
   imports: [
     FormsModule,
@@ -399,7 +399,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
     </div>
   `,
 })
-export class MasterInboxPage implements OnInit, OnDestroy {
+export class MasterPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly store = inject(UnifiedInboxStore);

@@ -10,7 +10,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 
 @Component({
-  selector: 'app-invoice-detail',
+  selector: 'app-invoices-detail',
   standalone: true,
   imports: [CommonModule, CurrencyPipe, DatePipe, RouterLink, NgIcon, HlmCardImports, HlmButtonImports, HlmSpinnerImports, HlmTableImports, HlmSeparatorImports],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto bg-muted/20 p-4 sm:p-8' },
@@ -140,7 +140,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     </div>
   `,
 })
-export class InvoiceDetailPage implements OnInit {
+export class DetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(InvoiceDetailsStore);
 

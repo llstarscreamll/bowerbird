@@ -20,7 +20,7 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 @Component({
-  selector: 'app-connections-list',
+  selector: 'app-connections-master',
   standalone: true,
   imports: [
     CommonModule,
@@ -179,7 +179,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
     </hlm-alert-dialog>
   `,
 })
-export class ConnectionsListPage implements OnInit {
+export class MasterPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   readonly store = inject(ConnectionsStore);
   private readonly tenantContext = inject(TenantContextStore);

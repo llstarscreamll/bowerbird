@@ -13,7 +13,7 @@ import { EntitlementGrant, FeatureKeys, PlatformTenant, TenantEntitlementsDetail
 import { ToastService } from '../../../../core/services/toast.service';
 
 @Component({
-  selector: 'app-platform-operators',
+  selector: 'app-platform',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, HlmButtonImports, HlmCardImports, HlmCheckboxImports, HlmInputImports, HlmLabelImports, HlmSpinnerImports],
   template: `
@@ -115,7 +115,7 @@ import { ToastService } from '../../../../core/services/toast.service';
     </div>
   `,
 })
-export class PlatformOperatorsPage implements OnInit {
+export class PlatformPage implements OnInit {
   private readonly repo = inject(EntitlementsHttpRepository);
   private readonly toast = inject(ToastService);
 

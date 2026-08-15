@@ -17,7 +17,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 
 @Component({
-  selector: 'app-master-invoices',
+  selector: 'app-invoices-master',
   standalone: true,
   imports: [
     CommonModule,
@@ -167,7 +167,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     </hlm-dialog>
   `,
 })
-export class MasterInvoicesPage implements OnInit {
+export class MasterPage implements OnInit {
   private readonly importStore = inject(InvoiceHistoryImportStore);
   private readonly invoicesStore = inject(InvoicesStore);
   private readonly formBuilder = inject(FormBuilder);
