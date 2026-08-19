@@ -31,3 +31,4 @@ secrets.*.json
 .DS_Store
 .vscode/
 .idea/
+bowerbird-local-ca.crt

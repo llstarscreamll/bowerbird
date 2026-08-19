@@ -56,22 +56,13 @@ Add to `/etc/hosts`:
 127.0.0.1   media.bowerbird.dev
 ```
 
-Caddy (Compose) proxies:
+Caddy (Compose) uses `network_mode: host` and proxies:
 
 - `app.bowerbird.dev` → Angular `:4200`
 - `api.bowerbird.dev` → Go API `:8080`
 - `media.bowerbird.dev` → LocalStack S3 `:4566`
 
-### Linux + UFW
-
-If Chrome gets **502** and Caddy logs `dial tcp …:4200: i/o timeout`, UFW is blocking Docker → host. Allow the compose bridge range to the host apps:
-
-```bash
-sudo ufw allow from 172.16.0.0/12 to any port 4200 proto tcp comment 'bowerbird pwa'
-sudo ufw allow from 172.16.0.0/12 to any port 8080 proto tcp comment 'bowerbird api'
-sudo ufw allow from 172.16.0.0/12 to any port 4566 proto tcp comment 'bowerbird localstack'
-sudo ufw reload
-```
+Host networking is required on Linux so Caddy can reach those host ports. A bridged `host.docker.internal` hop is dropped by UFW/nftables and the browser shows **502**.
 
 ### Trust the local CA
 

@@ -55,15 +55,14 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: bowerbird-caddy
-    ports:
-      - '80:80'
-      - '443:443'
+    # Share the host network so Caddy can reach Angular/API on localhost.
+    # Bridged host.docker.internal (172.17.0.1) is dropped by Linux firewalls
+    # (UFW) and surfaces as HTTP 502 / "dial tcp …:4200: i/o timeout".
+    network_mode: host
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
     healthcheck:
       test: ['CMD-SHELL', 'nc -z 127.0.0.1 80 && nc -z 127.0.0.1 443']
       interval: 5s
