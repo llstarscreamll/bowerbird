@@ -82,6 +82,32 @@ docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./bowerbird-local-ca.crt
 ```
 
+**Arch Linux:**
+
+```bash
+docker cp bowerbird-caddy:/data/caddy/pki/authorities/local/root.crt ./bowerbird-local-ca.crt
+sudo trust anchor --store ./bowerbird-local-ca.crt
+```
+
+Equivalent with the CA bundle files:
+
+```bash
+sudo cp ./bowerbird-local-ca.crt /etc/ca-certificates/trust-source/anchors/
+sudo update-ca-trust
+```
+
+**Chromium / Chrome on Arch:** also import into the NSS DB (Chromium does not always use the system store):
+
+```bash
+sudo pacman -S --needed nss
+mkdir -p ~/.pki/nssdb
+certutil -d sql:$HOME/.pki/nssdb -N --empty-password || true
+certutil -d sql:$HOME/.pki/nssdb -D -n "Caddy Local Authority - ECC Root" || true
+certutil -d sql:$HOME/.pki/nssdb -A -n "Caddy Local Authority - ECC Root" -t "C,," -i ./bowerbird-local-ca.crt
+```
+
+Restart the browser after importing.
+
 **Fedora:**
 
 ```bash
