@@ -6,11 +6,14 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	catalogModule "github.com/bowerbird/internal/catalog"
 	connectionsModule "github.com/bowerbird/internal/connections"
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
 	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
+	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
+	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	platformCrypto "github.com/bowerbird/internal/platform/crypto"
 	platformJobs "github.com/bowerbird/internal/platform/jobs"
@@ -35,6 +38,9 @@ func init() {
 	secretsApp := secretsModule.NewApplication(platformModule.TenantRegistry, secretsCipher)
 	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
 
+	partiesApp := partiesModule.NewApplication(platformModule.TenantRegistry)
+	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry)
+
 	invoicesApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
@@ -42,6 +48,8 @@ func init() {
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
 		documentPasswordResolver,
+		invoiceLinking.NewPartyResolverAdapter(partiesApp),
+		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 	)
 
 	processorCommand := invoicesJobs.NewInvoiceExtractionRequestedProcessor(

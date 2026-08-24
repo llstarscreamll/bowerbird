@@ -95,6 +95,26 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
                     <span>Facturas</span>
                   </a>
                 </li>
+                <li hlmSidebarMenuItem>
+                  <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'parties']" routerLinkActive #partiesLink="routerLinkActive" [isActive]="partiesLink.isActive" [tooltip]="'Contrapartes'">
+                    <ng-icon name="lucideBuilding2" />
+                    <span>Contrapartes</span>
+                  </a>
+                </li>
+                <li hlmSidebarMenuItem>
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', tenantId(), 'catalog']"
+                    routerLinkActive
+                    #catalogLink="routerLinkActive"
+                    [routerLinkActiveOptions]="{ exact: false }"
+                    [isActive]="catalogLink.isActive"
+                    [tooltip]="'Catálogo'"
+                  >
+                    <ng-icon name="lucidePackage" />
+                    <span>Catálogo</span>
+                  </a>
+                </li>
               }
               @if (entitlements.showConnections()) {
                 <li hlmSidebarMenuItem>

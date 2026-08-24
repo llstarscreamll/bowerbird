@@ -62,6 +62,18 @@ export const routes: Routes = [
         path: 'secrets',
         loadComponent: () => import('./secrets/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },
+      {
+        path: 'parties',
+        loadComponent: () => import('./parties/presentation/pages/master/master.page').then((c) => c.MasterPage),
+      },
+      {
+        path: 'catalog',
+        loadComponent: () => import('./catalog/presentation/pages/master/master.page').then((c) => c.MasterPage),
+      },
+      {
+        path: 'catalog/review',
+        loadComponent: () => import('./catalog/presentation/pages/review/review.page').then((c) => c.ReviewPage),
+      },
     ],
   },
 ];

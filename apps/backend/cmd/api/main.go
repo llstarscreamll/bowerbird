@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	catalogModule "github.com/bowerbird/internal/catalog"
 	connectionsModule "github.com/bowerbird/internal/connections"
 	connectionsApp "github.com/bowerbird/internal/connections/application"
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
@@ -20,7 +21,9 @@ import (
 	invoicesModule "github.com/bowerbird/internal/invoices"
 	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
+	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	organizationModule "github.com/bowerbird/internal/organization"
+	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	"github.com/bowerbird/internal/platform/auth"
 	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
@@ -132,6 +135,11 @@ func main() {
 	secretsModule.NewHTTPHandler(mux, secretsApp, rbacService, authMiddleware, cfg)
 	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
 
+	partiesApp := partiesModule.NewApplication(tenantsDbRegistry)
+	partiesModule.NewHTTPHandler(mux, partiesApp, authMiddleware, cfg)
+	catalogApp := catalogModule.NewApplication(tenantsDbRegistry)
+	catalogModule.NewHTTPHandler(mux, catalogApp, authMiddleware, cfg)
+
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
@@ -139,6 +147,8 @@ func main() {
 		platformModule.FileStore,
 		tenantsDbRegistry,
 		documentPasswordResolver,
+		invoiceLinking.NewPartyResolverAdapter(partiesApp),
+		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

@@ -35,6 +35,8 @@ func init() {
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
 		nil,
+		nil,
+		nil,
 	)
 	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
 
