@@ -6,6 +6,7 @@ export interface InvoiceSummary {
   invoice_number: string;
   issuer_name: string;
   issuer_tax_id: string;
+  issuer_party_id?: string | null;
   receiver_name: string;
   receiver_tax_id: string;
   currency_code: string;
@@ -16,6 +17,7 @@ export interface InvoiceSummary {
   tax_total: number;
   grand_total: number;
   extraction_source: string;
+  linking_status?: string;
   created_at: string;
 }
 
@@ -35,6 +37,11 @@ export interface InvoiceLine {
   unit_price: number;
   line_tax_total: number;
   line_total: number;
+  item_id?: string | null;
+  link_status?: string;
+  link_method?: string | null;
+  link_locked?: boolean;
+  suggestions?: { item_id: string; score: number; reason: string }[];
 }
 
 export interface InvoiceDetails extends InvoiceSummary {

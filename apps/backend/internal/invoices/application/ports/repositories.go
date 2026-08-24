@@ -8,6 +8,16 @@ import (
 
 type InvoiceWriteRepository interface {
 	PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error
+	ApplyCatalogLinking(ctx context.Context, headerID string, issuerPartyID *string, linkingStatus string, lines []LineLinkUpdate) error
+}
+
+type LineLinkUpdate struct {
+	LineID      string
+	ItemID      *string
+	LinkStatus  string
+	LinkMethod  string
+	LinkLocked  bool
+	Suggestions []byte
 }
 
 type InvoiceQueryRepository interface {
@@ -20,4 +30,32 @@ type InvoiceRepository interface {
 	InvoiceQueryRepository
 	ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error)
 	ExistsInvoiceByCUFE(ctx context.Context, cufe string) (bool, error)
+}
+
+// IssuerPartyResolver resolves or creates a party from invoice issuer fields.
+// Returns empty partyID when tax id is missing.
+type IssuerPartyResolver interface {
+	ResolveIssuerPartyID(ctx context.Context, taxID, name string) (partyID string, err error)
+}
+
+type CatalogLineResolveInput struct {
+	LineID         string
+	PartyID        string
+	ItemCode       string
+	Description    string
+	ExistingItemID string
+	ExistingLocked bool
+	ExistingStatus string
+	ExistingMethod string
+}
+
+type CatalogLineResolveResult struct {
+	ItemID      string
+	Status      string
+	Method      string
+	Suggestions []byte
+}
+
+type CatalogLineResolver interface {
+	ResolveLine(ctx context.Context, input CatalogLineResolveInput) (*CatalogLineResolveResult, error)
 }

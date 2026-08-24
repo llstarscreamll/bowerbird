@@ -32,6 +32,7 @@ func NewCreateInvoicesFromFilesCommand(
 	llmExtractor ports.InvoiceLLMExtractor,
 	repo ports.InvoiceRepository,
 	passwordResolver ports.DocumentPasswordResolver,
+	create *CreateInvoiceCommand,
 ) *CreateInvoicesFromFilesCommand {
 	if fileStore == nil {
 		panic("file store is required")
@@ -45,6 +46,9 @@ func NewCreateInvoicesFromFilesCommand(
 	if repo == nil {
 		panic("invoice repository is required")
 	}
+	if create == nil {
+		panic("create invoice command is required")
+	}
 
 	return &CreateInvoicesFromFilesCommand{
 		fileStore:        fileStore,
@@ -52,7 +56,7 @@ func NewCreateInvoicesFromFilesCommand(
 		llmExtractor:     llmExtractor,
 		repo:             repo,
 		passwordResolver: passwordResolver,
-		create:           NewCreateInvoiceCommand(repo),
+		create:           create,
 		logger:           slog.Default(),
 	}
 }

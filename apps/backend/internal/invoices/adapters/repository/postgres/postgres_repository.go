@@ -71,12 +71,14 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 			id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
 			due_date, payment_code, subtotal, tax_total, grand_total,
-			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at
+			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
+			issuer_party_id, linking_status
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10, $11,
 			$12, $13, $14, $15, $16,
-			$17, $18, $19, $20, $21
+			$17, $18, $19, $20, $21,
+			NULLIF($22, ''), COALESCE(NULLIF($23, ''), 'pending')
 		)
 	`,
 		header.ID,
@@ -100,6 +102,8 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 		headRaw,
 		header.CreatedAt,
 		header.UpdatedAt,
+		header.IssuerPartyID,
+		header.LinkingStatus,
 	); err != nil {
 		return fmt.Errorf("insert invoice header: %w", err)
 	}
@@ -109,16 +113,22 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 		if len(lineRaw) == 0 {
 			lineRaw = []byte("{}")
 		}
+		suggestions := line.Suggestions
+		if len(suggestions) == 0 {
+			suggestions = []byte("[]")
+		}
 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO invoice_lines (
 				id, invoice_header_id, line_number, item_code, description,
 				quantity, unit_price, line_tax_total, line_total,
-				raw_data, created_at, updated_at
+				raw_data, created_at, updated_at,
+				item_id, link_status, link_method, link_locked, suggestions
 			) VALUES (
 				$1, $2, $3, $4, $5,
 				$6, $7, $8, $9,
-				$10, $11, $12
+				$10, $11, $12,
+				NULLIF($13, ''), COALESCE(NULLIF($14, ''), 'unmatched'), NULLIF($15, ''), $16, $17::jsonb
 			)
 		`,
 			line.ID,
@@ -133,6 +143,11 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 			lineRaw,
 			line.CreatedAt,
 			line.UpdatedAt,
+			line.ItemID,
+			line.LinkStatus,
+			line.LinkMethod,
+			line.LinkLocked,
+			suggestions,
 		); err != nil {
 			return fmt.Errorf("insert invoice line: %w", err)
 		}
@@ -142,6 +157,52 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 		return fmt.Errorf("commit invoice transaction: %w", err)
 	}
 
+	return nil
+}
+
+func (r *PostgresRepository) ApplyCatalogLinking(
+	ctx context.Context,
+	headerID string,
+	issuerPartyID *string,
+	linkingStatus string,
+	lines []ports.LineLinkUpdate,
+) error {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin linking transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE invoice_headers
+		SET issuer_party_id = $2, linking_status = $3, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`, headerID, issuerPartyID, linkingStatus); err != nil {
+		return fmt.Errorf("update invoice header linking: %w", err)
+	}
+
+	for _, line := range lines {
+		suggestions := line.Suggestions
+		if len(suggestions) == 0 {
+			suggestions = []byte("[]")
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE invoice_lines
+			SET item_id = $2, link_status = $3, link_method = NULLIF($4, ''),
+			    link_locked = $5, suggestions = $6::jsonb, updated_at = CURRENT_TIMESTAMP
+			WHERE id = $1
+		`, line.LineID, line.ItemID, line.LinkStatus, line.LinkMethod, line.LinkLocked, suggestions); err != nil {
+			return fmt.Errorf("update invoice line linking: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit linking transaction: %w", err)
+	}
 	return nil
 }
 
@@ -158,7 +219,8 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 		SELECT id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
 			due_date, payment_code, subtotal, tax_total, grand_total,
-			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at
+			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
+			COALESCE(issuer_party_id, ''), COALESCE(linking_status, 'pending')
 		FROM invoice_headers
 		WHERE id = $1
 	`, id).Scan(
@@ -167,6 +229,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 		&header.CurrencyCode, &header.IssueDate, &header.DueDate, &header.PaymentCode,
 		&header.Subtotal, &header.TaxTotal, &header.GrandTotal, &header.DocumentRefS3Key,
 		&header.ExtractionSource, &header.RawData, &header.CreatedAt, &header.UpdatedAt,
+		&header.IssuerPartyID, &header.LinkingStatus,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -177,7 +240,9 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 
 	rows, err := pool.Query(ctx, `
 		SELECT id, invoice_header_id, line_number, item_code, description,
-			quantity, unit_price, line_tax_total, line_total, raw_data, created_at, updated_at
+			quantity, unit_price, line_tax_total, line_total, raw_data, created_at, updated_at,
+			COALESCE(item_id, ''), COALESCE(link_status, 'unmatched'), COALESCE(link_method, ''),
+			COALESCE(link_locked, false), COALESCE(suggestions, '[]'::jsonb)
 		FROM invoice_lines
 		WHERE invoice_header_id = $1
 		ORDER BY line_number
@@ -194,6 +259,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 			&line.ID, &line.InvoiceHeaderID, &line.LineNumber, &line.ItemCode,
 			&line.Description, &line.Quantity, &line.UnitPrice, &line.LineTaxTotal,
 			&line.LineTotal, &line.RawData, &line.CreatedAt, &line.UpdatedAt,
+			&line.ItemID, &line.LinkStatus, &line.LinkMethod, &line.LinkLocked, &line.Suggestions,
 		); err != nil {
 			return nil, nil, fmt.Errorf("scan invoice line: %w", err)
 		}
@@ -216,7 +282,8 @@ func (r *PostgresRepository) ListInvoices(ctx context.Context, limit int, cursor
 		SELECT id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
 			due_date, payment_code, subtotal, tax_total, grand_total,
-			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at
+			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
+			COALESCE(issuer_party_id, ''), COALESCE(linking_status, 'pending')
 		FROM invoice_headers
 	`
 	args := []any{}
@@ -245,6 +312,7 @@ func (r *PostgresRepository) ListInvoices(ctx context.Context, limit int, cursor
 			&header.CurrencyCode, &header.IssueDate, &header.DueDate, &header.PaymentCode,
 			&header.Subtotal, &header.TaxTotal, &header.GrandTotal, &header.DocumentRefS3Key,
 			&header.ExtractionSource, &header.RawData, &header.CreatedAt, &header.UpdatedAt,
+			&header.IssuerPartyID, &header.LinkingStatus,
 		); err != nil {
 			return nil, false, fmt.Errorf("scan invoice header: %w", err)
 		}

@@ -101,14 +101,27 @@ type CreateInvoiceResult struct {
 }
 
 type CreateInvoiceCommand struct {
-	repo   ports.InvoiceWriteRepository
-	logger *slog.Logger
-	now    func() time.Time
-	newID  func() string
+	repo          ports.InvoiceWriteRepository
+	partyResolver ports.IssuerPartyResolver
+	lineResolver  ports.CatalogLineResolver
+	logger        *slog.Logger
+	now           func() time.Time
+	newID         func() string
 }
 
-func NewCreateInvoiceCommand(repo ports.InvoiceWriteRepository) *CreateInvoiceCommand {
-	return &CreateInvoiceCommand{repo: repo, logger: slog.Default(), now: time.Now, newID: id.NewULID}
+func NewCreateInvoiceCommand(
+	repo ports.InvoiceWriteRepository,
+	partyResolver ports.IssuerPartyResolver,
+	lineResolver ports.CatalogLineResolver,
+) *CreateInvoiceCommand {
+	return &CreateInvoiceCommand{
+		repo:          repo,
+		partyResolver: partyResolver,
+		lineResolver:  lineResolver,
+		logger:        slog.Default(),
+		now:           time.Now,
+		newID:         id.NewULID,
+	}
 }
 
 func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoiceInput) (*CreateInvoiceResult, error) {
@@ -184,7 +197,83 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 	}
 	cmd.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
 
+	if err := cmd.applyLinking(ctx, header, lines); err != nil {
+		cmd.logger.Error("invoice catalog linking failed after persist", "header_id", headerID, "error", err)
+		// Invoice financial write is kept; applyLinking persists partial results + failed/pending status when possible.
+	}
+
 	return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil
+}
+
+func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
+	if cmd.partyResolver == nil && cmd.lineResolver == nil {
+		return nil
+	}
+
+	var partyID string
+	var resolveErr error
+	if cmd.partyResolver != nil {
+		resolved, err := cmd.partyResolver.ResolveIssuerPartyID(ctx, header.IssuerTaxID, header.IssuerName)
+		if err != nil {
+			resolveErr = err
+		} else {
+			partyID = resolved
+		}
+	}
+
+	updates := make([]ports.LineLinkUpdate, 0, len(lines))
+	if resolveErr == nil && cmd.lineResolver != nil {
+		for _, line := range lines {
+			result, err := cmd.lineResolver.ResolveLine(ctx, ports.CatalogLineResolveInput{
+				LineID:      line.ID,
+				PartyID:     partyID,
+				ItemCode:    line.ItemCode,
+				Description: line.Description,
+			})
+			if err != nil {
+				resolveErr = err
+				break
+			}
+			var itemID *string
+			if result.ItemID != "" {
+				idCopy := result.ItemID
+				itemID = &idCopy
+			}
+			suggestions := normalizeSuggestionsJSON(result.Suggestions)
+			updates = append(updates, ports.LineLinkUpdate{
+				LineID:      line.ID,
+				ItemID:      itemID,
+				LinkStatus:  result.Status,
+				LinkMethod:  result.Method,
+				Suggestions: suggestions,
+			})
+		}
+	}
+
+	var partyPtr *string
+	if partyID != "" {
+		partyPtr = &partyID
+	}
+	linkingStatus := "linked"
+	if resolveErr != nil {
+		linkingStatus = "failed"
+	}
+
+	if err := cmd.repo.ApplyCatalogLinking(ctx, header.ID, partyPtr, linkingStatus, updates); err != nil {
+		cmd.logger.Error("failed to persist invoice catalog linking state", "header_id", header.ID, "error", err)
+		if resolveErr != nil {
+			return fmt.Errorf("resolve linking: %w; also failed to persist linking state: %v", resolveErr, err)
+		}
+		return fmt.Errorf("persist linking state: %w", err)
+	}
+	return resolveErr
+}
+
+func normalizeSuggestionsJSON(raw []byte) []byte {
+	if len(raw) == 0 || string(raw) == "null" {
+		return []byte("[]")
+	}
+	return raw
 }
 
 func normalizeInvoiceRawData(raw []byte) ([]byte, error) {

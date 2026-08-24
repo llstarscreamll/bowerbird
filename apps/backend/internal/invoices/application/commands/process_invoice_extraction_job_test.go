@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
 	"github.com/bowerbird/internal/invoices/domain"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -38,6 +39,10 @@ func (r *fakeInvoiceRepo) ListInvoices(ctx context.Context, limit int, query str
 
 func (r *fakeInvoiceRepo) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	r.persistedHeaders = append(r.persistedHeaders, header)
+	return nil
+}
+
+func (r *fakeInvoiceRepo) ApplyCatalogLinking(ctx context.Context, headerID string, issuerPartyID *string, linkingStatus string, lines []ports.LineLinkUpdate) error {
 	return nil
 }
 
@@ -108,7 +113,7 @@ func TestExtractSkipsWhenMessageAlreadyProcessed(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{}
 	repo := &fakeInvoiceRepo{messageProcessed: true}
 
-	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "inbox-message",
@@ -138,7 +143,7 @@ func TestExtractProcessesZIPPDFAndPersistsInvoice(t *testing.T) {
 	}}
 	repo := &fakeInvoiceRepo{}
 
-	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	uc.create.newID = func() string { return "id_1" }
 	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -159,7 +164,7 @@ func TestExtractSkipsWhenZIPHasNoSupportedFiles(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{}
 	repo := &fakeInvoiceRepo{}
 
-	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -187,7 +192,7 @@ func TestExtractSkipsWhenCUFEAlreadyExists(t *testing.T) {
 	}}
 	repo := &fakeInvoiceRepo{cufeExists: true}
 
-	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	uc := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := uc.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",

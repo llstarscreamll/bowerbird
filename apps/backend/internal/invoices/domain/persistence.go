@@ -12,6 +12,7 @@ type InvoiceHeaderRecord struct {
 	InvoiceNumber    string
 	IssuerName       string
 	IssuerTaxID      string
+	IssuerPartyID    string
 	ReceiverName     string
 	ReceiverTaxID    string
 	CurrencyCode     string
@@ -23,6 +24,7 @@ type InvoiceHeaderRecord struct {
 	GrandTotal       float64
 	DocumentRefS3Key string
 	ExtractionSource string
+	LinkingStatus    string
 	RawData          []byte
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -38,6 +40,11 @@ type InvoiceLineRecord struct {
 	UnitPrice       float64
 	LineTaxTotal    float64
 	LineTotal       float64
+	ItemID          string
+	LinkStatus      string
+	LinkMethod      string
+	LinkLocked      bool
+	Suggestions     []byte
 	RawData         []byte
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

@@ -6,6 +6,7 @@ import (
 
 	awsEvents "github.com/aws/aws-lambda-go/events"
 	invoicingCommands "github.com/bowerbird/internal/invoices/application/commands"
+	invoicingPorts "github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
 	"github.com/bowerbird/internal/invoices/domain"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -60,6 +61,10 @@ func (r *processorRepo) PersistInvoiceAtomic(ctx context.Context, header domain.
 	return nil
 }
 
+func (r *processorRepo) ApplyCatalogLinking(ctx context.Context, headerID string, issuerPartyID *string, linkingStatus string, lines []invoicingPorts.LineLinkUpdate) error {
+	return nil
+}
+
 type processorXMLExtractor struct{}
 
 func (e *processorXMLExtractor) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument, error) {
@@ -81,7 +86,7 @@ func (e *processorLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []by
 }
 
 func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil)
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil, invoicingCommands.NewCreateInvoiceCommand(&processorRepo{}, nil, nil))
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
@@ -104,7 +109,7 @@ func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
 }
 
 func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil)
+	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil, invoicingCommands.NewCreateInvoiceCommand(&processorRepo{}, nil, nil))
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{

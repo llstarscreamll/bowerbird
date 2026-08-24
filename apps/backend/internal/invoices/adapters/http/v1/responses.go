@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/bowerbird/internal/invoices/application/commands"
@@ -58,6 +59,7 @@ type invoiceSummaryAttributes struct {
 	InvoiceNumber    string  `json:"invoice_number"`
 	IssuerName       string  `json:"issuer_name"`
 	IssuerTaxID      string  `json:"issuer_tax_id"`
+	IssuerPartyID    *string `json:"issuer_party_id"`
 	ReceiverName     string  `json:"receiver_name"`
 	ReceiverTaxID    string  `json:"receiver_tax_id"`
 	CurrencyCode     string  `json:"currency_code"`
@@ -68,10 +70,12 @@ type invoiceSummaryAttributes struct {
 	TaxTotal         float64 `json:"tax_total"`
 	GrandTotal       float64 `json:"grand_total"`
 	ExtractionSource string  `json:"extraction_source"`
+	LinkingStatus    string  `json:"linking_status"`
 	CreatedAt        string  `json:"created_at"`
 }
 
 type invoiceLineAttributes struct {
+	ID           string  `json:"id"`
 	LineNumber   int     `json:"line_number"`
 	ItemCode     string  `json:"item_code"`
 	Description  string  `json:"description"`
@@ -79,6 +83,11 @@ type invoiceLineAttributes struct {
 	UnitPrice    float64 `json:"unit_price"`
 	LineTaxTotal float64 `json:"line_tax_total"`
 	LineTotal    float64 `json:"line_total"`
+	ItemID       *string `json:"item_id"`
+	LinkStatus   string  `json:"link_status"`
+	LinkMethod   *string `json:"link_method"`
+	LinkLocked   bool    `json:"link_locked"`
+	Suggestions  any     `json:"suggestions"`
 }
 
 type invoiceDetailsAttributes struct {
@@ -102,6 +111,7 @@ func toInvoiceSummaryAttributes(header domain.InvoiceHeaderRecord) invoiceSummar
 		InvoiceNumber:    header.InvoiceNumber,
 		IssuerName:       header.IssuerName,
 		IssuerTaxID:      header.IssuerTaxID,
+		IssuerPartyID:    optionalString(header.IssuerPartyID),
 		ReceiverName:     header.ReceiverName,
 		ReceiverTaxID:    header.ReceiverTaxID,
 		CurrencyCode:     header.CurrencyCode,
@@ -112,8 +122,16 @@ func toInvoiceSummaryAttributes(header domain.InvoiceHeaderRecord) invoiceSummar
 		TaxTotal:         header.TaxTotal,
 		GrandTotal:       header.GrandTotal,
 		ExtractionSource: header.ExtractionSource,
+		LinkingStatus:    header.LinkingStatus,
 		CreatedAt:        header.CreatedAt.Format(time.RFC3339),
 	}
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func newInvoiceListResponse(result *queries.PaginatedInvoices) jsonApiCollectionResponse[invoiceSummaryAttributes] {
@@ -144,7 +162,12 @@ func newInvoiceListResponse(result *queries.PaginatedInvoices) jsonApiCollection
 func newInvoiceDetailsResponse(result *queries.InvoiceDetails) jsonApiResponse[invoiceDetailsAttributes] {
 	lines := make([]invoiceLineAttributes, 0, len(result.Lines))
 	for _, line := range result.Lines {
+		var suggestions any = []any{}
+		if len(line.Suggestions) > 0 {
+			_ = json.Unmarshal(line.Suggestions, &suggestions)
+		}
 		lines = append(lines, invoiceLineAttributes{
+			ID:           line.ID,
 			LineNumber:   line.LineNumber,
 			ItemCode:     line.ItemCode,
 			Description:  line.Description,
@@ -152,6 +175,11 @@ func newInvoiceDetailsResponse(result *queries.InvoiceDetails) jsonApiResponse[i
 			UnitPrice:    line.UnitPrice,
 			LineTaxTotal: line.LineTaxTotal,
 			LineTotal:    line.LineTotal,
+			ItemID:       optionalString(line.ItemID),
+			LinkStatus:   line.LinkStatus,
+			LinkMethod:   optionalString(line.LinkMethod),
+			LinkLocked:   line.LinkLocked,
+			Suggestions:  suggestions,
 		})
 	}
 

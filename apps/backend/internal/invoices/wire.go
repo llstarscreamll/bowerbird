@@ -28,6 +28,8 @@ func NewApplication(
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
 	passwordResolver ports.DocumentPasswordResolver,
+	partyResolver ports.IssuerPartyResolver,
+	lineResolver ports.CatalogLineResolver,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -57,6 +59,8 @@ func NewApplication(
 		panic(fmt.Sprintf("new Gemini invoice extractor failed: %v", err))
 	}
 
+	createInvoice := commands.NewCreateInvoiceCommand(invoiceRepository, partyResolver, lineResolver)
+
 	return &application.Application{
 		Commands: application.Commands{
 			CreateInvoicesFromInboxMessage:  commands.NewCreateInvoicesFromInboxMessageCommand(jobQueue),
@@ -67,8 +71,9 @@ func NewApplication(
 				llmExtractor,
 				invoiceRepository,
 				passwordResolver,
+				createInvoice,
 			),
-			CreateInvoice: commands.NewCreateInvoiceCommand(invoiceRepository),
+			CreateInvoice: createInvoice,
 		},
 		Queries: application.Queries{
 			GetInvoiceByID: queries.NewGetInvoiceByIDQuery(invoiceRepository),

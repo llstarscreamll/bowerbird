@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
 	"github.com/bowerbird/internal/invoices/domain"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -39,6 +40,10 @@ func (r *createFilesRepoStub) ListInvoices(ctx context.Context, limit int, query
 
 func (r *createFilesRepoStub) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	r.persistedHeaders = append(r.persistedHeaders, header)
+	return nil
+}
+
+func (r *createFilesRepoStub) ApplyCatalogLinking(ctx context.Context, headerID string, issuerPartyID *string, linkingStatus string, lines []ports.LineLinkUpdate) error {
 	return nil
 }
 
@@ -112,7 +117,7 @@ func TestCreateInvoicesFromFilesSkipsAlreadyProcessedSource(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{alreadyProcessed: true}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "inbox-message",
@@ -131,7 +136,7 @@ func TestCreateInvoicesFromFilesSkipsUnsupportedInputFiles(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -151,7 +156,7 @@ func TestCreateInvoicesFromFilesProcessesZipAndPersistsInvoice(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -176,7 +181,7 @@ func TestCreateInvoicesFromFilesNormalizesXMLRawDataToJSON(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -202,7 +207,7 @@ func TestCreateInvoicesFromFilesSkipsZipWithoutSupportedFiles(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -222,7 +227,7 @@ func TestCreateInvoicesFromFilesSkipsWhenCUFEAlreadyExists(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{cufeExists: true}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil)
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
