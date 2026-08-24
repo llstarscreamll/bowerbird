@@ -158,7 +158,11 @@ export class BowerbirdStack extends cdk.Stack {
       responseHeadersPolicyName: `${prefix}-spa-headers`,
       securityHeadersBehavior: {
         contentSecurityPolicy: {
-          contentSecurityPolicy: "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://" + apiDomain,
+          // SPA CSP via response headers (not index.html meta). No localhost / local HMR hosts.
+          contentSecurityPolicy:
+            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; connect-src 'self' https://" +
+            apiDomain +
+            "; frame-src 'self' blob:; form-action 'self'",
           override: true,
         },
         contentTypeOptions: { override: true },
