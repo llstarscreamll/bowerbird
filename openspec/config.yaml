@@ -9,6 +9,9 @@ context: |
     - Specs, tasks, proposals, and business context: Spanish.
     - Domain terms: ALWAYS refer to `docs/domain/GLOSSARY.md` to map Spanish business terms to their exact English counterparts for code. Colombian e-invoicing acronyms (DIAN, CUFE, UBL) stay as-is in both code and specs.
     - Prefer existing patterns over new abstractions.
+  Agent Output Style: Be EXTREMELY concise. Direct, brief, no conversational filler or yapping. Focus only on the requested code, actions, and essential explanations.
+  Git Commits: NEVER commit automatically unless explicitly requested. NEVER include co-authorship, assistance tags, or AI watermarks (e.g., "Assisted by...") in commit messages.
+  Documentation Style: When writing or updating documentation, specs, or proposals, do NOT omit important details. Present them comprehensively but clearly, structurally (using lists/tables), and concisely (no fluff).
 
 rules:
   proposal:

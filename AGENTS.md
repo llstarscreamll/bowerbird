@@ -1,5 +1,14 @@
 # AGENTS
 
+## Global Agent Rules & Output Style
+
+- **Extreme Conciseness**: Be direct and extremely brief in all your responses.
+- **No Conversational Filler**: Do not use preambles, postambles, or conversational phrases (e.g., "Here is the code," "I have finished," "Let me know").
+- **Action-Oriented**: Focus strictly on the requested actions, tool calls, and essential explanations.
+- **Output Style**: Zero yapping. Stop talking and just output the requested code, steps, or results.
+- **Git Commits**: NEVER commit automatically unless explicitly requested. NEVER include co-authorship, assistance tags, or AI watermarks (e.g., "Assisted by...", "Co-authored-by...") in commit messages.
+- **Documentation Style**: When writing or updating documentation, specs, or proposals, do NOT omit important details. Present them comprehensively but clearly, structurally (using lists/tables), and concisely (no fluff).
+
 ## Toolchain and workspace
 
 - Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
