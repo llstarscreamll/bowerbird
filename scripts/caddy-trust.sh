@@ -4,7 +4,8 @@ set -euo pipefail
 
 readonly CADDY_CONTAINER_NAME="bowerbird-caddy"
 readonly CADDY_CA_PATH_IN_CONTAINER="/data/caddy/pki/authorities/local/root.crt"
-readonly LINUX_SYSTEM_CA_TARGET="/etc/pki/ca-trust/source/anchors/bowerbird-caddy-local-ca.crt"
+readonly LINUX_SYSTEM_CA_TARGET_FEDORA="/etc/pki/ca-trust/source/anchors/bowerbird-caddy-local-ca.crt"
+readonly LINUX_SYSTEM_CA_TARGET_ARCH="/etc/ca-certificates/trust-source/anchors/bowerbird-caddy-local-ca.crt"
 readonly NICKNAME="Bowerbird Caddy Local CA"
 
 TMP_DIR=""
@@ -91,20 +92,31 @@ import_firefox_profiles() {
 install_linux_fedora() {
   local cert_file="$1"
 
-  [[ -f /etc/os-release ]] || die "Cannot detect Linux distribution (/etc/os-release missing)."
-  # shellcheck disable=SC1091
-  source /etc/os-release
-
-  if [[ "${ID:-}" != "fedora" && "${ID_LIKE:-}" != *"fedora"* && "${ID_LIKE:-}" != *"rhel"* ]]; then
-    die "This Linux flow currently supports Fedora-family systems only."
-  fi
-
   require_command sudo
   require_command update-ca-trust
 
   log "Installing Caddy root CA into Fedora system trust store"
-  sudo install -D -m 0644 "$cert_file" "$LINUX_SYSTEM_CA_TARGET"
+  sudo install -D -m 0644 "$cert_file" "$LINUX_SYSTEM_CA_TARGET_FEDORA"
   sudo update-ca-trust
+
+  install_nss_databases "$cert_file"
+}
+
+install_linux_arch() {
+  local cert_file="$1"
+
+  require_command sudo
+  require_command trust
+
+  log "Installing Caddy root CA into Arch Linux system trust store"
+  sudo install -D -m 0644 "$cert_file" "$LINUX_SYSTEM_CA_TARGET_ARCH"
+  sudo trust extract-compat
+
+  install_nss_databases "$cert_file"
+}
+
+install_nss_databases() {
+  local cert_file="$1"
 
   if command -v certutil >/dev/null 2>&1; then
     log "Installing certificate into NSS databases (Chrome/Chromium/Firefox)"
@@ -122,7 +134,7 @@ install_linux_fedora() {
     import_firefox_profiles "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox" "$cert_file"
   else
     warn "certutil is not installed; browser-specific trust steps were skipped."
-    warn "Install it with: sudo dnf install nss-tools"
+    warn "Install it with your package manager (e.g., sudo dnf install nss-tools or sudo pacman -S nss)"
   fi
 }
 
@@ -157,7 +169,18 @@ main() {
 
   case "$os" in
     Linux)
-      install_linux_fedora "$cert_file"
+      if [[ -f /etc/os-release ]]; then
+        source /etc/os-release
+        if [[ "${ID:-}" == "arch" || "${ID_LIKE:-}" == *"arch"* ]]; then
+          install_linux_arch "$cert_file"
+        elif [[ "${ID:-}" == "fedora" || "${ID_LIKE:-}" == *"fedora"* || "${ID_LIKE:-}" == *"rhel"* ]]; then
+          install_linux_fedora "$cert_file"
+        else
+          die "Unsupported Linux distribution. Please manually trust the certificate."
+        fi
+      else
+        die "Cannot detect Linux distribution (/etc/os-release missing)."
+      fi
       ;;
     Darwin)
       install_macos "$cert_file"
