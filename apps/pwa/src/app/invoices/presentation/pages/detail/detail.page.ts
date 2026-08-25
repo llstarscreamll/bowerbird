@@ -114,7 +114,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
               <h2 class="text-lg font-semibold tracking-tight">Líneas</h2>
               <p class="text-sm text-muted-foreground">Montos de la factura y vínculo opcional al catálogo de ítems.</p>
             </div>
-            <span class="text-sm text-muted-foreground">{{ inv.lines?.length || 0 }} línea(s)</span>
+            <span class="text-sm text-muted-foreground">{{ inv.lines.length || 0 }} línea(s)</span>
           </div>
 
           @if (!inv.lines || inv.lines.length === 0) {
