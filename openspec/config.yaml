@@ -11,7 +11,7 @@ context: |
     - Prefer existing patterns over new abstractions.
   Agent Output Style: Be EXTREMELY concise. Direct, brief, no conversational filler or yapping. Focus only on the requested code, actions, and essential explanations.
   Git Commits: NEVER commit automatically unless explicitly requested. NEVER include co-authorship, assistance tags, or AI watermarks (e.g., "Assisted by...") in commit messages.
-  Documentation Style: When writing or updating documentation, specs, or proposals, do NOT omit important details. Present them comprehensively but clearly, structurally (using lists/tables), and concisely (no fluff).
+  Documentation Style: When writing or updating documentation, specs, or proposals, do NOT omit important details. Present them comprehensively but clearly, structurally (using lists/tables), and concisely (no fluff). For technical documentation, you must use the `docs-writer` skill.
 
 rules:
   proposal:
