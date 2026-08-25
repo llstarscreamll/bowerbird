@@ -11,12 +11,7 @@ To configure your agent environment, you must install the following core skills:
 **Google Chrome Guidance:**
 
 ```bash
-# For Opencode:
-opencode skill add https://github.com/GoogleChrome/modern-web-guidance
-
-# For Cursor, Roo Code (Cline), or Windsurf, append the rules to your project config:
-curl -sL https://raw.githubusercontent.com/GoogleChrome/modern-web-guidance/main/guidance.md >> .cursorrules
-# (replace .cursorrules with .clinerules or .windsurfrules as needed)
+npx skills add GoogleChrome/modern-web-guidance
 ```
 
 **TLC Agent Skills (Tech Leads Club):**
