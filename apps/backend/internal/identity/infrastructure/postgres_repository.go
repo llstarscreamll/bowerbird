@@ -115,7 +115,7 @@ func (r *PostgresRepository) CreateUserIdentity(ctx context.Context, identity *d
 
 func (r *PostgresRepository) FindTenantMemberships(ctx context.Context, userID string) ([]*domain.TenantMembership, error) {
 	query := `
-		SELECT m.user_id, m.tenant_id, t.organization_name, m.role, m.created_at, m.deleted_at 
+		SELECT m.user_id, m.tenant_id, t.tenant_name, m.role, m.created_at, m.deleted_at 
 		FROM tenant_memberships m
 		JOIN tenants t ON m.tenant_id = t.id
 		WHERE m.user_id = $1 AND m.deleted_at IS NULL AND t.status = 'active'

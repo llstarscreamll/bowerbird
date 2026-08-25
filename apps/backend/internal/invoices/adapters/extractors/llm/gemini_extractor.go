@@ -207,10 +207,10 @@ func (e *GeminiExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (*
 	if strings.TrimSpace(invoice.CUFE) == "" {
 		return nil, domain.ErrMissingCUFE
 	}
-	if strings.TrimSpace(invoice.Issuer.Name) == "" || strings.TrimSpace(invoice.Issuer.CompanyID) == "" {
+	if strings.TrimSpace(invoice.Issuer.Name) == "" || strings.TrimSpace(invoice.Issuer.TaxID) == "" {
 		return nil, domain.ErrMissingIssuer
 	}
-	if strings.TrimSpace(invoice.Receiver.Name) == "" || strings.TrimSpace(invoice.Receiver.CompanyID) == "" {
+	if strings.TrimSpace(invoice.Receiver.Name) == "" || strings.TrimSpace(invoice.Receiver.TaxID) == "" {
 		return nil, domain.ErrMissingReceiver
 	}
 	if len(invoice.Lines) == 0 {
@@ -380,12 +380,12 @@ func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 		CUFE:             out.CUFE,
 		PaymentMeansCode: out.PaymentMeansCode,
 		Issuer: domain.Party{
-			Name:      out.Issuer.Name,
-			CompanyID: out.Issuer.CompanyID,
+			Name:  out.Issuer.Name,
+			TaxID: out.Issuer.TaxID,
 		},
 		Receiver: domain.Party{
-			Name:      out.Receiver.Name,
-			CompanyID: out.Receiver.CompanyID,
+			Name:  out.Receiver.Name,
+			TaxID: out.Receiver.TaxID,
 		},
 		TaxTotals:     taxTotals,
 		LineExtension: out.LineExtension,
@@ -465,12 +465,12 @@ type llmInvoiceOutput struct {
 	CUFE             string `json:"cufe"`
 	PaymentMeansCode string `json:"payment_means_code"`
 	Issuer           struct {
-		Name      string `json:"name"`
-		CompanyID string `json:"company_id"`
+		Name  string `json:"name"`
+		TaxID string `json:"tax_id"`
 	} `json:"issuer"`
 	Receiver struct {
-		Name      string `json:"name"`
-		CompanyID string `json:"company_id"`
+		Name  string `json:"name"`
+		TaxID string `json:"tax_id"`
 	} `json:"receiver"`
 	TaxTotals []struct {
 		TaxAmount float64 `json:"tax_amount"`
@@ -507,18 +507,18 @@ var geminiResponseSchema = map[string]any{
 		"payment_means_code": map[string]any{"type": "string"},
 		"issuer": map[string]any{
 			"type":     "object",
-			"required": []string{"name", "company_id"},
+			"required": []string{"name", "tax_id"},
 			"properties": map[string]any{
-				"name":       map[string]any{"type": "string"},
-				"company_id": map[string]any{"type": "string"},
+				"name":   map[string]any{"type": "string"},
+				"tax_id": map[string]any{"type": "string"},
 			},
 		},
 		"receiver": map[string]any{
 			"type":     "object",
-			"required": []string{"name", "company_id"},
+			"required": []string{"name", "tax_id"},
 			"properties": map[string]any{
-				"name":       map[string]any{"type": "string"},
-				"company_id": map[string]any{"type": "string"},
+				"name":   map[string]any{"type": "string"},
+				"tax_id": map[string]any{"type": "string"},
 			},
 		},
 		"tax_totals": map[string]any{

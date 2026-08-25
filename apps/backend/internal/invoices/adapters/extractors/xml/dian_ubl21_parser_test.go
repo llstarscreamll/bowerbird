@@ -88,11 +88,11 @@ func TestDIANUBL21ParserParseInvoiceXMLSuccess(t *testing.T) {
 	if doc.CUFE != "cufe-abc-123" {
 		t.Fatalf("expected CUFE parsed, got %q", doc.CUFE)
 	}
-	if doc.Issuer.CompanyID != "900123456" {
-		t.Fatalf("expected issuer id parsed, got %q", doc.Issuer.CompanyID)
+	if doc.Issuer.TaxID != "900123456" {
+		t.Fatalf("expected issuer id parsed, got %q", doc.Issuer.TaxID)
 	}
-	if doc.Receiver.CompanyID != "901999888" {
-		t.Fatalf("expected receiver id parsed, got %q", doc.Receiver.CompanyID)
+	if doc.Receiver.TaxID != "901999888" {
+		t.Fatalf("expected receiver id parsed, got %q", doc.Receiver.TaxID)
 	}
 	if doc.PaymentMeansCode != "1" {
 		t.Fatalf("expected payment means code parsed, got %q", doc.PaymentMeansCode)
@@ -123,10 +123,10 @@ func TestDIANUBL21ParserParseInvoiceXMLFromAttachedDocumentRealExample(t *testin
 	if doc.PaymentMeansCode != "48" {
 		t.Fatalf("expected first payment means code 48, got %q", doc.PaymentMeansCode)
 	}
-	if doc.Issuer.Name != "I SHOP COLOMBIA SAS" || doc.Issuer.CompanyID != "900277370" {
+	if doc.Issuer.Name != "I SHOP COLOMBIA SAS" || doc.Issuer.TaxID != "900277370" {
 		t.Fatalf("unexpected issuer: %#v", doc.Issuer)
 	}
-	if doc.Receiver.Name != "JOHAN ALVAREZ" || doc.Receiver.CompanyID != "1057581292" {
+	if doc.Receiver.Name != "JOHAN ALVAREZ" || doc.Receiver.TaxID != "1057581292" {
 		t.Fatalf("unexpected receiver: %#v", doc.Receiver)
 	}
 	if len(doc.TaxTotals) != 1 {

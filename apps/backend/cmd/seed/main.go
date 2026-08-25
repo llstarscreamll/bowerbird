@@ -8,10 +8,10 @@ import (
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	"github.com/bowerbird/internal/identity/domain"
 	idinfra "github.com/bowerbird/internal/identity/infrastructure"
-	organizationModule "github.com/bowerbird/internal/organization"
-	"github.com/bowerbird/internal/organization/application"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
+	tenantModule "github.com/bowerbird/internal/tenant"
+	"github.com/bowerbird/internal/tenant/application"
 )
 
 func main() {
@@ -35,8 +35,8 @@ func main() {
 		}
 	}
 
-	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsModule.NewApplication(pool))
-	orgUseCase := application.NewCreateOrganizationUseCaseFromCommand(organizationApp.Commands.CreateOrganization)
+	organizationApp := tenantModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsModule.NewApplication(pool))
+	orgUseCase := application.NewCreateTenantUseCaseFromCommand(organizationApp.Commands.CreateTenant)
 
 	// We also need the user to exist in the Control Plane identity tables before we create the tenant.
 	// Because the AddMembership requires a foreign key to users.id
@@ -60,7 +60,7 @@ func main() {
 		user, _ = idRepo.FindUserByEmail(ctx, email)
 	}
 
-	cmd := application.CreateOrganizationCommand{
+	cmd := application.CreateTenantCommand{
 		Name:           "Acme Corp",
 		Slug:           "acme",
 		OwnerID:        user.ID,

@@ -7,8 +7,8 @@ import (
 	entitlementsPostgres "github.com/bowerbird/internal/entitlements/adapters/repository/postgres"
 	tenantDir "github.com/bowerbird/internal/entitlements/adapters/tenants"
 	"github.com/bowerbird/internal/entitlements/application"
-	orgpostgres "github.com/bowerbird/internal/organization/adapters/repository/postgres"
 	"github.com/bowerbird/internal/platform/config"
+	orgpostgres "github.com/bowerbird/internal/tenant/adapters/repository/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

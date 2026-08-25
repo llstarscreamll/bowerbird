@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthStore } from './auth.store';
 import { TenantMembership } from '../domain/auth.model';
-import { OrganizationHttpService } from '../../organization/infrastructure/organization.http.service';
+import { TenantHttpService } from '../../tenant/infrastructure/tenant.http.service';
 import { ToastService } from '../../core/services/toast.service';
 
 @Injectable({ providedIn: 'root' })
@@ -14,7 +14,7 @@ export class LobbyStore {
   readonly createError = signal('');
 
   private readonly authStore = inject(AuthStore);
-  private readonly orgService = inject(OrganizationHttpService);
+  private readonly orgService = inject(TenantHttpService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
 
@@ -59,7 +59,7 @@ export class LobbyStore {
     this.isCreating.set(true);
     this.createError.set('');
 
-    this.orgService.createOrganization({ name, slug }).subscribe({
+    this.orgService.createTenant({ name, slug }).subscribe({
       next: () => {
         this.isCreating.set(false);
         this.toggleCreateForm();

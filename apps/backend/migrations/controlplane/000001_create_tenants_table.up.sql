@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS tenants (
     id CHAR(26) PRIMARY KEY,
-    organization_name VARCHAR(255) NOT NULL,
+    tenant_name VARCHAR(255) NOT NULL,
     slug VARCHAR(100) UNIQUE NOT NULL,
     db_name VARCHAR(100) UNIQUE NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'provisioning',

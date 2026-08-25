@@ -22,7 +22,6 @@ import (
 	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
 	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
-	organizationModule "github.com/bowerbird/internal/organization"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	"github.com/bowerbird/internal/platform/auth"
@@ -33,6 +32,7 @@ import (
 	"github.com/bowerbird/internal/platform/tenant"
 	rbacModule "github.com/bowerbird/internal/rbac"
 	secretsModule "github.com/bowerbird/internal/secrets"
+	tenantModule "github.com/bowerbird/internal/tenant"
 )
 
 func main() {
@@ -75,8 +75,8 @@ func main() {
 			migrationsDir = "apps/backend/migrations/tenant"
 		}
 	}
-	organizationApp := organizationModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsApp)
-	organizationModule.NewHTTPHandler(mux, organizationApp, authMiddleware, cfg)
+	organizationApp := tenantModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsApp)
+	tenantModule.NewHTTPHandler(mux, organizationApp, authMiddleware, cfg)
 
 	// Setup AWS Config
 	awsCfg := platformModule.AWSConfig

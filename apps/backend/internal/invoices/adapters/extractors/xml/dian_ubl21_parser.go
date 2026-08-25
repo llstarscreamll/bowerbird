@@ -29,12 +29,12 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 	}
 
 	issuer := mapParty(invoice.AccountingSupplierParty)
-	if strings.TrimSpace(issuer.Name) == "" || strings.TrimSpace(issuer.CompanyID) == "" {
+	if strings.TrimSpace(issuer.Name) == "" || strings.TrimSpace(issuer.TaxID) == "" {
 		return nil, domain.ErrMissingIssuer
 	}
 
 	receiver := mapParty(invoice.AccountingCustomerParty)
-	if strings.TrimSpace(receiver.Name) == "" || strings.TrimSpace(receiver.CompanyID) == "" {
+	if strings.TrimSpace(receiver.Name) == "" || strings.TrimSpace(receiver.TaxID) == "" {
 		return nil, domain.ErrMissingReceiver
 	}
 
@@ -151,7 +151,7 @@ func mapParty(input partyContainer) domain.Party {
 	name := firstNonEmpty(input.Party.PartyName.Name, partyTaxScheme.RegistrationName, input.Party.PartyLegalEntity.RegistrationName)
 	return domain.Party{
 		Name:           strings.TrimSpace(name),
-		CompanyID:      strings.TrimSpace(companyID),
+		TaxID:          strings.TrimSpace(companyID),
 		SchemeID:       strings.TrimSpace(schemeID),
 		TaxLevelCode:   strings.TrimSpace(partyTaxScheme.TaxLevelCode),
 		RegistrationID: strings.TrimSpace(partyTaxScheme.RegistrationName),

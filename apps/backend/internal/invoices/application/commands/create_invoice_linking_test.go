@@ -74,8 +74,8 @@ func TestCreateInvoice_LinksPartyAndProvisionalItem(t *testing.T) {
 		Invoice: &domain.InvoiceDocument{
 			CUFE:      "CUFE-LINK-1",
 			InvoiceID: "FV-1",
-			Issuer:    domain.Party{Name: "Proveedor", CompanyID: "900123"},
-			Receiver:  domain.Party{Name: "Cliente", CompanyID: "901456"},
+			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
+			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
 			Lines: []domain.InvoiceLine{
 				{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
 				{LineID: "2", ItemCode: "", ItemDescription: "Service", Quantity: 1, UnitPrice: 5, LineExtension: 5},
@@ -110,8 +110,8 @@ func TestCreateInvoice_LinkFailureKeepsPersistedInvoice(t *testing.T) {
 		Invoice: &domain.InvoiceDocument{
 			CUFE:      "CUFE-LINK-2",
 			InvoiceID: "FV-2",
-			Issuer:    domain.Party{Name: "Proveedor", CompanyID: "900123"},
-			Receiver:  domain.Party{Name: "Cliente", CompanyID: "901456"},
+			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
+			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
 			Lines:     []domain.InvoiceLine{{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
 		},
 		SourceName:       "test",
@@ -158,8 +158,8 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 		Invoice: &domain.InvoiceDocument{
 			CUFE:      "CUFE-LINK-3",
 			InvoiceID: "FV-3",
-			Issuer:    domain.Party{Name: "Proveedor", CompanyID: "900123"},
-			Receiver:  domain.Party{Name: "Cliente", CompanyID: "901456"},
+			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
+			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
 			Lines: []domain.InvoiceLine{
 				{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
 				{LineID: "2", ItemCode: "SKU-2", ItemDescription: "Gadget", Quantity: 1, UnitPrice: 5, LineExtension: 5},

@@ -18,7 +18,7 @@ var (
 
 type Party struct {
 	Name           string
-	CompanyID      string
+	TaxID          string
 	SchemeID       string
 	TaxLevelCode   string
 	RegistrationID string
@@ -71,10 +71,10 @@ func (d *InvoiceDocument) Validate() error {
 	if strings.TrimSpace(d.InvoiceID) == "" {
 		return ErrMissingInvoiceID
 	}
-	if strings.TrimSpace(d.Issuer.Name) == "" || strings.TrimSpace(d.Issuer.CompanyID) == "" {
+	if strings.TrimSpace(d.Issuer.Name) == "" || strings.TrimSpace(d.Issuer.TaxID) == "" {
 		return ErrMissingIssuer
 	}
-	if strings.TrimSpace(d.Receiver.Name) == "" || strings.TrimSpace(d.Receiver.CompanyID) == "" {
+	if strings.TrimSpace(d.Receiver.Name) == "" || strings.TrimSpace(d.Receiver.TaxID) == "" {
 		return ErrMissingReceiver
 	}
 	if len(d.Lines) == 0 {

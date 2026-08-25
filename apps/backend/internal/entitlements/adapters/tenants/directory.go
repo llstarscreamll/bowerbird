@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/bowerbird/internal/entitlements/application"
-	orgdomain "github.com/bowerbird/internal/organization/domain"
+	orgdomain "github.com/bowerbird/internal/tenant/domain"
 )
 
 type Source interface {
-	ListAll(ctx context.Context) ([]orgdomain.Organization, error)
+	ListAll(ctx context.Context) ([]orgdomain.Tenant, error)
 	ExistsByID(ctx context.Context, id string) (bool, error)
 }
 

@@ -135,8 +135,8 @@ func TestExtractProcessesZIPPDFAndPersistsInvoice(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{
 		CUFE:          "CUFE-LLM",
 		InvoiceID:     "INV-1",
-		Issuer:        domain.Party{Name: "Issuer", CompanyID: "123"},
-		Receiver:      domain.Party{Name: "Receiver", CompanyID: "456"},
+		Issuer:        domain.Party{Name: "Issuer", TaxID: "123"},
+		Receiver:      domain.Party{Name: "Receiver", TaxID: "456"},
 		Lines:         []domain.InvoiceLine{{LineID: "1", ItemDescription: "x", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
 		CurrencyCode:  "COP",
 		PayableAmount: 10,
@@ -184,8 +184,8 @@ func TestExtractSkipsWhenCUFEAlreadyExists(t *testing.T) {
 	llmExtractor := &fakeLLMExtractor{invoice: &domain.InvoiceDocument{
 		CUFE:          "CUFE-LLM",
 		InvoiceID:     "INV-1",
-		Issuer:        domain.Party{Name: "Issuer", CompanyID: "123"},
-		Receiver:      domain.Party{Name: "Receiver", CompanyID: "456"},
+		Issuer:        domain.Party{Name: "Issuer", TaxID: "123"},
+		Receiver:      domain.Party{Name: "Receiver", TaxID: "456"},
 		Lines:         []domain.InvoiceLine{{LineID: "1", ItemDescription: "x", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
 		CurrencyCode:  "COP",
 		PayableAmount: 10,

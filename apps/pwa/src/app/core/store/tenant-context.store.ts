@@ -1,12 +1,12 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { OrganizationHttpService, OrganizationResponse } from '../../organization/infrastructure/organization.http.service';
+import { TenantHttpService, TenantResponse } from '../../tenant/infrastructure/tenant.http.service';
 
 @Injectable({ providedIn: 'root' })
 export class TenantContextStore {
   readonly tenantId = signal('');
-  readonly tenantDetails = signal<OrganizationResponse | null>(null);
+  readonly tenantDetails = signal<TenantResponse | null>(null);
 
-  private organizationService = inject(OrganizationHttpService);
+  private tenantService = inject(TenantHttpService);
 
   setTenantId(id: string) {
     if (this.tenantId() !== id) {
@@ -16,7 +16,7 @@ export class TenantContextStore {
   }
 
   private fetchTenantDetails(id: string) {
-    this.organizationService.getOrganization(id).subscribe({
+    this.tenantService.getTenant(id).subscribe({
       next: (response) => {
         const data = (response as any).data ? (response as any).data : response;
         this.tenantDetails.set(data);

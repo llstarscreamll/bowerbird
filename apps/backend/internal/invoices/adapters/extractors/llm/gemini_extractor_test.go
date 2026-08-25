@@ -34,7 +34,7 @@ func TestGeminiExtractorExtractFromPDFSuccess(t *testing.T) {
 
 		_, _ = w.Write([]byte(`{
 			"candidates":[
-				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"company_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"company_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
+				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
 			]
 		}`))
 	}))
@@ -65,7 +65,7 @@ func TestGeminiExtractorExtractFromPDFSuccess(t *testing.T) {
 
 func TestGeminiExtractorExtractFromPDFFailsOnMissingCUFE(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"issuer\":{\"name\":\"Proveedor\",\"company_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"company_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}]}"}]}}]}`))
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}]}"}]}}]}`))
 	}))
 	defer server.Close()
 
@@ -78,7 +78,7 @@ func TestGeminiExtractorExtractFromPDFFailsOnMissingCUFE(t *testing.T) {
 
 func TestGeminiExtractorRejectsUnknownJSONFields(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"company_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"company_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"unexpected\":123}"}]}}]}`))
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"unexpected\":123}"}]}}]}`))
 	}))
 	defer server.Close()
 
@@ -102,7 +102,7 @@ func TestGeminiExtractorExtractFromPDFRetriesOn429AndThenSucceeds(t *testing.T) 
 
 		_, _ = w.Write([]byte(`{
 			"candidates":[
-				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"company_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"company_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
+				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
 			]
 		}`))
 	}))

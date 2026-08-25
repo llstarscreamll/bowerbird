@@ -243,8 +243,8 @@ func validInvoiceDoc(cufe string) *domain.InvoiceDocument {
 	return &domain.InvoiceDocument{
 		CUFE:          cufe,
 		InvoiceID:     "INV-1",
-		Issuer:        domain.Party{Name: "Issuer", CompanyID: "123"},
-		Receiver:      domain.Party{Name: "Receiver", CompanyID: "456"},
+		Issuer:        domain.Party{Name: "Issuer", TaxID: "123"},
+		Receiver:      domain.Party{Name: "Receiver", TaxID: "456"},
 		Lines:         []domain.InvoiceLine{{LineID: "1", ItemDescription: "x", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
 		CurrencyCode:  "COP",
 		PayableAmount: 10,

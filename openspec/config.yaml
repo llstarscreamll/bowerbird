@@ -1,0 +1,38 @@
+schema: spec-driven
+
+# Injected into artifact instructions. Keep short; AGENTS.md is the source of truth for commands.
+context: |
+  Architecture: Monorepo (pnpm + Turbo), PWA Angular (standalone, zoneless), Backend Go (no ORM), Infra AWS CDK (TypeScript).
+  Backend: Hexagonal `internal/<feature>` — domain → application (CQRS commands/queries) → adapters; contracts for cross-boundary DTOs. Commands usually return nothing.
+  Language Rules:
+    - Code, types, function names, API contracts, and commits (conventional): English.
+    - Specs, tasks, proposals, and business context: Spanish.
+    - Domain terms: ALWAYS refer to `docs/domain/GLOSSARY.md` to map Spanish business terms to their exact English counterparts for code. Colombian e-invoicing acronyms (DIAN, CUFE, UBL) stay as-is in both code and specs.
+    - Prefer existing patterns over new abstractions.
+
+rules:
+  proposal:
+    - State Why, What Changes, Capabilities (new/modified), Impact
+    - Always include Non-goals / out of scope
+    - Name concrete packages/modules touched; avoid vague "update the API"
+  design:
+    - Prefer decisions + alternatives rejected over long narrative
+    - Call out migrations, events/contracts, and cross-app (backend/PWA) seams
+  specs:
+    - Requirement-oriented; observable behavior only
+    - Keep Colombian e-invoicing terms (DIAN, CUFE, UBL) unchanged
+  tasks:
+    - Chunks ≤ ~2 hours each
+    - Order by dependency; group backend / PWA / infra when relevant
+    - Each task must be verifiable (test, command, or observable check)
+
+operations:
+  apply:
+    guidance:
+      - Follow AGENTS.md toolchain (mise, pnpm filters); do not invent alternate run commands
+      - Match existing feature layout and error/JSON:API patterns
+      - Tests: concise summaries; Given/When/Then comments in test bodies
+  archive:
+    guidance:
+      - Summarize what shipped vs deferred Non-goals before finishing
+      - Sync delta specs into main specs when the change is complete

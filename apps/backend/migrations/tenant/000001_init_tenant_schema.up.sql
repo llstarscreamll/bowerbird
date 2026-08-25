@@ -1,5 +1,5 @@
 -- Initial migration for tenant databases
--- This schema will be applied to every new organization's isolated database
+-- This schema will be applied to every new tenant's isolated database
 
 CREATE TABLE IF NOT EXISTS users (
     id CHAR(26) PRIMARY KEY,

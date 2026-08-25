@@ -74,4 +74,5 @@
 - Pre-commit runs `pnpm lint-staged` then `pnpm run lint`, then optional `codegraph sync` (`.husky/pre-commit`).
 - `lint-staged` applies Prettier to staged web/docs files and `gofmt -w` to staged Go files.
 - Root `pnpm run format` only formats `*.{ts,tsx,md,mdx}`.
-- Product/domain specs live under `.specs/features/*` in English. Keep Colombian e-invoicing domain terms as-is (DIAN, CUFE, UBL field names).
+- Product/domain specs live under `.specs/features/*` in English.
+- **Ubiquitous Language**: ALWAYS refer to `docs/domain/GLOSSARY.md` to map Spanish business terms (e.g., Factura, Adquirente) to their exact English counterparts for code. Keep Colombian e-invoicing acronyms (DIAN, CUFE, UBL) as-is.

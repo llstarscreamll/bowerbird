@@ -3,7 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { filter } from 'rxjs';
-import { OrganizationHttpService } from '../../../../organization/infrastructure/organization.http.service';
+import { TenantHttpService } from '../../../../tenant/infrastructure/tenant.http.service';
 import { AuthStore } from '../../../../auth/application/auth.store';
 import { TenantContextStore } from '../../../store/tenant-context.store';
 import { EntitlementsStore } from '../../../../entitlements/application/entitlements.store';
@@ -199,7 +199,7 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 export class TenantLayoutComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private organizationService = inject(OrganizationHttpService);
+  private tenantService = inject(TenantHttpService);
   private authStore = inject(AuthStore);
   private tenantContextStore = inject(TenantContextStore);
   readonly entitlements = inject(EntitlementsStore);

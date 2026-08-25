@@ -9,8 +9,8 @@ func TestInvoiceDocumentValidate(t *testing.T) {
 	doc := &InvoiceDocument{
 		CUFE:      "CUFE-1",
 		InvoiceID: "INV-1",
-		Issuer:    Party{Name: "Issuer", CompanyID: "900"},
-		Receiver:  Party{Name: "Receiver", CompanyID: "901"},
+		Issuer:    Party{Name: "Issuer", TaxID: "900"},
+		Receiver:  Party{Name: "Receiver", TaxID: "901"},
 		Lines:     []InvoiceLine{{LineID: "1", ItemDescription: "Service"}},
 	}
 

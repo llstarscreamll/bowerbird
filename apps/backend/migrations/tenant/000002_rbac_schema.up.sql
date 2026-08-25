@@ -35,7 +35,7 @@ CREATE TABLE user_roles (
 );
 
 -- =========================================================================
--- SEED DATA: Default roles and permissions for every new organization
+-- SEED DATA: Default roles and permissions for every new tenant
 -- =========================================================================
 
 -- Seed basic system permissions
@@ -44,7 +44,7 @@ INSERT INTO permissions (id, code, description) VALUES
 ('01JW58TAT9M0N4R8M1P3Q6R9Y1', 'users:write', 'Invitar y editar usuarios'),
 ('01JW58TAT9M0N4R8M1P3Q6R9Y2', 'roles:read', 'Ver roles y permisos'),
 ('01JW58TAT9M0N4R8M1P3Q6R9Y3', 'roles:write', 'Crear y editar roles personalizados'),
-('01JW58TAT9M0N4R8M1P3Q6R9Y4', 'settings:write', 'Modificar configuración de la organización');
+('01JW58TAT9M0N4R8M1P3Q6R9Y4', 'settings:write', 'Modificar configuración del facturador/tenant');
 
 -- Seed the system default 'admin' role
 INSERT INTO roles (id, name, description, is_system) VALUES
