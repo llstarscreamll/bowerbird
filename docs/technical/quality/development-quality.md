@@ -2,11 +2,17 @@
 
 ## Agent skills
 
-Prefer curated skills (frontend, performance, architecture, security) from trusted sources such as [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills). Base skill often used: `GoogleChrome/modern-web-guidance`.
+Prefer curated skills (frontend, performance, architecture, security) from trusted sources such as [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills).
 
 ### Installing Skills
 
 To configure your agent environment, you must install the following core skills:
+
+**Google Chrome Guidance:**
+
+```bash
+opencode skill add https://github.com/GoogleChrome/modern-web-guidance
+```
 
 **TLC Agent Skills (Tech Leads Club):**
 
