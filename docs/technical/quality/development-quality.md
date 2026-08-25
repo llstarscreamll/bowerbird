@@ -11,24 +11,19 @@ To configure your agent environment, you must install the following core skills:
 **Google Chrome Guidance:**
 
 ```bash
+# For Opencode:
 opencode skill add https://github.com/GoogleChrome/modern-web-guidance
+
+# For Cursor, Roo Code (Cline), or Windsurf, append the rules to your project config:
+curl -sL https://raw.githubusercontent.com/GoogleChrome/modern-web-guidance/main/guidance.md >> .cursorrules
+# (replace .cursorrules with .clinerules or .windsurfrules as needed)
 ```
 
 **TLC Agent Skills (Tech Leads Club):**
 
 ```bash
-# Documentation writing and editing
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/docs-writer
-# Coding guidelines to prevent common LLM mistakes
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/coding-guidelines
-# Tactical DDD detection and refactoring
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/tactical-ddd
-# Modular architecture and boundary design
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/modular-design-principles
-# Feature planning and implementation with EARS notation
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/tlc-spec-driven
-# Cloud advisory for architecture and security
-opencode skill add https://github.com/tech-leads-club/agent-skills/tree/main/aws-advisor
+# The agent-skills CLI auto-detects and supports Cursor, Roo Code, Windsurf, and Copilot.
+npx @tech-leads-club/agent-skills install -s docs-writer coding-guidelines tactical-ddd modular-design-principles tlc-spec-driven aws-advisor
 ```
 
 **OpenSpec:**
