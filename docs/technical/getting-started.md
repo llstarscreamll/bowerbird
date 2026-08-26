@@ -11,12 +11,30 @@ Pinned in `.mise.toml`: Node `24`, Go `1.25`, pnpm `11.5`, Air `latest`.
 
 ## Setup
 
+`mise` must already be on your `PATH`. Then run the local setup script (idempotent):
+
 ```bash
-mise install
-pnpm install
+pnpm run setup:local
 ```
 
-Optional: `mise x -- pnpm run dev` to use the repo toolchain without changing globals.
+If `pnpm` is not available yet, invoke the script directly:
+
+```bash
+./scripts/setup-local.sh
+```
+
+`setup:local` / `scripts/setup-local.sh`:
+
+1. Installs the mise toolchain from `.mise.toml` (`node`, `go`, `pnpm`, `air`).
+2. Runs `pnpm install` for the workspace.
+3. Installs agent skills and MCP CLIs documented in
+   [Development quality](./quality/development-quality.md).
+4. Verifies project MCP registration files (`.cursor/mcp.json`, `opencode.json`).
+
+After setup, copy env/secrets as described below, then start infra/dev.
+
+Optional: `mise x -- pnpm run dev` to use the repo toolchain without changing
+globals.
 
 ## Environment
 
@@ -138,6 +156,8 @@ Starts Postgres, Redis, LocalStack, Caddy, Go API (Air), and Angular. Prefer the
 
 ## Commands
 
-`infra:up` · `infra:down` · `build` · `test` · `lint` · `format` · `format:check` · `deploy`
+`setup:local` · `infra:up` · `infra:down` · `build` · `test` · `lint` · `format` ·
+`format:check` · `deploy`
 
-Also: [CodeGraph](./tooling/codegraph.md) · [LocalStack](./tooling/localstack.md)
+Also: [Development quality](./quality/development-quality.md) ·
+[CodeGraph](./tooling/codegraph.md) · [LocalStack](./tooling/localstack.md)

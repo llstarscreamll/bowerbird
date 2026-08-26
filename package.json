@@ -10,6 +10,7 @@
     "packages/*"
   ],
   "scripts": {
+    "setup:local": "./scripts/setup-local.sh",
     "dev": "pnpm run infra:up && turbo run dev",
     "seed": "pnpm --filter @bowerbird/backend run seed",
     "build": "turbo run build",
