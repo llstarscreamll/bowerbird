@@ -18,6 +18,7 @@ type Commands struct {
 
 type Queries struct {
 	GetItemByID     *queries.GetItemByIDQuery
+	GetItemNames    *queries.GetItemNamesQuery
 	ListItems       *queries.ListItemsQuery
 	ListReviewQueue *queries.ListReviewQueueQuery
 }

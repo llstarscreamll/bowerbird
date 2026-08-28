@@ -24,9 +24,9 @@ export class PartiesStore {
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         if (err.status >= 400 && err.status < 500) {
-          this.errorMessage.set(err.error?.errors?.[0]?.detail || 'No se pudieron cargar las contrapartes.');
+          this.errorMessage.set(err.error?.errors?.[0]?.detail || 'No se pudieron cargar los contactos.');
         } else {
-          this.toast.showError('Error al cargar contrapartes.');
+          this.toast.showError('Error al cargar contactos.');
         }
       },
     });

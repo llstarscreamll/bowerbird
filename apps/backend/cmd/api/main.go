@@ -149,6 +149,7 @@ func main() {
 		documentPasswordResolver,
 		invoiceLinking.NewPartyResolverAdapter(partiesApp),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
+		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

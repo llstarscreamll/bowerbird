@@ -1,19 +1,17 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { CatalogStore } from '../../../application/catalog.store';
+import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-linker.component';
 
 @Component({
   selector: 'app-catalog-review',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, NgIcon, HlmCardImports, HlmSpinnerImports, HlmAlertImports, HlmButtonImports, HlmInputImports],
+  imports: [CommonModule, RouterLink, NgIcon, HlmCardImports, HlmSpinnerImports, HlmAlertImports, CatalogLinkerComponent],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto p-8' },
   template: `
     <div class="mx-auto w-full max-w-5xl space-y-6">
@@ -47,13 +45,7 @@ import { CatalogStore } from '../../../application/catalog.store';
                 </div>
                 <a class="text-xs text-primary underline" [routerLink]="['/', tenantPrefix(), 'invoices', line.invoice_header_id]">Ver factura</a>
               </div>
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <div class="flex-1 space-y-1">
-                  <label class="text-xs text-muted-foreground" [attr.for]="'item-' + line.id">ID de ítem</label>
-                  <input hlmInput class="w-full" [id]="'item-' + line.id" [(ngModel)]="itemIds[line.id]" [ngModelOptions]="{ standalone: true }" placeholder="ULID del ítem" />
-                </div>
-                <button hlmBtn (click)="confirm(line.id)" [disabled]="!itemIds[line.id]">Vincular y recordar</button>
-              </div>
+              <app-catalog-linker [lineId]="line.id" [description]="line.description" [itemCode]="line.item_code" [suggestions]="line.suggestions || []" (resolved)="onResolved()" />
             </hlm-card>
           } @empty {
             <p class="py-10 text-center text-muted-foreground">No hay líneas pendientes de revisión.</p>
@@ -65,7 +57,6 @@ import { CatalogStore } from '../../../application/catalog.store';
 })
 export class ReviewPage implements OnInit {
   readonly store = inject(CatalogStore);
-  itemIds: Record<string, string> = {};
 
   ngOnInit(): void {
     this.store.loadReviewQueue();
@@ -75,9 +66,7 @@ export class ReviewPage implements OnInit {
     return location.pathname.split('/')[1] || '';
   }
 
-  confirm(lineId: string): void {
-    const itemId = this.itemIds[lineId]?.trim();
-    if (!itemId) return;
-    this.store.rememberDecision(lineId, { item_id: itemId, action: 'link', remember: true, lock: true }, () => this.store.loadReviewQueue());
+  onResolved(): void {
+    this.store.loadReviewQueue();
   }
 }

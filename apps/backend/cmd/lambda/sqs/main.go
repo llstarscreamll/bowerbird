@@ -50,6 +50,7 @@ func init() {
 		documentPasswordResolver,
 		invoiceLinking.NewPartyResolverAdapter(partiesApp),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
+		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
 	)
 
 	processorCommand := invoicesJobs.NewInvoiceExtractionRequestedProcessor(

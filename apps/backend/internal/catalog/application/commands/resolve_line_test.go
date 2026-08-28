@@ -35,6 +35,15 @@ func (m *memItems) GetItemByID(ctx context.Context, id string) (*domain.Item, er
 	cp := item
 	return &cp, nil
 }
+func (m *memItems) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, id := range ids {
+		if item, ok := m.items[id]; ok {
+			out[id] = item.Name
+		}
+	}
+	return out, nil
+}
 func (m *memItems) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	out := make([]domain.Item, 0, len(m.items))
 	for _, i := range m.items {

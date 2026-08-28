@@ -1,3 +1,10 @@
+export interface CatalogSuggestion {
+  item_id: string;
+  name?: string;
+  score: number;
+  reason: string;
+}
+
 export interface CatalogItem {
   id: string;
   name: string;
@@ -18,12 +25,12 @@ export interface CatalogReviewLine {
   link_status: string;
   link_method: string | null;
   link_locked: boolean;
-  suggestions: { item_id: string; score: number; reason: string }[];
+  suggestions: CatalogSuggestion[];
 }
 
 export interface LineDecisionPayload {
   item_id?: string;
-  action: 'link' | 'never_match';
+  action: 'link' | 'never_match' | 'create_provisional';
   remember: boolean;
   lock: boolean;
 }

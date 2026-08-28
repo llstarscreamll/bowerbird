@@ -10,6 +10,7 @@ type ItemRepository interface {
 	CreateItem(ctx context.Context, item domain.Item) error
 	UpdateItem(ctx context.Context, item domain.Item) error
 	GetItemByID(ctx context.Context, id string) (*domain.Item, error)
+	GetItemNames(ctx context.Context, ids []string) (map[string]string, error)
 	ListItems(ctx context.Context, filter ItemListFilter) ([]domain.Item, error)
 	FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error)
 }
@@ -37,6 +38,15 @@ type InvoiceLineLinkRepository interface {
 	SyncHeaderLinkingStatus(ctx context.Context, invoiceHeaderID string) error
 }
 
+// EnrichedSuggestion is an application DTO that adds a human-readable item name
+// to a domain.Suggestion without modifying the domain value object.
+type EnrichedSuggestion struct {
+	ItemID string  `json:"item_id"`
+	Name   string  `json:"name"`
+	Score  float64 `json:"score"`
+	Reason string  `json:"reason"`
+}
+
 type ReviewLine struct {
 	LineID          string
 	InvoiceHeaderID string
@@ -47,7 +57,7 @@ type ReviewLine struct {
 	LinkStatus      string
 	LinkMethod      string
 	LinkLocked      bool
-	Suggestions     []domain.Suggestion
+	Suggestions     []EnrichedSuggestion
 }
 
 type LineLinkState struct {

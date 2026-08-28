@@ -40,6 +40,15 @@ func (s *stubCatalog) GetItemByID(ctx context.Context, id string) (*domain.Item,
 	cp := item
 	return &cp, nil
 }
+func (s *stubCatalog) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, id := range ids {
+		if item, ok := s.items[id]; ok {
+			out[id] = item.Name
+		}
+	}
+	return out, nil
+}
 func (s *stubCatalog) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	out := []domain.Item{}
 	for _, i := range s.items {
@@ -108,6 +117,7 @@ func TestRememberLineDecision_LocksAndRemembers(t *testing.T) {
 		Commands: application.Commands{RememberDecision: remember},
 		Queries: application.Queries{
 			GetItemByID:     queries.NewGetItemByIDQuery(stub),
+			GetItemNames:    queries.NewGetItemNamesQuery(stub),
 			ListItems:       queries.NewListItemsQuery(stub),
 			ListReviewQueue: queries.NewListReviewQueueQuery(stub),
 		},

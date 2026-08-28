@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 import { ToastService } from '../../core/services/toast.service';
 import { CatalogHttpService } from '../infrastructure/catalog.http.service';
 import { CatalogItem, CatalogReviewLine, LineDecisionPayload } from '../domain/catalog.model';
@@ -26,6 +27,15 @@ export class CatalogStore {
     });
   }
 
+  searchItems(query: string): Observable<CatalogItem[]> {
+    return this.http.listItems(undefined, undefined, query).pipe(
+      catchError((err: HttpErrorResponse) => {
+        this.handleError(err, 'No se pudo buscar en el catálogo.');
+        return of([]);
+      }),
+    );
+  }
+
   loadReviewQueue(): void {
     this.loading.set(true);
     this.errorMessage.set(null);
@@ -39,14 +49,22 @@ export class CatalogStore {
   }
 
   rememberDecision(lineId: string, payload: LineDecisionPayload, onDone?: () => void): void {
-    this.errorMessage.set(null);
-    this.http.rememberDecision(lineId, payload).subscribe({
-      next: () => {
-        this.toast.showSuccess('Decisión de coincidencia guardada.');
-        onDone?.();
-      },
-      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo guardar la decisión.'),
+    this.resolveDecision(lineId, payload).subscribe((ok) => {
+      if (ok) onDone?.();
     });
+  }
+
+  /** Returns true when the decision was persisted successfully. */
+  resolveDecision(lineId: string, payload: LineDecisionPayload): Observable<boolean> {
+    this.errorMessage.set(null);
+    return this.http.rememberDecision(lineId, payload).pipe(
+      tap(() => this.toast.showSuccess('Decisión de coincidencia guardada.')),
+      map(() => true),
+      catchError((err: HttpErrorResponse) => {
+        this.handleError(err, 'No se pudo guardar la decisión.');
+        return of(false);
+      }),
+    );
   }
 
   private handleError(err: HttpErrorResponse, fallback: string): void {

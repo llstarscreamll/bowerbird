@@ -41,7 +41,7 @@ export interface InvoiceLine {
   link_status?: string;
   link_method?: string | null;
   link_locked?: boolean;
-  suggestions?: { item_id: string; score: number; reason: string }[];
+  suggestions?: { item_id: string; name?: string; score: number; reason: string }[];
 }
 
 export interface InvoiceDetails extends InvoiceSummary {

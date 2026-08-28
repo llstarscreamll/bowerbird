@@ -8,6 +8,7 @@ import { InvoiceHistoryImportStore } from '../../../application/invoice-history-
 import { InvoicesStore } from '../../../application/invoices.store';
 import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload';
 import { INVOICE_HISTORY_ACCEPT, INVOICE_HISTORY_MAX_FILE_SIZE_BYTES, supportsInvoiceHistoryFile } from '../../../domain/invoice-history-import.model';
+import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -34,6 +35,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     HlmEmptyImports,
     HlmTableImports,
     HlmAlertImports,
+    HlmBadgeImports,
     BrnDialogContent,
     BrnDialogClose,
   ],
@@ -93,6 +95,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
                   <tr hlmTr>
                     <th hlmTh>Número</th>
                     <th hlmTh>Emisor</th>
+                    <th hlmTh>Catálogo</th>
                     <th hlmTh>Total</th>
                     <th hlmTh class="text-right">Fecha Emisión</th>
                   </tr>
@@ -106,6 +109,9 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
                       <td hlmTd>
                         <div class="max-w-[200px] truncate font-medium" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
                         <div class="text-xs text-muted-foreground">{{ invoice.issuer_tax_id }}</div>
+                      </td>
+                      <td hlmTd>
+                        <span hlmBadge [variant]="linkingBadgeVariant(invoice.linking_status)">{{ linkingStatusLabel(invoice.linking_status) }}</span>
                       </td>
                       <td hlmTd class="font-medium">{{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}</td>
                       <td hlmTd class="text-right text-muted-foreground">{{ invoice.issue_date | date: 'mediumDate' }}</td>
@@ -246,6 +252,25 @@ export class MasterPage implements OnInit {
     const id = this.importForm.controls.id.value;
     if (!this.importForm.valid || !id) return;
     this.importStore.analyzeUploadedFiles(id);
+  }
+
+  linkingStatusLabel(status?: string): string {
+    switch (status) {
+      case 'linked':
+        return 'Vinculado';
+      case 'failed':
+        return 'Fallido';
+      case 'pending':
+        return 'Pendiente';
+      default:
+        return status || 'Pendiente';
+    }
+  }
+
+  linkingBadgeVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+    if (status === 'failed') return 'destructive';
+    if (status === 'linked') return 'default';
+    return 'secondary';
   }
 
   private resetRequestId(): void {

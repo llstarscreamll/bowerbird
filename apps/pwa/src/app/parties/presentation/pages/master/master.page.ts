@@ -16,7 +16,7 @@ import { PartiesStore } from '../../../application/parties.store';
   template: `
     <div class="mx-auto w-full max-w-5xl space-y-6">
       <header>
-        <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Contrapartes</h1>
+        <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Contactos</h1>
         <p class="mt-1 text-sm text-muted-foreground">Proveedores y clientes identificados por NIT, creados desde facturas electrónicas.</p>
       </header>
 
@@ -55,7 +55,7 @@ import { PartiesStore } from '../../../application/parties.store';
                 </tr>
               } @empty {
                 <tr hlmTr>
-                  <td hlmTd colspan="4" class="py-10 text-center text-muted-foreground">Aún no hay contrapartes.</td>
+                  <td hlmTd colspan="4" class="py-10 text-center text-muted-foreground">Aún no hay contactos.</td>
                 </tr>
               }
             </tbody>

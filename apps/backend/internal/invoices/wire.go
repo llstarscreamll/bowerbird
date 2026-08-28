@@ -30,6 +30,7 @@ func NewApplication(
 	passwordResolver ports.DocumentPasswordResolver,
 	partyResolver ports.IssuerPartyResolver,
 	lineResolver ports.CatalogLineResolver,
+	catalogService ports.CatalogService,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -76,7 +77,7 @@ func NewApplication(
 			CreateInvoice: createInvoice,
 		},
 		Queries: application.Queries{
-			GetInvoiceByID: queries.NewGetInvoiceByIDQuery(invoiceRepository),
+			GetInvoiceByID: queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogService),
 			ListInvoices:   queries.NewListInvoicesQuery(invoiceRepository),
 		},
 	}

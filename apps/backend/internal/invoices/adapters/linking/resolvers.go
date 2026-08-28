@@ -76,3 +76,20 @@ func (a *CatalogResolverAdapter) ResolveLine(ctx context.Context, input ports.Ca
 }
 
 var _ ports.CatalogLineResolver = (*CatalogResolverAdapter)(nil)
+
+type CatalogNamesAdapter struct {
+	app *catalogApp.Application
+}
+
+func NewCatalogNamesAdapter(app *catalogApp.Application) *CatalogNamesAdapter {
+	return &CatalogNamesAdapter{app: app}
+}
+
+func (a *CatalogNamesAdapter) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
+	if a == nil || a.app == nil || a.app.Queries.GetItemNames == nil {
+		return map[string]string{}, nil
+	}
+	return a.app.Queries.GetItemNames.Execute(ctx, ids)
+}
+
+var _ ports.CatalogService = (*CatalogNamesAdapter)(nil)

@@ -28,6 +28,7 @@ func NewApplication(registry *database.Registry) *application.Application {
 		},
 		Queries: application.Queries{
 			GetItemByID:     queries.NewGetItemByIDQuery(repo),
+			GetItemNames:    queries.NewGetItemNamesQuery(repo),
 			ListItems:       queries.NewListItemsQuery(repo),
 			ListReviewQueue: queries.NewListReviewQueueQuery(repo),
 		},

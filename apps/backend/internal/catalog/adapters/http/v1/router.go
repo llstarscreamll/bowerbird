@@ -71,6 +71,15 @@ func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) err
 	}
 	data := make([]map[string]any, 0, len(lines))
 	for _, line := range lines {
+		suggestions := make([]map[string]any, 0, len(line.Suggestions))
+		for _, s := range line.Suggestions {
+			suggestions = append(suggestions, map[string]any{
+				"item_id": s.ItemID,
+				"name":    s.Name,
+				"score":   s.Score,
+				"reason":  s.Reason,
+			})
+		}
 		data = append(data, map[string]any{
 			"type": "catalog_review_lines",
 			"id":   line.LineID,
@@ -83,7 +92,7 @@ func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) err
 				"link_status":       line.LinkStatus,
 				"link_method":       nullIfEmptyStr(line.LinkMethod),
 				"link_locked":       line.LinkLocked,
-				"suggestions":       line.Suggestions,
+				"suggestions":       suggestions,
 			},
 		})
 	}

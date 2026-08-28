@@ -41,7 +41,7 @@ func NewRememberDecisionCommand(
 type RememberDecisionInput struct {
 	LineID      string
 	ItemID      string
-	Action      string // link | never_match
+	Action      string // link | never_match | create_provisional
 	Remember    bool
 	Lock        bool
 	PartyID     string
@@ -66,6 +66,24 @@ func (cmd *RememberDecisionCommand) Execute(ctx context.Context, input RememberD
 	itemCode := firstNonEmpty(input.ItemCode, state.ItemCode)
 	description := firstNonEmpty(input.Description, state.Description)
 
+	action := strings.TrimSpace(input.Action)
+	if action == "" {
+		action = domain.MemoryActionLink
+	}
+	if action == "create_provisional" {
+		itemID, err := cmd.mintProvisionalItem(ctx, partyID, itemCode, description)
+		if err != nil {
+			return err
+		}
+		input.ItemID = itemID
+		input.Action = domain.MemoryActionLink
+		input.Remember = true
+		if !input.Lock {
+			input.Lock = true
+		}
+		action = domain.MemoryActionLink
+	}
+
 	decision, err := domain.DecideManualLink(input.Action, input.ItemID)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidMemoryAction) {
@@ -75,11 +93,6 @@ func (cmd *RememberDecisionCommand) Execute(ctx context.Context, input RememberD
 			return appErrors.New(appErrors.CodeValidation, "item_id is required for link")
 		}
 		return err
-	}
-
-	action := strings.TrimSpace(input.Action)
-	if action == "" {
-		action = domain.MemoryActionLink
 	}
 
 	if decision.Status == domain.LinkStatusLinked {
@@ -130,6 +143,30 @@ func (cmd *RememberDecisionCommand) Execute(ctx context.Context, input RememberD
 		}
 	}
 	return nil
+}
+
+func (cmd *RememberDecisionCommand) mintProvisionalItem(ctx context.Context, partyID, code, description string) (string, error) {
+	if cmd.items == nil {
+		return "", fmt.Errorf("item repository is required")
+	}
+	now := cmd.now().UTC()
+	item, err := domain.NewProvisionalItem(cmd.newID(), description, code, now)
+	if err != nil {
+		if errors.Is(err, domain.ErrMissingItemName) {
+			return "", appErrors.New(appErrors.CodeValidation, "description or item code is required to create a provisional item")
+		}
+		return "", err
+	}
+	if err := cmd.items.CreateItem(ctx, item); err != nil {
+		return "", err
+	}
+	normalized := domain.NormalizeItemCode(code)
+	if normalized != "" && strings.TrimSpace(partyID) != "" && cmd.aliases != nil {
+		if err := cmd.ensureSupplierAlias(ctx, partyID, normalized, item.ID); err != nil {
+			return "", err
+		}
+	}
+	return item.ID, nil
 }
 
 func (cmd *RememberDecisionCommand) ensureSupplierAlias(ctx context.Context, partyID, code, itemID string) error {

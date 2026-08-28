@@ -9,10 +9,11 @@ export class CatalogHttpService {
   private readonly http = inject(HttpClient);
   private readonly apiDomain = environment.apiUrl;
 
-  listItems(kind?: string, status?: string): Observable<CatalogItem[]> {
+  listItems(kind?: string, status?: string, search?: string): Observable<CatalogItem[]> {
     let params = new HttpParams();
     if (kind) params = params.set('kind', kind);
     if (status) params = params.set('status', status);
+    if (search?.trim()) params = params.set('search', search.trim());
     return this.http
       .get<{ data: { id: string; attributes: Omit<CatalogItem, 'id'> }[] }>(`${this.apiDomain}/api/v1/catalog/items`, { params })
       .pipe(map((res) => res.data.map((doc) => ({ id: doc.id, ...doc.attributes }))));

@@ -1,22 +1,20 @@
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { InvoiceDetailsStore } from '../../../application/invoice-details.store';
-import { CatalogStore } from '../../../../catalog/application/catalog.store';
+import { CatalogLinkerComponent } from '../../../../catalog/presentation/components/catalog-linker/catalog-linker.component';
 import { InvoiceLine } from '../../../domain/invoice.model';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSeparatorImports } from '@spartan-ng/helm/separator';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
 @Component({
   selector: 'app-invoices-detail',
   standalone: true,
-  imports: [CommonModule, CurrencyPipe, DatePipe, FormsModule, RouterLink, NgIcon, HlmCardImports, HlmButtonImports, HlmSpinnerImports, HlmSeparatorImports, HlmBadgeImports, HlmInputImports],
+  imports: [CommonModule, CurrencyPipe, DatePipe, RouterLink, NgIcon, HlmCardImports, HlmButtonImports, HlmSpinnerImports, HlmSeparatorImports, HlmBadgeImports, CatalogLinkerComponent],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto bg-muted/20 p-4 sm:p-6 lg:p-8' },
   template: `
     <div class="mx-auto w-full max-w-7xl space-y-8">
@@ -65,7 +63,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
             @if (inv.issuer_party_id) {
               <a class="inline-flex items-center gap-1.5 text-sm text-primary hover:underline" [routerLink]="['/', tenantId(), 'parties']">
                 <ng-icon name="lucideBuilding2" class="size-3.5" />
-                Contraparte en catálogo
+                Contacto en catálogo
               </a>
             }
           </hlm-card>
@@ -157,7 +155,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                     <div class="flex flex-col justify-between gap-3 bg-muted/30 p-5 lg:col-span-4">
                       <div>
                         <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Catálogo</p>
-                        @if (line.item_id) {
+                        @if (line.item_id && line.link_status === 'linked') {
                           <p class="mt-2 text-sm">
                             Ítem
                             <a class="font-mono text-xs text-primary hover:underline" [routerLink]="['/', tenantId(), 'catalog']">{{ shortId(line.item_id) }}</a>
@@ -168,26 +166,15 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                           @if (line.link_locked) {
                             <p class="mt-1 text-xs text-muted-foreground">Bloqueado por el usuario</p>
                           }
+                        } @else if (line.link_status === 'rejected') {
+                          <p class="mt-2 text-sm text-muted-foreground">Vinculación rechazada.</p>
                         } @else {
                           <p class="mt-2 text-sm text-muted-foreground">Sin ítem de catálogo vinculado.</p>
                         }
                       </div>
 
-                      @if (line.id && !line.link_locked) {
-                        <div class="space-y-2">
-                          <label class="text-xs text-muted-foreground" [attr.for]="'link-' + line.id">ID de ítem</label>
-                          <div class="flex flex-col gap-2 sm:flex-row">
-                            <input
-                              hlmInput
-                              class="min-w-0 flex-1 font-mono text-xs"
-                              [id]="'link-' + line.id"
-                              [(ngModel)]="draftItemIds[line.id]"
-                              [ngModelOptions]="{ standalone: true }"
-                              [placeholder]="line.item_id || 'ULID del ítem'"
-                            />
-                            <button hlmBtn size="sm" class="shrink-0" (click)="linkLine(line.id)" [disabled]="!(draftItemIds[line.id] || '').trim()">Vincular</button>
-                          </div>
-                        </div>
+                      @if (line.id && needsLinking(line)) {
+                        <app-catalog-linker [lineId]="line.id" [description]="line.description" [itemCode]="line.item_code" [suggestions]="line.suggestions || []" (resolved)="onLineResolved()" />
                       }
                     </div>
                   </div>
@@ -210,11 +197,9 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 export class DetailPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly store = inject(InvoiceDetailsStore);
-  private readonly catalogStore = inject(CatalogStore);
 
   readonly invoice = this.store.invoice;
   readonly isLoading = this.store.isLoading;
-  draftItemIds: Record<string, string> = {};
 
   ngOnInit(): void {
     const invoiceId = this.route.snapshot.paramMap.get('invoiceId');
@@ -230,6 +215,16 @@ export class DetailPage implements OnInit {
   shortId(id: string): string {
     if (!id) return '—';
     return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+  }
+
+  needsLinking(line: InvoiceLine): boolean {
+    if (line.link_locked) return false;
+    return line.link_status === 'unmatched' || line.link_status === 'suggested' || !line.link_status;
+  }
+
+  onLineResolved(): void {
+    const invoiceId = this.route.snapshot.paramMap.get('invoiceId');
+    if (invoiceId) this.store.loadInvoice(invoiceId);
   }
 
   linkingStatusLabel(status: string): string {
@@ -292,14 +287,5 @@ export class DetailPage implements OnInit {
       default:
         return method;
     }
-  }
-
-  linkLine(lineId: string): void {
-    const itemId = (this.draftItemIds[lineId] || '').trim();
-    if (!itemId) return;
-    const invoiceId = this.route.snapshot.paramMap.get('invoiceId');
-    this.catalogStore.rememberDecision(lineId, { item_id: itemId, action: 'link', remember: true, lock: true }, () => {
-      if (invoiceId) this.store.loadInvoice(invoiceId);
-    });
   }
 }

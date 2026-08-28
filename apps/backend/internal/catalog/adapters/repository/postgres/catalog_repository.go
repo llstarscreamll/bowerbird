@@ -80,6 +80,46 @@ func (r *CatalogRepository) GetItemByID(ctx context.Context, id string) (*domain
 	return &item, nil
 }
 
+func (r *CatalogRepository) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
+	out := make(map[string]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get tenant db pool: %w", err)
+	}
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return out, nil
+	}
+	rows, err := pool.Query(ctx, `SELECT id, name FROM catalog_items WHERE id = ANY($1)`, unique)
+	if err != nil {
+		return nil, fmt.Errorf("get catalog item names: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
+}
+
 func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
@@ -99,7 +139,9 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 		n++
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
-		query += fmt.Sprintf(` AND name ILIKE $%d`, n)
+		query += fmt.Sprintf(` AND (name ILIKE $%d OR EXISTS (
+			SELECT 1 FROM catalog_item_aliases a WHERE a.item_id = catalog_items.id AND a.value ILIKE $%d
+		))`, n, n)
 		args = append(args, "%"+search+"%")
 	}
 	query += ` ORDER BY name ASC`
@@ -288,6 +330,8 @@ func (r *CatalogRepository) ListReviewLines(ctx context.Context, statuses []stri
 	}
 	defer rows.Close()
 	out := make([]ports.ReviewLine, 0)
+	rawSuggestions := make([][]domain.Suggestion, 0)
+	itemIDs := make([]string, 0)
 	for rows.Next() {
 		var line ports.ReviewLine
 		var suggestionsRaw []byte
@@ -297,10 +341,39 @@ func (r *CatalogRepository) ListReviewLines(ctx context.Context, statuses []stri
 		); err != nil {
 			return nil, err
 		}
-		_ = json.Unmarshal(suggestionsRaw, &line.Suggestions)
+		var suggestions []domain.Suggestion
+		_ = json.Unmarshal(suggestionsRaw, &suggestions)
+		if suggestions == nil {
+			suggestions = []domain.Suggestion{}
+		}
+		for _, s := range suggestions {
+			if strings.TrimSpace(s.ItemID) != "" {
+				itemIDs = append(itemIDs, s.ItemID)
+			}
+		}
+		rawSuggestions = append(rawSuggestions, suggestions)
 		out = append(out, line)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	names, err := r.GetItemNames(ctx, itemIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i, suggestions := range rawSuggestions {
+		enriched := make([]ports.EnrichedSuggestion, 0, len(suggestions))
+		for _, s := range suggestions {
+			enriched = append(enriched, ports.EnrichedSuggestion{
+				ItemID: s.ItemID,
+				Name:   names[s.ItemID],
+				Score:  s.Score,
+				Reason: s.Reason,
+			})
+		}
+		out[i].Suggestions = enriched
+	}
+	return out, nil
 }
 
 func (r *CatalogRepository) GetLineLinkState(ctx context.Context, lineID string) (*ports.LineLinkState, error) {

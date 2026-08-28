@@ -37,6 +37,7 @@ func init() {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
 
