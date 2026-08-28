@@ -63,6 +63,18 @@ func (s *stubCatalog) CreateAlias(ctx context.Context, alias domain.Alias) error
 func (s *stubCatalog) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	return nil, nil
 }
+func (s *stubCatalog) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+func (s *stubCatalog) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
+	s.items[item.ID] = item
+	return nil
+}
+func (s *stubCatalog) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
+	s.items[item.ID] = item
+	return nil
+}
+
 func (s *stubCatalog) UpsertMemory(ctx context.Context, memory domain.MatchMemory) error {
 	s.mem[memory.EvidenceKey] = memory
 	return nil
@@ -116,9 +128,9 @@ func TestRememberLineDecision_LocksAndRemembers(t *testing.T) {
 	app := &application.Application{
 		Commands: application.Commands{RememberDecision: remember},
 		Queries: application.Queries{
-			GetItemByID:     queries.NewGetItemByIDQuery(stub),
+			GetItemByID:     queries.NewGetItemByIDQuery(stub, stub),
 			GetItemNames:    queries.NewGetItemNamesQuery(stub),
-			ListItems:       queries.NewListItemsQuery(stub),
+			ListItems:       queries.NewListItemsQuery(stub, stub),
 			ListReviewQueue: queries.NewListReviewQueueQuery(stub),
 		},
 	}

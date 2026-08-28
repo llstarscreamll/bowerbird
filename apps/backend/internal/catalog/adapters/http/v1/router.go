@@ -3,12 +3,13 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bowerbird/internal/catalog/application"
 	"github.com/bowerbird/internal/catalog/application/commands"
 	"github.com/bowerbird/internal/catalog/application/ports"
-	"github.com/bowerbird/internal/catalog/domain"
+	"github.com/bowerbird/internal/catalog/application/queries"
 	"github.com/bowerbird/internal/platform/config"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
@@ -26,12 +27,12 @@ func NewController(app *application.Application) *Controller {
 }
 
 type itemAttributes struct {
-	Name      string `json:"name"`
-	Kind      string `json:"kind"`
-	Status    string `json:"status"`
-	Stockable *bool  `json:"stockable"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	Name        string  `json:"name"`
+	Kind        string  `json:"kind"`
+	Status      string  `json:"status"`
+	InternalSKU *string `json:"internal_sku"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
 type itemResource struct {
@@ -62,6 +63,69 @@ func (c *Controller) GetItem(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return api.Success(w, http.StatusOK, map[string]any{"data": toItemResource(*item)})
+}
+
+func (c *Controller) CreateItem(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Data struct {
+			Type       string `json:"type"`
+			ID         string `json:"id"`
+			Attributes struct {
+				Name        string `json:"name"`
+				Kind        string `json:"kind"`
+				InternalSKU string `json:"internal_sku"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
+	}
+	if strings.TrimSpace(req.Data.Type) != "" && req.Data.Type != "catalog_items" {
+		return appErrors.New(appErrors.CodeValidation, "data.type must be catalog_items")
+	}
+	if err := c.app.Commands.CreateItem.Execute(r.Context(), commands.CreateItemInput{
+		ID:          req.Data.ID,
+		Name:        req.Data.Attributes.Name,
+		Kind:        req.Data.Attributes.Kind,
+		InternalSKU: req.Data.Attributes.InternalSKU,
+	}); err != nil {
+		return err
+	}
+	view, err := c.app.Queries.GetItemByID.Execute(r.Context(), req.Data.ID)
+	if err != nil {
+		return err
+	}
+	return api.Success(w, http.StatusCreated, map[string]any{"data": toItemResource(*view)})
+}
+
+func (c *Controller) UpdateItem(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Data struct {
+			Attributes struct {
+				Name        *string `json:"name"`
+				Kind        *string `json:"kind"`
+				Status      *string `json:"status"`
+				InternalSKU *string `json:"internal_sku"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
+	}
+	if err := c.app.Commands.UpdateItem.Execute(r.Context(), commands.UpdateItemInput{
+		ID:          r.PathValue("id"),
+		Name:        req.Data.Attributes.Name,
+		Kind:        req.Data.Attributes.Kind,
+		Status:      req.Data.Attributes.Status,
+		InternalSKU: req.Data.Attributes.InternalSKU,
+	}); err != nil {
+		return err
+	}
+	view, err := c.app.Queries.GetItemByID.Execute(r.Context(), r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	return api.Success(w, http.StatusOK, map[string]any{"data": toItemResource(*view)})
 }
 
 func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) error {
@@ -125,17 +189,17 @@ func (c *Controller) RememberLineDecision(w http.ResponseWriter, r *http.Request
 	return api.Success(w, http.StatusNoContent, nil)
 }
 
-func toItemResource(item domain.Item) itemResource {
+func toItemResource(view queries.ItemView) itemResource {
 	return itemResource{
 		Type: "catalog_items",
-		ID:   item.ID,
+		ID:   view.Item.ID,
 		Attributes: itemAttributes{
-			Name:      item.Name,
-			Kind:      item.Kind,
-			Status:    item.Status,
-			Stockable: item.Stockable,
-			CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339),
-			UpdatedAt: item.UpdatedAt.UTC().Format(time.RFC3339),
+			Name:        view.Item.Name,
+			Kind:        view.Item.Kind,
+			Status:      view.Item.Status,
+			InternalSKU: view.InternalSKU,
+			CreatedAt:   view.Item.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:   view.Item.UpdatedAt.UTC().Format(time.RFC3339),
 		},
 	}
 }
@@ -157,7 +221,9 @@ func NewRouter(controller *Controller) *Router {
 
 func (h *Router) Register(mux *http.ServeMux, cfg config.Config, authMiddleware func(http.Handler) http.Handler) {
 	mux.Handle("GET /api/v1/catalog/items", authMiddleware(api.Wrap(h.controller.ListItems, cfg)))
+	mux.Handle("POST /api/v1/catalog/items", authMiddleware(api.Wrap(h.controller.CreateItem, cfg)))
 	mux.Handle("GET /api/v1/catalog/items/{id}", authMiddleware(api.Wrap(h.controller.GetItem, cfg)))
+	mux.Handle("PATCH /api/v1/catalog/items/{id}", authMiddleware(api.Wrap(h.controller.UpdateItem, cfg)))
 	mux.Handle("GET /api/v1/catalog/review-queue", authMiddleware(api.Wrap(h.controller.ListReviewQueue, cfg)))
 	mux.Handle("POST /api/v1/catalog/lines/{lineId}/decisions", authMiddleware(api.Wrap(h.controller.RememberLineDecision, cfg)))
 }

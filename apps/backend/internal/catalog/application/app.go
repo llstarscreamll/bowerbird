@@ -14,6 +14,8 @@ type Commands struct {
 	ResolveInvoiceLine *commands.ResolveInvoiceLineCommand
 	RememberDecision   *commands.RememberDecisionCommand
 	LinkInvoiceLine    *commands.LinkInvoiceLineCommand
+	CreateItem         *commands.CreateItemCommand
+	UpdateItem         *commands.UpdateItemCommand
 }
 
 type Queries struct {

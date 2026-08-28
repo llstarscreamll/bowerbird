@@ -84,6 +84,10 @@ func (m *memAliases) CreateAlias(ctx context.Context, alias domain.Alias) error 
 	m.byKey[key] = alias
 	return nil
 }
+func (m *memAliases) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func (m *memAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	a, ok := m.byKey[aliasKey(scheme, partyID, value)]
 	if !ok {
@@ -227,6 +231,10 @@ type raceAliases struct {
 func (r *raceAliases) CreateAlias(ctx context.Context, alias domain.Alias) error {
 	return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
 }
+func (r *raceAliases) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func (r *raceAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	r.finds++
 	if r.finds == 1 {

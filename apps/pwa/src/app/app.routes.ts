@@ -71,8 +71,20 @@ export const routes: Routes = [
         loadComponent: () => import('./catalog/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },
       {
+        path: 'catalog/new',
+        loadComponent: () => import('./catalog/presentation/pages/new/new.page').then((c) => c.NewItemPage),
+      },
+      {
         path: 'catalog/review',
         loadComponent: () => import('./catalog/presentation/pages/review/review.page').then((c) => c.ReviewPage),
+      },
+      {
+        path: 'catalog/:itemId/edit',
+        loadComponent: () => import('./catalog/presentation/pages/edit/edit.page').then((c) => c.EditItemPage),
+      },
+      {
+        path: 'catalog/:itemId',
+        loadComponent: () => import('./catalog/presentation/pages/detail/detail.page').then((c) => c.DetailItemPage),
       },
     ],
   },

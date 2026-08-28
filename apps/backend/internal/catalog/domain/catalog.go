@@ -46,12 +46,18 @@ const (
 )
 
 // Item is the catalog aggregate root (goods/service/asset identity).
+//
+// Persistence notes:
+//   - Kind/Status are strings for storage; mutate only via domain factories/methods
+//     (NewManualItem, NewProvisionalItem, ChangeKind, Confirm, …). Use ItemKind() to
+//     read Kind as a value object.
+//   - Canonical InternalSKU is NOT a field here — it lives in Alias (scheme=internal_sku).
+//     Application loads/saves that alias in the same TX as Item (CatalogWriteRepository).
 type Item struct {
 	ID        string
 	Name      string
-	Kind      string
+	Kind      string // persistence; prefer ItemKind() / ChangeKind in domain logic
 	Status    string
-	Stockable *bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

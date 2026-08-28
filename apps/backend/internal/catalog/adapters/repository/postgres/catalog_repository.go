@@ -26,6 +26,7 @@ func NewCatalogRepository(registry *database.Registry) *CatalogRepository {
 var (
 	_ ports.ItemRepository            = (*CatalogRepository)(nil)
 	_ ports.AliasRepository           = (*CatalogRepository)(nil)
+	_ ports.CatalogWriteRepository    = (*CatalogRepository)(nil)
 	_ ports.MatchMemoryRepository     = (*CatalogRepository)(nil)
 	_ ports.InvoiceLineLinkRepository = (*CatalogRepository)(nil)
 )
@@ -36,9 +37,9 @@ func (r *CatalogRepository) CreateItem(ctx context.Context, item domain.Item) er
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	_, err = pool.Exec(ctx, `
-		INSERT INTO catalog_items (id, name, kind, status, stockable, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, item.ID, item.Name, item.Kind, item.Status, item.Stockable, item.CreatedAt, item.UpdatedAt)
+		INSERT INTO catalog_items (id, name, kind, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreatedAt, item.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("create catalog item: %w", err)
 	}
@@ -51,8 +52,8 @@ func (r *CatalogRepository) UpdateItem(ctx context.Context, item domain.Item) er
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	tag, err := pool.Exec(ctx, `
-		UPDATE catalog_items SET name=$2, kind=$3, status=$4, stockable=$5, updated_at=$6 WHERE id=$1
-	`, item.ID, item.Name, item.Kind, item.Status, item.Stockable, item.UpdatedAt)
+		UPDATE catalog_items SET name=$2, kind=$3, status=$4, updated_at=$5 WHERE id=$1
+	`, item.ID, item.Name, item.Kind, item.Status, item.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("update catalog item: %w", err)
 	}
@@ -69,8 +70,8 @@ func (r *CatalogRepository) GetItemByID(ctx context.Context, id string) (*domain
 	}
 	var item domain.Item
 	err = pool.QueryRow(ctx, `
-		SELECT id, name, kind, status, stockable, created_at, updated_at FROM catalog_items WHERE id=$1
-	`, id).Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.Stockable, &item.CreatedAt, &item.UpdatedAt)
+		SELECT id, name, kind, status, created_at, updated_at FROM catalog_items WHERE id=$1
+	`, id).Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -125,7 +126,7 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	if err != nil {
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
-	query := `SELECT id, name, kind, status, stockable, created_at, updated_at FROM catalog_items WHERE 1=1`
+	query := `SELECT id, name, kind, status, created_at, updated_at FROM catalog_items WHERE 1=1`
 	args := []any{}
 	n := 1
 	if filter.Kind != "" {
@@ -153,7 +154,7 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	out := make([]domain.Item, 0)
 	for rows.Next() {
 		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.Stockable, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -167,7 +168,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT id, name, kind, status, stockable, created_at, updated_at
+		SELECT id, name, kind, status, created_at, updated_at
 		FROM catalog_items
 		WHERE lower(regexp_replace(btrim(name), '\s+', ' ', 'g')) = $1
 	`, normalizedDesc)
@@ -178,7 +179,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 	out := make([]domain.Item, 0)
 	for rows.Next() {
 		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.Stockable, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -193,7 +194,7 @@ func (r *CatalogRepository) CreateAlias(ctx context.Context, alias domain.Alias)
 	}
 	_, err = pool.Exec(ctx, `
 		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -224,6 +225,122 @@ func (r *CatalogRepository) FindBySchemePartyValue(ctx context.Context, scheme, 
 		return nil, fmt.Errorf("find alias: %w", err)
 	}
 	return &alias, nil
+}
+
+func (r *CatalogRepository) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return out, nil
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get tenant db pool: %w", err)
+	}
+	unique := make([]string, 0, len(itemIDs))
+	seen := make(map[string]struct{}, len(itemIDs))
+	for _, id := range itemIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return out, nil
+	}
+	rows, err := pool.Query(ctx, `
+		SELECT item_id, value
+		FROM catalog_item_aliases
+		WHERE scheme = $1 AND item_id = ANY($2)
+	`, domain.AliasSchemeInternalSKU, unique)
+	if err != nil {
+		return nil, fmt.Errorf("list internal skus: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var itemID, value string
+		if err := rows.Scan(&itemID, &value); err != nil {
+			return nil, err
+		}
+		out[itemID] = value
+	}
+	return out, rows.Err()
+}
+
+func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO catalog_items (id, name, kind, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreatedAt, item.UpdatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return appErrors.New(appErrors.CodeConflict, "a catalog item with this id already exists")
+		}
+		return fmt.Errorf("create catalog item: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+		}
+		return fmt.Errorf("create alias: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit create item+alias: %w", err)
+	}
+	return nil
+}
+
+func (r *CatalogRepository) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE catalog_items SET name=$2, kind=$3, status=$4, updated_at=$5 WHERE id=$1
+	`, item.ID, item.Name, item.Kind, item.Status, item.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("update catalog item: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
+	}
+	if alias != nil {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt); err != nil {
+			if isUniqueViolation(err) {
+				return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+			}
+			return fmt.Errorf("create alias: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit update item: %w", err)
+	}
+	return nil
 }
 
 func (r *CatalogRepository) UpsertMemory(ctx context.Context, memory domain.MatchMemory) error {

@@ -3,7 +3,6 @@ CREATE TABLE catalog_items (
     name TEXT NOT NULL,
     kind VARCHAR(32) NOT NULL DEFAULT 'unknown',
     status VARCHAR(32) NOT NULL DEFAULT 'provisional',
-    stockable BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT catalog_items_kind_check CHECK (kind IN ('goods', 'service', 'asset', 'unknown')),

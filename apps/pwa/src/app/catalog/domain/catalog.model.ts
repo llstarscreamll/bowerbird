@@ -10,9 +10,23 @@ export interface CatalogItem {
   name: string;
   kind: string;
   status: string;
-  stockable: boolean | null;
+  internal_sku: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateCatalogItemInput {
+  id: string;
+  name: string;
+  kind: string;
+  internal_sku: string;
+}
+
+export interface UpdateCatalogItemInput {
+  name?: string;
+  kind?: string;
+  status?: string;
+  internal_sku?: string;
 }
 
 export interface CatalogReviewLine {
@@ -34,3 +48,10 @@ export interface LineDecisionPayload {
   remember: boolean;
   lock: boolean;
 }
+
+export const CATALOG_KINDS = [
+  { value: 'goods', label: 'Bien' },
+  { value: 'service', label: 'Servicio' },
+  { value: 'asset', label: 'Activo' },
+  { value: 'unknown', label: 'Desconocido' },
+] as const;

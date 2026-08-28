@@ -8,35 +8,73 @@ import (
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
+// ItemView is the HTTP/read-model projection of a catalog item plus canonical SKU.
+type ItemView struct {
+	Item        domain.Item
+	InternalSKU *string
+}
+
 type GetItemByIDQuery struct {
-	repo ports.ItemRepository
+	items   ports.ItemRepository
+	aliases ports.AliasRepository
 }
 
-func NewGetItemByIDQuery(repo ports.ItemRepository) *GetItemByIDQuery {
-	return &GetItemByIDQuery{repo: repo}
+func NewGetItemByIDQuery(items ports.ItemRepository, aliases ports.AliasRepository) *GetItemByIDQuery {
+	return &GetItemByIDQuery{items: items, aliases: aliases}
 }
 
-func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*domain.Item, error) {
-	item, err := q.repo.GetItemByID(ctx, id)
+func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*ItemView, error) {
+	item, err := q.items.GetItemByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if item == nil {
 		return nil, appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
-	return item, nil
+	skus, err := q.aliases.ListInternalSKUsByItemIDs(ctx, []string{item.ID})
+	if err != nil {
+		return nil, err
+	}
+	view := &ItemView{Item: *item}
+	if sku, ok := skus[item.ID]; ok && sku != "" {
+		s := sku
+		view.InternalSKU = &s
+	}
+	return view, nil
 }
 
 type ListItemsQuery struct {
-	repo ports.ItemRepository
+	items   ports.ItemRepository
+	aliases ports.AliasRepository
 }
 
-func NewListItemsQuery(repo ports.ItemRepository) *ListItemsQuery {
-	return &ListItemsQuery{repo: repo}
+func NewListItemsQuery(items ports.ItemRepository, aliases ports.AliasRepository) *ListItemsQuery {
+	return &ListItemsQuery{items: items, aliases: aliases}
 }
 
-func (q *ListItemsQuery) Execute(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
-	return q.repo.ListItems(ctx, filter)
+func (q *ListItemsQuery) Execute(ctx context.Context, filter ports.ItemListFilter) ([]ItemView, error) {
+	items, err := q.items.ListItems(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	skus, err := q.aliases.ListInternalSKUsByItemIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ItemView, 0, len(items))
+	for _, item := range items {
+		view := ItemView{Item: item}
+		if sku, ok := skus[item.ID]; ok && sku != "" {
+			s := sku
+			view.InternalSKU = &s
+		}
+		out = append(out, view)
+	}
+	return out, nil
 }
 
 type GetItemNamesQuery struct {

@@ -24,6 +24,16 @@ type ItemListFilter struct {
 type AliasRepository interface {
 	CreateAlias(ctx context.Context, alias domain.Alias) error
 	FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error)
+	ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error)
+}
+
+// CatalogWriteRepository is the persistence ACL for Item + canonical InternalSKU.
+// Internal SKU is an Alias (scheme=internal_sku), not a column on catalog_items;
+// create/update must keep Item and that alias in one transaction so domain
+// invariants (required SKU on manual create / confirm, SKU immutability) hold.
+type CatalogWriteRepository interface {
+	CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error
+	UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error
 }
 
 type MatchMemoryRepository interface {

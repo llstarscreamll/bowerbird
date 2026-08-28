@@ -7,6 +7,7 @@ import { BrnDialogClose, BrnDialogContent } from '@spartan-ng/brain/dialog';
 import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
 import { InvoicesStore } from '../../../application/invoices.store';
 import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload';
+import { generateUlid } from '../../../../core/utils/ulid';
 import { INVOICE_HISTORY_ACCEPT, INVOICE_HISTORY_MAX_FILE_SIZE_BYTES, supportsInvoiceHistoryFile } from '../../../domain/invoice-history-import.model';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
@@ -274,31 +275,6 @@ export class MasterPage implements OnInit {
   }
 
   private resetRequestId(): void {
-    this.importForm.patchValue({ id: this.generateUlid() });
-  }
-
-  private generateUlid(): string {
-    const ulidAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-    const timestamp = Date.now();
-    const timePart: string[] = new Array(10);
-    let value = timestamp;
-    for (let index = 9; index >= 0; index -= 1) {
-      timePart[index] = ulidAlphabet[value % 32] ?? '0';
-      value = Math.floor(value / 32);
-    }
-    const randomBytes = crypto.getRandomValues(new Uint8Array(10));
-    let randomPart = '';
-    let bitBuffer = 0;
-    let bitCount = 0;
-    for (const byte of randomBytes) {
-      bitBuffer = (bitBuffer << 8) | byte;
-      bitCount += 8;
-      while (bitCount >= 5 && randomPart.length < 16) {
-        bitCount -= 5;
-        randomPart += ulidAlphabet[(bitBuffer >> bitCount) & 31] ?? '0';
-      }
-      if (randomPart.length === 16) break;
-    }
-    return `${timePart.join('')}${randomPart}`;
+    this.importForm.patchValue({ id: generateUlid() });
   }
 }

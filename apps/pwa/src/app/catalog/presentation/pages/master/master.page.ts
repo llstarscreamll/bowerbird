@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -22,7 +22,13 @@ import { CatalogStore } from '../../../application/catalog.store';
           <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Catálogo</h1>
           <p class="mt-1 text-sm text-muted-foreground">Ítems (productos, servicios, activos) vinculados desde líneas de factura.</p>
         </div>
-        <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
+        <div class="flex flex-wrap gap-2">
+          <a hlmBtn routerLink="new">
+            <ng-icon name="lucidePlus" />
+            Nuevo
+          </a>
+          <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
+        </div>
       </header>
 
       @if (store.errorMessage(); as err) {
@@ -41,14 +47,16 @@ import { CatalogStore } from '../../../application/catalog.store';
             <thead hlmTHead>
               <tr hlmTr>
                 <th hlmTh>Nombre</th>
+                <th hlmTh>SKU</th>
                 <th hlmTh>Tipo</th>
                 <th hlmTh>Estado</th>
               </tr>
             </thead>
             <tbody hlmTBody>
               @for (item of store.items(); track item.id) {
-                <tr hlmTr>
+                <tr hlmTr class="cursor-pointer hover:bg-muted/40" (click)="openDetail(item.id)">
                   <td hlmTd class="font-medium">{{ item.name }}</td>
+                  <td hlmTd class="text-muted-foreground">{{ item.internal_sku || '—' }}</td>
                   <td hlmTd>
                     <span hlmBadge variant="secondary">{{ item.kind }}</span>
                   </td>
@@ -56,7 +64,7 @@ import { CatalogStore } from '../../../application/catalog.store';
                 </tr>
               } @empty {
                 <tr hlmTr>
-                  <td hlmTd colspan="3" class="py-10 text-center text-muted-foreground">Aún no hay ítems en el catálogo.</td>
+                  <td hlmTd colspan="4" class="py-10 text-center text-muted-foreground">Aún no hay ítems en el catálogo.</td>
                 </tr>
               }
             </tbody>
@@ -68,8 +76,14 @@ import { CatalogStore } from '../../../application/catalog.store';
 })
 export class MasterPage implements OnInit {
   readonly store = inject(CatalogStore);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {
     this.store.loadItems();
+  }
+
+  openDetail(id: string): void {
+    void this.router.navigate([id], { relativeTo: this.route });
   }
 }

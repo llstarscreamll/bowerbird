@@ -25,11 +25,13 @@ func NewApplication(registry *database.Registry) *application.Application {
 			ResolveInvoiceLine: commands.NewResolveInvoiceLineCommand(repo, repo, repo, matcher),
 			RememberDecision:   remember,
 			LinkInvoiceLine:    commands.NewLinkInvoiceLineCommand(remember),
+			CreateItem:         commands.NewCreateItemCommand(repo, repo),
+			UpdateItem:         commands.NewUpdateItemCommand(repo, repo, repo),
 		},
 		Queries: application.Queries{
-			GetItemByID:     queries.NewGetItemByIDQuery(repo),
+			GetItemByID:     queries.NewGetItemByIDQuery(repo, repo),
 			GetItemNames:    queries.NewGetItemNamesQuery(repo),
-			ListItems:       queries.NewListItemsQuery(repo),
+			ListItems:       queries.NewListItemsQuery(repo, repo),
 			ListReviewQueue: queries.NewListReviewQueueQuery(repo),
 		},
 	}
