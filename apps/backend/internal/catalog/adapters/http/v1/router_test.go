@@ -1,9 +1,7 @@
 package v1
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,14 +12,13 @@ import (
 	"github.com/bowerbird/internal/catalog/application/ports"
 	"github.com/bowerbird/internal/catalog/application/queries"
 	"github.com/bowerbird/internal/catalog/domain"
+	"github.com/bowerbird/internal/platform/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type stubCatalog struct {
 	items map[string]domain.Item
-	links map[string]ports.LineLinkState
-	mem   map[string]domain.MatchMemory
 }
 
 func (s *stubCatalog) CreateItem(ctx context.Context, item domain.Item) error {
@@ -74,84 +71,38 @@ func (s *stubCatalog) UpdateItemWithOptionalAlias(ctx context.Context, item doma
 	s.items[item.ID] = item
 	return nil
 }
-
-func (s *stubCatalog) UpsertMemory(ctx context.Context, memory domain.MatchMemory) error {
-	s.mem[memory.EvidenceKey] = memory
-	return nil
-}
+func (s *stubCatalog) UpsertMemory(ctx context.Context, memory domain.MatchMemory) error { return nil }
 func (s *stubCatalog) FindMemoryByEvidenceKey(ctx context.Context, evidenceKey string) (*domain.MatchMemory, error) {
-	m, ok := s.mem[evidenceKey]
-	if !ok {
-		return nil, nil
-	}
-	cp := m
-	return &cp, nil
-}
-func (s *stubCatalog) UpdateLineLink(ctx context.Context, lineID string, itemID *string, status, method string, locked bool, suggestions []domain.Suggestion) error {
-	st := s.links[lineID]
-	if itemID != nil {
-		st.ItemID = *itemID
-	} else {
-		st.ItemID = ""
-	}
-	st.LinkStatus = status
-	st.LinkMethod = method
-	st.LinkLocked = locked
-	s.links[lineID] = st
-	return nil
-}
-func (s *stubCatalog) ListReviewLines(ctx context.Context, statuses []string) ([]ports.ReviewLine, error) {
 	return nil, nil
 }
-func (s *stubCatalog) GetLineLinkState(ctx context.Context, lineID string) (*ports.LineLinkState, error) {
-	st, ok := s.links[lineID]
-	if !ok {
-		return nil, nil
-	}
-	cp := st
-	return &cp, nil
-}
-func (s *stubCatalog) SyncHeaderLinkingStatus(ctx context.Context, invoiceHeaderID string) error {
-	return nil
-}
 
-func TestRememberLineDecision_LocksAndRemembers(t *testing.T) {
+func TestCatalogRoutes_NoReviewQueue(t *testing.T) {
 	now := time.Now().UTC()
 	stub := &stubCatalog{
 		items: map[string]domain.Item{"ITEM-1": {ID: "ITEM-1", Name: "Widget", Kind: domain.KindUnknown, Status: domain.StatusConfirmed, CreatedAt: now, UpdatedAt: now}},
-		links: map[string]ports.LineLinkState{
-			"LINE-1": {LineID: "LINE-1", PartyID: "P1", ItemCode: "SKU-1", Description: "Widget", LinkStatus: domain.LinkStatusUnmatched},
-		},
-		mem: map[string]domain.MatchMemory{},
 	}
-	remember := commands.NewRememberDecisionCommand(stub, stub, stub, stub)
 	app := &application.Application{
-		Commands: application.Commands{RememberDecision: remember},
+		Commands: application.Commands{
+			CreateItem: commands.NewCreateItemCommand(stub, stub),
+		},
 		Queries: application.Queries{
-			GetItemByID:     queries.NewGetItemByIDQuery(stub, stub),
-			GetItemNames:    queries.NewGetItemNamesQuery(stub),
-			ListItems:       queries.NewListItemsQuery(stub, stub),
-			ListReviewQueue: queries.NewListReviewQueueQuery(stub),
+			GetItemByID:  queries.NewGetItemByIDQuery(stub, stub),
+			GetItemNames: queries.NewGetItemNamesQuery(stub),
+			ListItems:    queries.NewListItemsQuery(stub, stub),
 		},
 	}
 	ctrl := NewController(app)
-	body, _ := json.Marshal(map[string]any{
-		"data": map[string]any{
-			"attributes": map[string]any{
-				"item_id":  "ITEM-1",
-				"action":   "link",
-				"remember": true,
-				"lock":     true,
-			},
-		},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/catalog/lines/LINE-1/decisions", bytes.NewReader(body))
-	req.SetPathValue("lineId", "LINE-1")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/catalog/items", nil)
 	rr := httptest.NewRecorder()
-	err := ctrl.RememberLineDecision(rr, req)
+	err := ctrl.ListItems(rr, req)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusNoContent, rr.Code)
-	assert.True(t, stub.links["LINE-1"].LinkLocked)
-	assert.Equal(t, "ITEM-1", stub.links["LINE-1"].ItemID)
-	assert.NotEmpty(t, stub.mem)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	reviewReq := httptest.NewRequest(http.MethodGet, "/api/v1/catalog/review-queue", nil)
+	reviewRR := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	NewRouter(ctrl).Register(mux, config.Config{}, func(next http.Handler) http.Handler { return next })
+	mux.ServeHTTP(reviewRR, reviewReq)
+	assert.Equal(t, http.StatusNotFound, reviewRR.Code)
 }

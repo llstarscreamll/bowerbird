@@ -50,6 +50,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
             <p class="mt-1 text-sm text-muted-foreground">Gestiona tus facturas electrónicas.</p>
           </div>
           <div class="flex items-center gap-3">
+            <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
             @if (hasInvoices()) {
               <button hlmBtn variant="outline" (click)="openImportModal()">
                 <ng-icon name="lucideCloudDownload" />

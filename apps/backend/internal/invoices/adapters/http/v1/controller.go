@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
@@ -100,4 +101,77 @@ func (c *Controller) GetInvoiceByID(w http.ResponseWriter, r *http.Request) erro
 
 	resp := newInvoiceDetailsResponse(result)
 	return api.Success(w, http.StatusOK, resp)
+}
+
+func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) error {
+	lines, err := c.app.Queries.ListReviewQueue.Execute(r.Context())
+	if err != nil {
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list review queue")
+	}
+	data := make([]map[string]any, 0, len(lines))
+	for _, line := range lines {
+		suggestions := make([]map[string]any, 0, len(line.Suggestions))
+		for _, s := range line.Suggestions {
+			suggestions = append(suggestions, map[string]any{
+				"item_id": s.ItemID,
+				"name":    s.Name,
+				"score":   s.Score,
+				"reason":  s.Reason,
+			})
+		}
+		data = append(data, map[string]any{
+			"type": "invoice_lines",
+			"id":   line.LineID,
+			"attributes": map[string]any{
+				"line_number": line.LineNumber,
+				"item_code":   line.ItemCode,
+				"description": line.Description,
+				"item_id":     nullIfEmptyStr(line.ItemID),
+				"link_status": line.LinkStatus,
+				"link_method": nullIfEmptyStr(line.LinkMethod),
+				"link_locked": line.LinkLocked,
+				"suggestions": suggestions,
+			},
+			"relationships": map[string]any{
+				"invoice": map[string]any{
+					"data": map[string]any{
+						"type": "invoices",
+						"id":   line.InvoiceHeaderID,
+					},
+				},
+			},
+		})
+	}
+	return api.Success(w, http.StatusOK, map[string]any{"data": data})
+}
+
+func (c *Controller) ApplyLineDecision(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Data struct {
+			Type       string `json:"type"`
+			Attributes struct {
+				ItemID   string `json:"item_id"`
+				Action   string `json:"action"`
+				Remember bool   `json:"remember"`
+				Lock     bool   `json:"lock"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
+	}
+	if strings.TrimSpace(req.Data.Type) != "" && req.Data.Type != "invoice_line_decisions" {
+		return appErrors.New(appErrors.CodeValidation, "data.type must be invoice_line_decisions")
+	}
+	if err := c.app.Commands.ApplyLineDecision.Execute(r.Context(), commands.ApplyLineDecisionInput{
+		InvoiceID: r.PathValue("invoiceId"),
+		LineID:    r.PathValue("lineId"),
+		ItemID:    req.Data.Attributes.ItemID,
+		Action:    req.Data.Attributes.Action,
+		Remember:  req.Data.Attributes.Remember,
+		Lock:      req.Data.Attributes.Lock,
+	}); err != nil {
+		return err
+	}
+	return api.Success(w, http.StatusNoContent, nil)
 }

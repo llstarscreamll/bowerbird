@@ -234,19 +234,14 @@ func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain
 				resolveErr = err
 				break
 			}
-			var itemID *string
-			if result.ItemID != "" {
-				idCopy := result.ItemID
-				itemID = &idCopy
-			}
-			suggestions := normalizeSuggestionsJSON(result.Suggestions)
-			updates = append(updates, ports.LineLinkUpdate{
-				LineID:      line.ID,
-				ItemID:      itemID,
-				LinkStatus:  result.Status,
-				LinkMethod:  result.Method,
-				Suggestions: suggestions,
-			})
+			link := domain.LineLinkFromRecord(
+				result.ItemID,
+				result.Status,
+				result.Method,
+				false,
+				normalizeSuggestionsJSON(result.Suggestions),
+			)
+			updates = append(updates, ports.NewLineLinkUpdate(line.ID, link))
 		}
 	}
 
@@ -254,9 +249,13 @@ func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain
 	if partyID != "" {
 		partyPtr = &partyID
 	}
-	linkingStatus := "linked"
+	statuses := make([]string, 0, len(updates))
+	for _, u := range updates {
+		statuses = append(statuses, u.LinkStatus)
+	}
+	linkingStatus := domain.RecalculateLinkingStatus(statuses)
 	if resolveErr != nil {
-		linkingStatus = "failed"
+		linkingStatus = domain.LinkingStatusFailed
 	}
 
 	if err := cmd.repo.ApplyCatalogLinking(ctx, header.ID, partyPtr, linkingStatus, updates); err != nil {

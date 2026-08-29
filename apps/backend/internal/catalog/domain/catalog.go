@@ -299,41 +299,6 @@ func CanMintProvisional(partyID, itemCode string) bool {
 	return strings.TrimSpace(partyID) != "" && NormalizeItemCode(itemCode) != ""
 }
 
-// ManualLinkDecision is the invoice-line outcome of a human review action.
-type ManualLinkDecision struct {
-	ItemID *string
-	Status string
-	Method string
-}
-
-// DecideManualLink derives line link fields for link | never_match.
-func DecideManualLink(action, itemID string) (ManualLinkDecision, error) {
-	action = strings.TrimSpace(action)
-	if action == "" {
-		action = MemoryActionLink
-	}
-	switch action {
-	case MemoryActionLink:
-		if strings.TrimSpace(itemID) == "" {
-			return ManualLinkDecision{}, ErrItemIDRequired
-		}
-		idCopy := strings.TrimSpace(itemID)
-		return ManualLinkDecision{
-			ItemID: &idCopy,
-			Status: LinkStatusLinked,
-			Method: LinkMethodManual,
-		}, nil
-	case MemoryActionNeverMatch:
-		return ManualLinkDecision{
-			ItemID: nil,
-			Status: LinkStatusRejected,
-			Method: LinkMethodManual,
-		}, nil
-	default:
-		return ManualLinkDecision{}, ErrInvalidMemoryAction
-	}
-}
-
 func NormalizeItemCode(code string) string {
 	return strings.TrimSpace(code)
 }

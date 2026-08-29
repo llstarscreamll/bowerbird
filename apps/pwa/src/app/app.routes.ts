@@ -55,6 +55,10 @@ export const routes: Routes = [
         loadComponent: () => import('./invoices/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },
       {
+        path: 'invoices/review',
+        loadComponent: () => import('./invoices/presentation/pages/review/review.page').then((c) => c.ReviewPage),
+      },
+      {
         path: 'invoices/:invoiceId',
         loadComponent: () => import('./invoices/presentation/pages/detail/detail.page').then((c) => c.DetailPage),
       },
@@ -73,10 +77,6 @@ export const routes: Routes = [
       {
         path: 'catalog/new',
         loadComponent: () => import('./catalog/presentation/pages/new/new.page').then((c) => c.NewItemPage),
-      },
-      {
-        path: 'catalog/review',
-        loadComponent: () => import('./catalog/presentation/pages/review/review.page').then((c) => c.ReviewPage),
       },
       {
         path: 'catalog/:itemId/edit',

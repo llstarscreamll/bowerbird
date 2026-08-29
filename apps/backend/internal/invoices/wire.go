@@ -31,6 +31,7 @@ func NewApplication(
 	partyResolver ports.IssuerPartyResolver,
 	lineResolver ports.CatalogLineResolver,
 	catalogService ports.CatalogService,
+	catalogMatching ports.CatalogMatchingPort,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -74,11 +75,13 @@ func NewApplication(
 				passwordResolver,
 				createInvoice,
 			),
-			CreateInvoice: createInvoice,
+			CreateInvoice:     createInvoice,
+			ApplyLineDecision: commands.NewApplyLineDecisionCommand(invoiceRepository, catalogMatching),
 		},
 		Queries: application.Queries{
-			GetInvoiceByID: queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogService),
-			ListInvoices:   queries.NewListInvoicesQuery(invoiceRepository),
+			GetInvoiceByID:  queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogService),
+			ListInvoices:    queries.NewListInvoicesQuery(invoiceRepository),
+			ListReviewQueue: queries.NewListReviewQueueQuery(invoiceRepository, catalogService),
 		},
 	}
 }

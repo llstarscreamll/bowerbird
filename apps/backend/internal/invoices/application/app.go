@@ -15,9 +15,11 @@ type Commands struct {
 	QueueInvoiceExtractionFromFiles *commands.QueueInvoiceExtractionFromFilesCommand
 	ProcessInvoiceExtractionJob     *commands.CreateInvoicesFromFilesCommand
 	CreateInvoice                   *commands.CreateInvoiceCommand
+	ApplyLineDecision               *commands.ApplyLineDecisionCommand
 }
 
 type Queries struct {
-	GetInvoiceByID *queries.GetInvoiceByIDQuery
-	ListInvoices   *queries.ListInvoicesQuery
+	GetInvoiceByID  *queries.GetInvoiceByIDQuery
+	ListInvoices    *queries.ListInvoicesQuery
+	ListReviewQueue *queries.ListReviewQueueQuery
 }

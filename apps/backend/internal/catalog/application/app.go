@@ -11,16 +11,17 @@ type Application struct {
 }
 
 type Commands struct {
-	ResolveInvoiceLine *commands.ResolveInvoiceLineCommand
-	RememberDecision   *commands.RememberDecisionCommand
-	LinkInvoiceLine    *commands.LinkInvoiceLineCommand
-	CreateItem         *commands.CreateItemCommand
-	UpdateItem         *commands.UpdateItemCommand
+	ResolveInvoiceLine          *commands.ResolveInvoiceLineCommand
+	ValidateCatalogItem         *commands.ValidateCatalogItemCommand
+	MintProvisionalFromEvidence *commands.MintProvisionalFromEvidenceCommand
+	EnsureSupplierAlias         *commands.EnsureSupplierAliasCommand
+	RecordMatchMemory           *commands.RecordMatchMemoryCommand
+	CreateItem                  *commands.CreateItemCommand
+	UpdateItem                  *commands.UpdateItemCommand
 }
 
 type Queries struct {
-	GetItemByID     *queries.GetItemByIDQuery
-	GetItemNames    *queries.GetItemNamesQuery
-	ListItems       *queries.ListItemsQuery
-	ListReviewQueue *queries.ListReviewQueueQuery
+	GetItemByID  *queries.GetItemByIDQuery
+	GetItemNames *queries.GetItemNamesQuery
+	ListItems    *queries.ListItemsQuery
 }

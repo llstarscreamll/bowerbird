@@ -89,7 +89,7 @@ func TestCreateInvoice_LinksPartyAndProvisionalItem(t *testing.T) {
 	require.NotNil(t, result)
 	assert.True(t, repo.persisted)
 	assert.True(t, repo.applied)
-	assert.Equal(t, "linked", repo.status)
+	assert.Equal(t, domain.LinkingStatusPending, repo.status)
 	require.NotNil(t, repo.partyID)
 	assert.Equal(t, "PARTY-1", *repo.partyID)
 	require.Len(t, repo.lines, 2)

@@ -7,6 +7,7 @@ import (
 	catalogApp "github.com/bowerbird/internal/catalog/application"
 	catalogDomain "github.com/bowerbird/internal/catalog/domain"
 	"github.com/bowerbird/internal/invoices/application/ports"
+	"github.com/bowerbird/internal/invoices/domain"
 	partiesApp "github.com/bowerbird/internal/parties/application"
 )
 
@@ -44,7 +45,7 @@ func NewCatalogResolverAdapter(app *catalogApp.Application) *CatalogResolverAdap
 
 func (a *CatalogResolverAdapter) ResolveLine(ctx context.Context, input ports.CatalogLineResolveInput) (*ports.CatalogLineResolveResult, error) {
 	if a == nil || a.app == nil || a.app.Commands.ResolveInvoiceLine == nil {
-		return &ports.CatalogLineResolveResult{Status: catalogDomain.LinkStatusUnmatched}, nil
+		return &ports.CatalogLineResolveResult{Status: domain.LinkStatusUnmatched}, nil
 	}
 	result, err := a.app.Commands.ResolveInvoiceLine.Execute(ctx, catalogDomain.LineResolutionInput{
 		LineID:         input.LineID,
@@ -59,13 +60,15 @@ func (a *CatalogResolverAdapter) ResolveLine(ctx context.Context, input ports.Ca
 	if err != nil {
 		return nil, err
 	}
-	suggestions := result.Suggestions
-	if suggestions == nil {
-		suggestions = []catalogDomain.Suggestion{}
+	if result == nil {
+		return &ports.CatalogLineResolveResult{Status: domain.LinkStatusUnmatched}, nil
 	}
-	suggestionsJSON, err := json.Marshal(suggestions)
-	if err != nil {
-		return nil, err
+	suggestionsJSON := []byte("[]")
+	if result.Suggestions != nil {
+		suggestionsJSON, err = json.Marshal(result.Suggestions)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &ports.CatalogLineResolveResult{
 		ItemID:      result.ItemID,

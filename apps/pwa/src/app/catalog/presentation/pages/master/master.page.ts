@@ -27,7 +27,6 @@ import { CatalogStore } from '../../../application/catalog.store';
             <ng-icon name="lucidePlus" />
             Nuevo
           </a>
-          <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
         </div>
       </header>
 

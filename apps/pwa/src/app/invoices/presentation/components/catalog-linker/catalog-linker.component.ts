@@ -7,8 +7,10 @@ import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
-import { CatalogStore } from '../../../application/catalog.store';
-import { CatalogItem, CatalogSuggestion } from '../../../domain/catalog.model';
+import { CatalogStore } from '../../../../catalog/application/catalog.store';
+import { CatalogItem } from '../../../../catalog/domain/catalog.model';
+import { InvoicesStore } from '../../../application/invoices.store';
+import { LineDecisionPayload } from '../../../domain/invoice.model';
 
 @Component({
   selector: 'app-catalog-linker',
@@ -70,14 +72,16 @@ import { CatalogItem, CatalogSuggestion } from '../../../domain/catalog.model';
   `,
 })
 export class CatalogLinkerComponent implements OnInit {
-  private readonly store = inject(CatalogStore);
+  private readonly catalogStore = inject(CatalogStore);
+  private readonly invoicesStore = inject(InvoicesStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly search$ = new Subject<string>();
 
   readonly lineId = input.required<string>();
+  readonly invoiceId = input.required<string>();
   readonly description = input('');
   readonly itemCode = input('');
-  readonly suggestions = input<CatalogSuggestion[]>([]);
+  readonly suggestions = input<{ item_id: string; name?: string; score: number; reason: string }[]>([]);
   readonly resolved = output<void>();
 
   readonly searchResults = signal<CatalogItem[]>([]);
@@ -85,7 +89,6 @@ export class CatalogLinkerComponent implements OnInit {
   readonly busy = signal(false);
   readonly selectedItemId = signal<string | null>(null);
 
-  /** Disable client-side filtering; results come from the API. */
   readonly passthroughFilter = () => true;
 
   ngOnInit(): void {
@@ -95,7 +98,7 @@ export class CatalogLinkerComponent implements OnInit {
         distinctUntilChanged(),
         switchMap((query) => {
           this.searching.set(true);
-          return this.store.searchItems(query);
+          return this.catalogStore.searchItems(query);
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -130,9 +133,9 @@ export class CatalogLinkerComponent implements OnInit {
     this.run({ action: 'create_provisional', remember: true, lock: true });
   }
 
-  private run(payload: Parameters<CatalogStore['resolveDecision']>[1]): void {
+  private run(payload: LineDecisionPayload): void {
     this.busy.set(true);
-    this.store.resolveDecision(this.lineId(), payload).subscribe((ok) => {
+    this.invoicesStore.resolveLineDecision(this.invoiceId(), this.lineId(), payload).subscribe((ok) => {
       this.busy.set(false);
       if (ok) this.resolved.emit();
     });

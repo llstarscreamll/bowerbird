@@ -88,15 +88,3 @@ func NewGetItemNamesQuery(repo ports.ItemRepository) *GetItemNamesQuery {
 func (q *GetItemNamesQuery) Execute(ctx context.Context, ids []string) (map[string]string, error) {
 	return q.repo.GetItemNames(ctx, ids)
 }
-
-type ListReviewQueueQuery struct {
-	repo ports.InvoiceLineLinkRepository
-}
-
-func NewListReviewQueueQuery(repo ports.InvoiceLineLinkRepository) *ListReviewQueueQuery {
-	return &ListReviewQueueQuery{repo: repo}
-}
-
-func (q *ListReviewQueueQuery) Execute(ctx context.Context) ([]ports.ReviewLine, error) {
-	return q.repo.ListReviewLines(ctx, []string{domain.LinkStatusUnmatched, domain.LinkStatusSuggested})
-}

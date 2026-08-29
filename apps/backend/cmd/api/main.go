@@ -150,6 +150,7 @@ func main() {
 		invoiceLinking.NewPartyResolverAdapter(partiesApp),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
+		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

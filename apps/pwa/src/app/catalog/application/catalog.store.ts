@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { ToastService } from '../../core/services/toast.service';
 import { CatalogHttpService } from '../infrastructure/catalog.http.service';
-import { CatalogItem, CatalogReviewLine, CreateCatalogItemInput, LineDecisionPayload, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogItem, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogStore {
@@ -12,7 +12,6 @@ export class CatalogStore {
 
   readonly items = signal<CatalogItem[]>([]);
   readonly selectedItem = signal<CatalogItem | null>(null);
-  readonly reviewLines = signal<CatalogReviewLine[]>([]);
   readonly loading = signal(false);
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
@@ -81,37 +80,6 @@ export class CatalogStore {
         this.submitting.set(false);
         this.handleError(err, 'No se pudo actualizar el ítem.');
         return of(null);
-      }),
-    );
-  }
-
-  loadReviewQueue(): void {
-    this.loading.set(true);
-    this.errorMessage.set(null);
-    this.http.listReviewQueue().subscribe({
-      next: (lines) => {
-        this.reviewLines.set(lines);
-        this.loading.set(false);
-      },
-      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo cargar la cola de revisión.'),
-    });
-  }
-
-  rememberDecision(lineId: string, payload: LineDecisionPayload, onDone?: () => void): void {
-    this.resolveDecision(lineId, payload).subscribe((ok) => {
-      if (ok) onDone?.();
-    });
-  }
-
-  /** Returns true when the decision was persisted successfully. */
-  resolveDecision(lineId: string, payload: LineDecisionPayload): Observable<boolean> {
-    this.errorMessage.set(null);
-    return this.http.rememberDecision(lineId, payload).pipe(
-      tap(() => this.toast.showSuccess('Decisión de coincidencia guardada.')),
-      map(() => true),
-      catchError((err: HttpErrorResponse) => {
-        this.handleError(err, 'No se pudo guardar la decisión.');
-        return of(false);
       }),
     );
   }

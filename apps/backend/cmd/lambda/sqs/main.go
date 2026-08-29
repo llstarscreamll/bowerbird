@@ -51,6 +51,7 @@ func init() {
 		invoiceLinking.NewPartyResolverAdapter(partiesApp),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
+		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),
 	)
 
 	processorCommand := invoicesJobs.NewInvoiceExtractionRequestedProcessor(

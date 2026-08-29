@@ -20,6 +20,18 @@ type LineLinkUpdate struct {
 	Suggestions []byte
 }
 
+func NewLineLinkUpdate(lineID string, link domain.LineLink) LineLinkUpdate {
+	itemID, status, method, locked, suggestions := link.PersistFields()
+	return LineLinkUpdate{
+		LineID:      lineID,
+		ItemID:      itemID,
+		LinkStatus:  status,
+		LinkMethod:  method,
+		LinkLocked:  locked,
+		Suggestions: suggestions,
+	}
+}
+
 type InvoiceQueryRepository interface {
 	GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error)
 	ListInvoices(ctx context.Context, limit int, cursor string) ([]domain.InvoiceHeaderRecord, bool, error)

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -24,11 +23,10 @@ func NewCatalogRepository(registry *database.Registry) *CatalogRepository {
 }
 
 var (
-	_ ports.ItemRepository            = (*CatalogRepository)(nil)
-	_ ports.AliasRepository           = (*CatalogRepository)(nil)
-	_ ports.CatalogWriteRepository    = (*CatalogRepository)(nil)
-	_ ports.MatchMemoryRepository     = (*CatalogRepository)(nil)
-	_ ports.InvoiceLineLinkRepository = (*CatalogRepository)(nil)
+	_ ports.ItemRepository         = (*CatalogRepository)(nil)
+	_ ports.AliasRepository        = (*CatalogRepository)(nil)
+	_ ports.CatalogWriteRepository = (*CatalogRepository)(nil)
+	_ ports.MatchMemoryRepository  = (*CatalogRepository)(nil)
 )
 
 func (r *CatalogRepository) CreateItem(ctx context.Context, item domain.Item) error {
@@ -390,157 +388,6 @@ func (r *CatalogRepository) FindMemoryByEvidenceKey(ctx context.Context, evidenc
 		return nil, fmt.Errorf("find match memory: %w", err)
 	}
 	return &mem, nil
-}
-
-func (r *CatalogRepository) UpdateLineLink(
-	ctx context.Context,
-	lineID string,
-	itemID *string,
-	status, method string,
-	locked bool,
-	suggestions []domain.Suggestion,
-) error {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return fmt.Errorf("get tenant db pool: %w", err)
-	}
-	if suggestions == nil {
-		suggestions = []domain.Suggestion{}
-	}
-	raw, err := json.Marshal(suggestions)
-	if err != nil {
-		return fmt.Errorf("marshal suggestions: %w", err)
-	}
-	tag, err := pool.Exec(ctx, `
-		UPDATE invoice_lines
-		SET item_id = $2, link_status = $3, link_method = NULLIF($4, ''), link_locked = $5,
-		    suggestions = $6::jsonb, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
-	`, lineID, itemID, status, method, locked, raw)
-	if err != nil {
-		return fmt.Errorf("update line link: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "invoice line not found")
-	}
-	return nil
-}
-
-func (r *CatalogRepository) ListReviewLines(ctx context.Context, statuses []string) ([]ports.ReviewLine, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get tenant db pool: %w", err)
-	}
-	if len(statuses) == 0 {
-		statuses = []string{domain.LinkStatusUnmatched, domain.LinkStatusSuggested}
-	}
-	rows, err := pool.Query(ctx, `
-		SELECT l.id, l.invoice_header_id, l.line_number, COALESCE(l.item_code, ''), COALESCE(l.description, ''),
-			COALESCE(l.item_id, ''), l.link_status, COALESCE(l.link_method, ''), l.link_locked, l.suggestions
-		FROM invoice_lines l
-		WHERE l.link_status = ANY($1)
-		ORDER BY l.updated_at DESC
-		LIMIT 200
-	`, statuses)
-	if err != nil {
-		return nil, fmt.Errorf("list review lines: %w", err)
-	}
-	defer rows.Close()
-	out := make([]ports.ReviewLine, 0)
-	rawSuggestions := make([][]domain.Suggestion, 0)
-	itemIDs := make([]string, 0)
-	for rows.Next() {
-		var line ports.ReviewLine
-		var suggestionsRaw []byte
-		if err := rows.Scan(
-			&line.LineID, &line.InvoiceHeaderID, &line.LineNumber, &line.ItemCode, &line.Description,
-			&line.ItemID, &line.LinkStatus, &line.LinkMethod, &line.LinkLocked, &suggestionsRaw,
-		); err != nil {
-			return nil, err
-		}
-		var suggestions []domain.Suggestion
-		_ = json.Unmarshal(suggestionsRaw, &suggestions)
-		if suggestions == nil {
-			suggestions = []domain.Suggestion{}
-		}
-		for _, s := range suggestions {
-			if strings.TrimSpace(s.ItemID) != "" {
-				itemIDs = append(itemIDs, s.ItemID)
-			}
-		}
-		rawSuggestions = append(rawSuggestions, suggestions)
-		out = append(out, line)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	names, err := r.GetItemNames(ctx, itemIDs)
-	if err != nil {
-		return nil, err
-	}
-	for i, suggestions := range rawSuggestions {
-		enriched := make([]ports.EnrichedSuggestion, 0, len(suggestions))
-		for _, s := range suggestions {
-			enriched = append(enriched, ports.EnrichedSuggestion{
-				ItemID: s.ItemID,
-				Name:   names[s.ItemID],
-				Score:  s.Score,
-				Reason: s.Reason,
-			})
-		}
-		out[i].Suggestions = enriched
-	}
-	return out, nil
-}
-
-func (r *CatalogRepository) GetLineLinkState(ctx context.Context, lineID string) (*ports.LineLinkState, error) {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get tenant db pool: %w", err)
-	}
-	var state ports.LineLinkState
-	err = pool.QueryRow(ctx, `
-		SELECT l.id, l.invoice_header_id, COALESCE(l.item_id, ''), l.link_status, COALESCE(l.link_method, ''), l.link_locked,
-			COALESCE(l.item_code, ''), COALESCE(l.description, ''), COALESCE(h.issuer_party_id, '')
-		FROM invoice_lines l
-		JOIN invoice_headers h ON h.id = l.invoice_header_id
-		WHERE l.id = $1
-	`, lineID).Scan(
-		&state.LineID, &state.InvoiceHeaderID, &state.ItemID, &state.LinkStatus, &state.LinkMethod, &state.LinkLocked,
-		&state.ItemCode, &state.Description, &state.PartyID,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get line link state: %w", err)
-	}
-	return &state, nil
-}
-
-func (r *CatalogRepository) SyncHeaderLinkingStatus(ctx context.Context, invoiceHeaderID string) error {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return fmt.Errorf("get tenant db pool: %w", err)
-	}
-	// linked when no open review work remains; otherwise pending (user has acted on a failed/pending invoice).
-	_, err = pool.Exec(ctx, `
-		UPDATE invoice_headers h
-		SET linking_status = CASE
-			WHEN EXISTS (
-				SELECT 1 FROM invoice_lines l
-				WHERE l.invoice_header_id = h.id
-				  AND l.link_status IN ('unmatched', 'suggested')
-			) THEN 'pending'
-			ELSE 'linked'
-		END,
-		updated_at = CURRENT_TIMESTAMP
-		WHERE h.id = $1
-	`, invoiceHeaderID)
-	if err != nil {
-		return fmt.Errorf("sync invoice header linking status: %w", err)
-	}
-	return nil
 }
 
 func isUniqueViolation(err error) bool {

@@ -19,20 +19,20 @@ func NewApplication(registry *database.Registry) *application.Application {
 	}
 	repo := catalogRepo.NewCatalogRepository(registry)
 	matcher := matchers.NewNormalizedDescriptionMatcher(repo)
-	remember := commands.NewRememberDecisionCommand(repo, repo, repo, repo)
 	return &application.Application{
 		Commands: application.Commands{
-			ResolveInvoiceLine: commands.NewResolveInvoiceLineCommand(repo, repo, repo, matcher),
-			RememberDecision:   remember,
-			LinkInvoiceLine:    commands.NewLinkInvoiceLineCommand(remember),
-			CreateItem:         commands.NewCreateItemCommand(repo, repo),
-			UpdateItem:         commands.NewUpdateItemCommand(repo, repo, repo),
+			ResolveInvoiceLine:          commands.NewResolveInvoiceLineCommand(repo, repo, repo, matcher),
+			ValidateCatalogItem:         commands.NewValidateCatalogItemCommand(repo),
+			MintProvisionalFromEvidence: commands.NewMintProvisionalFromEvidenceCommand(repo, repo),
+			EnsureSupplierAlias:         commands.NewEnsureSupplierAliasCommand(repo),
+			RecordMatchMemory:           commands.NewRecordMatchMemoryCommand(repo),
+			CreateItem:                  commands.NewCreateItemCommand(repo, repo),
+			UpdateItem:                  commands.NewUpdateItemCommand(repo, repo, repo),
 		},
 		Queries: application.Queries{
-			GetItemByID:     queries.NewGetItemByIDQuery(repo, repo),
-			GetItemNames:    queries.NewGetItemNamesQuery(repo),
-			ListItems:       queries.NewListItemsQuery(repo, repo),
-			ListReviewQueue: queries.NewListReviewQueueQuery(repo),
+			GetItemByID:  queries.NewGetItemByIDQuery(repo, repo),
+			GetItemNames: queries.NewGetItemNamesQuery(repo),
+			ListItems:    queries.NewListItemsQuery(repo, repo),
 		},
 	}
 }

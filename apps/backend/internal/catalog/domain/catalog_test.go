@@ -37,21 +37,6 @@ func TestNewSupplierSKUAlias(t *testing.T) {
 	assert.False(t, alias.PointsTo("OTHER"))
 }
 
-func TestDecideManualLink(t *testing.T) {
-	linked, err := DecideManualLink(MemoryActionLink, "ITEM-1")
-	require.NoError(t, err)
-	assert.Equal(t, LinkStatusLinked, linked.Status)
-	require.NotNil(t, linked.ItemID)
-
-	rejected, err := DecideManualLink(MemoryActionNeverMatch, "ITEM-1")
-	require.NoError(t, err)
-	assert.Equal(t, LinkStatusRejected, rejected.Status)
-	assert.Nil(t, rejected.ItemID)
-
-	_, err = DecideManualLink(MemoryActionLink, "")
-	assert.ErrorIs(t, err, ErrItemIDRequired)
-}
-
 func TestPreserveLockedLinkAndSoftStatus(t *testing.T) {
 	assert.Nil(t, PreserveLockedLink(LineResolutionInput{}))
 	preserved := PreserveLockedLink(LineResolutionInput{

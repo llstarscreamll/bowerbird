@@ -48,6 +48,26 @@ export interface InvoiceDetails extends InvoiceSummary {
   lines: InvoiceLine[];
 }
 
+export interface InvoiceReviewLine {
+  id: string;
+  invoice_header_id: string;
+  line_number: number;
+  item_code: string;
+  description: string;
+  item_id: string | null;
+  link_status: string;
+  link_method: string | null;
+  link_locked: boolean;
+  suggestions: { item_id: string; name?: string; score: number; reason: string }[];
+}
+
+export interface LineDecisionPayload {
+  item_id?: string;
+  action: 'link' | 'never_match' | 'create_provisional';
+  remember: boolean;
+  lock: boolean;
+}
+
 // JSON:API Types
 export interface JsonApiDocument<T> {
   type: string;

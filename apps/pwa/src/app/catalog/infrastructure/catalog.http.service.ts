@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CatalogItem, CatalogReviewLine, CreateCatalogItemInput, LineDecisionPayload, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogItem, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogHttpService {
@@ -47,22 +47,5 @@ export class CatalogHttpService {
         data: { attributes: input },
       })
       .pipe(map((res) => ({ id: res.data.id, ...res.data.attributes })));
-  }
-
-  listReviewQueue(): Observable<CatalogReviewLine[]> {
-    return this.http.get<{ data: { id: string; attributes: Omit<CatalogReviewLine, 'id'> }[] }>(`${this.apiDomain}/api/v1/catalog/review-queue`).pipe(
-      map((res) =>
-        res.data.map((doc) => ({
-          id: doc.id,
-          ...doc.attributes,
-        })),
-      ),
-    );
-  }
-
-  rememberDecision(lineId: string, payload: LineDecisionPayload): Observable<void> {
-    return this.http.post<void>(`${this.apiDomain}/api/v1/catalog/lines/${lineId}/decisions`, {
-      data: { attributes: payload },
-    });
   }
 }

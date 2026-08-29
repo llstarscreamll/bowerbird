@@ -128,67 +128,6 @@ func (c *Controller) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 	return api.Success(w, http.StatusOK, map[string]any{"data": toItemResource(*view)})
 }
 
-func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) error {
-	lines, err := c.app.Queries.ListReviewQueue.Execute(r.Context())
-	if err != nil {
-		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list review queue")
-	}
-	data := make([]map[string]any, 0, len(lines))
-	for _, line := range lines {
-		suggestions := make([]map[string]any, 0, len(line.Suggestions))
-		for _, s := range line.Suggestions {
-			suggestions = append(suggestions, map[string]any{
-				"item_id": s.ItemID,
-				"name":    s.Name,
-				"score":   s.Score,
-				"reason":  s.Reason,
-			})
-		}
-		data = append(data, map[string]any{
-			"type": "catalog_review_lines",
-			"id":   line.LineID,
-			"attributes": map[string]any{
-				"invoice_header_id": line.InvoiceHeaderID,
-				"line_number":       line.LineNumber,
-				"item_code":         line.ItemCode,
-				"description":       line.Description,
-				"item_id":           nullIfEmptyStr(line.ItemID),
-				"link_status":       line.LinkStatus,
-				"link_method":       nullIfEmptyStr(line.LinkMethod),
-				"link_locked":       line.LinkLocked,
-				"suggestions":       suggestions,
-			},
-		})
-	}
-	return api.Success(w, http.StatusOK, map[string]any{"data": data})
-}
-
-func (c *Controller) RememberLineDecision(w http.ResponseWriter, r *http.Request) error {
-	var req struct {
-		Data struct {
-			Attributes struct {
-				ItemID   string `json:"item_id"`
-				Action   string `json:"action"`
-				Remember bool   `json:"remember"`
-				Lock     bool   `json:"lock"`
-			} `json:"attributes"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
-	}
-	if err := c.app.Commands.RememberDecision.Execute(r.Context(), commands.RememberDecisionInput{
-		LineID:   r.PathValue("lineId"),
-		ItemID:   req.Data.Attributes.ItemID,
-		Action:   req.Data.Attributes.Action,
-		Remember: req.Data.Attributes.Remember,
-		Lock:     req.Data.Attributes.Lock,
-	}); err != nil {
-		return err
-	}
-	return api.Success(w, http.StatusNoContent, nil)
-}
-
 func toItemResource(view queries.ItemView) itemResource {
 	return itemResource{
 		Type: "catalog_items",
@@ -204,13 +143,6 @@ func toItemResource(view queries.ItemView) itemResource {
 	}
 }
 
-func nullIfEmptyStr(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
-}
-
 type Router struct {
 	controller *Controller
 }
@@ -224,6 +156,4 @@ func (h *Router) Register(mux *http.ServeMux, cfg config.Config, authMiddleware 
 	mux.Handle("POST /api/v1/catalog/items", authMiddleware(api.Wrap(h.controller.CreateItem, cfg)))
 	mux.Handle("GET /api/v1/catalog/items/{id}", authMiddleware(api.Wrap(h.controller.GetItem, cfg)))
 	mux.Handle("PATCH /api/v1/catalog/items/{id}", authMiddleware(api.Wrap(h.controller.UpdateItem, cfg)))
-	mux.Handle("GET /api/v1/catalog/review-queue", authMiddleware(api.Wrap(h.controller.ListReviewQueue, cfg)))
-	mux.Handle("POST /api/v1/catalog/lines/{lineId}/decisions", authMiddleware(api.Wrap(h.controller.RememberLineDecision, cfg)))
 }

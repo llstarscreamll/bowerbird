@@ -3,7 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { NgIcon } from '@ng-icons/core';
 import { InvoiceDetailsStore } from '../../../application/invoice-details.store';
-import { CatalogLinkerComponent } from '../../../../catalog/presentation/components/catalog-linker/catalog-linker.component';
+import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-linker.component';
 import { InvoiceLine } from '../../../domain/invoice.model';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -174,7 +174,14 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                       </div>
 
                       @if (line.id && needsLinking(line)) {
-                        <app-catalog-linker [lineId]="line.id" [description]="line.description" [itemCode]="line.item_code" [suggestions]="line.suggestions || []" (resolved)="onLineResolved()" />
+                        <app-catalog-linker
+                          [invoiceId]="inv.id"
+                          [lineId]="line.id"
+                          [description]="line.description"
+                          [itemCode]="line.item_code"
+                          [suggestions]="line.suggestions || []"
+                          (resolved)="onLineResolved()"
+                        />
                       }
                     </div>
                   </div>
