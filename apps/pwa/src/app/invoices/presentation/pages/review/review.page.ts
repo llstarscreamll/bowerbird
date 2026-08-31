@@ -15,7 +15,7 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto p-8' },
   template: `
     <div class="mx-auto w-full max-w-5xl space-y-6">
-      <a routerLink="../invoices" class="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+      <a routerLink=".." class="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
         <ng-icon name="lucideArrowLeft" class="mr-1" />
         Volver a facturas
       </a>
