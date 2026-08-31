@@ -1,0 +1,26 @@
+{
+  "name": "@bowerbird/system-notices",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./angular": "./src/angular/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.angular.json --noEmit"
+  },
+  "peerDependencies": {
+    "@angular/core": "^21.0.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/core": "^21.2.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}

@@ -1,5 +1,6 @@
-import { ApplicationRef, DestroyRef, Injectable, PLATFORM_ID, inject, isDevMode, signal } from '@angular/core';
 import { DOCUMENT, isPlatformBrowser } from '@angular/common';
+import { Injectable, PLATFORM_ID, inject, signal } from '@angular/core';
+import { ApplicationRef, DestroyRef } from '@angular/core';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, first } from 'rxjs';
 
@@ -9,7 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 @Injectable({ providedIn: 'root' })
-export class PwaService {
+export class PwaRuntimeService {
   private readonly document = inject(DOCUMENT);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly appRef = inject(ApplicationRef);
@@ -18,7 +19,7 @@ export class PwaService {
 
   private deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 
-  readonly canInstall = signal(false);
+  readonly nativeInstallAvailable = signal(false);
   readonly updateAvailable = signal(false);
 
   constructor() {
@@ -30,17 +31,49 @@ export class PwaService {
     this.setupServiceWorkerUpdates();
   }
 
-  async promptInstall(): Promise<void> {
+  isStandalone(): boolean {
+    if (!isPlatformBrowser(this.platformId)) {
+      return false;
+    }
+
+    return this.document.defaultView?.matchMedia('(display-mode: standalone)').matches ?? false;
+  }
+
+  canInstallNative(): boolean {
+    return this.nativeInstallAvailable() && !this.isStandalone();
+  }
+
+  isIosSafari(): boolean {
+    if (!isPlatformBrowser(this.platformId)) {
+      return false;
+    }
+
+    const nav = this.document.defaultView?.navigator;
+    if (!nav) {
+      return false;
+    }
+
+    const ua = nav.userAgent;
+    const isIosDevice = /iPad|iPhone|iPod/.test(ua) || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1);
+    return isIosDevice && !this.canInstallNative();
+  }
+
+  canShowIosGuide(): boolean {
+    return this.isIosSafari() && !this.isStandalone();
+  }
+
+  async promptInstall(): Promise<'accepted' | 'dismissed' | 'unavailable'> {
     if (!this.deferredInstallPrompt) {
-      return;
+      return 'unavailable';
     }
 
     const installEvent = this.deferredInstallPrompt;
     this.deferredInstallPrompt = null;
-    this.canInstall.set(false);
+    this.nativeInstallAvailable.set(false);
 
     await installEvent.prompt();
-    await installEvent.userChoice;
+    const choice = await installEvent.userChoice;
+    return choice.outcome;
   }
 
   async activateUpdateAndReload(): Promise<void> {
@@ -56,17 +89,17 @@ export class PwaService {
     this.document.defaultView?.addEventListener('beforeinstallprompt', (event: Event) => {
       event.preventDefault();
       this.deferredInstallPrompt = event as BeforeInstallPromptEvent;
-      this.canInstall.set(true);
+      this.nativeInstallAvailable.set(true);
     });
 
     this.document.defaultView?.addEventListener('appinstalled', () => {
       this.deferredInstallPrompt = null;
-      this.canInstall.set(false);
+      this.nativeInstallAvailable.set(false);
     });
   }
 
   private setupServiceWorkerUpdates(): void {
-    if (!this.swUpdate?.isEnabled || isDevMode()) {
+    if (!this.swUpdate?.isEnabled) {
       return;
     }
 

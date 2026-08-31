@@ -14,11 +14,27 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSeparatorImports } from '@spartan-ng/helm/separator';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
+import { SystemNoticesHostComponent } from '@bowerbird/system-notices/angular';
+import { InstallPromptHostComponent, PwaInstallCoordinator } from '../../../pwa-install';
 
 @Component({
   selector: 'app-tenant-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, NgIcon, HlmSidebarImports, HlmDropdownMenuImports, HlmAvatarImports, HlmButtonImports, HlmSeparatorImports, HlmTooltipImports],
+  imports: [
+    CommonModule,
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    NgIcon,
+    HlmSidebarImports,
+    HlmDropdownMenuImports,
+    HlmAvatarImports,
+    HlmButtonImports,
+    HlmSeparatorImports,
+    HlmTooltipImports,
+    SystemNoticesHostComponent,
+    InstallPromptHostComponent,
+  ],
   template: `
     <div hlmSidebarWrapper class="h-screen w-full overflow-hidden">
       <hlm-sidebar collapsible="icon" side="left">
@@ -180,6 +196,13 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
                 </div>
               </div>
               <hlm-separator class="my-1" />
+              @if (installCoordinator.showMenuItem()) {
+                <button hlmDropdownMenuItem (click)="openInstall()">
+                  <ng-icon name="lucideDownload" />
+                  Instalar aplicación
+                </button>
+                <hlm-separator class="my-1" />
+              }
               <button hlmDropdownMenuItem variant="destructive" (click)="logout()">
                 <ng-icon name="lucideLogOut" />
                 Cerrar sesión
@@ -194,6 +217,8 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
         <router-outlet />
       </main>
     </div>
+    <bb-system-notices-host scope="tenant" />
+    <app-install-prompt-host />
   `,
 })
 export class TenantLayoutComponent implements OnInit {
@@ -205,6 +230,7 @@ export class TenantLayoutComponent implements OnInit {
   readonly entitlements = inject(EntitlementsStore);
   readonly permissions = inject(PermissionsStore);
   readonly sidebarService = inject(HlmSidebarService);
+  readonly installCoordinator = inject(PwaInstallCoordinator);
 
   themeMode = signal<'system' | 'light' | 'dark'>('system');
 
@@ -291,6 +317,10 @@ export class TenantLayoutComponent implements OnInit {
   }
 
   closeTenantMenu() {}
+
+  openInstall(): void {
+    void this.installCoordinator.openFromMenu();
+  }
 
   logout() {
     this.authStore.logout({

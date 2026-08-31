@@ -12,6 +12,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
+    "baseUrl": ".",
     "paths": {
       "@spartan-ng/helm/button": ["./src/app/shared/ui/button/src/index.ts"],
       "@spartan-ng/helm/utils": ["./src/app/shared/ui/utils/src/index.ts"],
@@ -40,7 +41,10 @@
       "@spartan-ng/helm/item": ["./src/app/shared/ui/item/src/index.ts"],
       "@spartan-ng/helm/command": ["./src/app/shared/ui/command/src/index.ts"],
       "@spartan-ng/helm/input-group": ["./src/app/shared/ui/input-group/src/index.ts"],
-      "@spartan-ng/helm/textarea": ["./src/app/shared/ui/textarea/src/index.ts"]
+      "@spartan-ng/helm/textarea": ["./src/app/shared/ui/textarea/src/index.ts"],
+      "@bowerbird/system-notices": ["../../packages/system-notices/src/index.ts"],
+      "@bowerbird/system-notices/angular": ["../../packages/system-notices/src/angular/index.ts"],
+      "tslib": ["node_modules/tslib"]
     }
   },
   "angularCompilerOptions": {

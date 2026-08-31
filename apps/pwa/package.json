@@ -10,6 +10,7 @@
     "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit && ng lint"
   },
   "dependencies": {
+    "@bowerbird/system-notices": "workspace:*",
     "@angular/cdk": "^21.2.0",
     "@angular/common": "^21.2.0",
     "@angular/compiler": "^21.2.0",
