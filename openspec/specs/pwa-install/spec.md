@@ -129,20 +129,6 @@ Un dismiss de la promoción automática MUST aplicar en una sola operación el c
 - **WHEN** el usuario dismissa la promoción mobile con «Continuar en navegador»
 - **THEN** se registra un dismiss explícito, se activa cooldown de 7 días y el contador de dismiss refleja exactamente un incremento respecto al estado previo
 
-### Requirement: Domain events de engagement
-
-Tras mutaciones de engagement (`recordSessionVisit`, `declineAutoPrompt`), el sistema MUST emitir domain events internos que la capa application traduce a eventos de analytics. Los eventos MUST incluir al menos: `SessionVisitRecorded`, `AutoPromptDeclined`, y `AutoPromptBecameEligible` cuando el umbral de visitas se cumple por primera vez.
-
-#### Scenario: Segunda visita genera elegibilidad
-
-- **WHEN** `recordSessionVisit` hace que el usuario cumpla el umbral de 2ª visita en 7 días
-- **THEN** se emite `AutoPromptBecameEligible` y, vía application handler, el evento de analytics `pwa_install_eligible`
-
-#### Scenario: Decline genera evento
-
-- **WHEN** el usuario dismissa con «Ahora no»
-- **THEN** se emite `AutoPromptDeclined` y, vía application handler, `pwa_install_prompt_action` con `action: not_now`
-
 ### Requirement: Pull model en menú de usuario
 
 Mientras la app sea instalable (Chromium) o aplicable la guía iOS, el menú de usuario del tenant layout MUST incluir un ítem «Instalar aplicación» que dispare el prompt nativo o la guía iOS sin requerir engagement gate ni cooldown.
@@ -189,15 +175,6 @@ Las claves de persistencia de engagement (`bb:pwa:visits`, `bb:pwa:install-prefs
 - **WHEN** el tenant layout necesita saber si mostrar el ítem de menú «Instalar aplicación»
 - **THEN** consulta el coordinator público de `pwa-install` y no lee `localStorage` directamente
 
-### Requirement: Analytics no bloqueante
-
-El envío de eventos de funnel MUST NOT interrumpir ni retrasar la promoción de instalación, el prompt nativo ni la navegación del usuario. Un fallo en el adapter de analytics MUST ser contenido (sin propagar error al usuario).
-
-#### Scenario: Adapter de analytics falla
-
-- **WHEN** el adapter de analytics lanza un error interno al emitir un evento
-- **THEN** la acción de instalación o dismiss del usuario se completa con normalidad
-
 ### Requirement: No promover si ya instalada
 
 El sistema MUST NOT mostrar promoción automática ni guía iOS cuando la app corre en `display-mode: standalone` (ya instalada).
@@ -206,27 +183,3 @@ El sistema MUST NOT mostrar promoción automática ni guía iOS cuando la app co
 
 - **WHEN** el usuario abre Bowerbird en modo standalone
 - **THEN** no se muestra promoción de instalación ni guía iOS
-
-### Requirement: Funnel de analytics (fase 1 — cliente)
-
-El sistema MUST emitir eventos de analytics del funnel de instalación. En fase 1 MUST registrarlos vía abstracción cliente (`console.debug` en desarrollo). Eventos mínimos:
-
-- `pwa_visit_recorded`
-- `pwa_install_eligible`
-- `pwa_install_prompt_shown` (variant: `snackbar` | `sheet` | `ios_guide`)
-- `pwa_install_prompt_action` (action: `install` | `not_now` | `continue_browser` | `timeout`)
-- `pwa_install_native_result` (outcome: `accepted` | `dismissed`)
-- `pwa_installed`
-- `pwa_install_menu_clicked`
-- `pwa_update_prompt_shown`
-- `pwa_update_prompt_accepted`
-
-#### Scenario: Promoción mostrada
-
-- **WHEN** se muestra una promoción de instalación al usuario
-- **THEN** se emite `pwa_install_prompt_shown` con la variante correspondiente
-
-#### Scenario: Usuario instala
-
-- **WHEN** el browser dispara `appinstalled`
-- **THEN** se emite `pwa_installed`

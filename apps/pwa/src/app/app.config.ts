@@ -13,7 +13,6 @@ import { ConnectionsHttpRepository } from './connections/infrastructure/connecti
 import { UNIFIED_INBOX_REPOSITORY } from './inbox/domain/unified-inbox.repository';
 import { UnifiedInboxHttpRepository } from './inbox/infrastructure/unified-inbox.http.repository';
 import { appIcons } from './shared/icons/app-icons';
-import { provideAnalytics } from './core/analytics';
 import { providePwaInstall } from './core/pwa-install';
 import { provideSystemNotices } from '@bowerbird/system-notices/angular';
 
@@ -26,7 +25,6 @@ export const appConfig: ApplicationConfig = {
     { provide: CONNECTIONS_REPOSITORY, useClass: ConnectionsHttpRepository },
     { provide: UNIFIED_INBOX_REPOSITORY, useClass: UnifiedInboxHttpRepository },
     appIcons,
-    provideAnalytics(),
     provideSystemNotices(),
     providePwaInstall(),
     provideServiceWorker('ngsw-worker.js', {

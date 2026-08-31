@@ -11,38 +11,37 @@ describe('InstallEngagement', () => {
 
   it('does not allow auto prompt on first visit', () => {
     const engagement = InstallEngagement.reconstitute(VisitHistory.empty(), AutoPromptPrefs.initial());
-    const result = engagement.recordSessionVisit(day1);
+    const next = engagement.recordSessionVisit(day1);
 
-    expect(result.engagement.isEligibleForAutoPrompt(day1)).toBe(false);
-    expect(result.engagement.canShowAutoPrompt(day1)).toBe(false);
+    expect(next.isEligibleForAutoPrompt(day1)).toBe(false);
+    expect(next.canShowAutoPrompt(day1)).toBe(false);
   });
 
   it('allows auto prompt on second visit within 7 days', () => {
     let engagement = InstallEngagement.reconstitute(VisitHistory.empty(), AutoPromptPrefs.initial());
-    engagement = engagement.recordSessionVisit(day1).engagement;
-    const result = engagement.recordSessionVisit(day3);
+    engagement = engagement.recordSessionVisit(day1);
+    const next = engagement.recordSessionVisit(day3);
 
-    expect(result.engagement.isEligibleForAutoPrompt(day3)).toBe(true);
-    expect(result.engagement.canShowAutoPrompt(day3)).toBe(true);
-    expect(result.events.some((event) => event.type === 'AutoPromptBecameEligible')).toBe(true);
+    expect(next.isEligibleForAutoPrompt(day3)).toBe(true);
+    expect(next.canShowAutoPrompt(day3)).toBe(true);
   });
 
   it('does not allow auto prompt when second visit is after 7 days', () => {
     let engagement = InstallEngagement.reconstitute(VisitHistory.empty(), AutoPromptPrefs.initial());
-    engagement = engagement.recordSessionVisit(day1).engagement;
-    const result = engagement.recordSessionVisit(day10);
+    engagement = engagement.recordSessionVisit(day1);
+    const next = engagement.recordSessionVisit(day10);
 
-    expect(result.engagement.isEligibleForAutoPrompt(day10)).toBe(false);
+    expect(next.isEligibleForAutoPrompt(day10)).toBe(false);
   });
 
   it('applies atomic decline with cooldown', () => {
     let engagement = InstallEngagement.reconstitute(VisitHistory.reconstitute([day1.toISOString(), day3.toISOString()]), AutoPromptPrefs.initial());
-    engagement = engagement.recordSessionVisit(day3).engagement;
+    engagement = engagement.recordSessionVisit(day3);
     const declined = engagement.declineAutoPrompt(DismissReason.fromUserAction('not_now'), day3);
 
-    expect(declined.engagement.canShowAutoPrompt(day3)).toBe(false);
-    expect(declined.engagement.prefs.dismissCount).toBe(1);
-    expect(declined.engagement.prefs.lastDismissReason).toBe('not_now');
+    expect(declined.canShowAutoPrompt(day3)).toBe(false);
+    expect(declined.prefs.dismissCount).toBe(1);
+    expect(declined.prefs.lastDismissReason).toBe('not_now');
   });
 
   it('silences after third explicit dismiss', () => {
@@ -51,8 +50,7 @@ describe('InstallEngagement', () => {
     let engagement = InstallEngagement.reconstitute(visits, prefs);
 
     for (let i = 0; i < 3; i++) {
-      const result = engagement.declineAutoPrompt(DismissReason.fromUserAction('not_now'), day3);
-      engagement = result.engagement;
+      engagement = engagement.declineAutoPrompt(DismissReason.fromUserAction('not_now'), day3);
       prefs = engagement.prefs;
     }
 

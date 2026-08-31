@@ -2,7 +2,6 @@ import { Injectable, Injector, computed, effect, inject, isDevMode, untracked } 
 import { SystemNoticesOrchestratorService } from '@bowerbird/system-notices/angular';
 import { CLOCK_PORT } from './ports/clock.port';
 import { INSTALL_ENGAGEMENT_REPOSITORY } from './ports/engagement.repository.port';
-import { EngagementEventHandler } from './engagement-event.handler';
 import { PwaRuntimeService } from '../infrastructure/pwa-runtime.service';
 import { RecordSessionVisitCommand } from './record-session-visit.command';
 import { InstallPromptPresenter } from '../presentation/install-prompt.presenter';
@@ -12,7 +11,6 @@ export class PwaInstallCoordinator {
   private readonly repository = inject(INSTALL_ENGAGEMENT_REPOSITORY);
   private readonly runtime = inject(PwaRuntimeService);
   private readonly clock = inject(CLOCK_PORT);
-  private readonly events = inject(EngagementEventHandler);
   private readonly recordSessionVisit = inject(RecordSessionVisitCommand);
   private readonly presenter = inject(InstallPromptPresenter);
   private readonly injector = inject(Injector);
@@ -44,14 +42,8 @@ export class PwaInstallCoordinator {
   }
 
   async openFromMenu(): Promise<void> {
-    this.events.track('pwa_install_menu_clicked', {});
-
     if (this.runtime.canInstallNative()) {
-      const outcome = await this.runtime.promptInstall();
-      this.events.track('pwa_install_native_result', { outcome });
-      if (outcome === 'accepted') {
-        this.events.track('pwa_installed', {});
-      }
+      await this.runtime.promptInstall();
       return;
     }
 
