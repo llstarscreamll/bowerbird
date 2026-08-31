@@ -147,7 +147,7 @@ func main() {
 		platformModule.FileStore,
 		tenantsDbRegistry,
 		documentPasswordResolver,
-		invoiceLinking.NewPartyResolverAdapter(partiesApp),
+		invoiceLinking.NewPartyResolverAdapter(partiesModule.NewIssuerPartyLookup(partiesApp)),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
 		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),

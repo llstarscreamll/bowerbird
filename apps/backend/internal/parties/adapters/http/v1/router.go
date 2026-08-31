@@ -63,6 +63,30 @@ func (c *Controller) GetParty(w http.ResponseWriter, r *http.Request) error {
 	return api.Success(w, http.StatusOK, map[string]any{"data": toPartyResource(*party)})
 }
 
+func (c *Controller) CreateParty(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Data struct {
+			Attributes struct {
+				Name  string   `json:"name"`
+				TaxID string   `json:"tax_id"`
+				Roles []string `json:"roles"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request body")
+	}
+	party, err := c.app.Commands.CreateParty.Execute(r.Context(), commands.CreatePartyInput{
+		Name:  req.Data.Attributes.Name,
+		TaxID: req.Data.Attributes.TaxID,
+		Roles: req.Data.Attributes.Roles,
+	})
+	if err != nil {
+		return err
+	}
+	return api.Success(w, http.StatusCreated, map[string]any{"data": toPartyResource(*party)})
+}
+
 func (c *Controller) UpdateParty(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
 		Data struct {
@@ -115,6 +139,7 @@ func NewRouter(controller *Controller) *Router {
 
 func (h *Router) Register(mux *http.ServeMux, cfg config.Config, authMiddleware func(http.Handler) http.Handler) {
 	mux.Handle("GET /api/v1/parties", authMiddleware(api.Wrap(h.controller.ListParties, cfg)))
+	mux.Handle("POST /api/v1/parties", authMiddleware(api.Wrap(h.controller.CreateParty, cfg)))
 	mux.Handle("GET /api/v1/parties/{id}", authMiddleware(api.Wrap(h.controller.GetParty, cfg)))
 	mux.Handle("PATCH /api/v1/parties/{id}", authMiddleware(api.Wrap(h.controller.UpdateParty, cfg)))
 }

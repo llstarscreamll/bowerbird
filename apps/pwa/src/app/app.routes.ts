@@ -71,6 +71,18 @@ export const routes: Routes = [
         loadComponent: () => import('./parties/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },
       {
+        path: 'parties/new',
+        loadComponent: () => import('./parties/presentation/pages/new/new.page').then((c) => c.NewPartyPage),
+      },
+      {
+        path: 'parties/:partyId/edit',
+        loadComponent: () => import('./parties/presentation/pages/edit/edit.page').then((c) => c.EditPartyPage),
+      },
+      {
+        path: 'parties/:partyId',
+        loadComponent: () => import('./parties/presentation/pages/detail/detail.page').then((c) => c.DetailPartyPage),
+      },
+      {
         path: 'catalog',
         loadComponent: () => import('./catalog/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },

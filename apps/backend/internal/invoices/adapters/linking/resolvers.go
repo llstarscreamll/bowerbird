@@ -12,25 +12,18 @@ import (
 )
 
 type PartyResolverAdapter struct {
-	app *partiesApp.Application
+	lookup partiesApp.IssuerPartyLookup
 }
 
-func NewPartyResolverAdapter(app *partiesApp.Application) *PartyResolverAdapter {
-	return &PartyResolverAdapter{app: app}
+func NewPartyResolverAdapter(lookup partiesApp.IssuerPartyLookup) *PartyResolverAdapter {
+	return &PartyResolverAdapter{lookup: lookup}
 }
 
 func (a *PartyResolverAdapter) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
-	if a == nil || a.app == nil || a.app.Commands.ResolveOrCreateFromIssuer == nil {
+	if a == nil || a.lookup == nil {
 		return "", nil
 	}
-	party, err := a.app.Commands.ResolveOrCreateFromIssuer.Execute(ctx, taxID, name)
-	if err != nil {
-		return "", err
-	}
-	if party == nil {
-		return "", nil
-	}
-	return party.ID, nil
+	return a.lookup.ResolveIssuerPartyID(ctx, taxID, name)
 }
 
 var _ ports.IssuerPartyResolver = (*PartyResolverAdapter)(nil)

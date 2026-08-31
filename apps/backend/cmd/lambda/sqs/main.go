@@ -48,7 +48,7 @@ func init() {
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
 		documentPasswordResolver,
-		invoiceLinking.NewPartyResolverAdapter(partiesApp),
+		invoiceLinking.NewPartyResolverAdapter(partiesModule.NewIssuerPartyLookup(partiesApp)),
 		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
 		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
 		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),

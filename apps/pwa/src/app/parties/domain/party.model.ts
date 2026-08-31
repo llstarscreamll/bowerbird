@@ -7,3 +7,23 @@ export interface Party {
   created_at: string;
   updated_at: string;
 }
+
+export interface CreatePartyInput {
+  name: string;
+  tax_id: string;
+  roles: string[];
+}
+
+export interface UpdatePartyInput {
+  name?: string;
+  roles?: string[];
+}
+
+export const PARTY_ROLES = [
+  { value: 'supplier', label: 'Proveedor' },
+  { value: 'customer', label: 'Cliente' },
+] as const;
+
+export function roleLabel(role: string): string {
+  return PARTY_ROLES.find((r) => r.value === role)?.label ?? role;
+}

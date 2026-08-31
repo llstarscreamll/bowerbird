@@ -9,6 +9,7 @@ import (
 var (
 	ErrMissingPartyName = errors.New("missing party name")
 	ErrMissingTaxID     = errors.New("missing party tax id")
+	ErrPartyIDRequired  = errors.New("party id is required")
 )
 
 const (
@@ -31,22 +32,40 @@ type Party struct {
 }
 
 // NewProvisionalSupplier bootstraps a provisional supplier from invoice issuer evidence.
-func NewProvisionalSupplier(id, taxID, name string, now time.Time) (Party, error) {
-	normalizedTaxID := NormalizeTaxID(taxID)
-	if normalizedTaxID == "" {
-		return Party{}, ErrMissingTaxID
-	}
+// Caller must supply a parsed TaxID.
+func NewProvisionalSupplier(id string, taxID TaxID, name string, now time.Time) Party {
 	displayName := strings.TrimSpace(name)
 	if displayName == "" {
-		displayName = normalizedTaxID
+		displayName = taxID.String()
 	}
 	now = now.UTC()
 	return Party{
 		ID:        id,
-		TaxID:     normalizedTaxID,
+		TaxID:     taxID.String(),
 		Name:      displayName,
 		Roles:     []string{RoleSupplier},
 		Status:    StatusProvisional,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
+
+// NewConfirmedParty creates a user-registered confirmed party.
+func NewConfirmedParty(id string, taxID TaxID, name string, roles PartyRoles, now time.Time) (Party, error) {
+	displayName := strings.TrimSpace(name)
+	if displayName == "" {
+		return Party{}, ErrMissingPartyName
+	}
+	if strings.TrimSpace(id) == "" {
+		return Party{}, ErrPartyIDRequired
+	}
+	now = now.UTC()
+	return Party{
+		ID:        id,
+		TaxID:     taxID.String(),
+		Name:      displayName,
+		Roles:     roles.Strings(),
+		Status:    StatusConfirmed,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -61,15 +80,7 @@ func (p Party) HasRole(role string) bool {
 	return false
 }
 
-// EnsureRole adds a role if missing. Prefer EnsureSupplierRole for issuer resolution.
-func (p *Party) EnsureRole(role string) {
-	if p.HasRole(role) {
-		return
-	}
-	p.Roles = append(p.Roles, role)
-}
-
-// EnsureSupplierRole adds the supplier role and bumps UpdatedAt when changed.
+// EnsureSupplierRole adds the supplier role from invoice issuer evidence.
 func (p *Party) EnsureSupplierRole(now time.Time) bool {
 	if p.HasRole(RoleSupplier) {
 		return false
@@ -85,27 +96,48 @@ func (p *Party) Rename(name string, now time.Time) error {
 	if trimmed == "" {
 		return ErrMissingPartyName
 	}
+	if p.Name == trimmed {
+		return nil
+	}
 	p.Name = trimmed
 	p.UpdatedAt = now.UTC()
 	return nil
 }
 
-// ReplaceRoles replaces the role set (caller supplies the desired list).
-func (p *Party) ReplaceRoles(roles []string, now time.Time) {
-	p.Roles = append([]string{}, roles...)
+// AssignRoles replaces roles with a validated set.
+func (p *Party) AssignRoles(roles PartyRoles, now time.Time) {
+	if partyRolesEqual(p.Roles, roles) {
+		return
+	}
+	p.Roles = roles.Strings()
 	p.UpdatedAt = now.UTC()
+}
+
+func partyRolesEqual(stored []string, desired PartyRoles) bool {
+	current, err := ParsePartyRoles(stored)
+	if err != nil {
+		return false
+	}
+	return current.Equals(desired)
+}
+
+// UpdateProfile applies manual profile changes (name and/or roles).
+func (p *Party) UpdateProfile(name *string, roles *PartyRoles, now time.Time) (changed bool, err error) {
+	if name == nil && roles == nil {
+		return false, nil
+	}
+	before := p.UpdatedAt
+	if name != nil {
+		if err := p.Rename(*name, now); err != nil {
+			return false, err
+		}
+	}
+	if roles != nil {
+		p.AssignRoles(*roles, now)
+	}
+	return !p.UpdatedAt.Equal(before), nil
 }
 
 func NormalizeTaxID(taxID string) string {
 	return strings.TrimSpace(taxID)
-}
-
-func ValidateNewParty(name, taxID string) error {
-	if strings.TrimSpace(name) == "" {
-		return ErrMissingPartyName
-	}
-	if NormalizeTaxID(taxID) == "" {
-		return ErrMissingTaxID
-	}
-	return nil
 }

@@ -20,6 +20,7 @@ func NewApplication(registry *database.Registry) *application.Application {
 	return &application.Application{
 		Commands: application.Commands{
 			ResolveOrCreateFromIssuer: commands.NewResolveOrCreateFromIssuerCommand(repo),
+			CreateParty:               commands.NewCreatePartyCommand(repo),
 			UpdateParty:               commands.NewUpdatePartyCommand(repo),
 		},
 		Queries: application.Queries{
@@ -38,4 +39,8 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	}
 	controller := httpV1.NewController(app)
 	httpV1.NewRouter(controller).Register(mux, cfg, authMiddleware)
+}
+
+func NewIssuerPartyLookup(app *application.Application) application.IssuerPartyLookup {
+	return application.NewIssuerPartyLookupFromApp(app)
 }

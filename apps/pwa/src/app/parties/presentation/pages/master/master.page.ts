@@ -1,23 +1,34 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { NgIcon } from '@ng-icons/core';
 import { PartiesStore } from '../../../application/parties.store';
+import { roleLabel } from '../../../domain/party.model';
 
 @Component({
   selector: 'app-parties-master',
   standalone: true,
-  imports: [CommonModule, NgIcon, HlmCardImports, HlmSpinnerImports, HlmTableImports, HlmAlertImports, HlmBadgeImports],
+  imports: [CommonModule, RouterLink, NgIcon, HlmCardImports, HlmSpinnerImports, HlmTableImports, HlmAlertImports, HlmBadgeImports, HlmButtonImports],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto p-8' },
   template: `
     <div class="mx-auto w-full max-w-5xl space-y-6">
-      <header>
-        <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Contactos</h1>
-        <p class="mt-1 text-sm text-muted-foreground">Proveedores y clientes identificados por NIT, creados desde facturas electrónicas.</p>
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Contactos</h1>
+          <p class="mt-1 text-sm text-muted-foreground">Proveedores y clientes identificados por NIT.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a hlmBtn routerLink="new">
+            <ng-icon name="lucidePlus" />
+            Nuevo contacto
+          </a>
+        </div>
       </header>
 
       @if (store.errorMessage(); as err) {
@@ -43,12 +54,12 @@ import { PartiesStore } from '../../../application/parties.store';
             </thead>
             <tbody hlmTBody>
               @for (party of store.parties(); track party.id) {
-                <tr hlmTr>
+                <tr hlmTr class="cursor-pointer hover:bg-muted/40" (click)="openDetail(party.id)">
                   <td hlmTd class="font-medium">{{ party.name }}</td>
                   <td hlmTd class="text-muted-foreground">{{ party.tax_id || '—' }}</td>
                   <td hlmTd>
                     @for (role of party.roles; track role) {
-                      <span hlmBadge variant="secondary" class="mr-1">{{ role }}</span>
+                      <span hlmBadge variant="secondary" class="mr-1">{{ roleLabel(role) }}</span>
                     }
                   </td>
                   <td hlmTd>{{ party.status }}</td>
@@ -67,8 +78,15 @@ import { PartiesStore } from '../../../application/parties.store';
 })
 export class MasterPage implements OnInit {
   readonly store = inject(PartiesStore);
+  readonly roleLabel = roleLabel;
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {
     this.store.load();
+  }
+
+  openDetail(id: string): void {
+    void this.router.navigate([id], { relativeTo: this.route });
   }
 }

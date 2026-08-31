@@ -2,11 +2,13 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/bowerbird/internal/parties/application/ports"
 	"github.com/bowerbird/internal/parties/domain"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/id"
 )
 
@@ -20,17 +22,20 @@ func NewResolveOrCreateFromIssuerCommand(repo ports.PartyRepository) *ResolveOrC
 	return &ResolveOrCreateFromIssuerCommand{repo: repo, now: time.Now, newID: id.NewULID}
 }
 
-func (cmd *ResolveOrCreateFromIssuerCommand) Execute(ctx context.Context, taxID, name string) (*domain.Party, error) {
+func (cmd *ResolveOrCreateFromIssuerCommand) Execute(ctx context.Context, taxIDRaw, name string) (*domain.Party, error) {
 	if cmd.repo == nil {
 		return nil, fmt.Errorf("party repository is required")
 	}
 
-	normalizedTaxID := domain.NormalizeTaxID(taxID)
-	if normalizedTaxID == "" {
-		return nil, nil
+	taxID, err := domain.ParseTaxID(taxIDRaw)
+	if err != nil {
+		if errors.Is(err, domain.ErrMissingTaxID) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
-	existing, err := cmd.repo.GetByTaxID(ctx, normalizedTaxID)
+	existing, err := cmd.repo.GetByTaxID(ctx, taxID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -43,13 +48,9 @@ func (cmd *ResolveOrCreateFromIssuerCommand) Execute(ctx context.Context, taxID,
 		return existing, nil
 	}
 
-	party, err := domain.NewProvisionalSupplier(cmd.newID(), normalizedTaxID, name, cmd.now())
-	if err != nil {
-		return nil, err
-	}
+	party := domain.NewProvisionalSupplier(cmd.newID(), taxID, name, cmd.now())
 	if err := cmd.repo.Create(ctx, party); err != nil {
-		// Concurrent create: re-read by tax id
-		again, getErr := cmd.repo.GetByTaxID(ctx, normalizedTaxID)
+		again, getErr := cmd.repo.GetByTaxID(ctx, taxID.String())
 		if getErr == nil && again != nil {
 			return again, nil
 		}
@@ -79,18 +80,24 @@ func (cmd *UpdatePartyCommand) Execute(ctx context.Context, input UpdatePartyInp
 		return nil, err
 	}
 	if party == nil {
-		return nil, fmt.Errorf("party not found")
+		return nil, appErrors.New(appErrors.CodeNotFound, "party not found")
 	}
-	if input.Name != nil {
-		if err := party.Rename(*input.Name, cmd.now()); err != nil {
-			return nil, err
-		}
-	}
+
+	var rolesVO *domain.PartyRoles
 	if input.Roles != nil {
-		party.ReplaceRoles(*input.Roles, cmd.now())
+		parsed, err := domain.ParsePartyRoles(*input.Roles)
+		if err != nil {
+			return mapDomainValidation(err)
+		}
+		rolesVO = &parsed
 	}
-	if input.Name == nil && input.Roles == nil {
-		party.UpdatedAt = cmd.now().UTC()
+
+	changed, err := party.UpdateProfile(input.Name, rolesVO, cmd.now())
+	if err != nil {
+		return mapDomainValidation(err)
+	}
+	if !changed {
+		return party, nil
 	}
 	if err := cmd.repo.Update(ctx, *party); err != nil {
 		return nil, err

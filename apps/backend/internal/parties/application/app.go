@@ -12,6 +12,7 @@ type Application struct {
 
 type Commands struct {
 	ResolveOrCreateFromIssuer *commands.ResolveOrCreateFromIssuerCommand
+	CreateParty               *commands.CreatePartyCommand
 	UpdateParty               *commands.UpdatePartyCommand
 }
 
