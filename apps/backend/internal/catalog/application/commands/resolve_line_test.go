@@ -208,6 +208,9 @@ func TestResolve_ProvisionalMintOnHardMiss(t *testing.T) {
 	assert.Equal(t, "ITEM-NEW", res.ItemID)
 	assert.Equal(t, domain.LinkMethodHard, res.Method)
 	assert.Len(t, items.items, 1)
+	for _, item := range items.items {
+		assert.Equal(t, domain.CreationSourceInvoice, item.CreationSource)
+	}
 }
 
 func TestResolve_EmptyCodeNoMint(t *testing.T) {

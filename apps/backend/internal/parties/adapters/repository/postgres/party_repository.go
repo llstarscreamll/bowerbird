@@ -31,9 +31,9 @@ func (r *PartyRepository) Create(ctx context.Context, party domain.Party) error 
 	}
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO parties (id, tax_id, name, roles, status, created_at, updated_at)
-		VALUES ($1, NULLIF($2, ''), $3, $4, $5, $6, $7)
-	`, party.ID, party.TaxID, party.Name, party.Roles, party.Status, party.CreatedAt, party.UpdatedAt)
+		INSERT INTO parties (id, tax_id, name, roles, status, creation_source, created_at, updated_at)
+		VALUES ($1, NULLIF($2, ''), $3, $4, $5, $6, $7, $8)
+	`, party.ID, party.TaxID, party.Name, party.Roles, party.Status, party.CreationSource, party.CreatedAt, party.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return appErrors.New(appErrors.CodeConflict, "a party with this tax id already exists")
@@ -73,7 +73,7 @@ func (r *PartyRepository) GetByID(ctx context.Context, id string) (*domain.Party
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, COALESCE(tax_id, ''), name, roles, status, created_at, updated_at
+		SELECT id, COALESCE(tax_id, ''), name, roles, status, creation_source, created_at, updated_at
 		FROM parties WHERE id = $1
 	`, id)
 	return scanParty(row)
@@ -86,7 +86,7 @@ func (r *PartyRepository) GetByTaxID(ctx context.Context, taxID string) (*domain
 	}
 
 	row := pool.QueryRow(ctx, `
-		SELECT id, COALESCE(tax_id, ''), name, roles, status, created_at, updated_at
+		SELECT id, COALESCE(tax_id, ''), name, roles, status, creation_source, created_at, updated_at
 		FROM parties WHERE tax_id = $1
 	`, taxID)
 	return scanParty(row)
@@ -99,7 +99,7 @@ func (r *PartyRepository) List(ctx context.Context, filter ports.ListFilter) ([]
 	}
 
 	query := `
-		SELECT id, COALESCE(tax_id, ''), name, roles, status, created_at, updated_at
+		SELECT id, COALESCE(tax_id, ''), name, roles, status, creation_source, created_at, updated_at
 		FROM parties
 		WHERE 1=1
 	`
@@ -108,6 +108,11 @@ func (r *PartyRepository) List(ctx context.Context, filter ports.ListFilter) ([]
 	if role := strings.TrimSpace(filter.Role); role != "" {
 		query += fmt.Sprintf(` AND $%d = ANY(roles)`, argN)
 		args = append(args, role)
+		argN++
+	}
+	if source := strings.TrimSpace(filter.CreationSource); source != "" {
+		query += fmt.Sprintf(` AND creation_source = $%d`, argN)
+		args = append(args, source)
 		argN++
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
@@ -126,7 +131,7 @@ func (r *PartyRepository) List(ctx context.Context, filter ports.ListFilter) ([]
 	out := make([]domain.Party, 0)
 	for rows.Next() {
 		var party domain.Party
-		if err := rows.Scan(&party.ID, &party.TaxID, &party.Name, &party.Roles, &party.Status, &party.CreatedAt, &party.UpdatedAt); err != nil {
+		if err := rows.Scan(&party.ID, &party.TaxID, &party.Name, &party.Roles, &party.Status, &party.CreationSource, &party.CreatedAt, &party.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan party: %w", err)
 		}
 		out = append(out, party)
@@ -136,7 +141,7 @@ func (r *PartyRepository) List(ctx context.Context, filter ports.ListFilter) ([]
 
 func scanParty(row pgx.Row) (*domain.Party, error) {
 	var party domain.Party
-	err := row.Scan(&party.ID, &party.TaxID, &party.Name, &party.Roles, &party.Status, &party.CreatedAt, &party.UpdatedAt)
+	err := row.Scan(&party.ID, &party.TaxID, &party.Name, &party.Roles, &party.Status, &party.CreationSource, &party.CreatedAt, &party.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

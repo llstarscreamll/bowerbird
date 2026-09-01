@@ -64,6 +64,9 @@ func (s *stubPartyRepo) List(ctx context.Context, filter ports.ListFilter) ([]do
 		if filter.Role != "" && !p.HasRole(filter.Role) {
 			continue
 		}
+		if filter.CreationSource != "" && p.CreationSource != filter.CreationSource {
+			continue
+		}
 		out = append(out, p)
 	}
 	return out, nil
@@ -86,8 +89,8 @@ func testApp(repo ports.PartyRepository) *application.Application {
 func TestListParties_FiltersByRole(t *testing.T) {
 	now := time.Now().UTC()
 	repo := &stubPartyRepo{parties: map[string]domain.Party{
-		"1": {ID: "1", TaxID: "900", Name: "Supplier", Roles: []string{domain.RoleSupplier}, Status: domain.StatusProvisional, CreatedAt: now, UpdatedAt: now},
-		"2": {ID: "2", TaxID: "901", Name: "Customer", Roles: []string{domain.RoleCustomer}, Status: domain.StatusProvisional, CreatedAt: now, UpdatedAt: now},
+		"1": {ID: "1", TaxID: "900", Name: "Supplier", Roles: []string{domain.RoleSupplier}, Status: domain.StatusProvisional, CreationSource: domain.CreationSourceInvoice, CreatedAt: now, UpdatedAt: now},
+		"2": {ID: "2", TaxID: "901", Name: "Customer", Roles: []string{domain.RoleCustomer}, Status: domain.StatusConfirmed, CreationSource: domain.CreationSourceManual, CreatedAt: now, UpdatedAt: now},
 	}}
 	ctrl := NewController(testApp(repo))
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/parties?role=supplier", nil)
@@ -121,6 +124,7 @@ func TestCreateParty_Returns201(t *testing.T) {
 	assert.Equal(t, "parties", resp.Data.Type)
 	assert.Equal(t, "900123", resp.Data.Attributes.TaxID)
 	assert.Equal(t, domain.StatusConfirmed, resp.Data.Attributes.Status)
+	assert.Equal(t, domain.CreationSourceManual, resp.Data.Attributes.CreationSource)
 }
 
 func TestCreateParty_DuplicateTaxID409(t *testing.T) {
@@ -182,4 +186,25 @@ func TestUpdateParty_DuplicateTaxIDConflictSurfaces(t *testing.T) {
 	var appErr *appErrors.AppError
 	require.True(t, errors.As(err, &appErr))
 	assert.Equal(t, appErrors.CodeConflict, appErr.Code)
+}
+
+func TestListParties_FiltersByCreationSource(t *testing.T) {
+	now := time.Now().UTC()
+	repo := &stubPartyRepo{parties: map[string]domain.Party{
+		"1": {ID: "1", TaxID: "900", Name: "From Invoice", Roles: []string{domain.RoleSupplier}, Status: domain.StatusProvisional, CreationSource: domain.CreationSourceInvoice, CreatedAt: now, UpdatedAt: now},
+		"2": {ID: "2", TaxID: "901", Name: "Manual", Roles: []string{domain.RoleCustomer}, Status: domain.StatusConfirmed, CreationSource: domain.CreationSourceManual, CreatedAt: now, UpdatedAt: now},
+	}}
+	ctrl := NewController(testApp(repo))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/parties?creation_source=invoice", nil)
+	rr := httptest.NewRecorder()
+	err := ctrl.ListParties(rr, req)
+	require.NoError(t, err)
+
+	var body struct {
+		Data []partyResource `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.Len(t, body.Data, 1)
+	assert.Equal(t, "1", body.Data[0].ID)
+	assert.Equal(t, domain.CreationSourceInvoice, body.Data[0].Attributes.CreationSource)
 }

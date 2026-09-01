@@ -18,17 +18,21 @@ const (
 
 	StatusProvisional = "provisional"
 	StatusConfirmed   = "confirmed"
+
+	CreationSourceManual  = "manual"
+	CreationSourceInvoice = "invoice"
 )
 
 // Party is the trading-partner aggregate root (supplier/customer identity by tax id).
 type Party struct {
-	ID        string
-	TaxID     string
-	Name      string
-	Roles     []string
-	Status    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             string
+	TaxID          string
+	Name           string
+	Roles          []string
+	Status         string
+	CreationSource string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // NewProvisionalSupplier bootstraps a provisional supplier from invoice issuer evidence.
@@ -40,13 +44,14 @@ func NewProvisionalSupplier(id string, taxID TaxID, name string, now time.Time) 
 	}
 	now = now.UTC()
 	return Party{
-		ID:        id,
-		TaxID:     taxID.String(),
-		Name:      displayName,
-		Roles:     []string{RoleSupplier},
-		Status:    StatusProvisional,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             id,
+		TaxID:          taxID.String(),
+		Name:           displayName,
+		Roles:          []string{RoleSupplier},
+		Status:         StatusProvisional,
+		CreationSource: CreationSourceInvoice,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 }
 
@@ -61,13 +66,14 @@ func NewConfirmedParty(id string, taxID TaxID, name string, roles PartyRoles, no
 	}
 	now = now.UTC()
 	return Party{
-		ID:        id,
-		TaxID:     taxID.String(),
-		Name:      displayName,
-		Roles:     roles.Strings(),
-		Status:    StatusConfirmed,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             id,
+		TaxID:          taxID.String(),
+		Name:           displayName,
+		Roles:          roles.Strings(),
+		Status:         StatusConfirmed,
+		CreationSource: CreationSourceManual,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}, nil
 }
 

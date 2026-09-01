@@ -27,12 +27,13 @@ func NewController(app *application.Application) *Controller {
 }
 
 type itemAttributes struct {
-	Name        string  `json:"name"`
-	Kind        string  `json:"kind"`
-	Status      string  `json:"status"`
-	InternalSKU *string `json:"internal_sku"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	Name           string  `json:"name"`
+	Kind           string  `json:"kind"`
+	Status         string  `json:"status"`
+	CreationSource string  `json:"creation_source"`
+	InternalSKU    *string `json:"internal_sku"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 type itemResource struct {
@@ -43,9 +44,10 @@ type itemResource struct {
 
 func (c *Controller) ListItems(w http.ResponseWriter, r *http.Request) error {
 	items, err := c.app.Queries.ListItems.Execute(r.Context(), ports.ItemListFilter{
-		Kind:   r.URL.Query().Get("kind"),
-		Status: r.URL.Query().Get("status"),
-		Search: r.URL.Query().Get("search"),
+		Kind:           r.URL.Query().Get("kind"),
+		Status:         r.URL.Query().Get("status"),
+		Search:         r.URL.Query().Get("search"),
+		CreationSource: r.URL.Query().Get("creation_source"),
 	})
 	if err != nil {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list catalog items")
@@ -133,12 +135,13 @@ func toItemResource(view queries.ItemView) itemResource {
 		Type: "catalog_items",
 		ID:   view.Item.ID,
 		Attributes: itemAttributes{
-			Name:        view.Item.Name,
-			Kind:        view.Item.Kind,
-			Status:      view.Item.Status,
-			InternalSKU: view.InternalSKU,
-			CreatedAt:   view.Item.CreatedAt.UTC().Format(time.RFC3339),
-			UpdatedAt:   view.Item.UpdatedAt.UTC().Format(time.RFC3339),
+			Name:           view.Item.Name,
+			Kind:           view.Item.Kind,
+			Status:         view.Item.Status,
+			CreationSource: view.Item.CreationSource,
+			InternalSKU:    view.InternalSKU,
+			CreatedAt:      view.Item.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:      view.Item.UpdatedAt.UTC().Format(time.RFC3339),
 		},
 	}
 }

@@ -36,6 +36,7 @@ func TestNewManualItemAndInternalSKUAlias(t *testing.T) {
 	item, err := domain.NewManualItem("01ITEM", "Consulting", kind, sku, now)
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusConfirmed, item.Status)
+	assert.Equal(t, domain.CreationSourceManual, item.CreationSource)
 	assert.True(t, item.IsConfirmed())
 	assert.False(t, item.IsProvisional())
 

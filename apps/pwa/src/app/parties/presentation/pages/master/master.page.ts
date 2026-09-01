@@ -9,7 +9,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { NgIcon } from '@ng-icons/core';
 import { PartiesStore } from '../../../application/parties.store';
-import { roleLabel } from '../../../domain/party.model';
+import { roleLabel, creationSourceLabel } from '../../../domain/party.model';
 
 @Component({
   selector: 'app-parties-master',
@@ -49,6 +49,7 @@ import { roleLabel } from '../../../domain/party.model';
                 <th hlmTh>Nombre</th>
                 <th hlmTh>NIT</th>
                 <th hlmTh>Roles</th>
+                <th hlmTh>Origen</th>
                 <th hlmTh>Estado</th>
               </tr>
             </thead>
@@ -62,11 +63,12 @@ import { roleLabel } from '../../../domain/party.model';
                       <span hlmBadge variant="secondary" class="mr-1">{{ roleLabel(role) }}</span>
                     }
                   </td>
+                  <td hlmTd>{{ creationSourceLabel(party.creation_source) }}</td>
                   <td hlmTd>{{ party.status }}</td>
                 </tr>
               } @empty {
                 <tr hlmTr>
-                  <td hlmTd colspan="4" class="py-10 text-center text-muted-foreground">Aún no hay contactos.</td>
+                  <td hlmTd colspan="5" class="py-10 text-center text-muted-foreground">Aún no hay contactos.</td>
                 </tr>
               }
             </tbody>
@@ -79,6 +81,7 @@ import { roleLabel } from '../../../domain/party.model';
 export class MasterPage implements OnInit {
   readonly store = inject(PartiesStore);
   readonly roleLabel = roleLabel;
+  readonly creationSourceLabel = creationSourceLabel;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

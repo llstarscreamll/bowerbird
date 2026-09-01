@@ -16,9 +16,10 @@ type ItemRepository interface {
 }
 
 type ItemListFilter struct {
-	Kind   string
-	Status string
-	Search string
+	Kind           string
+	Status         string
+	Search         string
+	CreationSource string
 }
 
 type AliasRepository interface {

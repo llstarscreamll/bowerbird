@@ -10,6 +10,7 @@ export interface CatalogItem {
   name: string;
   kind: string;
   status: string;
+  creation_source: string;
   internal_sku: string | null;
   created_at: string;
   updated_at: string;
@@ -35,3 +36,14 @@ export const CATALOG_KINDS = [
   { value: 'asset', label: 'Activo' },
   { value: 'unknown', label: 'Desconocido' },
 ] as const;
+
+export function creationSourceLabel(source: string): string {
+  switch (source) {
+    case 'manual':
+      return 'Manual';
+    case 'invoice':
+      return 'Desde factura';
+    default:
+      return source;
+  }
+}

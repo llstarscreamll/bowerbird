@@ -84,12 +84,13 @@ func NewManualItem(id, name string, kind ItemKind, sku InternalSKU, now time.Tim
 	}
 	now = now.UTC()
 	return Item{
-		ID:        id,
-		Name:      name,
-		Kind:      kind.String(),
-		Status:    StatusConfirmed,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             id,
+		Name:           name,
+		Kind:           kind.String(),
+		Status:         StatusConfirmed,
+		CreationSource: CreationSourceManual,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}, nil
 }
 

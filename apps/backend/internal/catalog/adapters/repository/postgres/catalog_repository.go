@@ -35,9 +35,9 @@ func (r *CatalogRepository) CreateItem(ctx context.Context, item domain.Item) er
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	_, err = pool.Exec(ctx, `
-		INSERT INTO catalog_items (id, name, kind, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, item.ID, item.Name, item.Kind, item.Status, item.CreatedAt, item.UpdatedAt)
+		INSERT INTO catalog_items (id, name, kind, status, creation_source, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, item.CreatedAt, item.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("create catalog item: %w", err)
 	}
@@ -68,8 +68,8 @@ func (r *CatalogRepository) GetItemByID(ctx context.Context, id string) (*domain
 	}
 	var item domain.Item
 	err = pool.QueryRow(ctx, `
-		SELECT id, name, kind, status, created_at, updated_at FROM catalog_items WHERE id=$1
-	`, id).Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+		SELECT id, name, kind, status, creation_source, created_at, updated_at FROM catalog_items WHERE id=$1
+	`, id).Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -124,7 +124,7 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	if err != nil {
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
-	query := `SELECT id, name, kind, status, created_at, updated_at FROM catalog_items WHERE 1=1`
+	query := `SELECT id, name, kind, status, creation_source, created_at, updated_at FROM catalog_items WHERE 1=1`
 	args := []any{}
 	n := 1
 	if filter.Kind != "" {
@@ -135,6 +135,11 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	if filter.Status != "" {
 		query += fmt.Sprintf(` AND status=$%d`, n)
 		args = append(args, filter.Status)
+		n++
+	}
+	if source := strings.TrimSpace(filter.CreationSource); source != "" {
+		query += fmt.Sprintf(` AND creation_source=$%d`, n)
+		args = append(args, source)
 		n++
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
@@ -152,7 +157,7 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	out := make([]domain.Item, 0)
 	for rows.Next() {
 		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -166,7 +171,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT id, name, kind, status, created_at, updated_at
+		SELECT id, name, kind, status, creation_source, created_at, updated_at
 		FROM catalog_items
 		WHERE lower(regexp_replace(btrim(name), '\s+', ' ', 'g')) = $1
 	`, normalizedDesc)
@@ -177,7 +182,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 	out := make([]domain.Item, 0)
 	for rows.Next() {
 		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -281,9 +286,9 @@ func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO catalog_items (id, name, kind, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`, item.ID, item.Name, item.Kind, item.Status, item.CreatedAt, item.UpdatedAt); err != nil {
+		INSERT INTO catalog_items (id, name, kind, status, creation_source, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, item.CreatedAt, item.UpdatedAt); err != nil {
 		if isUniqueViolation(err) {
 			return appErrors.New(appErrors.CodeConflict, "a catalog item with this id already exists")
 		}

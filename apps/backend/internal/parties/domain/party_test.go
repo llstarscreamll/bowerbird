@@ -38,6 +38,7 @@ func TestNewProvisionalSupplier(t *testing.T) {
 	assert.Equal(t, "Acme", party.Name)
 	assert.True(t, party.HasRole(RoleSupplier))
 	assert.Equal(t, StatusProvisional, party.Status)
+	assert.Equal(t, CreationSourceInvoice, party.CreationSource)
 
 	taxID2, err := ParseTaxID("901")
 	require.NoError(t, err)
@@ -55,6 +56,7 @@ func TestNewConfirmedParty(t *testing.T) {
 	party, err := NewConfirmedParty("P1", taxID, "Acme", roles, now)
 	require.NoError(t, err)
 	assert.Equal(t, StatusConfirmed, party.Status)
+	assert.Equal(t, CreationSourceManual, party.CreationSource)
 	assert.True(t, party.HasRole(RoleCustomer))
 
 	_, err = NewConfirmedParty("P2", taxID, "  ", roles, now)

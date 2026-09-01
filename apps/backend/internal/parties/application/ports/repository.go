@@ -15,6 +15,7 @@ type PartyRepository interface {
 }
 
 type ListFilter struct {
-	Role   string
-	Search string
+	Role           string
+	Search         string
+	CreationSource string
 }

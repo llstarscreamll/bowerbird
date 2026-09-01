@@ -14,6 +14,7 @@ func TestNewProvisionalItem(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Widget", item.Name)
 	assert.Equal(t, StatusProvisional, item.Status)
+	assert.Equal(t, CreationSourceInvoice, item.CreationSource)
 	assert.Equal(t, KindUnknown, item.Kind)
 	assert.True(t, item.IsProvisional())
 

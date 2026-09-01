@@ -24,6 +24,9 @@ const (
 	StatusProvisional = "provisional"
 	StatusConfirmed   = "confirmed"
 
+	CreationSourceManual  = "manual"
+	CreationSourceInvoice = "invoice"
+
 	AliasSchemeSupplierSKU = "supplier_sku"
 	AliasSchemeInternalSKU = "internal_sku"
 
@@ -54,12 +57,13 @@ const (
 //   - Canonical InternalSKU is NOT a field here — it lives in Alias (scheme=internal_sku).
 //     Application loads/saves that alias in the same TX as Item (CatalogWriteRepository).
 type Item struct {
-	ID        string
-	Name      string
-	Kind      string // persistence; prefer ItemKind() / ChangeKind in domain logic
-	Status    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             string
+	Name           string
+	Kind           string // persistence; prefer ItemKind() / ChangeKind in domain logic
+	Status         string
+	CreationSource string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // NewProvisionalItem mints a provisional catalog item from invoice evidence.
@@ -73,12 +77,13 @@ func NewProvisionalItem(id, description, fallbackCode string, now time.Time) (It
 	}
 	now = now.UTC()
 	return Item{
-		ID:        id,
-		Name:      name,
-		Kind:      KindUnknown,
-		Status:    StatusProvisional,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             id,
+		Name:           name,
+		Kind:           KindUnknown,
+		Status:         StatusProvisional,
+		CreationSource: CreationSourceInvoice,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}, nil
 }
 

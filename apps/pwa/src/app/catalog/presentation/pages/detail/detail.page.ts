@@ -8,6 +8,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { CatalogStore } from '../../../application/catalog.store';
+import { creationSourceLabel } from '../../../domain/catalog.model';
 
 @Component({
   selector: 'app-catalog-item-detail',
@@ -49,6 +50,10 @@ import { CatalogStore } from '../../../application/catalog.store';
               <span hlmBadge variant="secondary">{{ item.kind }}</span>
             </div>
             <div>
+              <p class="text-muted-foreground">Origen</p>
+              <p class="font-medium">{{ creationSourceLabel(item.creation_source) }}</p>
+            </div>
+            <div>
               <p class="text-muted-foreground">Estado</p>
               <p class="font-medium">{{ item.status }}</p>
             </div>
@@ -72,6 +77,7 @@ import { CatalogStore } from '../../../application/catalog.store';
 })
 export class DetailItemPage implements OnInit {
   readonly store = inject(CatalogStore);
+  readonly creationSourceLabel = creationSourceLabel;
   private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {

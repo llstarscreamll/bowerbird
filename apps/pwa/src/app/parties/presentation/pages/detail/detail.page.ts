@@ -8,7 +8,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { PartiesStore } from '../../../application/parties.store';
-import { roleLabel } from '../../../domain/party.model';
+import { roleLabel, creationSourceLabel } from '../../../domain/party.model';
 
 @Component({
   selector: 'app-parties-detail',
@@ -58,6 +58,10 @@ import { roleLabel } from '../../../domain/party.model';
               </div>
             </div>
             <div>
+              <p class="text-muted-foreground">Origen</p>
+              <p class="font-medium">{{ creationSourceLabel(party.creation_source) }}</p>
+            </div>
+            <div>
               <p class="text-muted-foreground">Estado</p>
               <p class="font-medium">{{ party.status }}</p>
             </div>
@@ -78,6 +82,7 @@ import { roleLabel } from '../../../domain/party.model';
 export class DetailPartyPage implements OnInit {
   readonly store = inject(PartiesStore);
   readonly roleLabel = roleLabel;
+  readonly creationSourceLabel = creationSourceLabel;
   private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {

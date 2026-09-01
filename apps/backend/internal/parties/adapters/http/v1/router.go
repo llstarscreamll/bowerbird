@@ -26,12 +26,13 @@ func NewController(app *application.Application) *Controller {
 }
 
 type partyAttributes struct {
-	TaxID     string   `json:"tax_id"`
-	Name      string   `json:"name"`
-	Roles     []string `json:"roles"`
-	Status    string   `json:"status"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	TaxID          string   `json:"tax_id"`
+	Name           string   `json:"name"`
+	Roles          []string `json:"roles"`
+	Status         string   `json:"status"`
+	CreationSource string   `json:"creation_source"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 type partyResource struct {
@@ -42,8 +43,9 @@ type partyResource struct {
 
 func (c *Controller) ListParties(w http.ResponseWriter, r *http.Request) error {
 	parties, err := c.app.Queries.ListParties.Execute(r.Context(), ports.ListFilter{
-		Role:   r.URL.Query().Get("role"),
-		Search: r.URL.Query().Get("search"),
+		Role:           r.URL.Query().Get("role"),
+		Search:         r.URL.Query().Get("search"),
+		CreationSource: r.URL.Query().Get("creation_source"),
 	})
 	if err != nil {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list parties")
@@ -119,12 +121,13 @@ func toPartyResource(party domain.Party) partyResource {
 		Type: "parties",
 		ID:   party.ID,
 		Attributes: partyAttributes{
-			TaxID:     party.TaxID,
-			Name:      party.Name,
-			Roles:     roles,
-			Status:    party.Status,
-			CreatedAt: party.CreatedAt.UTC().Format(time.RFC3339),
-			UpdatedAt: party.UpdatedAt.UTC().Format(time.RFC3339),
+			TaxID:          party.TaxID,
+			Name:           party.Name,
+			Roles:          roles,
+			Status:         party.Status,
+			CreationSource: party.CreationSource,
+			CreatedAt:      party.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:      party.UpdatedAt.UTC().Format(time.RFC3339),
 		},
 	}
 }

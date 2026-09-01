@@ -49,6 +49,9 @@ func (s *stubCatalog) GetItemNames(ctx context.Context, ids []string) (map[strin
 func (s *stubCatalog) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	out := []domain.Item{}
 	for _, i := range s.items {
+		if filter.CreationSource != "" && i.CreationSource != filter.CreationSource {
+			continue
+		}
 		out = append(out, i)
 	}
 	return out, nil
@@ -79,7 +82,7 @@ func (s *stubCatalog) FindMemoryByEvidenceKey(ctx context.Context, evidenceKey s
 func TestCatalogRoutes_NoReviewQueue(t *testing.T) {
 	now := time.Now().UTC()
 	stub := &stubCatalog{
-		items: map[string]domain.Item{"ITEM-1": {ID: "ITEM-1", Name: "Widget", Kind: domain.KindUnknown, Status: domain.StatusConfirmed, CreatedAt: now, UpdatedAt: now}},
+		items: map[string]domain.Item{"ITEM-1": {ID: "ITEM-1", Name: "Widget", Kind: domain.KindUnknown, Status: domain.StatusConfirmed, CreationSource: domain.CreationSourceManual, CreatedAt: now, UpdatedAt: now}},
 	}
 	app := &application.Application{
 		Commands: application.Commands{

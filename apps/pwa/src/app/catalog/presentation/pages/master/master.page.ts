@@ -9,6 +9,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { CatalogStore } from '../../../application/catalog.store';
+import { creationSourceLabel } from '../../../domain/catalog.model';
 
 @Component({
   selector: 'app-catalog-master',
@@ -48,6 +49,7 @@ import { CatalogStore } from '../../../application/catalog.store';
                 <th hlmTh>Nombre</th>
                 <th hlmTh>SKU</th>
                 <th hlmTh>Tipo</th>
+                <th hlmTh>Origen</th>
                 <th hlmTh>Estado</th>
               </tr>
             </thead>
@@ -59,11 +61,12 @@ import { CatalogStore } from '../../../application/catalog.store';
                   <td hlmTd>
                     <span hlmBadge variant="secondary">{{ item.kind }}</span>
                   </td>
+                  <td hlmTd>{{ creationSourceLabel(item.creation_source) }}</td>
                   <td hlmTd>{{ item.status }}</td>
                 </tr>
               } @empty {
                 <tr hlmTr>
-                  <td hlmTd colspan="4" class="py-10 text-center text-muted-foreground">Aún no hay ítems en el catálogo.</td>
+                  <td hlmTd colspan="5" class="py-10 text-center text-muted-foreground">Aún no hay ítems en el catálogo.</td>
                 </tr>
               }
             </tbody>
@@ -75,6 +78,7 @@ import { CatalogStore } from '../../../application/catalog.store';
 })
 export class MasterPage implements OnInit {
   readonly store = inject(CatalogStore);
+  readonly creationSourceLabel = creationSourceLabel;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

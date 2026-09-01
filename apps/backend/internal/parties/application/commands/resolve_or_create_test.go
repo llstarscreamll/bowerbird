@@ -69,6 +69,7 @@ func TestResolveOrCreateFromIssuer_CreatesProvisionalSupplier(t *testing.T) {
 	assert.Equal(t, "900123", party.TaxID)
 	assert.Equal(t, "Proveedor SA", party.Name)
 	assert.Equal(t, domain.StatusProvisional, party.Status)
+	assert.Equal(t, domain.CreationSourceInvoice, party.CreationSource)
 	assert.True(t, party.HasRole(domain.RoleSupplier))
 }
 

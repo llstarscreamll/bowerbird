@@ -4,8 +4,10 @@ CREATE TABLE parties (
     name VARCHAR(255) NOT NULL,
     roles TEXT[] NOT NULL DEFAULT '{}',
     status VARCHAR(32) NOT NULL DEFAULT 'provisional',
+    creation_source VARCHAR(32) NOT NULL DEFAULT 'manual',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT parties_creation_source_check CHECK (creation_source IN ('manual', 'invoice'))
 );
 
 CREATE UNIQUE INDEX ux_parties_tax_id
