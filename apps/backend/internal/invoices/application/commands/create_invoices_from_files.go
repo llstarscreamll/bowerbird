@@ -155,38 +155,8 @@ func (cmd *CreateInvoicesFromFilesCommand) Execute(ctx context.Context, input co
 		}
 
 		sortedFiles := sortFiles(files)
-
-		for _, xmlOrPdf := range sortedFiles {
-			invoice, extractionSource, storageKey, err := cmd.extractInvoiceDocument(ctx, xmlOrPdf, passwords, passwordIDs)
-			if err != nil {
-				cmd.logger.Warn("invoice extraction failed for document", "filename", xmlOrPdf.Filename, "kind", xmlOrPdf.Kind, "error", err)
-				continue
-			}
-			if invoice == nil {
-				continue
-			}
-
-			duplicated, err := cmd.repo.ExistsInvoiceByCUFE(ctx, invoice.CUFE)
-			if err != nil {
-				return fmt.Errorf("check invoice by cufe: %w", err)
-			}
-			if duplicated {
-				cmd.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
-				continue
-			}
-
-			persisted, err := cmd.create.Execute(ctx, CreateInvoiceInput{
-				SourceName:       input.SourceName,
-				SourceID:         input.SourceID,
-				ExtractionSource: extractionSource,
-				StorageKey:       storageKey,
-				Invoice:          invoice,
-			})
-			if err != nil {
-				return fmt.Errorf("persist invoice: %w", err)
-			}
-
-			cmd.logger.Info("invoice extracted and persisted", "source", extractionSource, "cufe", invoice.CUFE, "header_id", persisted.HeaderID)
+		if err := cmd.processDocumentGroups(ctx, input, sortedFiles, passwords, passwordIDs); err != nil {
+			return err
 		}
 	}
 
@@ -220,6 +190,140 @@ func (cmd *CreateInvoicesFromFilesCommand) markPasswordUsed(ctx context.Context,
 	if err := cmd.passwordResolver.MarkUsed(ctx, secretID); err != nil {
 		cmd.logger.Warn("failed to mark document password as used", "secret_id", secretID, "error", err)
 	}
+}
+
+func (cmd *CreateInvoicesFromFilesCommand) processDocumentGroups(
+	ctx context.Context,
+	input contractJobs.ExtractInvoicesFromFilesJob,
+	files []extractedDocument,
+	passwords []string,
+	passwordIDs []string,
+) error {
+	groups := groupDocuments(files)
+
+	xmlCount, pdfCount := 0, 0
+	for _, file := range files {
+		switch file.Kind {
+		case documentKindXML:
+			xmlCount++
+		case documentKindPDF:
+			pdfCount++
+		}
+	}
+	singleXMLAndPDF := xmlCount == 1 && pdfCount == 1
+	batchXMLHandled := false
+
+	for _, group := range groups {
+		xmlHandled, err := cmd.tryExtractAndPersistFromDocument(ctx, input, group.xml, passwords, passwordIDs)
+		if err != nil {
+			return err
+		}
+		if xmlHandled {
+			batchXMLHandled = true
+			continue
+		}
+		if group.pdf == nil {
+			continue
+		}
+		if singleXMLAndPDF && batchXMLHandled {
+			continue
+		}
+
+		_, err = cmd.tryExtractAndPersistFromDocument(ctx, input, group.pdf, passwords, passwordIDs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type documentGroup struct {
+	xml *extractedDocument
+	pdf *extractedDocument
+}
+
+func groupDocuments(files []extractedDocument) []documentGroup {
+	byKey := make(map[string]*documentGroup)
+	order := make([]string, 0)
+
+	for _, file := range files {
+		key := documentGroupKey(file.Filename)
+		if _, ok := byKey[key]; !ok {
+			byKey[key] = &documentGroup{}
+			order = append(order, key)
+		}
+		group := byKey[key]
+		switch file.Kind {
+		case documentKindXML:
+			if group.xml == nil {
+				group.xml = &file
+			}
+		case documentKindPDF:
+			if group.pdf == nil {
+				group.pdf = &file
+			}
+		}
+	}
+
+	groups := make([]documentGroup, 0, len(order))
+	for _, key := range order {
+		groups = append(groups, *byKey[key])
+	}
+	return groups
+}
+
+func documentGroupKey(filename string) string {
+	base := strings.ToLower(filepath.Base(filename))
+	ext := filepath.Ext(base)
+	if ext == "" {
+		return base
+	}
+	return strings.TrimSuffix(base, ext)
+}
+
+func (cmd *CreateInvoicesFromFilesCommand) tryExtractAndPersistFromDocument(
+	ctx context.Context,
+	input contractJobs.ExtractInvoicesFromFilesJob,
+	document *extractedDocument,
+	passwords []string,
+	passwordIDs []string,
+) (handled bool, err error) {
+	if document == nil {
+		return false, nil
+	}
+
+	invoice, extractionSource, storageKey, err := cmd.extractInvoiceDocument(ctx, *document, passwords, passwordIDs)
+	if err != nil {
+		cmd.logger.Warn("invoice extraction failed for document", "filename", document.Filename, "kind", document.Kind, "error", err)
+		return false, nil
+	}
+	if invoice == nil {
+		return false, nil
+	}
+
+	duplicated, err := cmd.repo.ExistsInvoiceByCUFE(ctx, invoice.CUFE)
+	if err != nil {
+		return false, fmt.Errorf("check invoice by cufe: %w", err)
+	}
+	if duplicated {
+		cmd.logger.Info("invoice extraction skipped by cufe", "cufe", invoice.CUFE)
+		return true, nil
+	}
+
+	persisted, err := cmd.create.Execute(ctx, CreateInvoiceInput{
+		SourceName:       input.SourceName,
+		SourceID:         input.SourceID,
+		ExtractionSource: extractionSource,
+		StorageKey:       storageKey,
+		Invoice:          invoice,
+	})
+	if err != nil {
+		return false, fmt.Errorf("persist invoice: %w", err)
+	}
+
+	cmd.logger.Info("invoice extracted and persisted", "source", extractionSource, "cufe", invoice.CUFE, "header_id", persisted.HeaderID)
+	return true, nil
 }
 
 func sortFiles(files []extractedDocument) []extractedDocument {

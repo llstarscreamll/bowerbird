@@ -181,6 +181,102 @@ func TestCreateInvoicesFromFilesProcessesZipAndPersistsInvoice(t *testing.T) {
 	assert.Equal(t, "upload-zip-1", repo.persistedHeaders[0].SourceID)
 }
 
+func TestCreateInvoicesFromFilesSkipsPDFWhenXMLInZipSucceeds(t *testing.T) {
+	archive := makeCreateFilesZip(t, map[string][]byte{
+		"inv.xml": []byte("<Invoice>raw</Invoice>"),
+		"inv.pdf": []byte("%PDF-1.4 file"),
+	})
+	store := &createFilesStoreStub{data: map[string][]byte{"k1": archive}}
+	xmlInvoice := validInvoiceDoc("CUFE-XML")
+	xmlExtractor := &createFilesXMLExtractorStub{invoice: xmlInvoice}
+	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
+	repo := &createFilesRepoStub{}
+
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd.create.newID = func() string { return "id_1" }
+	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-xml-pdf-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, xmlExtractor.called)
+	assert.Equal(t, 0, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 1)
+}
+
+func TestCreateInvoicesFromFilesFallsBackToPDFWhenXMLInZipFails(t *testing.T) {
+	archive := makeCreateFilesZip(t, map[string][]byte{
+		"inv.xml": []byte("<Invoice>broken</Invoice>"),
+		"inv.pdf": []byte("%PDF-1.4 file"),
+	})
+	store := &createFilesStoreStub{data: map[string][]byte{"k1": archive}}
+	xmlExtractor := &createFilesXMLExtractorStub{err: errors.New("parse failed")}
+	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
+	repo := &createFilesRepoStub{}
+
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd.create.newID = func() string { return "id_1" }
+	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-xml-pdf-fallback-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, xmlExtractor.called)
+	assert.Equal(t, 1, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 1)
+}
+
+func TestCreateInvoicesFromFilesSkipsPDFWhenSingleXMLAndPDFHaveDifferentNames(t *testing.T) {
+	archive := makeCreateFilesZip(t, map[string][]byte{
+		"invoice.xml":                      []byte("<Invoice>raw</Invoice>"),
+		"ad90129424100319FEV112834526.pdf": []byte("%PDF-1.4 file"),
+	})
+	store := &createFilesStoreStub{data: map[string][]byte{"k1": archive}}
+	xmlExtractor := &createFilesXMLExtractorStub{invoice: validInvoiceDoc("CUFE-XML")}
+	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
+	repo := &createFilesRepoStub{}
+
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd.create.newID = func() string { return "id_1" }
+	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-xml-pdf-mismatch-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, xmlExtractor.called)
+	assert.Equal(t, 0, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 1)
+}
+
+func TestCreateInvoicesFromFilesSkipsPDFWhenXMLInZipSkippedByCUFE(t *testing.T) {
+	archive := makeCreateFilesZip(t, map[string][]byte{
+		"inv.xml": []byte("<Invoice>raw</Invoice>"),
+		"inv.pdf": []byte("%PDF-1.4 file"),
+	})
+	store := &createFilesStoreStub{data: map[string][]byte{"k1": archive}}
+	xmlExtractor := &createFilesXMLExtractorStub{invoice: validInvoiceDoc("CUFE-XML")}
+	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
+	repo := &createFilesRepoStub{cufeExists: true}
+
+	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job-1",
+		SourceName: "files-uploaded-by-user",
+		SourceID:   "upload-zip-xml-pdf-cufe-1",
+		Files:      []contractJobs.File{{Path: "k1", Filename: "bundle.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, xmlExtractor.called)
+	assert.Equal(t, 0, llmExtractor.called)
+	assert.Len(t, repo.persistedHeaders, 0)
+}
+
 func TestCreateInvoicesFromFilesNormalizesXMLRawDataToJSON(t *testing.T) {
 	archive := makeCreateFilesZip(t, map[string][]byte{"inv.xml": []byte("<Invoice>raw</Invoice>")})
 	store := &createFilesStoreStub{data: map[string][]byte{"k1": archive}}
