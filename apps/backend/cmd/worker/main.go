@@ -150,7 +150,9 @@ func runEventsConsumer(ctx context.Context, deps *platform.Dependencies) {
 				}
 				if err := handlers.Events.HandleCloudEventJSON(ctx, msg.Body); err != nil {
 					log.Printf("events consumer error: tenant=%v correlation=%v err=%v", msg.Headers["tenant_slug"], msg.Headers["correlation_id"], err)
-					_ = msg.Nack(false, true)
+					if nackErr := rabbitmqbroker.HandleConsumerFailure(ch, rabbitmqbroker.EventsQueue, msg, err); nackErr != nil {
+						log.Printf("events consumer nack error: %v", nackErr)
+					}
 					continue
 				}
 				_ = msg.Ack(false)
@@ -192,7 +194,9 @@ func runJobsConsumer(ctx context.Context, deps *platform.Dependencies) {
 					jobMsg := parseJobAMQP(msg)
 					log.Printf("jobs consumer error: id=%s type=%s tenant=%s correlation=%s err=%v",
 						jobMsg.MessageID, jobMsg.JobType, jobMsg.TenantSlug, jobMsg.CorrelationID, err)
-					_ = msg.Nack(false, true)
+					if nackErr := rabbitmqbroker.HandleConsumerFailure(ch, rabbitmqbroker.JobsQueue, msg, err); nackErr != nil {
+						log.Printf("jobs consumer nack error: %v", nackErr)
+					}
 					continue
 				}
 				_ = msg.Ack(false)

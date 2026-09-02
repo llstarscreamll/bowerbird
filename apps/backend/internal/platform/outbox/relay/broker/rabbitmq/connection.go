@@ -142,5 +142,11 @@ func DeclareTopology(ch *amqp.Channel) error {
 	if _, err := ch.QueueDeclare(JobsQueue, true, false, false, false, dlqArgs); err != nil {
 		return err
 	}
+	if err := declareRetryQueues(ch, JobsQueue, ConsumerRetryDelays); err != nil {
+		return err
+	}
+	if err := declareRetryQueues(ch, EventsQueue, ConsumerRetryDelays); err != nil {
+		return err
+	}
 	return nil
 }
