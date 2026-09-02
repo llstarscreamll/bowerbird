@@ -5,30 +5,30 @@ import (
 	"errors"
 	"log"
 
-	awsevents "github.com/aws/aws-lambda-go/events"
 	contractevents "github.com/bowerbird/internal/contracts/events"
 	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
 	inboxPorts "github.com/bowerbird/internal/inbox/application/ports"
 	appErrors "github.com/bowerbird/internal/platform/errors"
+	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/tenant"
 )
 
 type ConnectionAddedSubscriber struct {
-	command  *inboxCommands.SyncAccountCommand
-	features inboxPorts.FeatureChecker
+	dispatcher inboxCommands.SyncAccountJobDispatcher
+	features   inboxPorts.FeatureChecker
 }
 
-func NewConnectionAddedSubscriber(command *inboxCommands.SyncAccountCommand, features inboxPorts.FeatureChecker) *ConnectionAddedSubscriber {
-	return &ConnectionAddedSubscriber{command: command, features: features}
+func NewConnectionAddedSubscriber(dispatcher inboxCommands.SyncAccountJobDispatcher, features inboxPorts.FeatureChecker) *ConnectionAddedSubscriber {
+	return &ConnectionAddedSubscriber{dispatcher: dispatcher, features: features}
 }
 
 func (s *ConnectionAddedSubscriber) DetailType() string {
 	return contractevents.ConnectionAddedDetailType
 }
 
-func (s *ConnectionAddedSubscriber) HandleEventBridge(ctx context.Context, event awsevents.CloudWatchEvent) error {
-	if s.command == nil {
+func (s *ConnectionAddedSubscriber) Handle(ctx context.Context, event platformEvents.IntegrationEvent) error {
+	if s.dispatcher == nil {
 		return nil
 	}
 
@@ -48,5 +48,10 @@ func (s *ConnectionAddedSubscriber) HandleEventBridge(ctx context.Context, event
 			return err
 		}
 	}
-	return s.command.Execute(msgCtx, inboxCommands.SyncAccountCommandInput{AccountID: decoded.ConnectionID})
+
+	return s.dispatcher.DispatchSyncAccount(msgCtx, inboxCommands.SyncAccountJob{
+		TenantID:  decoded.TenantSlug,
+		AccountID: decoded.ConnectionID,
+		Provider:  decoded.Provider,
+	})
 }

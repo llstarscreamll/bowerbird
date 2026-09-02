@@ -237,7 +237,7 @@ func (c *Controller) SendMessage(w http.ResponseWriter, r *http.Request) error {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to send message")
 	}
 
-	return api.Success(w, http.StatusAccepted, map[string]string{"id": message.ID})
+	return api.Success(w, http.StatusAccepted, map[string]string{"id": message.ID()})
 }
 
 func (c *Controller) DownloadAttachment(w http.ResponseWriter, r *http.Request) error {

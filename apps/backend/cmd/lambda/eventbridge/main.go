@@ -6,64 +6,22 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	connectionsModule "github.com/bowerbird/internal/connections"
-	entitlementsModule "github.com/bowerbird/internal/entitlements"
-	inboxModule "github.com/bowerbird/internal/inbox"
-	invoicesModule "github.com/bowerbird/internal/invoices"
-	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	"github.com/bowerbird/internal/platform"
-	platformCrypto "github.com/bowerbird/internal/platform/crypto"
-	platformEvents "github.com/bowerbird/internal/platform/events"
+	platformMessaging "github.com/bowerbird/internal/platform/messaging"
 )
 
-var eventHandler platformEvents.EventHandler
+var eventHandler platformMessaging.Handlers
 
 func init() {
 	platformModule, err := platform.NewModule(context.Background())
 	if err != nil {
 		log.Fatalf("failed to build dependencies at boot: %v", err)
 	}
-
-	cfg := platformModule.Config
-	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
-
-	// EventBridge only enqueues invoice extraction; PDF unlock runs in the SQS worker.
-	invoicingApp := invoicesModule.NewApplication(
-		cfg,
-		platformModule.EventBus,
-		platformModule.JobQueue,
-		platformModule.FileStore,
-		platformModule.TenantRegistry,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
-	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
-
-	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
-	if err != nil {
-		log.Fatalf("failed to create inbox credentials cipher at boot: %v", err)
-	}
-
-	connectionsApp := connectionsModule.NewApplication(platformModule.TenantRegistry, cipher)
-	connectionsService := connectionsModule.NewInternalService(connectionsApp)
-
-	inboxApp := inboxModule.NewApplication(
-		cfg,
-		connectionsService,
-		platformModule.EventBus,
-		platformModule.FileStore,
-		platformModule.TenantRegistry,
-		platformModule.JobQueue,
-	)
-	connectionAddedSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp, entitlementsApp)
-	eventHandler = platformEvents.NewEventHandler(inboxMessageSubscriber, connectionAddedSubscriber)
+	eventHandler = platformMessaging.WireMessagingHandlers(platformModule)
 }
 
 func handle(ctx context.Context, event events.CloudWatchEvent) error {
-	return eventHandler.HandleEventBridgeEvent(ctx, event)
+	return eventHandler.Events.HandleEventBridgeEvent(ctx, event)
 }
 
 func main() {

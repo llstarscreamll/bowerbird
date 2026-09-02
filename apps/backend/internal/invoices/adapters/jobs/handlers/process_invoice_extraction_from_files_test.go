@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"context"
+	"os"
 	"testing"
 
-	awsEvents "github.com/aws/aws-lambda-go/events"
 	invoicingCommands "github.com/bowerbird/internal/invoices/application/commands"
 	invoicingPorts "github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
 	"github.com/bowerbird/internal/invoices/domain"
+	"github.com/bowerbird/internal/platform/jobs"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
 	"github.com/bowerbird/internal/platform/tenant"
 )
@@ -21,6 +22,10 @@ func (s *processorFileStore) WriteFileIfAbsent(ctx context.Context, input platfo
 
 func (s *processorFileStore) ReadFile(ctx context.Context, input platformStorage.ReadFileInput) ([]byte, error) {
 	return []byte("<Invoice><ID>INV-1</ID><UUID>CUFE-1</UUID></Invoice>"), nil
+}
+
+func (s *processorFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	return os.WriteFile(input.DestPath, []byte("PK\x03\x04"), 0o600)
 }
 
 func (s *processorFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
@@ -102,7 +107,7 @@ func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
 	}
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant_1")
-	err = processor.HandleSQS(ctx, awsEvents.SQSMessage{Body: string(detail)})
+	err = processor.Handle(ctx, jobs.JobMessage{MessageID: "msg-1", Body: detail})
 	if err != nil {
 		t.Fatalf("handle message failed: %v", err)
 	}
@@ -124,7 +129,7 @@ func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) 
 		t.Fatalf("marshal detail failed: %v", err)
 	}
 
-	err = processor.HandleSQS(context.Background(), awsEvents.SQSMessage{Body: string(detail)})
+	err = processor.Handle(context.Background(), jobs.JobMessage{MessageID: "msg-1", Body: detail})
 	if err == nil {
 		t.Fatal("expected tenant id error")
 	}

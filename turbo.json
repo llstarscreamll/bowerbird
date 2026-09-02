@@ -5,6 +5,22 @@
       "cache": false,
       "persistent": true
     },
+    "dev:relay": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:events-consumer": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:jobs-consumer": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:scheduler": {
+      "cache": false,
+      "persistent": true
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "bin/**", "cdk.out/**"]

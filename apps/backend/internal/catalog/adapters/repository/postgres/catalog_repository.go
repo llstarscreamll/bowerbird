@@ -197,7 +197,7 @@ func (r *CatalogRepository) CreateAlias(ctx context.Context, alias domain.Alias)
 	}
 	_, err = pool.Exec(ctx, `
 		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {

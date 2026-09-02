@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -81,15 +82,13 @@ func (s *ObjectStore) WriteFileIfAbsent(ctx context.Context, input platformStora
 		return nil, fmt.Errorf("head object: %w", err)
 	}
 
-	putInput := &awsS3.PutObjectInput{
+	if _, err := s.client.PutObject(ctx, &awsS3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(input.Path),
 		Body:        bytes.NewReader(input.Data),
 		ContentType: aws.String(defaultContentType(input.ContentType)),
-		Metadata:    input.Metadata,
-	}
-
-	if _, err := s.client.PutObject(ctx, putInput); err != nil {
+		Metadata:    platformStorage.SanitizeObjectMetadata(input.Metadata),
+	}); err != nil {
 		return nil, fmt.Errorf("put object: %w", err)
 	}
 
@@ -122,6 +121,41 @@ func (s *ObjectStore) ReadFile(ctx context.Context, input platformStorage.ReadFi
 	}
 
 	return body, nil
+}
+
+func (s *ObjectStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	if s.client == nil {
+		return fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return fmt.Errorf("path is required")
+	}
+	if strings.TrimSpace(input.DestPath) == "" {
+		return fmt.Errorf("dest path is required")
+	}
+
+	res, err := s.client.GetObject(ctx, &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	})
+	if err != nil {
+		return fmt.Errorf("get object: %w", err)
+	}
+	defer res.Body.Close()
+
+	file, err := os.OpenFile(input.DestPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return fmt.Errorf("open dest file: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, res.Body); err != nil {
+		return fmt.Errorf("write dest file: %w", err)
+	}
+	return nil
 }
 
 func (s *ObjectStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
@@ -202,11 +236,12 @@ func (s *ObjectStore) PresignUpload(ctx context.Context, input platformStorage.P
 		expiresIn = s.uploadDuration
 	}
 
+	sanitizedMetadata := platformStorage.SanitizeObjectMetadata(input.Metadata)
 	presignedRequest, err := s.presignClient.PresignPutObject(ctx, &awsS3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(input.Path),
 		ContentType: aws.String(defaultContentType(input.ContentType)),
-		Metadata:    input.Metadata,
+		Metadata:    sanitizedMetadata,
 	}, func(opts *awsS3.PresignOptions) {
 		opts.Expires = expiresIn
 	})
@@ -214,12 +249,16 @@ func (s *ObjectStore) PresignUpload(ctx context.Context, input platformStorage.P
 		return nil, fmt.Errorf("presign put object: %w", err)
 	}
 
+	headers := platformStorage.MetadataToPresignHeaders(sanitizedMetadata)
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	headers["Content-Type"] = defaultContentType(input.ContentType)
+
 	return &platformStorage.PresignUploadResult{
-		URL:    presignedRequest.URL,
-		Method: "PUT",
-		Headers: map[string]string{
-			"Content-Type": defaultContentType(input.ContentType),
-		},
+		URL:       presignedRequest.URL,
+		Method:    "PUT",
+		Headers:   headers,
 		ExpiresAt: time.Now().Add(expiresIn),
 		Reference: platformStorage.FileReference{
 			Bucket: s.bucket,

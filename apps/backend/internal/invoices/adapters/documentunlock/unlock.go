@@ -4,11 +4,24 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	alexzip "github.com/alexmullins/zip"
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
+
+const (
+	maxZIPMemberUncompressedBytes = 64 << 20  // 64MB per member
+	maxZIPTotalUncompressedBytes  = 128 << 20 // 128MB per archive
+)
+
+type ExtractedMember struct {
+	Name string
+	Path string
+}
 
 func IsPDFEncrypted(data []byte) bool {
 	if len(data) == 0 {
@@ -51,12 +64,20 @@ func TryUnlockPDF(data []byte, passwords []string) (unlocked []byte, passwordInd
 	return nil, -1, lastErr
 }
 
-// ExtractZIPMembers opens a ZIP (optionally password-protected) and returns member bytes for names that pass keep.
-func ExtractZIPMembers(data []byte, passwords []string, keep func(name string, content []byte) bool) ([]struct {
-	Name string
-	Data []byte
-}, int, error) {
-	reader, err := alexzip.NewReader(bytes.NewReader(data), int64(len(data)))
+// ExtractZIPMembersToDir opens a ZIP on disk and writes kept members under destDir.
+func ExtractZIPMembersToDir(zipPath, destDir string, passwords []string, keep func(name, memberPath string) bool) ([]ExtractedMember, int, error) {
+	info, err := os.Stat(zipPath)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	archive, err := os.Open(zipPath)
+	if err != nil {
+		return nil, -1, err
+	}
+	defer archive.Close()
+
+	reader, err := alexzip.NewReader(archive, info.Size())
 	if err != nil {
 		return nil, -1, err
 	}
@@ -79,20 +100,33 @@ func ExtractZIPMembers(data []byte, passwords []string, keep func(name string, c
 
 	var lastErr error
 	for pwIdx, pw := range tryPasswords {
-		reader, err := alexzip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if _, err := archive.Seek(0, io.SeekStart); err != nil {
+			lastErr = err
+			continue
+		}
+		reader, err := alexzip.NewReader(archive, info.Size())
 		if err != nil {
 			lastErr = err
 			continue
 		}
 
-		members := make([]struct {
-			Name string
-			Data []byte
-		}, 0)
+		members := make([]ExtractedMember, 0)
 		ok := true
+		var totalUncompressed int64
 		for _, f := range reader.File {
 			if f.FileInfo().IsDir() {
 				continue
+			}
+			if f.UncompressedSize64 > maxZIPMemberUncompressedBytes {
+				ok = false
+				lastErr = fmt.Errorf("zip member %q exceeds uncompressed size limit", f.Name)
+				break
+			}
+			memberPath, err := uniqueMemberPath(destDir, f.Name)
+			if err != nil {
+				ok = false
+				lastErr = err
+				break
 			}
 			if f.IsEncrypted() {
 				f.SetPassword(pw)
@@ -103,23 +137,25 @@ func ExtractZIPMembers(data []byte, passwords []string, keep func(name string, c
 				lastErr = err
 				break
 			}
-			buf := new(bytes.Buffer)
-			_, err = io.Copy(buf, rc)
+			written, err := writeLimitedMember(rc, memberPath)
 			_ = rc.Close()
 			if err != nil {
 				ok = false
 				lastErr = err
 				break
 			}
-			content := buf.Bytes()
-			name := f.Name
-			if keep != nil && !keep(name, content) {
+			totalUncompressed += written
+			if totalUncompressed > maxZIPTotalUncompressedBytes {
+				_ = os.Remove(memberPath)
+				ok = false
+				lastErr = fmt.Errorf("zip archive exceeds total uncompressed size limit")
+				break
+			}
+			if keep != nil && !keep(f.Name, memberPath) {
+				_ = os.Remove(memberPath)
 				continue
 			}
-			members = append(members, struct {
-				Name string
-				Data []byte
-			}{Name: name, Data: content})
+			members = append(members, ExtractedMember{Name: f.Name, Path: memberPath})
 		}
 		if ok {
 			usedIdx := -1
@@ -134,4 +170,50 @@ func ExtractZIPMembers(data []byte, passwords []string, keep func(name string, c
 		lastErr = fmt.Errorf("unable to unlock zip with configured passwords")
 	}
 	return nil, -1, lastErr
+}
+
+func writeLimitedMember(rc io.Reader, destPath string) (int64, error) {
+	file, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return 0, fmt.Errorf("open zip member dest: %w", err)
+	}
+	defer file.Close()
+
+	limited := io.LimitReader(rc, maxZIPMemberUncompressedBytes+1)
+	written, err := io.Copy(file, limited)
+	if err != nil {
+		_ = os.Remove(destPath)
+		return 0, err
+	}
+	if written > maxZIPMemberUncompressedBytes {
+		_ = os.Remove(destPath)
+		return 0, fmt.Errorf("zip member exceeds uncompressed size limit")
+	}
+	return written, nil
+}
+
+func uniqueMemberPath(destDir, name string) (string, error) {
+	base, err := safeMemberBase(name)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(destDir, base)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path, nil
+	}
+	for i := 1; i < 1000; i++ {
+		candidate := filepath.Join(destDir, fmt.Sprintf("%s-%d%s", strings.TrimSuffix(base, filepath.Ext(base)), i, filepath.Ext(base)))
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("zip member name collision for %q", name)
+}
+
+func safeMemberBase(name string) (string, error) {
+	clean := filepath.Base(filepath.FromSlash(name))
+	if clean == "" || clean == "." || clean == ".." {
+		return "", fmt.Errorf("invalid zip member name %q", name)
+	}
+	return clean, nil
 }

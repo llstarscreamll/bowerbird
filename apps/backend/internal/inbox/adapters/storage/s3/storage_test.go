@@ -27,6 +27,10 @@ func (f *fakeObjectStore) ReadFile(ctx context.Context, input platformstorage.Re
 	return nil, nil
 }
 
+func (f *fakeObjectStore) DownloadFile(ctx context.Context, input platformstorage.DownloadFileInput) error {
+	return nil
+}
+
 func (f *fakeObjectStore) Exists(ctx context.Context, input platformstorage.ExistsFileInput) (bool, error) {
 	_, ok := f.objects[input.Path]
 	return ok, nil
@@ -56,13 +60,14 @@ func TestStoreAttachmentUploadsAndComputesDeterministicKey(t *testing.T) {
 	storage := NewStorageWithStore(store, "bucket-1")
 
 	stored, err := storage.StoreAttachment(context.Background(), StoreAttachmentInput{
-		TenantSlug:         "tenant_1",
-		ConnectedAccountID: "acc_1",
-		MessageID:          "msg_1",
-		AttachmentID:       "att_1",
-		Filename:           "factura.xml",
-		ContentType:        "application/xml",
-		Data:               []byte("same-content"),
+		TenantSlug:           "tenant_1",
+		ConnectedAccountID:   "acc_1",
+		MessageID:            "msg_1",
+		StorageFileID:        "01JTESTFILEID0000000000001",
+		ProviderAttachmentID: "att_1",
+		Filename:             "factura.xml",
+		ContentType:          "application/xml",
+		Data:                 []byte("same-content"),
 	})
 	if err != nil {
 		t.Fatalf("store attachment failed: %v", err)
@@ -71,8 +76,8 @@ func TestStoreAttachmentUploadsAndComputesDeterministicKey(t *testing.T) {
 	if !stored.Uploaded {
 		t.Fatal("expected first upload to write object")
 	}
-	if !strings.HasPrefix(stored.S3Key, "tenant/tenant_1/inbox/acc_1/messages/msg_1/attachments/") {
-		t.Fatalf("unexpected key prefix: %s", stored.S3Key)
+	if !strings.Contains(stored.S3Key, "01JTESTFILEID0000000000001") {
+		t.Fatalf("expected storage file id in key: %s", stored.S3Key)
 	}
 	if !strings.HasSuffix(stored.S3Key, ".xml") {
 		t.Fatalf("expected xml extension in key: %s", stored.S3Key)
@@ -84,26 +89,28 @@ func TestStoreAttachmentSkipsPhysicalDuplicateBySHA(t *testing.T) {
 	storage := NewStorageWithStore(store, "bucket-1")
 
 	first, err := storage.StoreAttachment(context.Background(), StoreAttachmentInput{
-		TenantSlug:         "tenant_1",
-		ConnectedAccountID: "acc_1",
-		MessageID:          "msg_1",
-		AttachmentID:       "att_1",
-		Filename:           "invoice.pdf",
-		ContentType:        "application/pdf",
-		Data:               []byte("duplicate-content"),
+		TenantSlug:           "tenant_1",
+		ConnectedAccountID:   "acc_1",
+		MessageID:            "msg_1",
+		StorageFileID:        "01JTESTFILEID0000000000001",
+		ProviderAttachmentID: "att_1",
+		Filename:             "invoice.pdf",
+		ContentType:          "application/pdf",
+		Data:                 []byte("duplicate-content"),
 	})
 	if err != nil {
 		t.Fatalf("first store failed: %v", err)
 	}
 
 	second, err := storage.StoreAttachment(context.Background(), StoreAttachmentInput{
-		TenantSlug:         "tenant_1",
-		ConnectedAccountID: "acc_2",
-		MessageID:          "msg_2",
-		AttachmentID:       "att_2",
-		Filename:           "invoice-copy.pdf",
-		ContentType:        "application/pdf",
-		Data:               []byte("duplicate-content"),
+		TenantSlug:           "tenant_1",
+		ConnectedAccountID:   "acc_2",
+		MessageID:            "msg_2",
+		StorageFileID:        "01JTESTFILEID0000000000002",
+		ProviderAttachmentID: "att_2",
+		Filename:             "invoice-copy.pdf",
+		ContentType:          "application/pdf",
+		Data:                 []byte("duplicate-content"),
 	})
 	if err != nil {
 		t.Fatalf("second store failed: %v", err)

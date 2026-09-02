@@ -77,8 +77,10 @@ export class BowerbirdStack extends cdk.Stack {
       entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/sqs'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
+      ephemeralStorageSize: cdk.Size.mebibytes(1024),
       environment: {
         SSM_PARAMETER_NAME: ssmParameterName,
+        TMPDIR: '/tmp',
       },
     });
 
@@ -89,6 +91,18 @@ export class BowerbirdStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
       environment: {
         SSM_PARAMETER_NAME: ssmParameterName,
+        DEPLOYMENT_TARGET: 'aws',
+      },
+    });
+
+    const outboxRelayLambda = new GoFunction(this, 'OutboxRelayLambda', {
+      functionName: `${prefix}-outbox-relay`,
+      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/outbox-relay'),
+      architecture: cdk.aws_lambda.Architecture.ARM_64,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        SSM_PARAMETER_NAME: ssmParameterName,
+        DEPLOYMENT_TARGET: 'aws',
       },
     });
 
@@ -98,6 +112,7 @@ export class BowerbirdStack extends cdk.Stack {
     secretsParam.grantRead(httpLambda);
     secretsParam.grantRead(sqsLambda);
     secretsParam.grantRead(eventBridgeLambda);
+    secretsParam.grantRead(outboxRelayLambda);
 
     const queueDLQ = new sqs.Queue(this, 'BowerbirdQueueDLQ', {
       queueName: `${prefix}-queue-dlq`,
@@ -125,6 +140,14 @@ export class BowerbirdStack extends cdk.Stack {
     });
 
     eventRule.addTarget(new eventTargets.LambdaFunction(eventBridgeLambda));
+
+    new events.Rule(this, 'OutboxRelaySchedule', {
+      ruleName: `${prefix}-outbox-relay`,
+      schedule: events.Schedule.rate(cdk.Duration.seconds(30)),
+      targets: [new eventTargets.LambdaFunction(outboxRelayLambda)],
+    });
+
+    queue.grantSendMessages(outboxRelayLambda);
 
     const httpApi = new apigwv2.HttpApi(this, 'BowerbirdHttpApi', {
       apiName: `${prefix}-http-api`,

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
@@ -60,6 +61,14 @@ func (s *fakeExtractFileStore) ReadFile(ctx context.Context, input platformStora
 		return nil, errors.New("not found")
 	}
 	return payload, nil
+}
+
+func (s *fakeExtractFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	payload, ok := s.data[input.Path]
+	if !ok {
+		return errors.New("not found")
+	}
+	return os.WriteFile(input.DestPath, payload, 0o600)
 }
 
 func (s *fakeExtractFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {

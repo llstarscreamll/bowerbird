@@ -4,6 +4,7 @@ import "errors"
 
 var (
 	ErrSyncCursorConnectionIDRequired     = errors.New("sync cursor connection ID is required")
+	ErrSyncCursorHistoryIDRequired        = errors.New("sync cursor history id is required")
 	ErrInboxMessageIDRequired             = errors.New("inbox message ID is required")
 	ErrInboxMessageConnectionIDRequired   = errors.New("inbox message connection ID is required")
 	ErrInboxMessageProviderIDRequired     = errors.New("inbox message provider ID is required")

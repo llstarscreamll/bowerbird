@@ -10,4 +10,4 @@ All implementation tasks are done.
 - [x] PWA PermissionsStore + secrets settings page
 - [x] Wire API / SQS; unit tests
 
-Operational (local/env, not code): re-init LocalStack SSM after `secrets.json` changes; run tenant migrations (`migrate:all`).
+Operational (local/env, not code): configure MinIO via `.env` and run `pnpm run infra:up`; run tenant migrations (`migrate:all`).

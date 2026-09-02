@@ -7,11 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
 	connectionsApp "github.com/bowerbird/internal/connections/application"
+	contractEvents "github.com/bowerbird/internal/contracts/events"
+	inboxMappers "github.com/bowerbird/internal/inbox/application/mappers"
 	"github.com/bowerbird/internal/inbox/domain"
 	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/id"
@@ -23,6 +24,10 @@ type ProviderClientFactory interface {
 	Build(ctx context.Context, provider string, credentialsJSON []byte) (domain.MailProviderClient, error)
 }
 
+type UnitOfWorkRunner interface {
+	Run(ctx context.Context, fn func(context.Context) error) error
+}
+
 type SyncAccountCommand struct {
 	cursorRepo         domain.SyncCursorRepository
 	messageRepo        domain.MessageRepository
@@ -30,6 +35,7 @@ type SyncAccountCommand struct {
 	providerFactory    ProviderClientFactory
 	eventBus           platformEvents.EventBus
 	fileStore          platformStorage.FileStore
+	unitOfWork         UnitOfWorkRunner
 	idGenerator        func() string
 	// config
 	perMessageTimeout  time.Duration
@@ -48,6 +54,7 @@ func NewSyncAccountCommand(
 	providerFactory ProviderClientFactory,
 	eventBus platformEvents.EventBus,
 	fileStore platformStorage.FileStore,
+	unitOfWork UnitOfWorkRunner,
 ) *SyncAccountCommand {
 	if cursorRepo == nil {
 		panic("sync account command: sync cursor repository is required")
@@ -73,6 +80,10 @@ func NewSyncAccountCommand(
 		panic("sync account command: attachment object store is required")
 	}
 
+	if unitOfWork == nil {
+		panic("sync account command: unit of work is required")
+	}
+
 	return &SyncAccountCommand{
 		cursorRepo:         cursorRepo,
 		messageRepo:        messageRepo,
@@ -80,6 +91,7 @@ func NewSyncAccountCommand(
 		providerFactory:    providerFactory,
 		eventBus:           eventBus,
 		fileStore:          fileStore,
+		unitOfWork:         unitOfWork,
 		idGenerator:        id.NewULID,
 		perMessageTimeout:  60 * time.Second,
 		maxRawMessageBytes: 128 * 1024 * 1024, // 128MB
@@ -171,7 +183,7 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 		return fmt.Errorf("build provider client: %w", err)
 	}
 
-	if cursor.HistoryID != nil && *cursor.HistoryID != "" {
+	if cursor.HistoryID() != "" {
 		if err := c.syncAccountFromHistory(ctx, tenantID, account, cursor, mailClient); err != nil {
 			return err
 		}
@@ -183,7 +195,7 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 
 	historyID, histErr := mailClient.GetHistoryID(ctx, "me")
 	if histErr == nil {
-		cursor.SetHistoryID(historyID)
+		_ = cursor.AdvanceHistory(historyID)
 	}
 
 	now := time.Now().UTC()
@@ -238,68 +250,73 @@ func (c *SyncAccountCommand) processSingleMessage(
 		return fmt.Errorf("build internal message: %w", err)
 	}
 
-	inserted, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage)
-	if err != nil {
-		return fmt.Errorf("save internal message: %w", err)
-	}
-
-	var attachmentRefs []domain.AttachmentRef
-	if len(message.Attachments) > 0 {
-		attachmentRefs, err = c.syncMessageAttachments(
-			messageCtx,
-			tenantID,
-			account.ID,
-			inboxMessage.ID,
-			message.ID,
-			message.Attachments,
-			client,
-		)
+	var attachmentRefs []domain.SyncedAttachmentRef
+	persist := func(ctx context.Context) error {
+		var err error
+		inserted, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage)
 		if err != nil {
-			return err
+			return fmt.Errorf("save internal message: %w", err)
 		}
-	}
 
-	if !inserted {
+		if len(message.Attachments) > 0 {
+			attachmentRefs, err = c.syncMessageAttachments(
+				ctx,
+				messageCtx,
+				tenantID,
+				account.ID,
+				inboxMessage.ID(),
+				message.ID,
+				message.Attachments,
+				client,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if !inserted {
+			return nil
+		}
+		domainEvent, err := inboxMessage.NotificationAfterPersist(inserted, domain.SyncNotificationContext{
+			EventID:         c.idGenerator(),
+			TenantSlug:      tenantID,
+			AccountID:       account.ID,
+			Provider:        account.Provider,
+			ProviderMessage: message,
+			AttachmentRefs:  attachmentRefs,
+		})
+		if err != nil {
+			return fmt.Errorf("build message synced event: %w", err)
+		}
+		if domainEvent == nil {
+			return nil
+		}
+		if err := c.publishMessageSynced(ctx, *domainEvent); err != nil {
+			return fmt.Errorf("publish inbox message received event: %w", err)
+		}
 		return nil
 	}
 
-	if err := c.publishInboxMessageReceivedEvent(ctx, tenantID, account, message, inboxMessage, attachmentRefs); err != nil {
-		return fmt.Errorf("publish inbox message received event: %w", err)
+	if c.unitOfWork == nil {
+		return fmt.Errorf("unit of work is not configured")
 	}
-
-	return nil
+	return c.unitOfWork.Run(ctx, persist)
 }
 
-func (c *SyncAccountCommand) publishInboxMessageReceivedEvent(ctx context.Context, tenantID string, account connectionsApp.ConnectionInfo, mailMessage *domain.MailMessage, inboxMessage *domain.InboxMessage, attachmentRefs []domain.AttachmentRef) error {
-	event, err := domain.NewInboxMessageReceived(domain.NewInboxMessageReceivedInput{
-		EventID:           c.idGenerator(),
-		OccurredAt:        inboxMessage.CreatedAt.Format(time.RFC3339Nano),
-		TenantSlug:        tenantID,
-		AccountID:         account.ID,
-		Provider:          account.Provider,
-		ProviderMessage:   mailMessage,
-		MessageInternalID: inboxMessage.ID,
-		AttachmentRefs:    attachmentRefs,
-	})
-	if err != nil {
-		return fmt.Errorf("build inbox message received event: %w", err)
-	}
-
-	payload, err := domain.MarshalInboxMessageReceived(event)
+func (c *SyncAccountCommand) publishMessageSynced(ctx context.Context, event domain.MessageSynced) error {
+	payload, err := inboxMappers.MarshalMessageSyncedPayload(event)
 	if err != nil {
 		return fmt.Errorf("marshal inbox message received event: %w", err)
 	}
 
 	err = c.eventBus.Publish(ctx, platformEvents.BusinessEvent{
-		Source:     domain.InboxMessageReceivedSource,
-		DetailType: domain.InboxMessageReceivedDetailType,
+		Source:     contractEvents.InboxMessageReceivedSource,
+		DetailType: contractEvents.InboxMessageReceivedDetailType,
 		Detail:     payload,
 	})
-
 	if err != nil {
 		return fmt.Errorf("publish inbox message received event: %w", err)
 	}
-
 	return nil
 }
 
@@ -322,18 +339,19 @@ func (c *SyncAccountCommand) validateMessagePayload(message *domain.MailMessage)
 }
 
 func (c *SyncAccountCommand) syncMessageAttachments(
-	ctx context.Context,
+	dbCtx context.Context,
+	providerCtx context.Context,
 	tenantID string,
 	connectionID string,
 	inboxMessageID string,
 	providerMessageID string,
 	attachments []domain.MailAttachmentRef,
 	client domain.MailProviderClient,
-) ([]domain.AttachmentRef, error) {
-	var refs []domain.AttachmentRef
+) ([]domain.SyncedAttachmentRef, error) {
+	var refs []domain.SyncedAttachmentRef
 	now := time.Now().UTC()
 	for _, att := range attachments {
-		data, err := client.DownloadAttachment(ctx, "me", providerMessageID, att.AttachmentID)
+		data, err := client.DownloadAttachment(providerCtx, "me", providerMessageID, att.AttachmentID)
 		if err != nil {
 			return refs, fmt.Errorf("get provider attachment %s: %w", att.AttachmentID, err)
 		}
@@ -343,9 +361,25 @@ func (c *SyncAccountCommand) syncMessageAttachments(
 
 		hash := sha256.Sum256(data)
 		shaHex := hex.EncodeToString(hash[:])
-		objectKey := buildAttachmentObjectKey(tenantID, connectionID, providerMessageID, att.AttachmentID, att.Filename)
 
-		_, err = c.fileStore.WriteFileIfAbsent(ctx, platformStorage.WriteFileIfAbsentInput{
+		existing, err := c.messageRepo.GetMessageAttachmentByMessageAndSHA(dbCtx, inboxMessageID, shaHex)
+		if err != nil {
+			return refs, fmt.Errorf("lookup attachment %s: %w", att.AttachmentID, err)
+		}
+		if existing != nil {
+			refs = append(refs, domain.SyncedAttachmentRef{
+				S3Key:    existing.S3Key,
+				Filename: existing.Filename,
+				MimeType: derefString(existing.MimeType),
+				SHA256:   existing.SHA256,
+			})
+			continue
+		}
+
+		storageFileID := c.idGenerator()
+		objectKey := platformStorage.InboxAttachmentObjectKey(tenantID, connectionID, inboxMessageID, storageFileID, att.Filename)
+
+		_, err = c.fileStore.WriteFileIfAbsent(dbCtx, platformStorage.WriteFileIfAbsentInput{
 			Path:        objectKey,
 			Data:        data,
 			ContentType: att.MimeType,
@@ -354,9 +388,8 @@ func (c *SyncAccountCommand) syncMessageAttachments(
 				"connection_id":       connectionID,
 				"provider_message_id": providerMessageID,
 				"message_id":          inboxMessageID,
-				"attachment_id":       att.AttachmentID,
 				"sha256":              shaHex,
-				"orig_name":           safeMetadata(att.Filename),
+				"orig_name":           att.Filename,
 				"module":              "inbox",
 				"stage":               "raw",
 			},
@@ -367,7 +400,7 @@ func (c *SyncAccountCommand) syncMessageAttachments(
 
 		sizeBytes := int64(len(data))
 		attachment, err := domain.NewMessageAttachment(domain.NewMessageAttachmentInput{
-			ID:        c.idGenerator(),
+			ID:        storageFileID,
 			MessageID: inboxMessageID,
 			Filename:  att.Filename,
 			MimeType:  pointerIfNotEmpty(att.MimeType),
@@ -381,11 +414,11 @@ func (c *SyncAccountCommand) syncMessageAttachments(
 			return refs, fmt.Errorf("build message attachment %s: %w", att.AttachmentID, err)
 		}
 
-		if _, err := c.messageRepo.UpsertMessageAttachment(ctx, attachment); err != nil {
+		if _, err := c.messageRepo.UpsertMessageAttachment(dbCtx, attachment); err != nil {
 			return refs, fmt.Errorf("save message attachment %s: %w", att.AttachmentID, err)
 		}
 
-		refs = append(refs, domain.AttachmentRef{
+		refs = append(refs, domain.SyncedAttachmentRef{
 			S3Key:    objectKey,
 			Filename: att.Filename,
 			MimeType: att.MimeType,
@@ -405,30 +438,11 @@ func pointerIfNotEmpty(value string) *string {
 	return &v
 }
 
-func buildAttachmentObjectKey(tenantID, connectionID, messageID, attachmentID, filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	if ext == "" {
-		ext = ".bin"
+func derefString(value *string) string {
+	if value == nil {
+		return ""
 	}
-	return fmt.Sprintf(
-		"tenant/%s/inbox/%s/messages/%s/attachments/%s%s",
-		tenantID,
-		connectionID,
-		messageID,
-		attachmentID,
-		ext,
-	)
-}
-
-func safeMetadata(value string) string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return "unknown"
-	}
-	if len(v) > 256 {
-		return v[:256]
-	}
-	return v
+	return *value
 }
 
 func incrementalQuery(lastSyncedAt *time.Time) string {
@@ -446,7 +460,7 @@ func (c *SyncAccountCommand) syncAccountFromList(
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
 ) error {
-	query := incrementalQuery(cursor.LastSyncedAt)
+	query := incrementalQuery(cursor.LastSyncedAt())
 	pageToken := ""
 	for {
 		refs, nextPageToken, err := mailClient.ListMessages(ctx, domain.ListMessagesOptions{
@@ -485,7 +499,7 @@ func (c *SyncAccountCommand) syncAccountFromHistory(
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
 ) error {
-	page, err := mailClient.ListHistory(ctx, "me", *cursor.HistoryID)
+	page, err := mailClient.ListHistory(ctx, "me", cursor.HistoryID())
 	if err != nil {
 		return fmt.Errorf("list provider history: %w", err)
 	}
@@ -506,7 +520,7 @@ func (c *SyncAccountCommand) syncAccountFromHistory(
 	}
 
 	if page.NewHistoryID != "" {
-		cursor.SetHistoryID(page.NewHistoryID)
+		_ = cursor.AdvanceHistory(page.NewHistoryID)
 	}
 
 	return nil

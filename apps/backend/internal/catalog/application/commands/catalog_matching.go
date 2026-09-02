@@ -38,14 +38,16 @@ func (cmd *ValidateCatalogItemCommand) Execute(ctx context.Context, itemID strin
 type MintProvisionalFromEvidenceCommand struct {
 	items   ports.ItemRepository
 	aliases ports.AliasRepository
+	write   ports.CatalogWriteRepository
 	now     func() time.Time
 	newID   func() string
 }
 
-func NewMintProvisionalFromEvidenceCommand(items ports.ItemRepository, aliases ports.AliasRepository) *MintProvisionalFromEvidenceCommand {
+func NewMintProvisionalFromEvidenceCommand(items ports.ItemRepository, aliases ports.AliasRepository, write ports.CatalogWriteRepository) *MintProvisionalFromEvidenceCommand {
 	return &MintProvisionalFromEvidenceCommand{
 		items:   items,
 		aliases: aliases,
+		write:   write,
 		now:     time.Now,
 		newID:   id.NewULID,
 	}
@@ -69,21 +71,35 @@ func (cmd *MintProvisionalFromEvidenceCommand) Execute(ctx context.Context, inpu
 		}
 		return "", err
 	}
-	if err := cmd.items.CreateItem(ctx, item); err != nil {
-		return "", err
-	}
 	normalized := domain.NormalizeItemCode(input.ItemCode)
 	if normalized != "" && strings.TrimSpace(input.PartyID) != "" && cmd.aliases != nil {
-		if err := cmd.ensureSupplierAlias(ctx, input.PartyID, normalized, item.ID); err != nil {
+		alias, aliasErr := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, input.PartyID, normalized, now)
+		if aliasErr != nil {
+			return "", aliasErr
+		}
+		if err := cmd.write.CreateItemWithAlias(ctx, item, alias); err != nil {
+			if isConflict(err) {
+				return cmd.loadWinnerItemIDBySupplierSKU(ctx, input.PartyID, normalized)
+			}
 			return "", err
 		}
+		return item.ID, nil
+	}
+	if err := cmd.items.CreateItem(ctx, item); err != nil {
+		return "", err
 	}
 	return item.ID, nil
 }
 
-func (cmd *MintProvisionalFromEvidenceCommand) ensureSupplierAlias(ctx context.Context, partyID, code, itemID string) error {
-	ensure := NewEnsureSupplierAliasCommand(cmd.aliases)
-	return ensure.Execute(ctx, partyID, code, itemID)
+func (cmd *MintProvisionalFromEvidenceCommand) loadWinnerItemIDBySupplierSKU(ctx context.Context, partyID, code string) (string, error) {
+	existing, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, partyID, code)
+	if err != nil {
+		return "", err
+	}
+	if existing == nil {
+		return "", appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+	}
+	return existing.ItemID, nil
 }
 
 type EnsureSupplierAliasCommand struct {

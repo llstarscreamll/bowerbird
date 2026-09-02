@@ -26,6 +26,10 @@ func (f *fakeDownloadFileStore) ReadFile(ctx context.Context, input platformStor
 	return nil, nil
 }
 
+func (f *fakeDownloadFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	return nil
+}
+
 func (f *fakeDownloadFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
 	f.existsInput = input
 	return f.exists, nil

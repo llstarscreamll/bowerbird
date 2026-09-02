@@ -25,5 +25,6 @@ type MessageRepository interface {
 	GetInboxMessageByID(ctx context.Context, messageID string) (*InboxMessage, error)
 	UpdateInboxMessageFlags(ctx context.Context, message *InboxMessage) error
 	GetMessageAttachment(ctx context.Context, messageID, attachmentID string) (*MessageAttachment, error)
+	GetMessageAttachmentByMessageAndSHA(ctx context.Context, messageID, sha256 string) (*MessageAttachment, error)
 	ListMessageAttachments(ctx context.Context, messageID string) ([]*MessageAttachment, error)
 }

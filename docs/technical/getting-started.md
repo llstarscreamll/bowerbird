@@ -38,24 +38,25 @@ globals.
 
 ## Environment
 
-### API (local)
+### API (local — onprem profile)
 
 1. Copy `apps/backend/.env.example` → `apps/backend/.env`.
-2. Copy `apps/backend/secrets.example.json` → `apps/backend/secrets.json`.
+2. Set `DEPLOYMENT_TARGET=onprem` and `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
+3. Provide secrets in `.env` (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`, `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
 
-| Source         | Use for                                                                                                                                                     |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`         | Process bootstrap: `PORT`, AWS IAM keys, `AWS_REGION`, `AWS_ENDPOINT_URL`, `S3_PRESIGN_ENDPOINT_URL`, `SSM_PARAMETER_NAME`, `ENABLE_LOCAL_EVENT_LOOP`       |
-| `secrets.json` | Business secrets and AWS resource names: `database_url`, buckets, queue URLs, API keys, `inbox_credentials_encryption_key`, `tenant_secrets_encryption_key` |
-
-The API loads config from the SSM parameter named in `.env`. LocalStack injects `secrets.json` into SSM on start.
+| Source | Use for                                                                     |
+| ------ | --------------------------------------------------------------------------- |
+| `.env` | All config for local/onprem: DB, RabbitMQ, MinIO, encryption keys, API keys |
 
 Typical local `.env` values:
 
-- `AWS_ENDPOINT_URL=http://localhost:4566`
+- `DEPLOYMENT_TARGET=onprem`
+- `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`
+- `MINIO_ENDPOINT_URL=http://localhost:9000`
+- `AWS_ACCESS_KEY_ID=bowerbird` / `AWS_SECRET_ACCESS_KEY=bowerbirdsecret`
+- `S3_BUCKET_NAME=bowerbird-local-bucket`
 - `S3_PRESIGN_ENDPOINT_URL=https://media.bowerbird.dev`
-- `ENABLE_LOCAL_EVENT_LOOP=true`
-- `SSM_PARAMETER_NAME=/bowerbird/local/secrets`
+- `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` / `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK compatibility)
 
 For raw Go commands: `export $(grep -v '^#' apps/backend/.env | xargs)`.
 
@@ -78,7 +79,7 @@ Caddy (Compose) uses `network_mode: host` and proxies:
 
 - `app.bowerbird.dev` → Angular `:4200`
 - `api.bowerbird.dev` → Go API `:8080`
-- `media.bowerbird.dev` → LocalStack S3 `:4566`
+- `media.bowerbird.dev` → MinIO `:9000`
 
 Host networking is required on Linux so Caddy can reach those host ports. A bridged `host.docker.internal` hop is dropped by UFW/nftables and the browser shows **502**.
 
@@ -145,14 +146,25 @@ If volumes were wiped, Caddy may regenerate the CA — re-export and re-trust. F
 pnpm run dev
 ```
 
-Starts Postgres, Redis, LocalStack, Caddy, Go API (Air), and Angular. Prefer the `*.bowerbird.dev` hosts (cookies/routing).
+Starts Postgres, RabbitMQ, MinIO, Caddy, Go API (Air), PWA, and backend workers (`relay`, `events-consumer`, `jobs-consumer`, `scheduler`). All backend processes use **Air** hot reload. Prefer `*.bowerbird.dev` hosts (cookies/routing).
+
+Manual workers (if needed):
+
+```bash
+pnpm --filter @bowerbird/backend dev:relay
+pnpm --filter @bowerbird/backend dev:events-consumer
+pnpm --filter @bowerbird/backend dev:jobs-consumer
+pnpm --filter @bowerbird/backend dev:scheduler
+```
+
+See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./architecture/outbox-relay.md).
 
 - App: `https://app.bowerbird.dev`
 - Tenant example: `https://app.bowerbird.dev/acme/dashboard`
 - API: `https://api.bowerbird.dev`
 - Media: `https://media.bowerbird.dev/bowerbird-local-bucket/<key>`
 
-`infra:up` / `dev` wait on healthchecks (Postgres, Redis, SSM `/bowerbird/local/secrets`, Caddy 80/443).
+`infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO, Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old LocalStack) are removed automatically.
 
 ## Commands
 
@@ -160,4 +172,4 @@ Starts Postgres, Redis, LocalStack, Caddy, Go API (Air), and Angular. Prefer the
 `format:check` · `deploy`
 
 Also: [Development quality](./quality/development-quality.md) ·
-[CodeGraph](./tooling/codegraph.md) · [LocalStack](./tooling/localstack.md)
+[CodeGraph](./tooling/codegraph.md) · [MinIO](./tooling/minio.md)

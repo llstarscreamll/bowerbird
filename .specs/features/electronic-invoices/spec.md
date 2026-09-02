@@ -101,7 +101,7 @@ Build modular, deterministic electronic invoice management for multi-account ten
 ## Acceptance criteria
 
 1. Every RF and RNF traces to implementation tasks.
-2. Full flow mail → event → pipeline → extraction → persistence works locally with LocalStack.
+2. Full flow mail → event → pipeline → extraction → persistence works locally with RabbitMQ + MinIO.
 3. Unit tests cover the DIAN XML parser and LLM normalizer.
 4. At least one integration test covers the idempotent CUFE deduplication path.
 5. UI connects accounts, shows statuses, and lists mail in a responsive unified view.

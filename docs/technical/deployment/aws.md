@@ -1,11 +1,19 @@
 # AWS deployment (CDK)
 
+Dual-runtime overview: [Runtime profiles](../architecture/runtime-profiles.md).
+
 ## Stack
 
 - PWA: private S3 + CloudFront
 - HTTP API: API Gateway + Go Lambda
-- Workers: SQS and EventBridge Lambdas
+- Workers: SQS and EventBridge Lambdas + **outbox-relay** (EventBridge schedule, 30s)
 - DNS: Route53 for app and API hosts
+
+Outbox flow: API → RDS outbox → `outbox-relay` Lambda → EventBridge / SQS → consumer Lambdas.
+
+### Future: relay on Fargate
+
+Replace the scheduled `outbox-relay` Lambda with a long-running Fargate task executing `worker relay` for lower latency and simpler batching. EventBridge/SQS consumers and broker contracts stay unchanged.
 
 ## Domains
 
@@ -28,6 +36,7 @@ Or from root: `pnpm run deploy`.
 - `AWS_REGION` must be `us-east-1`.
 - `packages/infra/.env` required (`ENV`, `AWS_ACCOUNT_ID`, …).
 - Web assets from `apps/pwa/dist/pwa/browser` (build PWA first).
+- Application secrets: SSM SecureString JSON — see [SSM secrets JSON](../deployment/ssm-secrets.md).
 
 ## CloudFront / cache
 

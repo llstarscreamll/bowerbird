@@ -27,7 +27,7 @@ pnpm run infra:up
 pnpm run migrate:all
 ```
 
-Wipes Postgres, Redis, LocalStack, and Caddy volumes. Re-seed with `pnpm run seed` if needed.
+Wipes Postgres, MinIO, RabbitMQ, and Caddy volumes. Re-seed with `pnpm run seed` if needed.
 
 Postgres-only:
 

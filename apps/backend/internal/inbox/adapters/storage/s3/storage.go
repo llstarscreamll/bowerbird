@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -23,13 +21,14 @@ type objectStore interface {
 }
 
 type StoreAttachmentInput struct {
-	TenantSlug         string
-	ConnectedAccountID string
-	MessageID          string
-	AttachmentID       string
-	Filename           string
-	ContentType        string
-	Data               []byte
+	TenantSlug           string
+	ConnectedAccountID   string
+	MessageID            string
+	StorageFileID        string
+	ProviderAttachmentID string
+	Filename             string
+	ContentType          string
+	Data                 []byte
 }
 
 type StoredAttachment struct {
@@ -63,8 +62,11 @@ func (s *Storage) StoreAttachment(ctx context.Context, input StoreAttachmentInpu
 	if input.MessageID == "" {
 		return nil, fmt.Errorf("message_id is required")
 	}
-	if input.AttachmentID == "" {
-		return nil, fmt.Errorf("attachment_id is required")
+	if input.StorageFileID == "" {
+		return nil, fmt.Errorf("storage_file_id is required")
+	}
+	if input.ProviderAttachmentID == "" {
+		return nil, fmt.Errorf("provider_attachment_id is required")
 	}
 	if len(input.Data) == 0 {
 		return nil, fmt.Errorf("attachment data is required")
@@ -72,7 +74,7 @@ func (s *Storage) StoreAttachment(ctx context.Context, input StoreAttachmentInpu
 
 	hash := sha256.Sum256(input.Data)
 	hashHex := hex.EncodeToString(hash[:])
-	key := buildS3Key(input.TenantSlug, input.ConnectedAccountID, input.MessageID, input.AttachmentID, input.Filename)
+	key := platformStorage.InboxAttachmentObjectKey(input.TenantSlug, input.ConnectedAccountID, input.MessageID, input.StorageFileID, input.Filename)
 
 	res, err := s.store.WriteFileIfAbsent(ctx, platformStorage.WriteFileIfAbsentInput{
 		Path:        key,
@@ -82,9 +84,9 @@ func (s *Storage) StoreAttachment(ctx context.Context, input StoreAttachmentInpu
 			"tenant_slug":          input.TenantSlug,
 			"connected_account_id": input.ConnectedAccountID,
 			"message_id":           input.MessageID,
-			"attachment_id":        input.AttachmentID,
+			"attachment_id":        input.ProviderAttachmentID,
 			"sha256":               hashHex,
-			"orig_name":            safeMetadata(input.Filename),
+			"orig_name":            input.Filename,
 			"module":               "inbox",
 			"stage":                "raw",
 		},
@@ -94,30 +96,4 @@ func (s *Storage) StoreAttachment(ctx context.Context, input StoreAttachmentInpu
 	}
 
 	return &StoredAttachment{S3Key: key, SHA256: hashHex, SizeBytes: res.SizeBytes, Uploaded: res.Written}, nil
-}
-
-func buildS3Key(tenantSlug, connectedAccountID, messageID, attachmentID, filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
-	if ext == "" {
-		ext = ".bin"
-	}
-	return fmt.Sprintf(
-		"tenant/%s/inbox/%s/messages/%s/attachments/%s%s",
-		tenantSlug,
-		connectedAccountID,
-		messageID,
-		attachmentID,
-		ext,
-	)
-}
-
-func safeMetadata(value string) string {
-	v := strings.TrimSpace(value)
-	if v == "" {
-		return "unknown"
-	}
-	if len(v) > 256 {
-		return v[:256]
-	}
-	return v
 }

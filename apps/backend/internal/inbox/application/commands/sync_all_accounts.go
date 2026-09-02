@@ -54,8 +54,6 @@ func (c *SyncAllAccountsCommand) Execute(ctx context.Context, requestorUserID st
 		return nil
 	}
 
-	fmt.Println("accounts to sync", len(accounts))
-
 	var dispatchErr error
 	for _, account := range accounts {
 		if account.SharingPolicy == domain.SharingPolicyPrivate && account.OwnerUserID != requestorUserID {
@@ -67,7 +65,6 @@ func (c *SyncAllAccountsCommand) Execute(ctx context.Context, requestorUserID st
 			AccountID: account.ID,
 			Provider:  account.Provider,
 		})
-
 		if err != nil {
 			dispatchErr = errors.Join(dispatchErr, fmt.Errorf("dispatch account %s: %w", account.ID, err))
 			c.logger.Error("failed to dispatch sync account job", "tenant_slug", tenantID, "account_id", account.ID, "error", err)

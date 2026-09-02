@@ -44,10 +44,7 @@ export class FileStorageService {
       const xhr = new XMLHttpRequest();
       xhr.open(presignedUpload.method, presignedUpload.url, true);
 
-      for (const [header, value] of Object.entries({
-        ...presignedUpload.headers,
-        'Content-Type': file.type || 'application/octet-stream',
-      })) {
+      for (const [header, value] of Object.entries(presignedUpload.headers)) {
         xhr.setRequestHeader(header, value);
       }
 

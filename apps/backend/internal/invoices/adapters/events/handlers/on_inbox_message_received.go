@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 
-	awsEvents "github.com/aws/aws-lambda-go/events"
 	contractEvents "github.com/bowerbird/internal/contracts/events"
 	commands "github.com/bowerbird/internal/invoices/application/commands"
+	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/tenant"
 )
 
@@ -21,12 +21,12 @@ func (h *OnInboxMessageReceived) DetailType() string {
 	return contractEvents.InboxMessageReceivedDetailType
 }
 
-func (h *OnInboxMessageReceived) HandleEventBridge(ctx context.Context, event awsEvents.CloudWatchEvent) error {
+func (h *OnInboxMessageReceived) Handle(ctx context.Context, event platformEvents.IntegrationEvent) error {
 	if h.command == nil {
 		return nil
 	}
 
-	decoded, err := contractEvents.DecodeInboxMessageReceivedFromCloudWatchEvent(event)
+	decoded, err := contractEvents.UnmarshalInboxMessageReceived(event.Detail)
 	if err != nil {
 		return err
 	}

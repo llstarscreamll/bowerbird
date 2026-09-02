@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type SyncCursorStatus string
 
@@ -11,6 +14,14 @@ const (
 )
 
 type SyncCursor struct {
+	connectionID string
+	lastSyncedAt *time.Time
+	historyID    *string
+	lastError    *string
+	status       SyncCursorStatus
+}
+
+type SyncCursorSnapshot struct {
 	ConnectionID string
 	LastSyncedAt *time.Time
 	HistoryID    *string
@@ -24,21 +35,45 @@ func NewSyncCursor(connectionID string, initialSyncedAt *time.Time) (*SyncCursor
 	}
 
 	cursor := &SyncCursor{
-		ConnectionID: connectionID,
-		Status:       SyncCursorStatusIdle,
+		connectionID: connectionID,
+		status:       SyncCursorStatusIdle,
 	}
 
 	if initialSyncedAt != nil {
 		t := initialSyncedAt.UTC()
-		cursor.LastSyncedAt = &t
+		cursor.lastSyncedAt = &t
 	}
 
 	return cursor, nil
 }
 
-func (s SyncCursorStatus) String() string {
-	return string(s)
+func RehydrateSyncCursor(snapshot SyncCursorSnapshot) *SyncCursor {
+	return &SyncCursor{
+		connectionID: snapshot.ConnectionID,
+		lastSyncedAt: snapshot.LastSyncedAt,
+		historyID:    snapshot.HistoryID,
+		lastError:    snapshot.LastError,
+		status:       snapshot.Status,
+	}
 }
+
+func (c *SyncCursor) ConnectionID() string     { return c.connectionID }
+func (c *SyncCursor) LastSyncedAt() *time.Time { return c.lastSyncedAt }
+func (c *SyncCursor) HistoryID() string        { return derefString(c.historyID) }
+func (c *SyncCursor) LastError() *string       { return c.lastError }
+func (c *SyncCursor) Status() SyncCursorStatus { return c.status }
+
+func (c *SyncCursor) Snapshot() SyncCursorSnapshot {
+	return SyncCursorSnapshot{
+		ConnectionID: c.connectionID,
+		LastSyncedAt: c.lastSyncedAt,
+		HistoryID:    c.historyID,
+		LastError:    c.lastError,
+		Status:       c.status,
+	}
+}
+
+func (s SyncCursorStatus) String() string { return string(s) }
 
 func (s SyncCursorStatus) IsValid() bool {
 	switch s {
@@ -50,25 +85,33 @@ func (s SyncCursorStatus) IsValid() bool {
 }
 
 func (c *SyncCursor) MarkSyncing() {
-	c.Status = SyncCursorStatusSyncing
+	c.status = SyncCursorStatusSyncing
 }
 
 func (c *SyncCursor) MarkSyncFailed(failure string) {
-	c.Status = SyncCursorStatusError
-	c.LastError = &failure
+	c.status = SyncCursorStatusError
+	c.lastError = &failure
 }
 
 func (c *SyncCursor) MarkSyncSucceeded(at time.Time) {
-	c.Status = SyncCursorStatusIdle
-	c.LastError = nil
+	c.status = SyncCursorStatusIdle
+	c.lastError = nil
 	syncedAt := at.UTC()
-	c.LastSyncedAt = &syncedAt
+	c.lastSyncedAt = &syncedAt
 }
 
-func (c *SyncCursor) SetHistoryID(historyID string) {
-	if historyID == "" {
-		return
+func (c *SyncCursor) AdvanceHistory(historyID string) error {
+	if strings.TrimSpace(historyID) == "" {
+		return ErrSyncCursorHistoryIDRequired
 	}
 	id := historyID
-	c.HistoryID = &id
+	c.historyID = &id
+	return nil
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

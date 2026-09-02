@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
+	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	invoicingLLM "github.com/bowerbird/internal/invoices/adapters/extractors/llm"
 	invoicingXML "github.com/bowerbird/internal/invoices/adapters/extractors/xml"
 	httpV1 "github.com/bowerbird/internal/invoices/adapters/http/v1"
+	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
 	invoicingRepo "github.com/bowerbird/internal/invoices/adapters/repository/postgres"
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
@@ -24,7 +26,7 @@ import (
 func NewApplication(
 	cfg config.Config,
 	eventBus events.EventBus,
-	jobQueue jobs.Queue,
+	jobQueue jobs.TaskQueue,
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
 	passwordResolver ports.DocumentPasswordResolver,
@@ -100,6 +102,18 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	handler.Register(mux, cfg, authMiddleware)
 
 	return handler
+}
+
+// RegisterMessaging wires invoices integration event and job handlers for the messaging composition root.
+func RegisterMessaging(app *application.Application) ([]events.IntegrationEventHandler, []jobs.JobHandler) {
+	if app == nil {
+		panic("invoicing application is required")
+	}
+	return []events.IntegrationEventHandler{
+			invoicesEvents.NewInboxMessageReceivedSubscriber(app.Commands.CreateInvoicesFromInboxMessage),
+		}, []jobs.JobHandler{
+			invoicesJobs.NewInvoiceExtractionRequestedProcessor(app.Commands.ProcessInvoiceExtractionJob),
+		}
 }
 
 type secretsPasswordAdapter struct {

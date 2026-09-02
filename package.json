@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "setup:local": "./scripts/setup-local.sh",
-    "dev": "pnpm run infra:up && turbo run dev",
+    "dev": "pnpm run infra:up && turbo run dev dev:relay dev:events-consumer dev:jobs-consumer dev:scheduler --filter=@bowerbird/backend --filter=@bowerbird/pwa",
     "seed": "pnpm --filter @bowerbird/backend run seed",
     "build": "turbo run build",
     "migrate:controlplane": "pnpm --filter @bowerbird/backend run migrate:controlplane",
@@ -26,7 +26,7 @@
     "format": "prettier \"**/*.{ts,tsx,md,mdx}\" --write",
     "format:check": "prettier \"**/*.{ts,tsx,md,mdx}\" --check",
     "caddy:trust": "./scripts/caddy-trust.sh",
-    "infra:up": "docker compose up -d --wait --wait-timeout 180",
+    "infra:up": "docker compose up -d --wait --wait-timeout 180 --remove-orphans && docker compose --profile init run --rm --no-TTY minio-init",
     "infra:down": "docker compose down",
     "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
     "prepare": "husky"

@@ -41,9 +41,9 @@ func (q *ListAccountHealthQuery) Execute(ctx context.Context) ([]AccountSyncStat
 		status := domain.SyncCursorStatusIdle.String()
 
 		if cursor != nil {
-			status = cursor.Status.String()
-			if cursor.LastSyncedAt != nil {
-				t := cursor.LastSyncedAt.Format("2006-01-02T15:04:05Z07:00")
+			status = cursor.Status().String()
+			if cursor.LastSyncedAt() != nil {
+				t := cursor.LastSyncedAt().Format("2006-01-02T15:04:05Z07:00")
 				lastSyncedAt = &t
 			}
 		}

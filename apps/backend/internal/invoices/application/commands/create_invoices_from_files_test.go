@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
@@ -62,6 +63,14 @@ func (s *createFilesStoreStub) ReadFile(ctx context.Context, input platformStora
 	}
 
 	return payload, nil
+}
+
+func (s *createFilesStoreStub) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	payload, ok := s.data[input.Path]
+	if !ok {
+		return errors.New("not found")
+	}
+	return os.WriteFile(input.DestPath, payload, 0o600)
 }
 
 func (s *createFilesStoreStub) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {

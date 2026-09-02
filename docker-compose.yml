@@ -16,41 +16,55 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: bowerbird-redis
+  minio:
+    image: minio/minio:latest
+    container_name: bowerbird-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: bowerbird
+      MINIO_ROOT_PASSWORD: bowerbirdsecret
+      MINIO_API_CORS_ALLOW_ORIGIN: 'https://app.bowerbird.dev,http://app.bowerbird.dev,http://localhost:4200'
     ports:
-      - '6379:6379'
-    command: ['redis-server', '--appendonly', 'yes']
+      - '9000:9000'
+      - '9001:9001'
     volumes:
-      - redis_data:/data
+      - minio_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
       interval: 5s
       timeout: 5s
       retries: 10
 
-  localstack:
-    image: localstack/localstack:3.8
-    container_name: bowerbird-localstack
+  minio-init:
+    image: minio/mc:latest
+    profiles: [init]
+    depends_on:
+      minio:
+        condition: service_healthy
     environment:
-      SERVICES: s3,sqs,ssm,events
-      AWS_DEFAULT_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      DEBUG: 1
-    ports:
-      - '4566:4566'
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: bowerbird
+      MINIO_ROOT_PASSWORD: bowerbirdsecret
+      MINIO_BUCKET: bowerbird-local-bucket
     volumes:
-      - localstack_data:/var/lib/localstack
-      - ./apps/backend/scripts/init-localstack.sh:/etc/localstack/init/ready.d/init-localstack.sh
-      - ./apps/backend/secrets.json:/tmp/secrets.json:ro
+      - ./apps/backend/scripts/init-minio.sh:/init-minio.sh:ro
+    entrypoint: ['/bin/sh', '/init-minio.sh']
+    restart: 'no'
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: bowerbird-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: bowerbird
+      RABBITMQ_DEFAULT_PASS: bowerbird
+    ports:
+      - '127.0.0.1:5672:5672'
+      - '127.0.0.1:15672:15672'
     healthcheck:
-      test: ['CMD-SHELL', 'awslocal ssm get-parameter --name /bowerbird/local/secrets >/dev/null']
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
       interval: 5s
       timeout: 10s
-      retries: 24
-      start_period: 20s
+      retries: 12
 
   caddy:
     image: caddy:2-alpine
@@ -71,7 +85,6 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
-  localstack_data:
+  minio_data:
   caddy_data:
   caddy_config:

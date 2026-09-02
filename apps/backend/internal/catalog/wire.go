@@ -21,9 +21,9 @@ func NewApplication(registry *database.Registry) *application.Application {
 	matcher := matchers.NewNormalizedDescriptionMatcher(repo)
 	return &application.Application{
 		Commands: application.Commands{
-			ResolveInvoiceLine:          commands.NewResolveInvoiceLineCommand(repo, repo, repo, matcher),
+			ResolveInvoiceLine:          commands.NewResolveInvoiceLineCommand(repo, repo, repo, repo, matcher),
 			ValidateCatalogItem:         commands.NewValidateCatalogItemCommand(repo),
-			MintProvisionalFromEvidence: commands.NewMintProvisionalFromEvidenceCommand(repo, repo),
+			MintProvisionalFromEvidence: commands.NewMintProvisionalFromEvidenceCommand(repo, repo, repo),
 			EnsureSupplierAlias:         commands.NewEnsureSupplierAliasCommand(repo),
 			RecordMatchMemory:           commands.NewRecordMatchMemoryCommand(repo),
 			CreateItem:                  commands.NewCreateItemCommand(repo, repo),

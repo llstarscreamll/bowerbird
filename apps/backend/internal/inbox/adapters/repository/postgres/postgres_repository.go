@@ -31,14 +31,14 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 			FROM inbox_sync_cursors
 			WHERE connection_id = $1
 		`
-	var cursor domain.SyncCursor
+	var snapshot domain.SyncCursorSnapshot
 	var status string
 	err = pool.QueryRow(ctx, query, connectionID).Scan(
-		&cursor.ConnectionID,
-		&cursor.LastSyncedAt,
-		&cursor.LastError,
+		&snapshot.ConnectionID,
+		&snapshot.LastSyncedAt,
+		&snapshot.LastError,
 		&status,
-		&cursor.HistoryID,
+		&snapshot.HistoryID,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -47,12 +47,12 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 		return nil, fmt.Errorf("failed to get sync cursor: %w", err)
 	}
 
-	cursor.Status = domain.SyncCursorStatus(status)
-	if !cursor.Status.IsValid() {
-		cursor.Status = domain.SyncCursorStatusIdle
+	snapshot.Status = domain.SyncCursorStatus(status)
+	if !snapshot.Status.IsValid() {
+		snapshot.Status = domain.SyncCursorStatusIdle
 	}
 
-	return &cursor, nil
+	return domain.RehydrateSyncCursor(snapshot), nil
 }
 
 func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domain.SyncCursor) error {
@@ -61,6 +61,7 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 		return fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
 
+	snapshot := cursor.Snapshot()
 	query := `
 			INSERT INTO inbox_sync_cursors (connection_id, last_synced_at, last_error, status, history_id)
 			VALUES ($1, $2, $3, $4, $5)
@@ -70,7 +71,7 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 				status = EXCLUDED.status,
 				history_id = EXCLUDED.history_id
 		`
-	_, err = pool.Exec(ctx, query, cursor.ConnectionID, cursor.LastSyncedAt, cursor.LastError, cursor.Status.String(), cursor.HistoryID)
+	_, err = pool.Exec(ctx, query, snapshot.ConnectionID, snapshot.LastSyncedAt, snapshot.LastError, snapshot.Status.String(), snapshot.HistoryID)
 	if err != nil {
 		return fmt.Errorf("failed to upsert sync cursor: %w", err)
 	}
@@ -83,7 +84,8 @@ func (r *PostgresRepository) UpsertInboxMessage(ctx context.Context, message *do
 	if err != nil {
 		return false, fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
-
+	q := database.QuerierFromContext(ctx, pool)
+	snapshot := message.Snapshot()
 	query := `
 			INSERT INTO email_messages (
 				id,
@@ -128,32 +130,34 @@ func (r *PostgresRepository) UpsertInboxMessage(ctx context.Context, message *do
 		`
 
 	var inserted bool
-	err = pool.QueryRow(
+	var returnedID string
+	err = q.QueryRow(
 		ctx,
 		query,
-		message.ID,
-		message.ConnectionID,
-		message.ProviderMessageID,
-		message.ProviderThreadID,
-		message.Subject,
-		message.SenderEmail,
-		message.Snippet,
-		nullableTextArray(message.ToEmails),
-		nullableTextArray(message.CcEmails),
-		nullableTextArray(message.BccEmails),
-		message.Folder.String(),
-		message.IsRead,
-		message.IsStarred,
-		message.IsDraft,
-		message.ReceivedAt,
-		string(message.SyncStatus),
-		defaultRawData(message.RawData),
-		message.CreatedAt,
-		message.UpdatedAt,
-	).Scan(&message.ID, &inserted)
+		snapshot.ID,
+		snapshot.ConnectionID,
+		snapshot.ProviderMessageID,
+		snapshot.ProviderThreadID,
+		snapshot.Subject,
+		snapshot.SenderEmail,
+		snapshot.Snippet,
+		nullableTextArray(snapshot.ToEmails),
+		nullableTextArray(snapshot.CcEmails),
+		nullableTextArray(snapshot.BccEmails),
+		snapshot.Folder.String(),
+		snapshot.IsRead,
+		snapshot.IsStarred,
+		snapshot.IsDraft,
+		snapshot.ReceivedAt,
+		string(snapshot.SyncStatus),
+		defaultRawData(snapshot.RawData),
+		snapshot.CreatedAt,
+		snapshot.UpdatedAt,
+	).Scan(&returnedID, &inserted)
 	if err != nil {
 		return false, fmt.Errorf("failed to upsert inbox message: %w", err)
 	}
+	message.ConfirmPersisted(returnedID)
 
 	return inserted, nil
 }
@@ -163,6 +167,7 @@ func (r *PostgresRepository) UpsertMessageAttachment(ctx context.Context, attach
 	if err != nil {
 		return false, fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
+	q := database.QuerierFromContext(ctx, pool)
 
 	query := `
 		INSERT INTO email_attachments (
@@ -190,7 +195,7 @@ func (r *PostgresRepository) UpsertMessageAttachment(ctx context.Context, attach
 	`
 
 	var inserted bool
-	err = pool.QueryRow(
+	err = q.QueryRow(
 		ctx,
 		query,
 		attachment.ID,
@@ -453,29 +458,29 @@ func (r *PostgresRepository) GetInboxMessageByID(ctx context.Context, messageID 
 		FROM email_messages
 		WHERE id = $1
 	`
-	var msg domain.InboxMessage
+	var snapshot domain.InboxMessageSnapshot
 	var status string
 	var folder string
 	err = pool.QueryRow(ctx, query, messageID).Scan(
-		&msg.ID,
-		&msg.ConnectionID,
-		&msg.ProviderMessageID,
-		&msg.ProviderThreadID,
-		&msg.Subject,
-		&msg.SenderEmail,
-		&msg.Snippet,
-		&msg.ToEmails,
-		&msg.CcEmails,
-		&msg.BccEmails,
+		&snapshot.ID,
+		&snapshot.ConnectionID,
+		&snapshot.ProviderMessageID,
+		&snapshot.ProviderThreadID,
+		&snapshot.Subject,
+		&snapshot.SenderEmail,
+		&snapshot.Snippet,
+		&snapshot.ToEmails,
+		&snapshot.CcEmails,
+		&snapshot.BccEmails,
 		&folder,
-		&msg.IsRead,
-		&msg.IsStarred,
-		&msg.IsDraft,
-		&msg.ReceivedAt,
+		&snapshot.IsRead,
+		&snapshot.IsStarred,
+		&snapshot.IsDraft,
+		&snapshot.ReceivedAt,
 		&status,
-		&msg.RawData,
-		&msg.CreatedAt,
-		&msg.UpdatedAt,
+		&snapshot.RawData,
+		&snapshot.CreatedAt,
+		&snapshot.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -483,9 +488,9 @@ func (r *PostgresRepository) GetInboxMessageByID(ctx context.Context, messageID 
 		}
 		return nil, fmt.Errorf("failed to get inbox message: %w", err)
 	}
-	msg.Folder = domain.MailFolder(folder)
-	msg.SyncStatus = domain.MessageSyncStatus(status)
-	return &msg, nil
+	snapshot.Folder = domain.MailFolder(folder)
+	snapshot.SyncStatus = domain.MessageSyncStatus(status)
+	return domain.RehydrateInboxMessage(snapshot), nil
 }
 
 func (r *PostgresRepository) UpdateInboxMessageFlags(ctx context.Context, message *domain.InboxMessage) error {
@@ -494,11 +499,12 @@ func (r *PostgresRepository) UpdateInboxMessageFlags(ctx context.Context, messag
 		return fmt.Errorf("failed to get tenant db pool: %w", err)
 	}
 
+	snapshot := message.Snapshot()
 	_, err = pool.Exec(ctx, `
 		UPDATE email_messages
 		SET folder = $2, is_read = $3, is_starred = $4, is_draft = $5, updated_at = $6
 		WHERE id = $1
-	`, message.ID, message.Folder.String(), message.IsRead, message.IsStarred, message.IsDraft, message.UpdatedAt)
+	`, snapshot.ID, snapshot.Folder.String(), snapshot.IsRead, snapshot.IsStarred, snapshot.IsDraft, snapshot.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to update inbox message flags: %w", err)
 	}
@@ -534,6 +540,40 @@ func (r *PostgresRepository) GetMessageAttachment(ctx context.Context, messageID
 			return nil, domain.ErrInboxMessageNotFound
 		}
 		return nil, fmt.Errorf("failed to get message attachment: %w", err)
+	}
+	return &att, nil
+}
+
+func (r *PostgresRepository) GetMessageAttachmentByMessageAndSHA(ctx context.Context, messageID, sha256 string) (*domain.MessageAttachment, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+	q := database.QuerierFromContext(ctx, pool)
+
+	query := `
+		SELECT id, message_id, filename, mime_type, size_bytes, sha256, s3_key, raw_data, created_at, updated_at
+		FROM email_attachments
+		WHERE message_id = $1 AND sha256 = $2
+	`
+	var att domain.MessageAttachment
+	err = q.QueryRow(ctx, query, messageID, sha256).Scan(
+		&att.ID,
+		&att.MessageID,
+		&att.Filename,
+		&att.MimeType,
+		&att.SizeBytes,
+		&att.SHA256,
+		&att.S3Key,
+		&att.RawData,
+		&att.CreatedAt,
+		&att.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get message attachment by sha: %w", err)
 	}
 	return &att, nil
 }

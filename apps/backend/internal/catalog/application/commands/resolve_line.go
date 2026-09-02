@@ -16,6 +16,7 @@ import (
 type ResolveInvoiceLineCommand struct {
 	items    ports.ItemRepository
 	aliases  ports.AliasRepository
+	write    ports.CatalogWriteRepository
 	memories ports.MatchMemoryRepository
 	matcher  ports.SoftMatcher
 	now      func() time.Time
@@ -25,12 +26,14 @@ type ResolveInvoiceLineCommand struct {
 func NewResolveInvoiceLineCommand(
 	items ports.ItemRepository,
 	aliases ports.AliasRepository,
+	write ports.CatalogWriteRepository,
 	memories ports.MatchMemoryRepository,
 	matcher ports.SoftMatcher,
 ) *ResolveInvoiceLineCommand {
 	return &ResolveInvoiceLineCommand{
 		items:    items,
 		aliases:  aliases,
+		write:    write,
 		memories: memories,
 		matcher:  matcher,
 		now:      time.Now,
@@ -135,32 +138,35 @@ func (cmd *ResolveInvoiceLineCommand) mintProvisional(ctx context.Context, party
 	if err != nil {
 		return nil, false, err
 	}
-	if err := cmd.items.CreateItem(ctx, item); err != nil {
-		return nil, false, err
-	}
 	alias, err := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, partyID, code, now)
 	if err != nil {
 		return nil, false, err
 	}
-	if err := cmd.aliases.CreateAlias(ctx, alias); err != nil {
+	if err := cmd.write.CreateItemWithAlias(ctx, item, alias); err != nil {
 		if isConflict(err) {
-			existing, findErr := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, partyID, code)
-			if findErr != nil {
-				return nil, false, findErr
-			}
-			if existing != nil {
-				won, getErr := cmd.items.GetItemByID(ctx, existing.ItemID)
-				if getErr != nil {
-					return nil, false, getErr
-				}
-				if won != nil {
-					return won, false, nil
-				}
-			}
+			return cmd.loadWinnerBySupplierSKU(ctx, partyID, code)
 		}
-		return nil, false, fmt.Errorf("create provisional alias: %w", err)
+		return nil, false, fmt.Errorf("create provisional item+alias: %w", err)
 	}
 	return &item, true, nil
+}
+
+func (cmd *ResolveInvoiceLineCommand) loadWinnerBySupplierSKU(ctx context.Context, partyID, code string) (*domain.Item, bool, error) {
+	existing, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, partyID, code)
+	if err != nil {
+		return nil, false, err
+	}
+	if existing == nil {
+		return nil, false, fmt.Errorf("create provisional item+alias: alias conflict but winner not found")
+	}
+	won, err := cmd.items.GetItemByID(ctx, existing.ItemID)
+	if err != nil {
+		return nil, false, err
+	}
+	if won == nil {
+		return nil, false, fmt.Errorf("create provisional item+alias: alias points to missing item %s", existing.ItemID)
+	}
+	return won, false, nil
 }
 
 func isConflict(err error) bool {

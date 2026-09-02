@@ -1,0 +1,134 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bowerbird}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bowerbird}
+      POSTGRES_DB: ${POSTGRES_DB:-bowerbird}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bowerbird -d bowerbird']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-bowerbird}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-bowerbird}
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 5s
+      timeout: 10s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-bowerbird}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-bowerbirdsecret}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/migrate', '-target', 'all']
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/api']
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8080/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  outbox-relay:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/worker', 'relay']
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+
+  events-consumer:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/worker', 'events']
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+
+  jobs-consumer:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/worker', 'jobs']
+    env_file: .env
+    environment:
+      BOWERBIRD_WORK_TEMP_DIR: /var/lib/bowerbird/work-tmp
+    volumes:
+      - work_tmp:/var/lib/bowerbird/work-tmp
+    depends_on:
+      api:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Dockerfile
+    command: ['./bin/worker', 'scheduler']
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+  work_tmp:

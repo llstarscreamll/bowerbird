@@ -18,13 +18,13 @@ import (
 )
 
 type CreateInvoicesFromInboxMessageCommand struct {
-	jobQueue jobs.Queue
+	jobQueue jobs.TaskQueue
 	logger   *slog.Logger
 	now      func() time.Time
 	newID    func() string
 }
 
-func NewCreateInvoicesFromInboxMessageCommand(jobQueue jobs.Queue) *CreateInvoicesFromInboxMessageCommand {
+func NewCreateInvoicesFromInboxMessageCommand(jobQueue jobs.TaskQueue) *CreateInvoicesFromInboxMessageCommand {
 	return &CreateInvoicesFromInboxMessageCommand{
 		jobQueue: jobQueue,
 		logger:   slog.Default(),
@@ -62,7 +62,7 @@ func (cmd *CreateInvoicesFromInboxMessageCommand) Execute(ctx context.Context, e
 		return err
 	}
 
-	err = cmd.jobQueue.Dispatch(ctx, jobs.Job{
+	err = cmd.jobQueue.Enqueue(ctx, jobs.Job{
 		Type:    contractJobs.InvoiceExtractionRequestedType,
 		Payload: payload,
 	})

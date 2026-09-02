@@ -97,6 +97,71 @@ func (m *memAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID
 	return &cp, nil
 }
 
+type catalogStore struct {
+	items               *memItems
+	aliases             ports.AliasRepository
+	createItemWithAlias func(ctx context.Context, item domain.Item, alias domain.Alias) error
+}
+
+func (s *catalogStore) CreateItem(ctx context.Context, item domain.Item) error {
+	return s.items.CreateItem(ctx, item)
+}
+func (s *catalogStore) UpdateItem(ctx context.Context, item domain.Item) error {
+	return s.items.UpdateItem(ctx, item)
+}
+func (s *catalogStore) GetItemByID(ctx context.Context, id string) (*domain.Item, error) {
+	return s.items.GetItemByID(ctx, id)
+}
+func (s *catalogStore) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
+	return s.items.GetItemNames(ctx, ids)
+}
+func (s *catalogStore) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
+	return s.items.ListItems(ctx, filter)
+}
+func (s *catalogStore) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {
+	return s.items.FindByNormalizedDescription(ctx, normalizedDesc)
+}
+func (s *catalogStore) CreateAlias(ctx context.Context, alias domain.Alias) error {
+	return s.aliases.CreateAlias(ctx, alias)
+}
+func (s *catalogStore) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
+	return s.aliases.FindBySchemePartyValue(ctx, scheme, partyID, value)
+}
+func (s *catalogStore) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
+	return s.aliases.ListInternalSKUsByItemIDs(ctx, itemIDs)
+}
+
+func (s *catalogStore) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
+	if s.createItemWithAlias != nil {
+		return s.createItemWithAlias(ctx, item, alias)
+	}
+	party := ""
+	if alias.PartyID != nil {
+		party = *alias.PartyID
+	}
+	if existing, _ := s.FindBySchemePartyValue(ctx, alias.Scheme, party, alias.Value); existing != nil {
+		return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+	}
+	if err := s.items.CreateItem(ctx, item); err != nil {
+		return err
+	}
+	if err := s.aliases.CreateAlias(ctx, alias); err != nil {
+		delete(s.items.items, item.ID)
+		return err
+	}
+	return nil
+}
+
+func (s *catalogStore) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
+	if err := s.items.UpdateItem(ctx, item); err != nil {
+		return err
+	}
+	if alias != nil {
+		return s.aliases.CreateAlias(ctx, *alias)
+	}
+	return nil
+}
+
 type memMemories struct {
 	byKey map[string]domain.MatchMemory
 }
@@ -125,8 +190,8 @@ func (s *stubMatcher) Match(ctx context.Context, description string) ([]domain.S
 	return s.suggestions, nil
 }
 
-func newResolveCmd(items *memItems, aliases ports.AliasRepository, memories *memMemories, matcher ports.SoftMatcher) *ResolveInvoiceLineCommand {
-	cmd := NewResolveInvoiceLineCommand(items, aliases, memories, matcher)
+func newResolveCmd(store *catalogStore, memories *memMemories, matcher ports.SoftMatcher) *ResolveInvoiceLineCommand {
+	cmd := NewResolveInvoiceLineCommand(store, store, store, memories, matcher)
 	n := 0
 	cmd.newID = func() string {
 		n++
@@ -136,7 +201,8 @@ func newResolveCmd(items *memItems, aliases ports.AliasRepository, memories *mem
 }
 
 func TestResolve_LockedPreserved(t *testing.T) {
-	cmd := newResolveCmd(&memItems{}, &memAliases{}, &memMemories{}, nil)
+	store := &catalogStore{items: &memItems{}, aliases: &memAliases{}}
+	cmd := newResolveCmd(store, &memMemories{}, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
 		ExistingLocked: true,
 		ExistingItemID: "ITEM-1",
@@ -154,7 +220,7 @@ func TestResolve_MemoryLink(t *testing.T) {
 	itemID := "ITEM-MEM"
 	key := domain.EvidenceKey("P", "ABC", domain.DescriptionFingerprint("Widget"), domain.EvidenceKindCodeDescription)
 	memories.byKey[key] = domain.MatchMemory{EvidenceKey: key, Action: domain.MemoryActionLink, ItemID: &itemID}
-	cmd := newResolveCmd(&memItems{}, &memAliases{}, memories, nil)
+	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: &memAliases{}}, memories, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
 		PartyID: "P", ItemCode: "ABC", Description: "Widget",
 	})
@@ -167,7 +233,7 @@ func TestResolve_HardAlias(t *testing.T) {
 	aliases := &memAliases{byKey: map[string]domain.Alias{
 		aliasKey(domain.AliasSchemeSupplierSKU, "P", "SKU-1"): {ItemID: "ITEM-HARD", Scheme: domain.AliasSchemeSupplierSKU, Value: "SKU-1"},
 	}}
-	cmd := newResolveCmd(&memItems{}, aliases, &memMemories{}, nil)
+	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: aliases}, &memMemories{}, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{PartyID: "P", ItemCode: "SKU-1", Description: "Thing"})
 	require.NoError(t, err)
 	assert.Equal(t, "ITEM-HARD", res.ItemID)
@@ -178,7 +244,7 @@ func TestResolve_HardAlias(t *testing.T) {
 func TestResolve_SoftSuggestOnlyNoAutoLink(t *testing.T) {
 	items := &memItems{items: map[string]domain.Item{"I1": {ID: "I1", Name: "MacBook Air"}}}
 	matcher := &stubMatcher{suggestions: []domain.Suggestion{{ItemID: "I1", Score: 1, Reason: "test"}}}
-	cmd := newResolveCmd(items, &memAliases{}, &memMemories{}, matcher)
+	cmd := newResolveCmd(&catalogStore{items: items, aliases: &memAliases{}}, &memMemories{}, matcher)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
 		Description: "MacBook Air",
 		// no party/code → no mint
@@ -190,9 +256,8 @@ func TestResolve_SoftSuggestOnlyNoAutoLink(t *testing.T) {
 }
 
 func TestResolve_ProvisionalMintOnHardMiss(t *testing.T) {
-	items := &memItems{}
-	aliases := &memAliases{}
-	cmd := newResolveCmd(items, aliases, &memMemories{}, nil)
+	store := &catalogStore{items: &memItems{}, aliases: &memAliases{}}
+	cmd := newResolveCmd(store, &memMemories{}, nil)
 	ids := []string{"ITEM-NEW", "ALIAS-NEW"}
 	i := 0
 	cmd.newID = func() string {
@@ -207,14 +272,14 @@ func TestResolve_ProvisionalMintOnHardMiss(t *testing.T) {
 	assert.True(t, res.Minted)
 	assert.Equal(t, "ITEM-NEW", res.ItemID)
 	assert.Equal(t, domain.LinkMethodHard, res.Method)
-	assert.Len(t, items.items, 1)
-	for _, item := range items.items {
+	assert.Len(t, store.items.items, 1)
+	for _, item := range store.items.items {
 		assert.Equal(t, domain.CreationSourceInvoice, item.CreationSource)
 	}
 }
 
 func TestResolve_EmptyCodeNoMint(t *testing.T) {
-	cmd := newResolveCmd(&memItems{}, &memAliases{}, &memMemories{}, nil)
+	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: &memAliases{}}, &memMemories{}, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
 		PartyID: "P", ItemCode: "", Description: "Service fee",
 	})
@@ -224,7 +289,7 @@ func TestResolve_EmptyCodeNoMint(t *testing.T) {
 	assert.False(t, res.Minted)
 }
 
-// raceAliases: Find misses on the initial hard lookup, then CreateAlias conflicts
+// raceAliases: Find misses on the initial hard lookup, then CreateItemWithAlias conflicts
 // and Find returns the concurrent winner (simulates unique-constraint race).
 type raceAliases struct {
 	finds  int
@@ -254,7 +319,14 @@ func TestResolve_ProvisionalMintAliasRaceReturnsWinner(t *testing.T) {
 	aliases := &raceAliases{winner: domain.Alias{
 		ID: "ALIAS-WIN", ItemID: "ITEM-WIN", Scheme: domain.AliasSchemeSupplierSKU, Value: "SKU-RACE",
 	}}
-	cmd := newResolveCmd(items, aliases, &memMemories{}, nil)
+	store := &catalogStore{
+		items:   items,
+		aliases: aliases,
+		createItemWithAlias: func(ctx context.Context, item domain.Item, alias domain.Alias) error {
+			return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+		},
+	}
+	cmd := newResolveCmd(store, &memMemories{}, nil)
 	n := 0
 	cmd.newID = func() string {
 		n++
@@ -272,5 +344,5 @@ func TestResolve_ProvisionalMintAliasRaceReturnsWinner(t *testing.T) {
 	assert.Equal(t, "ITEM-WIN", res.ItemID)
 	assert.Equal(t, domain.LinkMethodHard, res.Method)
 	assert.Contains(t, items.items, "ITEM-WIN")
-	assert.Contains(t, items.items, "ITEM-ORPHAN") // losing mint's orphan item
+	assert.NotContains(t, items.items, "ITEM-ORPHAN")
 }

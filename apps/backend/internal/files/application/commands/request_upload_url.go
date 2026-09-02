@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"path"
 	"path/filepath"
 	"strings"
@@ -60,11 +59,11 @@ func (cmd *RequestUploadURLCommand) Execute(ctx context.Context, input RequestUp
 		Metadata: map[string]string{
 			"tenant-id":           tenantID,
 			"user-id":             input.UserID,
-			"module":              cmd.sanitizeMetadata(input.Module),
-			"original-filename":   cmd.sanitizeMetadata(input.Filename),
+			"module":              input.Module,
+			"original-filename":   input.Filename,
 			"content-type":        input.ContentType,
 			"cache-control":       "max-age=31536000, public, immutable",
-			"content-disposition": fmt.Sprintf("attachment; filename=\"%s\"", cmd.sanitizeMetadata(input.Filename)),
+			"content-disposition": fmt.Sprintf("attachment; filename=\"%s\"", input.Filename),
 		},
 	})
 }
@@ -77,20 +76,4 @@ func (cmd *RequestUploadURLCommand) buildPath(tenantID, userID, module, filename
 
 	name := id.NewULID() + ext
 	return path.Join(defaultUploadScope, "tenants", tenantID, "uploads", module, userID, name)
-}
-
-func (cmd *RequestUploadURLCommand) sanitizeMetadata(value string) string {
-	v := strings.TrimSpace(value)
-	v = strings.ReplaceAll(v, " ", "_")
-	v = url.PathEscape(v)
-
-	if v == "" {
-		return "unknown"
-	}
-
-	if len(v) > 256 {
-		return v[:256]
-	}
-
-	return v
 }

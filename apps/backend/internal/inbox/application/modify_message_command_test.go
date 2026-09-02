@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	connectionsApp "github.com/bowerbird/internal/connections/application"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
@@ -14,13 +15,17 @@ import (
 
 func TestModifyMessageCommand_ArchivesViaProvider(t *testing.T) {
 	repo := newFakeInboxRepo()
-	message := &domain.InboxMessage{
+	now := time.Now().UTC()
+	message, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
 		ID:                "msg-1",
 		ConnectionID:      "acc-1",
 		ProviderMessageID: "prov-1",
 		Folder:            domain.MailFolderInbox,
-	}
-	repo.messagesByID[message.ID] = message
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	require.NoError(t, err)
+	repo.messagesByID[message.ID()] = message
 	connectionsSvc := &fakeConnectionsInternalService{
 		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
@@ -31,7 +36,7 @@ func TestModifyMessageCommand_ArchivesViaProvider(t *testing.T) {
 	require.NoError(t, cmd.Execute(ctx, "msg-1", inboxCommands.MessageActionArchive))
 	require.Len(t, providerClient.modifyCalls, 1)
 	assert.Equal(t, []string{"INBOX"}, providerClient.modifyCalls[0].RemoveLabelIDs)
-	assert.Equal(t, domain.MailFolderArchive, repo.messagesByID["msg-1"].Folder)
+	assert.Equal(t, domain.MailFolderArchive, repo.messagesByID["msg-1"].Folder())
 }
 
 func TestSendMessageCommand_RequiresRecipient(t *testing.T) {
@@ -58,8 +63,8 @@ func TestSendMessageCommand_PersistsSentCopy(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, message)
-	assert.Equal(t, "gmail-sent-9", message.ProviderMessageID)
-	assert.Equal(t, domain.MailFolderSent, message.Folder)
+	assert.Equal(t, "gmail-sent-9", message.ProviderMessageID())
+	assert.Equal(t, domain.MailFolderSent, message.Folder())
 	require.Len(t, providerClient.sendCalls, 1)
 	assert.Equal(t, []string{"to@example.com"}, providerClient.sendCalls[0].To)
 }

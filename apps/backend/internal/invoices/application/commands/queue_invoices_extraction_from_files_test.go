@@ -17,7 +17,7 @@ type requestInvoiceExtractionPublisherSpy struct {
 	jobs []jobs.Job
 }
 
-func (p *requestInvoiceExtractionPublisherSpy) Dispatch(ctx context.Context, job jobs.Job) error {
+func (p *requestInvoiceExtractionPublisherSpy) Enqueue(ctx context.Context, job jobs.Job) error {
 	p.jobs = append(p.jobs, job)
 	return nil
 }

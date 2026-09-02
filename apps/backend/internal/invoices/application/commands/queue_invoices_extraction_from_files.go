@@ -26,12 +26,12 @@ type QueueInvoiceExtractionFromFilesResult struct {
 }
 
 type QueueInvoiceExtractionFromFilesCommand struct {
-	jobQueue jobs.Queue
+	jobQueue jobs.TaskQueue
 	now      func() time.Time
 	newID    func() string
 }
 
-func NewQueueInvoiceExtractionFromFilesCommand(jobQueue jobs.Queue) *QueueInvoiceExtractionFromFilesCommand {
+func NewQueueInvoiceExtractionFromFilesCommand(jobQueue jobs.TaskQueue) *QueueInvoiceExtractionFromFilesCommand {
 	if jobQueue == nil {
 		panic("job queue is required")
 	}
@@ -71,7 +71,7 @@ func (cmd *QueueInvoiceExtractionFromFilesCommand) Execute(ctx context.Context, 
 		return nil, err
 	}
 
-	err = cmd.jobQueue.Dispatch(ctx, jobs.Job{
+	err = cmd.jobQueue.Enqueue(ctx, jobs.Job{
 		Type:    contractJobs.InvoiceExtractionRequestedType,
 		Payload: payload,
 	})

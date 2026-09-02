@@ -19,16 +19,12 @@ import (
 	identityModule "github.com/bowerbird/internal/identity"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
-	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
-	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
 	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	"github.com/bowerbird/internal/platform/auth"
-	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
 	platformCrypto "github.com/bowerbird/internal/platform/crypto"
 	"github.com/bowerbird/internal/platform/events"
-	platformJobs "github.com/bowerbird/internal/platform/jobs"
 	"github.com/bowerbird/internal/platform/tenant"
 	rbacModule "github.com/bowerbird/internal/rbac"
 	secretsModule "github.com/bowerbird/internal/secrets"
@@ -78,9 +74,6 @@ func main() {
 	organizationApp := tenantModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsApp)
 	tenantModule.NewHTTPHandler(mux, organizationApp, authMiddleware, cfg)
 
-	// Setup AWS Config
-	awsCfg := platformModule.AWSConfig
-
 	if cfg.S3BucketName != "" {
 		filesApp := filesModule.NewApplication(platformModule.FileStore)
 		filesModule.NewHTTPHandler(mux, filesApp, authMiddleware, cfg)
@@ -88,10 +81,7 @@ func main() {
 		log.Printf("file upload routes disabled: s3_bucket_name is empty")
 	}
 
-	var connectionsEventBus events.EventBus
-	if cfg.EventBusName != "" {
-		connectionsEventBus = platformModule.EventBus
-	}
+	var connectionsEventBus events.EventBus = platformModule.EventBus
 
 	// Setup Connections Context
 	var connectionsService connectionsApp.InternalService
@@ -120,7 +110,7 @@ func main() {
 		platformModule.EventBus,
 		platformModule.FileStore,
 		tenantsDbRegistry,
-		platformModule.JobQueue,
+		platformModule.TaskQueue,
 	)
 	inboxModule.NewHTTPHandler(mux, inboxApp, authMiddleware, cfg, entitlementsApp)
 
@@ -143,7 +133,7 @@ func main() {
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		platformModule.EventBus,
-		platformModule.JobQueue,
+		platformModule.TaskQueue,
 		platformModule.FileStore,
 		tenantsDbRegistry,
 		documentPasswordResolver,
@@ -153,23 +143,6 @@ func main() {
 		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
-
-	inboxMessageSubscriber := invoicesEvents.NewInboxMessageReceivedSubscriber(invoicingApp.Commands.CreateInvoicesFromInboxMessage)
-	invoiceExtractionProcessor := invoicesJobs.NewInvoiceExtractionRequestedProcessor(invoicingApp.Commands.ProcessInvoiceExtractionJob)
-
-	inboxEventsSubscriber := inboxModule.NewConnectionAddedSubscriber(inboxApp, entitlementsApp)
-	inboxSyncProcessor := inboxModule.NewSyncAccountProcessor(inboxApp, entitlementsApp)
-	eventHandler := events.NewEventHandler(inboxMessageSubscriber, inboxEventsSubscriber)
-	jobHandler := platformJobs.NewHandler(invoiceExtractionProcessor, inboxSyncProcessor)
-
-	if cfg.EnableLocalEventLoop && cfg.AWSEndpointURL != "" {
-		sqsClient := awsConfig.NewSQSClient(awsCfg, cfg.AWSEndpointURL)
-		jobsPoller := platformJobs.NewPoller(sqsClient, jobHandler, cfg.SQSQueueURL)
-		eventsPoller := events.NewPoller(sqsClient, eventHandler, cfg.EventBridgeQueueURL)
-		jobsPoller.Run(ctxApp)
-		eventsPoller.Run(ctxApp)
-		log.Printf("local event loop enabled: sqs=%t eventbridge=%t", cfg.SQSQueueURL != "", cfg.EventBridgeQueueURL != "")
-	}
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,

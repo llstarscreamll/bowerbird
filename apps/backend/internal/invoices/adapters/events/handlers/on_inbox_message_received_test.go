@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	awsevents "github.com/aws/aws-lambda-go/events"
 	contractevents "github.com/bowerbird/internal/contracts/events"
 	invoicingcommands "github.com/bowerbird/internal/invoices/application/commands"
+	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 )
 
@@ -14,7 +14,7 @@ type fakePublisher struct {
 	enqueued int
 }
 
-func (p *fakePublisher) Dispatch(ctx context.Context, job jobs.Job) error {
+func (p *fakePublisher) Enqueue(ctx context.Context, job jobs.Job) error {
 	p.enqueued++
 	return nil
 }
@@ -40,7 +40,7 @@ func TestOnInboxMessageReceivedRoutesEvent(t *testing.T) {
 		t.Fatalf("marshal detail failed: %v", err)
 	}
 
-	err = handler.HandleEventBridge(context.Background(), awsevents.CloudWatchEvent{
+	err = handler.Handle(context.Background(), platformEvents.IntegrationEvent{
 		DetailType: contractevents.InboxMessageReceivedDetailType,
 		Detail:     detail,
 	})

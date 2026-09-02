@@ -28,7 +28,7 @@ func NewApplication(
 	eventBus events.EventBus,
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
-	jobQueue jobs.Queue,
+	jobQueue jobs.TaskQueue,
 ) *application.Application {
 	if connectionsService == nil {
 		panic("connections internal service is required")
@@ -73,6 +73,7 @@ func NewApplication(
 			providerFactory,
 			eventBus,
 			fileStore,
+			database.NewRegistryUnitOfWork(registry),
 		)
 		modifyMessageCommand = commands.NewModifyMessageCommand(inboxRepository, connectionsService, providerFactory)
 		sendMessageCommand = commands.NewSendMessageCommand(inboxRepository, connectionsService, providerFactory)
@@ -80,7 +81,7 @@ func NewApplication(
 
 		var dispatcher commands.SyncAccountJobDispatcher
 		if jobQueue != nil {
-			dispatcher = commands.NewSQSSyncAccountJobDispatcher(jobQueue)
+			dispatcher = commands.NewOutboxSyncAccountJobDispatcher(jobQueue)
 		} else {
 			dispatcher = commands.NewInlineSyncAccountJobDispatcher(syncAccountCommand)
 		}
@@ -126,16 +127,26 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	return handler
 }
 
-func NewConnectionAddedSubscriber(app *application.Application, features inboxPorts.FeatureChecker) *eventsV1.ConnectionAddedSubscriber {
+// RegisterMessaging wires inbox integration event and job handlers for the messaging composition root.
+func RegisterMessaging(
+	app *application.Application,
+	features inboxPorts.FeatureChecker,
+	taskQueue jobs.TaskQueue,
+) ([]events.IntegrationEventHandler, []jobs.JobHandler) {
 	if app == nil {
 		panic("inbox application is required")
 	}
-	return eventsV1.NewConnectionAddedSubscriber(app.Commands.SyncAccount, features)
-}
 
-func NewSyncAccountProcessor(app *application.Application, features inboxPorts.FeatureChecker) *inboxJobs.ProcessInboxSyncAccount {
-	if app == nil {
-		panic("inbox application is required")
+	var eventHandlers []events.IntegrationEventHandler
+	if taskQueue != nil {
+		eventHandlers = append(eventHandlers, eventsV1.NewConnectionAddedSubscriber(
+			commands.NewOutboxSyncAccountJobDispatcher(taskQueue),
+			features,
+		))
 	}
-	return inboxJobs.NewProcessInboxSyncAccount(app.Commands.SyncAccount, features)
+
+	jobHandlers := []jobs.JobHandler{
+		inboxJobs.NewProcessInboxSyncAccount(app.Commands.SyncAccount, features),
+	}
+	return eventHandlers, jobHandlers
 }

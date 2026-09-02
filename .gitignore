@@ -21,7 +21,6 @@ packages/infra/node_modules/
 !.env.example
 secrets.json
 secrets.*.json
-!secrets.example.json
 .mise.local.toml
 
 # Tooling e IDEs

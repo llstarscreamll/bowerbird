@@ -27,6 +27,7 @@
 ## Backend (`apps/backend`)
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources `apps/backend/.env` if present.
+- Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
 - Feature architecture: follow the `internal/<feature>` modular layout used in `internal/invoices`:
   - `domain/`: core business model and pure domain logic (no infra/framework concerns).
   - `application/`: use cases (`commands`, `queries`) and `ports` interfaces.
@@ -37,12 +38,10 @@
 - Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
 - Domain Errors: Wrap or create errors using `appErrors.Wrap(err, appErrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
 - Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
-- Runtime config is env + SSM merge (`internal/platform/config/config.go`).
-  - Local default SSM parameter: `/bowerbird/local/secrets`.
-  - `inbox_credentials_encryption_key` is required from SSM (no env fallback).
-- LocalStack bootstrap script (`apps/backend/scripts/init-localstack.sh`) creates SQS/EventBridge/S3 and writes SSM secrets from `apps/backend/secrets.json`.
-  - If `apps/backend/secrets.json` changes, re-run inside container:
-    `docker exec bowerbird-localstack /etc/localstack/init/ready.d/init-localstack.sh`.
+- Runtime config (`internal/platform/config/config.go`):
+  - `onprem` (local + client deploy): plain `.env` — `MINIO_ENDPOINT_URL`, `RABBITMQ_URL`, encryption keys, API keys.
+  - `aws`: SSM SecureString at `SSM_PARAMETER_NAME` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)).
+- Local dev object storage: MinIO in root `docker-compose.yml` (`:9000` API, `:9001` console). Bucket bootstrap: `apps/backend/scripts/init-minio.sh` via `pnpm run infra:up` (`minio-init` service).
 
 ## PWA (`apps/pwa`)
 
@@ -70,7 +69,7 @@
 
 ## Local infra and deploy constraints
 
-- `docker-compose.yml` runs Postgres `5432`, Redis `6379`, LocalStack `4566`, Caddy `80/443`.
+- `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
 - `Caddyfile` maps `app.bowerbird.dev -> :4200` and `api.bowerbird.dev -> :8080`; use these domains locally for cookie/routing behavior.
 - Infra CDK entrypoint is `packages/infra/bin/index.ts` and requires `packages/infra/.env`:
   - `ENV` and `AWS_ACCOUNT_ID` must be set.

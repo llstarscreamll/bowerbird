@@ -22,7 +22,18 @@ func Load(ctx context.Context, region, endpointURL, accessKeyID, secretAccessKey
 		)
 	}
 
-	return awsconfigv2.LoadDefaultConfig(ctx, options...)
+	cfg, err := awsconfigv2.LoadDefaultConfig(ctx, options...)
+	if err != nil {
+		return aws.Config{}, err
+	}
+
+	// MinIO and other S3-compatible stores reject default SDK CRC32 checksum trailers (SignatureDoesNotMatch on PutObject).
+	if endpointURL != "" {
+		cfg.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		cfg.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
+	}
+
+	return cfg, nil
 }
 
 func NewSQSClient(awsCfg aws.Config, endpointURL string) *sqs.Client {
@@ -43,10 +54,15 @@ func NewS3Client(awsCfg aws.Config, endpointURL string) *s3.Client {
 	return s3.NewFromConfig(awsCfg, func(options *s3.Options) {
 		options.BaseEndpoint = &endpointURL
 		options.UsePathStyle = true
+		options.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		options.ResponseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
 	})
 }
 
 func NewS3PresignClient(awsCfg aws.Config, endpointURL string) *s3.PresignClient {
+	if endpointURL == "" {
+		return s3.NewPresignClient(NewS3Client(awsCfg, ""))
+	}
 	return s3.NewPresignClient(NewS3Client(awsCfg, endpointURL))
 }
 

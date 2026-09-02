@@ -1,37 +1,43 @@
 # Events vs jobs
 
-- **Events (EventBridge):** domain facts between decoupled contexts (`InboxMessageReceived`). Fan-out; producer does not know consumers.
-- **Jobs (SQS):** work to execute (`InvoiceExtractionRequested`). Retries, backoff, worker semantics.
+- **Integration events:** domain facts already occurred (`InboxMessageReceived`). Fan-out; producer does not know consumers.
+- **Background jobs:** deferred work units (`InvoiceExtractionRequested`, `InboxSyncAccount`). Retries/backoff; worker semantics.
 
-If both are needed: publish an event; a consumer may enqueue a job.
+Rule: event handlers stay light — enqueue a job for heavy work.
+
+See [Outbox relay](./outbox-relay.md) for the full pipeline and [Runtime profiles](./runtime-profiles.md) for broker selection by deployment target.
 
 ## Code map
 
-| Concern                    | Location                   |
-| -------------------------- | -------------------------- |
-| Publish / subscribe events | `internal/platform/events` |
-| Enqueue / process jobs     | `internal/platform/jobs`   |
-
-`cmd/api` wires separate `eventHandler` and `jobHandler`, plus two local pollers when `ENABLE_LOCAL_EVENT_LOOP` is on.
+| Concern        | Port / adapter                                        |
+| -------------- | ----------------------------------------------------- |
+| Publish events | `EventBus` → `OutboxEventPublisher` → `outbox_events` |
+| Enqueue jobs   | `TaskQueue` → `OutboxTaskQueue` → `outbox_jobs`       |
+| Relay          | `internal/platform/outbox/relay` → broker adapter     |
+| Handle events  | `IntegrationEventHandler` in consumers / Lambdas      |
+| Handle jobs    | `JobHandler` in consumers / Lambdas                   |
 
 ## Decision guide
 
-| Question                        | Event          | Job               |
-| ------------------------------- | -------------- | ----------------- |
-| Something already happened?     | Yes            | No                |
-| Pending work unit?              | No             | Yes               |
-| Multiple independent consumers? | Yes (fan-out)  | Usually no        |
-| Needs worker/retry semantics?   | Not by default | Yes               |
-| Producer fully decoupled?       | Yes            | May know job type |
+| Question                        | Event          | Job        |
+| ------------------------------- | -------------- | ---------- |
+| Something already happened?     | Yes            | No         |
+| Pending work unit?              | No             | Yes        |
+| Multiple independent consumers? | Yes            | Usually no |
+| Needs worker/retry semantics?   | Not by default | Yes        |
 
-## Avoid
+## Examples
 
-- Treating commands as EventBridge “events”
-- Mixing event and job pollers/handlers in one abstraction
-- Using jobs to broadcast domain facts across contexts
+| Flow                | Pattern                                            |
+| ------------------- | -------------------------------------------------- |
+| Inbox message saved | Event `InboxMessageReceived`                       |
+| Invoice extraction  | Job `InvoiceExtractionRequested`                   |
+| Connection added    | Event → handler enqueues sync **job**              |
+| Periodic inbox sync | Scheduler tick → **job** (not a fake domain event) |
 
-## Example
+## Contracts
 
-`inbox` → `InboxMessageReceived` → `invoices` evaluates → enqueue `InvoiceExtractionRequested` → processor extracts and persists.
+- Events on the wire: **CloudEvents 1.0 JSON** after relay (`type`, `data`, `tenant_slug`, `correlation_id`).
+- Jobs on the wire: internal envelope + `tenant_slug`, `job_type`, `correlation_id`, `message_id`.
 
-In PRs, label each new message contract as `event` or `job`.
+Label every new message contract as `event` or `job` in PRs.

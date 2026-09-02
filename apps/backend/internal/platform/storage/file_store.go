@@ -21,6 +21,11 @@ type ReadFileInput struct {
 	Path string
 }
 
+type DownloadFileInput struct {
+	Path     string
+	DestPath string
+}
+
 type ExistsFileInput struct {
 	Path string
 }
@@ -66,6 +71,7 @@ type PresignDownloadResult struct {
 type FileStore interface {
 	WriteFileIfAbsent(ctx context.Context, input WriteFileIfAbsentInput) (*WriteFileIfAbsentResult, error)
 	ReadFile(ctx context.Context, input ReadFileInput) ([]byte, error)
+	DownloadFile(ctx context.Context, input DownloadFileInput) error
 	Exists(ctx context.Context, input ExistsFileInput) (bool, error)
 	MoveFile(ctx context.Context, input MoveFileInput) error
 	PresignUpload(ctx context.Context, input PresignUploadInput) (*PresignUploadResult, error)

@@ -11,6 +11,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+func TestLoadDisablesDefaultChecksumsForCustomEndpoint(t *testing.T) {
+	cfg, err := Load(context.Background(), "us-east-1", "http://localhost:9000", "bowerbird", "bowerbirdsecret")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.RequestChecksumCalculation != aws.RequestChecksumCalculationWhenRequired {
+		t.Fatalf("expected when_required request checksums for MinIO, got %v", cfg.RequestChecksumCalculation)
+	}
+	if cfg.ResponseChecksumValidation != aws.ResponseChecksumValidationWhenRequired {
+		t.Fatalf("expected when_required response checksum validation for MinIO, got %v", cfg.ResponseChecksumValidation)
+	}
+}
+
 func TestNewS3PresignClientUsesCustomEndpoint(t *testing.T) {
 	awsCfg := aws.Config{
 		Region:      "us-east-1",
