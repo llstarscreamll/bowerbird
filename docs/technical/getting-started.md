@@ -38,17 +38,20 @@ globals.
 
 ## Environment
 
-### API (local — onprem profile)
+### Environment (repo root)
 
-1. Copy `apps/backend/.env.example` → `apps/backend/.env`.
-2. Set `DEPLOYMENT_TARGET=onprem` and `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
-3. Provide secrets in `.env` (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`, `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
+1. Copy `.env.example` → `.env` at the monorepo root.
+2. For local API: keep `DEPLOYMENT_TARGET=onprem` and `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
+3. Provide secrets (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`, `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
+4. For CDK deploy: set `ENV`, `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, `APP_SUBDOMAIN`, `API_SUBDOMAIN` in the same file.
 
-| Source | Use for                                                                     |
-| ------ | --------------------------------------------------------------------------- |
-| `.env` | All config for local/onprem: DB, RabbitMQ, MinIO, encryption keys, API keys |
+Backend, infra, and e2e scripts load the root `.env` automatically (`pnpm` / `turbo` tasks included).
 
-Typical local `.env` values:
+| Source      | Use for                                                                           |
+| ----------- | --------------------------------------------------------------------------------- |
+| Root `.env` | Backend (local/onprem), CDK (`ENV`, account, domains), optional E2E URL overrides |
+
+Typical local backend values:
 
 - `DEPLOYMENT_TARGET=onprem`
 - `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`
@@ -58,12 +61,9 @@ Typical local `.env` values:
 - `S3_PRESIGN_ENDPOINT_URL=https://media.bowerbird.dev`
 - `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` / `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK compatibility)
 
-For raw Go commands: `export $(grep -v '^#' apps/backend/.env | xargs)`.
+For raw Go commands from `apps/backend`: `set -a && . ../../.env && set +a`.
 
-### CDK
-
-1. Copy `packages/infra/.env.example` → `packages/infra/.env`.
-2. Set `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, `APP_SUBDOMAIN`, `API_SUBDOMAIN`.
+`deploy/onprem/.env` stays separate (Docker hostnames for the on-prem VM Compose).
 
 ## Local DNS and HTTPS
 

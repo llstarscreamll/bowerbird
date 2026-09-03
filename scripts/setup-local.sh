@@ -94,7 +94,7 @@ EOF
   install_agent_skills
   install_mcp_servers
 
-  log "Done. Next: copy env/secrets files, then pnpm run infra:up / pnpm run dev"
+  log "Done. Next: cp .env.example .env (repo root), then pnpm run infra:up / pnpm run dev"
   log "See docs/technical/getting-started.md"
 }
 

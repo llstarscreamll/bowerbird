@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
+import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as cdk from 'aws-cdk-lib';
 import { BowerbirdStack } from './bowerbird-stack';
 
-dotenv.config({ path: '.env' });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 const app = new cdk.App();
 
@@ -13,11 +14,11 @@ const account = process.env.AWS_ACCOUNT_ID;
 const region = process.env.AWS_REGION ?? 'us-east-1';
 
 if (!envName) {
-  throw new Error('ENV is required in packages/infra/.env');
+  throw new Error('ENV is required in root .env');
 }
 
 if (!account) {
-  throw new Error('AWS_ACCOUNT_ID is required in packages/infra/.env');
+  throw new Error('AWS_ACCOUNT_ID is required in root .env');
 }
 
 if (region !== 'us-east-1') {

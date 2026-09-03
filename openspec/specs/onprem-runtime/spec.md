@@ -90,7 +90,7 @@ El entorno de desarrollo local MUST usar `DEPLOYMENT_TARGET=onprem` con RabbitMQ
 #### Scenario: Secretos locales vía .env
 
 - **WHEN** el backend arranca en desarrollo local
-- **THEN** carga configuración desde `apps/backend/.env` incluyendo conexión RabbitMQ
+- **THEN** carga configuración desde el `.env` en la raíz del monorepo incluyendo conexión RabbitMQ
 
 ### Requirement: Trazabilidad y Correlation IDs
 

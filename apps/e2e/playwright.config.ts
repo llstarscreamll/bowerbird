@@ -1,4 +1,8 @@
+import path from 'node:path';
+import { config as loadEnv } from 'dotenv';
 import { defineConfig, devices } from '@playwright/test';
+
+loadEnv({ path: path.resolve(__dirname, '../../.env') });
 
 const appBaseUrl = process.env.E2E_BASE_URL ?? 'https://app.bowerbird.dev';
 

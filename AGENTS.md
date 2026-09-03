@@ -13,6 +13,7 @@
 
 - Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
 - Use `pnpm` only. Workspace roots are `apps/*` and `packages/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
+- Single repo-root `.env` / `.env.example` for backend, infra CDK, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `deploy/onprem/.env` separate.
 
 ## Commands that matter
 
@@ -27,7 +28,7 @@
 
 ## Backend (`apps/backend`)
 
-- API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources `apps/backend/.env` if present.
+- API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
 - Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
 - Feature architecture: follow the `internal/<feature>` modular layout used in `internal/invoices`:
   - `domain/`: core business model and pure domain logic (no infra/framework concerns).
@@ -72,7 +73,7 @@
 
 - `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
 - `Caddyfile` maps `app.bowerbird.dev -> :4200` and `api.bowerbird.dev -> :8080`; use these domains locally for cookie/routing behavior.
-- Infra CDK entrypoint is `packages/infra/bin/index.ts` and requires `packages/infra/.env`:
+- Infra CDK entrypoint is `packages/infra/bin/index.ts` and loads the repo-root `.env`:
   - `ENV` and `AWS_ACCOUNT_ID` must be set.
   - `AWS_REGION` must be `us-east-1` (enforced).
 - Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before infra deploy/synth checks that depend on assets.

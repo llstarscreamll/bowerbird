@@ -34,7 +34,7 @@ Or from root: `pnpm run deploy`.
 ## Constraints
 
 - `AWS_REGION` must be `us-east-1`.
-- `packages/infra/.env` required (`ENV`, `AWS_ACCOUNT_ID`, …).
+- Root `.env` required for CDK (`ENV`, `AWS_ACCOUNT_ID`, …).
 - Web assets from `apps/pwa/dist/pwa/browser` (build PWA first).
 - Application secrets: SSM SecureString JSON — see [SSM secrets JSON](../deployment/ssm-secrets.md).
 
