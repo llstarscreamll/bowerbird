@@ -20,6 +20,7 @@
 - Root verification flow: `pnpm run lint && pnpm run test && pnpm run build`.
 - Root deploy: `pnpm run deploy` (builds first, deploys only `@bowerbird/infra`).
 - Backend targeted: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
+- Backend tests: always `pnpm --filter @bowerbird/backend test` (full `go test ./...`). Never verify with package-scoped or `-run` filtered `go test`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
 - E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:ui`.
 - Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy`.

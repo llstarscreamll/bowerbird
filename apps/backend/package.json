@@ -13,7 +13,7 @@
     "migrate:controlplane": "set -a && . ./.env && set +a && ./bin/migrate -target controlplane",
     "migrate:tenants": "set -a && . ./.env && set +a && ./bin/migrate -target tenants",
     "migrate:all": "set -a && . ./.env && set +a && go run ./cmd/migrate -target all",
-    "test": "go test ./...",
+    "test": "[ -f .env ] && set -a && . ./.env && set +a; go test ./...",
     "lint": "go vet ./..."
   }
 }

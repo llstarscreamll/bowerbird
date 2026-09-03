@@ -3,7 +3,9 @@ package messaging_test
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -187,10 +189,10 @@ func TestPipelineAWSSmoke(t *testing.T) {
 }
 
 func TestPipelineOnPremSmoke(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
+	dsn := outboxDSN(t)
 	rabbitURL := os.Getenv("RABBITMQ_URL")
-	if dsn == "" || rabbitURL == "" {
-		t.Skip("TEST_DATABASE_URL and RABBITMQ_URL required for on-prem pipeline smoke")
+	if rabbitURL == "" {
+		t.Skip("RABBITMQ_URL required for on-prem pipeline smoke")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -199,9 +201,10 @@ func TestPipelineOnPremSmoke(t *testing.T) {
 	pool := connectPool(t, ctx, dsn)
 	defer pool.Close()
 
-	eventID := "smoke-onprem-evt-" + time.Now().Format("150405")
-	jobID := "smoke-onprem-job-" + time.Now().Format("150405")
+	eventID := "smoke-onprem-evt-" + time.Now().Format("150405.000")
+	jobID := "smoke-onprem-job-" + time.Now().Format("150405.000")
 	cleanupSmokeRows(t, ctx, pool, eventID, jobID)
+	t.Cleanup(func() { cleanupSmokeRows(t, ctx, pool, eventID, jobID) })
 
 	st := store.NewPostgresStore(pool)
 	require.NoError(t, st.InsertEventStandalone(ctx, store.InsertEventInput{
@@ -213,15 +216,24 @@ func TestPipelineOnPremSmoke(t *testing.T) {
 		Payload: []byte(`{"smoke":true}`), CorrelationID: "corr-onprem", MaxAttempts: 3,
 	}))
 
-	conn := rabbitmq.NewConnection(rabbitURL)
-	require.NoError(t, conn.Connect())
-	ch, err := conn.Channel()
+	probeConn, err := amqp.Dial(rabbitURL)
 	require.NoError(t, err)
-	require.NoError(t, rabbitmq.DeclareTopology(ch))
-	require.NoError(t, rabbitmq.BindJobsQueue(ch, "SmokeJob"))
-	require.NoError(t, ch.Close())
+	defer probeConn.Close()
+	probeCh, err := probeConn.Channel()
+	require.NoError(t, err)
+	defer probeCh.Close()
+	require.NoError(t, rabbitmq.DeclareTopology(probeCh))
+	require.NoError(t, rabbitmq.BindJobsQueue(probeCh, "SmokeJob"))
 
-	transport, err := rabbitmq.NewTransport(conn, smokeAttestationSecret, "SmokeJob")
+	eventsQ, err := probeCh.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, probeCh.QueueBind(eventsQ.Name, "SmokeEvent", rabbitmq.EventsExchange, false, nil))
+	jobsQ, err := probeCh.QueueDeclare("", false, true, true, false, nil)
+	require.NoError(t, err)
+	require.NoError(t, probeCh.QueueBind(jobsQ.Name, "SmokeJob", rabbitmq.JobsExchange, false, nil))
+
+	brokerConn := rabbitmq.NewConnection(rabbitURL)
+	transport, err := rabbitmq.NewTransport(brokerConn, smokeAttestationSecret, "SmokeJob")
 	require.NoError(t, err)
 
 	r := relay.New(st, transport, relay.Config{BatchSize: 10})
@@ -230,13 +242,26 @@ func TestPipelineOnPremSmoke(t *testing.T) {
 	require.Equal(t, store.StatusProcessed, rowStatus(t, ctx, pool, "outbox_events", eventID))
 	require.Equal(t, store.StatusProcessed, rowStatus(t, ctx, pool, "outbox_jobs", jobID))
 
-	eventBody := consumeOne(t, ctx, rabbitURL, rabbitmq.EventsQueue)
+	eventBody := consumeQueue(t, ctx, probeCh, eventsQ.Name)
 	ce, err := cloudevents.UnmarshalEvent(eventBody)
 	require.NoError(t, err)
 	require.Equal(t, eventID, ce.ID)
+	require.Equal(t, "SmokeEvent", ce.Type)
+	require.Equal(t, "acme", ce.TenantSlug)
+	require.NotEmpty(t, ce.TenantAttestation)
 
-	jobBody := consumeOne(t, ctx, rabbitURL, rabbitmq.JobsQueue)
-	require.Contains(t, string(jobBody), jobID)
+	jobBody := consumeQueue(t, ctx, probeCh, jobsQ.Name)
+	var jobEnvelope struct {
+		MessageID         string `json:"message_id"`
+		JobType           string `json:"job_type"`
+		TenantSlug        string `json:"tenant_slug"`
+		TenantAttestation string `json:"tenant_attestation"`
+	}
+	require.NoError(t, json.Unmarshal(jobBody, &jobEnvelope))
+	require.Equal(t, jobID, jobEnvelope.MessageID)
+	require.Equal(t, "SmokeJob", jobEnvelope.JobType)
+	require.Equal(t, "acme", jobEnvelope.TenantSlug)
+	require.NotEmpty(t, jobEnvelope.TenantAttestation)
 
 	eventHandler := &smokeEventHandler{}
 	onPremVerifier := attestation.NewVerifier(smokeAttestationSecret)
@@ -244,11 +269,9 @@ func TestPipelineOnPremSmoke(t *testing.T) {
 	require.Equal(t, eventID, eventHandler.handled)
 
 	jobHandler := &smokeJobHandler{}
-	var jobEnvelope map[string]string
-	require.NoError(t, json.Unmarshal(jobBody, &jobEnvelope))
 	require.NoError(t, platformJobs.NewRouter(onPremVerifier, jobHandler).HandleJob(ctx, platformJobs.JobMessage{
-		MessageID: jobID, JobType: "SmokeJob", TenantSlug: "acme", Body: jobBody,
-		TenantAttestation: jobEnvelope["tenant_attestation"],
+		MessageID: jobID, JobType: jobEnvelope.JobType, TenantSlug: jobEnvelope.TenantSlug, Body: jobBody,
+		TenantAttestation: jobEnvelope.TenantAttestation,
 	}))
 	require.Equal(t, jobID, jobHandler.handled)
 }
@@ -274,30 +297,39 @@ func rowStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, table, id 
 	return status
 }
 
-func consumeOne(t *testing.T, ctx context.Context, rabbitURL, queue string) []byte {
+func consumeQueue(t *testing.T, ctx context.Context, ch *amqp.Channel, queue string) []byte {
 	t.Helper()
-	conn, err := amqp.Dial(rabbitURL)
-	require.NoError(t, err)
-	defer conn.Close()
-
-	ch, err := conn.Channel()
-	require.NoError(t, err)
-	defer ch.Close()
-
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		deadline = time.Now().Add(10 * time.Second)
 	}
 	for time.Now().Before(deadline) {
-		msg, ok, err := ch.Get(queue, true)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		if ok {
+		msg, got, err := ch.Get(queue, true)
+		require.NoError(t, err)
+		if got {
 			return msg.Body
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatal("no message received from queue " + queue)
 	return nil
+}
+
+func outboxDSN(t *testing.T) string {
+	t.Helper()
+	if dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_URL")); dsn != "" {
+		return dsn
+	}
+	base := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if base == "" {
+		t.Skip("TEST_DATABASE_URL or DATABASE_URL required for on-prem pipeline smoke")
+	}
+	slug := os.Getenv("DEFAULT_TENANT_SLUG")
+	if slug == "" {
+		slug = "acme"
+	}
+	u, err := url.Parse(base)
+	require.NoError(t, err)
+	u.Path = "/tenant_" + strings.ReplaceAll(slug, "-", "_")
+	return u.String()
 }
