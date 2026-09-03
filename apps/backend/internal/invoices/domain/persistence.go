@@ -21,6 +21,7 @@ type InvoiceHeaderRecord struct {
 	PaymentCode      string
 	Subtotal         float64
 	TaxTotal         float64
+	AllowanceTotal   float64
 	GrandTotal       float64
 	DocumentRefS3Key string
 	ExtractionSource string

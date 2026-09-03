@@ -143,6 +143,59 @@ func TestDIANUBL21ParserParseInvoiceXMLFromAttachedDocumentRealExample(t *testin
 	}
 }
 
+func TestDIANUBL21ParserParseInvoiceXMLFromAttachedDocumentWithDocumentAllowance(t *testing.T) {
+	parser := NewDianUBL21Parser()
+	xmlData := mustReadFixture(t, "ad0860512780025260114AA28.xml")
+
+	doc, err := parser.ParseInvoiceXML(xmlData)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+
+	if doc.InvoiceID != "FVRC2573887" {
+		t.Fatalf("expected invoice id FVRC2573887, got %q", doc.InvoiceID)
+	}
+	if doc.CUFE != "39846624b5fdbcd00274f661ca57f3d8b3971668d53c264462027cabcaba35890481b4da403e86b178f929f3af9e85c0" {
+		t.Fatalf("unexpected CUFE: %q", doc.CUFE)
+	}
+	if doc.DueDate != "2026-08-08" {
+		t.Fatalf("expected due date 2026-08-08, got %q", doc.DueDate)
+	}
+	if doc.PaymentMeansCode != "10" {
+		t.Fatalf("expected payment means code 10, got %q", doc.PaymentMeansCode)
+	}
+	if doc.Issuer.Name != "UNIVERSIDAD NACIONAL ABIERTA Y A DISTANCIA" || doc.Issuer.TaxID != "860512780" {
+		t.Fatalf("unexpected issuer: %#v", doc.Issuer)
+	}
+	if doc.Receiver.Name != "YHORS JOHAN ALVAREZ COLMENARES" || doc.Receiver.TaxID != "1057581292" {
+		t.Fatalf("unexpected receiver: %#v", doc.Receiver)
+	}
+	if !almostEqual(doc.LineExtension, 2628000) {
+		t.Fatalf("expected line extension 2628000, got %v", doc.LineExtension)
+	}
+	if !almostEqual(doc.AllowanceTotal, 2618000) {
+		t.Fatalf("expected allowance total 2618000, got %v", doc.AllowanceTotal)
+	}
+	if !almostEqual(doc.PayableAmount, 10000) {
+		t.Fatalf("expected payable amount 10000, got %v", doc.PayableAmount)
+	}
+	if len(doc.Lines) != 2 {
+		t.Fatalf("expected 2 invoice lines, got %d", len(doc.Lines))
+	}
+	if !strings.Contains(doc.Lines[0].ItemDescription, "CREDITOS ADICIONALES") {
+		t.Fatalf("unexpected line 1 description: %q", doc.Lines[0].ItemDescription)
+	}
+	if !almostEqual(doc.Lines[0].LineExtension, 2618000) {
+		t.Fatalf("expected line 1 extension 2618000, got %v", doc.Lines[0].LineExtension)
+	}
+	if !strings.Contains(doc.Lines[1].ItemDescription, "SEGURO ESTUDIANTIL") {
+		t.Fatalf("unexpected line 2 description: %q", doc.Lines[1].ItemDescription)
+	}
+	if !almostEqual(doc.Lines[1].LineExtension, 10000) {
+		t.Fatalf("expected line 2 extension 10000, got %v", doc.Lines[1].LineExtension)
+	}
+}
+
 func TestDecodeInvoiceDocumentRealExampleMatchesStructure(t *testing.T) {
 	xmlData := mustReadFixture(t, "fv90027737040532300457505.xml")
 

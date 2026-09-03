@@ -41,6 +41,46 @@ func TestInvoiceDocumentIssueDateTimeUTC(t *testing.T) {
 	}
 }
 
+func TestInvoiceDocumentDueDateTimeUTC(t *testing.T) {
+	doc := &InvoiceDocument{DueDate: "2026-08-08"}
+
+	got := doc.DueDateTimeUTC()
+	if got == nil {
+		t.Fatal("expected parsed due date")
+	}
+
+	want := time.Date(2026, 8, 8, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestResolveDueDatePrefersInvoiceDueDate(t *testing.T) {
+	if got := ResolveDueDate("2026-08-08", "2026-08-06"); got != "2026-08-08" {
+		t.Fatalf("expected invoice due date, got %q", got)
+	}
+	if got := ResolveDueDate("", "2026-08-06"); got != "2026-08-06" {
+		t.Fatalf("expected payment due date fallback, got %q", got)
+	}
+}
+
+func TestInvoiceDocumentTotalsMapsPayableAndAllowance(t *testing.T) {
+	doc := &InvoiceDocument{
+		LineExtension:  2628000,
+		AllowanceTotal: 2618000,
+		PayableAmount:  10000,
+		TaxTotals:      []TaxTotal{{TaxAmount: 0}},
+	}
+
+	got := doc.Totals()
+	if got.Subtotal != 2628000 || got.TaxTotal != 0 || got.AllowanceTotal != 2618000 || got.GrandTotal != 10000 {
+		t.Fatalf("unexpected totals: %#v", got)
+	}
+	if !got.HasAllowance() {
+		t.Fatal("expected allowance")
+	}
+}
+
 func TestInvoiceLineNumberOrDefault(t *testing.T) {
 	line := InvoiceLine{LineID: "3"}
 	if got := line.NumberOrDefault(1); got != 3 {

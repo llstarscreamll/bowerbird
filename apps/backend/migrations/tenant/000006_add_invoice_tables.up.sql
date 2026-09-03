@@ -13,6 +13,7 @@ CREATE TABLE invoice_headers (
     payment_code VARCHAR(50),
     subtotal NUMERIC(18,2),
     tax_total NUMERIC(18,2),
+    allowance_total NUMERIC(18,2),
     grand_total NUMERIC(18,2),
     document_ref_s3_key TEXT,
     extraction_source VARCHAR(20) NOT NULL,

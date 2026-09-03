@@ -71,9 +71,11 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 	}
 
 	paymentMeansCode := ""
+	paymentDueDate := ""
 	for _, paymentMeans := range invoice.PaymentMeans {
 		paymentMeansCode = firstNonEmpty(paymentMeansCode, paymentMeans.PaymentMeansCode)
-		if paymentMeansCode != "" {
+		paymentDueDate = firstNonEmpty(paymentDueDate, paymentMeans.PaymentDueDate)
+		if paymentMeansCode != "" && paymentDueDate != "" {
 			break
 		}
 	}
@@ -83,6 +85,7 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 		InvoiceID:        strings.TrimSpace(invoice.ID),
 		IssueDate:        strings.TrimSpace(invoice.IssueDate),
 		IssueTime:        strings.TrimSpace(invoice.IssueTime),
+		DueDate:          domain.ResolveDueDate(invoice.DueDate, paymentDueDate),
 		CurrencyCode:     strings.TrimSpace(invoice.DocumentCurrencyCode),
 		CUFE:             cufe,
 		PaymentMeansCode: strings.TrimSpace(paymentMeansCode),
@@ -92,6 +95,7 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 		LineExtension:    parseFloat(invoice.LegalMonetaryTotal.LineExtensionAmount.Value),
 		TaxExclusive:     parseFloat(invoice.LegalMonetaryTotal.TaxExclusiveAmount.Value),
 		TaxInclusive:     parseFloat(invoice.LegalMonetaryTotal.TaxInclusiveAmount.Value),
+		AllowanceTotal:   parseFloat(invoice.LegalMonetaryTotal.AllowanceTotalAmount.Value),
 		PayableAmount:    parseFloat(invoice.LegalMonetaryTotal.PayableAmount.Value),
 		Lines:            lines,
 		RawData:          data,
@@ -189,6 +193,7 @@ type ublInvoice struct {
 	UUID                    valueWithAttrs     `xml:"UUID"`
 	IssueDate               string             `xml:"IssueDate"`
 	IssueTime               string             `xml:"IssueTime"`
+	DueDate                 string             `xml:"DueDate"`
 	InvoiceTypeCode         string             `xml:"InvoiceTypeCode"`
 	DocumentCurrencyCode    string             `xml:"DocumentCurrencyCode"`
 	LineCountNumeric        string             `xml:"LineCountNumeric"`
@@ -287,6 +292,7 @@ type country struct {
 
 type paymentMeans struct {
 	PaymentMeansCode string `xml:"PaymentMeansCode"`
+	PaymentDueDate   string `xml:"PaymentDueDate"`
 }
 
 type taxTotal struct {
@@ -313,6 +319,7 @@ type legalMonetaryTotal struct {
 	LineExtensionAmount   valueWithAttrs `xml:"LineExtensionAmount"`
 	TaxExclusiveAmount    valueWithAttrs `xml:"TaxExclusiveAmount"`
 	TaxInclusiveAmount    valueWithAttrs `xml:"TaxInclusiveAmount"`
+	AllowanceTotalAmount  valueWithAttrs `xml:"AllowanceTotalAmount"`
 	PrepaidAmount         valueWithAttrs `xml:"PrepaidAmount"`
 	PayableRoundingAmount valueWithAttrs `xml:"PayableRoundingAmount"`
 	PayableAmount         valueWithAttrs `xml:"PayableAmount"`

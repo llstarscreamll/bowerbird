@@ -68,6 +68,7 @@ type invoiceSummaryAttributes struct {
 	PaymentCode      string  `json:"payment_code"`
 	Subtotal         float64 `json:"subtotal"`
 	TaxTotal         float64 `json:"tax_total"`
+	AllowanceTotal   float64 `json:"allowance_total"`
 	GrandTotal       float64 `json:"grand_total"`
 	ExtractionSource string  `json:"extraction_source"`
 	LinkingStatus    string  `json:"linking_status"`
@@ -120,6 +121,7 @@ func toInvoiceSummaryAttributes(header domain.InvoiceHeaderRecord) invoiceSummar
 		PaymentCode:      header.PaymentCode,
 		Subtotal:         header.Subtotal,
 		TaxTotal:         header.TaxTotal,
+		AllowanceTotal:   header.AllowanceTotal,
 		GrandTotal:       header.GrandTotal,
 		ExtractionSource: header.ExtractionSource,
 		LinkingStatus:    header.LinkingStatus,

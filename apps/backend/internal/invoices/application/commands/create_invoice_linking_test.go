@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/domain"
@@ -13,6 +14,7 @@ import (
 
 type linkingRepoStub struct {
 	persisted bool
+	header    domain.InvoiceHeaderRecord
 	applied   bool
 	status    string
 	partyID   *string
@@ -21,6 +23,7 @@ type linkingRepoStub struct {
 
 func (r *linkingRepoStub) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
 	r.persisted = true
+	r.header = header
 	return nil
 }
 
@@ -177,4 +180,41 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 	require.Len(t, repo.lines, 1)
 	assert.Equal(t, "linked", repo.lines[0].LinkStatus)
 	assert.Equal(t, "ITEM-1", *repo.lines[0].ItemID)
+}
+
+func TestCreateInvoice_MapsDueDateAndAllowance(t *testing.T) {
+	repo := &linkingRepoStub{}
+	cmd := NewCreateInvoiceCommand(repo, nil, nil)
+	cmd.newID = func() string { return "ID-1" }
+
+	result, err := cmd.Execute(context.Background(), CreateInvoiceInput{
+		Invoice: &domain.InvoiceDocument{
+			CUFE:           "CUFE-ALLOW-1",
+			InvoiceID:      "FVRC2573887",
+			DueDate:        "2026-08-08",
+			Issuer:         domain.Party{Name: "UNAD", TaxID: "860512780"},
+			Receiver:       domain.Party{Name: "Cliente", TaxID: "1057581292"},
+			LineExtension:  2628000,
+			AllowanceTotal: 2618000,
+			PayableAmount:  10000,
+			Lines:          []domain.InvoiceLine{{LineID: "1", ItemDescription: "Seguro", Quantity: 1, UnitPrice: 10000, LineExtension: 10000}},
+		},
+		SourceName:       "test",
+		SourceID:         "src-allow-1",
+		ExtractionSource: "xml",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, repo.header.DueDate)
+	assert.True(t, repo.header.DueDate.Equal(mustParseDate(t, "2026-08-08")))
+	assert.Equal(t, 2618000.0, repo.header.AllowanceTotal)
+	assert.Equal(t, 2628000.0, repo.header.Subtotal)
+	assert.Equal(t, 10000.0, repo.header.GrandTotal)
+}
+
+func mustParseDate(t *testing.T, value string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse("2006-01-02", value)
+	require.NoError(t, err)
+	return parsed.UTC()
 }

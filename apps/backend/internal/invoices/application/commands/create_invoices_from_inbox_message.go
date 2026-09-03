@@ -142,6 +142,7 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 		return nil, fmt.Errorf("normalize invoice raw data: %w", err)
 	}
 
+	totals := input.Invoice.Totals()
 	header := domain.InvoiceHeaderRecord{
 		ID:               headerID,
 		SourceName:       input.SourceName,
@@ -154,10 +155,12 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 		ReceiverTaxID:    input.Invoice.Receiver.TaxID,
 		CurrencyCode:     input.Invoice.CurrencyCode,
 		IssueDate:        input.Invoice.IssueDateTimeUTC(),
+		DueDate:          input.Invoice.DueDateTimeUTC(),
 		PaymentCode:      input.Invoice.PaymentMeansCode,
-		Subtotal:         input.Invoice.LineExtension,
-		TaxTotal:         input.Invoice.TaxAmountTotal(),
-		GrandTotal:       input.Invoice.PayableAmount,
+		Subtotal:         totals.Subtotal,
+		TaxTotal:         totals.TaxTotal,
+		AllowanceTotal:   totals.AllowanceTotal,
+		GrandTotal:       totals.GrandTotal,
 		DocumentRefS3Key: input.StorageKey,
 		ExtractionSource: input.ExtractionSource,
 		RawData:          headerRawData,

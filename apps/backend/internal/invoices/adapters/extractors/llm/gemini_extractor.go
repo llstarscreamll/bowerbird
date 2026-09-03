@@ -376,6 +376,7 @@ func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 		InvoiceID:        out.InvoiceID,
 		IssueDate:        out.IssueDate,
 		IssueTime:        out.IssueTime,
+		DueDate:          out.DueDate,
 		CurrencyCode:     out.CurrencyCode,
 		CUFE:             out.CUFE,
 		PaymentMeansCode: out.PaymentMeansCode,
@@ -387,12 +388,13 @@ func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 			Name:  out.Receiver.Name,
 			TaxID: out.Receiver.TaxID,
 		},
-		TaxTotals:     taxTotals,
-		LineExtension: out.LineExtension,
-		TaxExclusive:  out.TaxExclusive,
-		TaxInclusive:  out.TaxInclusive,
-		PayableAmount: out.PayableAmount,
-		Lines:         lines,
+		TaxTotals:      taxTotals,
+		LineExtension:  out.LineExtension,
+		TaxExclusive:   out.TaxExclusive,
+		TaxInclusive:   out.TaxInclusive,
+		AllowanceTotal: out.AllowanceTotal,
+		PayableAmount:  out.PayableAmount,
+		Lines:          lines,
 	}
 
 	return invoice, nil
@@ -461,6 +463,7 @@ type llmInvoiceOutput struct {
 	InvoiceID        string `json:"invoice_id"`
 	IssueDate        string `json:"issue_date"`
 	IssueTime        string `json:"issue_time"`
+	DueDate          string `json:"due_date"`
 	CurrencyCode     string `json:"currency_code"`
 	CUFE             string `json:"cufe"`
 	PaymentMeansCode string `json:"payment_means_code"`
@@ -478,11 +481,12 @@ type llmInvoiceOutput struct {
 		TaxCode   string  `json:"tax_code"`
 		Percent   float64 `json:"percent"`
 	} `json:"tax_totals"`
-	LineExtension float64 `json:"line_extension"`
-	TaxExclusive  float64 `json:"tax_exclusive"`
-	TaxInclusive  float64 `json:"tax_inclusive"`
-	PayableAmount float64 `json:"payable_amount"`
-	Lines         []struct {
+	LineExtension  float64 `json:"line_extension"`
+	TaxExclusive   float64 `json:"tax_exclusive"`
+	TaxInclusive   float64 `json:"tax_inclusive"`
+	AllowanceTotal float64 `json:"allowance_total"`
+	PayableAmount  float64 `json:"payable_amount"`
+	Lines          []struct {
 		LineID          string  `json:"line_id"`
 		ItemCode        string  `json:"item_code"`
 		ItemDescription string  `json:"item_description"`
@@ -502,6 +506,7 @@ var geminiResponseSchema = map[string]any{
 		"invoice_id":         map[string]any{"type": "string"},
 		"issue_date":         map[string]any{"type": "string"},
 		"issue_time":         map[string]any{"type": "string"},
+		"due_date":           map[string]any{"type": "string"},
 		"currency_code":      map[string]any{"type": "string"},
 		"cufe":               map[string]any{"type": "string"},
 		"payment_means_code": map[string]any{"type": "string"},
@@ -533,10 +538,11 @@ var geminiResponseSchema = map[string]any{
 				},
 			},
 		},
-		"line_extension": map[string]any{"type": "number"},
-		"tax_exclusive":  map[string]any{"type": "number"},
-		"tax_inclusive":  map[string]any{"type": "number"},
-		"payable_amount": map[string]any{"type": "number"},
+		"line_extension":  map[string]any{"type": "number"},
+		"tax_exclusive":   map[string]any{"type": "number"},
+		"tax_inclusive":   map[string]any{"type": "number"},
+		"allowance_total": map[string]any{"type": "number"},
+		"payable_amount":  map[string]any{"type": "number"},
 		"lines": map[string]any{
 			"type": "array",
 			"items": map[string]any{
@@ -557,6 +563,6 @@ var geminiResponseSchema = map[string]any{
 	},
 }
 
-const prompt = `Eres un extractor de facturas electrónicas colombianas. Analiza el PDF y responde SOLO JSON estricto siguiendo el schema. Incluye CUFE/UUID, emisor, receptor, códigos de pago, impuestos y lineas de detalle.`
+const prompt = `Eres un extractor de facturas electrónicas colombianas. Analiza el PDF y responde SOLO JSON estricto siguiendo el schema. Incluye CUFE/UUID, emisor, receptor, fecha de vencimiento, códigos de pago, impuestos, descuentos (allowance_total) y lineas de detalle.`
 
 var _ ports.InvoiceLLMExtractor = (*GeminiExtractor)(nil)

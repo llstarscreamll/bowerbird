@@ -17,16 +17,18 @@ This glossary defines the ubiquitous language for the Bowerbird project, mapping
 
 ## Documents
 
-| Term (ES / Business)    | Meaning / Context                                                         | Code (EN)                                     |
-| :---------------------- | :------------------------------------------------------------------------ | :-------------------------------------------- |
-| **Factura Electrónica** | The electronic invoice document validated by DIAN.                        | `Invoice`                                     |
-| **Emisor**              | The party that created and sent the invoice.                              | `Issuer` (maps to a `Supplier`)               |
-| **Receptor**            | The party that receives the invoice.                                      | `Receiver` (maps to a `Customer` or `Tenant`) |
-| **CUFE**                | Unique electronic invoice code (Código Único de Facturación Electrónica). | `CUFE` (kept as-is)                           |
-| **UBL**                 | Universal Business Language (XML format used by DIAN).                    | `UBL` (kept as-is)                            |
-| **Línea de Factura**    | A single item/row inside an invoice.                                      | `InvoiceLine` or `LineItem`                   |
-| **Impuestos**           | Taxes applied to the invoice or line item.                                | `TaxAmount`, `TaxTotal`                       |
-| **Fecha de Emisión**    | The date the invoice was issued.                                          | `IssueDate`                                   |
+| Term (ES / Business)     | Meaning / Context                                                         | Code (EN)                                     |
+| :----------------------- | :------------------------------------------------------------------------ | :-------------------------------------------- |
+| **Factura Electrónica**  | The electronic invoice document validated by DIAN.                        | `Invoice`                                     |
+| **Emisor**               | The party that created and sent the invoice.                              | `Issuer` (maps to a `Supplier`)               |
+| **Receptor**             | The party that receives the invoice.                                      | `Receiver` (maps to a `Customer` or `Tenant`) |
+| **CUFE**                 | Unique electronic invoice code (Código Único de Facturación Electrónica). | `CUFE` (kept as-is)                           |
+| **UBL**                  | Universal Business Language (XML format used by DIAN).                    | `UBL` (kept as-is)                            |
+| **Línea de Factura**     | A single item/row inside an invoice.                                      | `InvoiceLine` or `LineItem`                   |
+| **Impuestos**            | Taxes applied to the invoice or line item.                                | `TaxAmount`, `TaxTotal`                       |
+| **Fecha de Emisión**     | The date the invoice was issued.                                          | `IssueDate`                                   |
+| **Fecha de Vencimiento** | The date the invoice is due (`cbc:DueDate`, else `PaymentDueDate`).       | `DueDate`                                     |
+| **Descuento**            | Document-level allowance; Payable = lines + tax − this amount.            | `AllowanceTotal`                              |
 
 ## Catalog & Inventory
 

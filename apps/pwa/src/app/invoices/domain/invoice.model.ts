@@ -15,6 +15,7 @@ export interface InvoiceSummary {
   payment_code: string;
   subtotal: number;
   tax_total: number;
+  allowance_total: number;
   grand_total: number;
   extraction_source: string;
   linking_status?: string;

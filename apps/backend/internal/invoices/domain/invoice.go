@@ -47,6 +47,7 @@ type InvoiceDocument struct {
 	InvoiceID        string
 	IssueDate        string
 	IssueTime        string
+	DueDate          string
 	CurrencyCode     string
 	CUFE             string
 	PaymentMeansCode string
@@ -56,6 +57,7 @@ type InvoiceDocument struct {
 	LineExtension    float64
 	TaxExclusive     float64
 	TaxInclusive     float64
+	AllowanceTotal   float64
 	PayableAmount    float64
 	Lines            []InvoiceLine
 	RawData          []byte
@@ -116,6 +118,40 @@ func (d *InvoiceDocument) IssueDateTimeUTC() *time.Time {
 	}
 	for _, layout := range layouts {
 		parsed, err := time.Parse(layout, combined)
+		if err == nil {
+			utc := parsed.UTC()
+			return &utc
+		}
+	}
+
+	return nil
+}
+
+func (d *InvoiceDocument) DueDateTimeUTC() *time.Time {
+	return parseCalendarDateUTC(d.DueDate)
+}
+
+func ResolveDueDate(invoiceDueDate, paymentDueDate string) string {
+	if due := strings.TrimSpace(invoiceDueDate); due != "" {
+		return due
+	}
+	return strings.TrimSpace(paymentDueDate)
+}
+
+func parseCalendarDateUTC(value string) *time.Time {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+
+	layouts := []string{
+		"2006-01-02",
+		time.RFC3339,
+		"2006-01-02T15:04:05-07:00",
+		"2006-01-02T15:04:05",
+	}
+	for _, layout := range layouts {
+		parsed, err := time.Parse(layout, trimmed)
 		if err == nil {
 			utc := parsed.UTC()
 			return &utc

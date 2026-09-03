@@ -34,7 +34,7 @@ func TestGeminiExtractorExtractFromPDFSuccess(t *testing.T) {
 
 		_, _ = w.Write([]byte(`{
 			"candidates":[
-				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"payable_amount\":119}"}]}}
+				{"content":{"parts":[{"text":"{\"cufe\":\"CUFE-1\",\"issuer\":{\"name\":\"Proveedor\",\"tax_id\":\"900\"},\"receiver\":{\"name\":\"Cliente\",\"tax_id\":\"901\"},\"due_date\":\"2026-08-08\",\"lines\":[{\"line_id\":\"1\",\"item_description\":\"Servicio\"}],\"tax_totals\":[{\"tax_amount\":19,\"taxable\":100,\"tax_code\":\"01\",\"percent\":19}],\"allowance_total\":50,\"payable_amount\":119}"}]}}
 			]
 		}`))
 	}))
@@ -60,6 +60,12 @@ func TestGeminiExtractorExtractFromPDFSuccess(t *testing.T) {
 	}
 	if len(doc.Lines) != 1 {
 		t.Fatalf("expected 1 line, got %d", len(doc.Lines))
+	}
+	if doc.DueDate != "2026-08-08" {
+		t.Fatalf("expected due date, got %q", doc.DueDate)
+	}
+	if doc.AllowanceTotal != 50 {
+		t.Fatalf("expected allowance total 50, got %v", doc.AllowanceTotal)
 	}
 }
 

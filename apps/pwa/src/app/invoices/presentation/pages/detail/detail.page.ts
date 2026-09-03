@@ -88,7 +88,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 
           <hlm-card class="flex flex-col justify-between p-5 lg:col-span-4">
             <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Totales</h2>
-            <div class="mt-4 space-y-2.5">
+            <div class="mt-4 flex flex-col gap-2.5">
               <div class="flex justify-between text-sm">
                 <span class="text-muted-foreground">Subtotal</span>
                 <span class="tabular-nums">{{ inv.subtotal | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
@@ -97,6 +97,12 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                 <span class="text-muted-foreground">Impuestos</span>
                 <span class="tabular-nums">{{ inv.tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
               </div>
+              @if (inv.allowance_total > 0) {
+                <div class="flex justify-between text-sm">
+                  <span class="text-muted-foreground">Descuentos</span>
+                  <span class="tabular-nums">{{ -inv.allowance_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</span>
+                </div>
+              }
               <hlm-separator />
               <div class="flex items-baseline justify-between gap-3 pt-1">
                 <span class="text-sm font-semibold">Total</span>

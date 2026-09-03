@@ -70,15 +70,15 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 		INSERT INTO invoice_headers (
 			id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
-			due_date, payment_code, subtotal, tax_total, grand_total,
+			due_date, payment_code, subtotal, tax_total, allowance_total, grand_total,
 			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
 			issuer_party_id, linking_status
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
 			$7, $8, $9, $10, $11,
-			$12, $13, $14, $15, $16,
-			$17, $18, $19, $20, $21,
-			NULLIF($22, ''), COALESCE(NULLIF($23, ''), 'pending')
+			$12, $13, $14, $15, $16, $17,
+			$18, $19, $20, $21, $22,
+			NULLIF($23, ''), COALESCE(NULLIF($24, ''), 'pending')
 		)
 	`,
 		header.ID,
@@ -96,6 +96,7 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 		header.PaymentCode,
 		header.Subtotal,
 		header.TaxTotal,
+		header.AllowanceTotal,
 		header.GrandTotal,
 		header.DocumentRefS3Key,
 		header.ExtractionSource,
@@ -218,7 +219,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 	err = pool.QueryRow(ctx, `
 		SELECT id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
-			due_date, payment_code, subtotal, tax_total, grand_total,
+			due_date, payment_code, subtotal, tax_total, allowance_total, grand_total,
 			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
 			COALESCE(issuer_party_id, ''), COALESCE(linking_status, 'pending')
 		FROM invoice_headers
@@ -227,7 +228,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 		&header.ID, &header.SourceName, &header.SourceID, &header.CUFE, &header.InvoiceNumber,
 		&header.IssuerName, &header.IssuerTaxID, &header.ReceiverName, &header.ReceiverTaxID,
 		&header.CurrencyCode, &header.IssueDate, &header.DueDate, &header.PaymentCode,
-		&header.Subtotal, &header.TaxTotal, &header.GrandTotal, &header.DocumentRefS3Key,
+		&header.Subtotal, &header.TaxTotal, &header.AllowanceTotal, &header.GrandTotal, &header.DocumentRefS3Key,
 		&header.ExtractionSource, &header.RawData, &header.CreatedAt, &header.UpdatedAt,
 		&header.IssuerPartyID, &header.LinkingStatus,
 	)
@@ -281,7 +282,7 @@ func (r *PostgresRepository) ListInvoices(ctx context.Context, limit int, cursor
 	query := `
 		SELECT id, source_name, source_id, cufe, invoice_number, issuer_name,
 			issuer_tax_id, receiver_name, receiver_tax_id, currency_code, issue_date,
-			due_date, payment_code, subtotal, tax_total, grand_total,
+			due_date, payment_code, subtotal, tax_total, allowance_total, grand_total,
 			document_ref_s3_key, extraction_source, raw_data, created_at, updated_at,
 			COALESCE(issuer_party_id, ''), COALESCE(linking_status, 'pending')
 		FROM invoice_headers
@@ -310,7 +311,7 @@ func (r *PostgresRepository) ListInvoices(ctx context.Context, limit int, cursor
 			&header.ID, &header.SourceName, &header.SourceID, &header.CUFE, &header.InvoiceNumber,
 			&header.IssuerName, &header.IssuerTaxID, &header.ReceiverName, &header.ReceiverTaxID,
 			&header.CurrencyCode, &header.IssueDate, &header.DueDate, &header.PaymentCode,
-			&header.Subtotal, &header.TaxTotal, &header.GrandTotal, &header.DocumentRefS3Key,
+			&header.Subtotal, &header.TaxTotal, &header.AllowanceTotal, &header.GrandTotal, &header.DocumentRefS3Key,
 			&header.ExtractionSource, &header.RawData, &header.CreatedAt, &header.UpdatedAt,
 			&header.IssuerPartyID, &header.LinkingStatus,
 		); err != nil {
