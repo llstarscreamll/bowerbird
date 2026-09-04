@@ -85,6 +85,8 @@ type invoiceLineAttributes struct {
 	LineTaxTotal float64 `json:"line_tax_total"`
 	LineTotal    float64 `json:"line_total"`
 	ItemID       *string `json:"item_id"`
+	ItemName     *string `json:"item_name,omitempty"`
+	ItemSKU      *string `json:"item_sku,omitempty"`
 	LinkStatus   string  `json:"link_status"`
 	LinkMethod   *string `json:"link_method"`
 	LinkLocked   bool    `json:"link_locked"`
@@ -178,6 +180,8 @@ func newInvoiceDetailsResponse(result *queries.InvoiceDetails) jsonApiResponse[i
 			LineTaxTotal: line.LineTaxTotal,
 			LineTotal:    line.LineTotal,
 			ItemID:       optionalString(line.ItemID),
+			ItemName:     optionalString(line.ItemName),
+			ItemSKU:      optionalString(line.ItemSKU),
 			LinkStatus:   line.LinkStatus,
 			LinkMethod:   optionalString(line.LinkMethod),
 			LinkLocked:   line.LinkLocked,

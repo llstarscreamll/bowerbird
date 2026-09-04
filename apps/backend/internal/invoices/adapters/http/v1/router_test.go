@@ -54,6 +54,10 @@ func (s *stubCatalogSvc) GetItemNames(ctx context.Context, ids []string) (map[st
 	return map[string]string{}, nil
 }
 
+func (s *stubCatalogSvc) GetItemDisplays(ctx context.Context, ids []string) (map[string]ports.ItemDisplay, error) {
+	return map[string]ports.ItemDisplay{}, nil
+}
+
 type stubMatching struct{}
 
 func (s *stubMatching) ValidateItemExists(ctx context.Context, itemID string) error { return nil }

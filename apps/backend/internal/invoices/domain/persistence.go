@@ -49,4 +49,7 @@ type InvoiceLineRecord struct {
 	RawData         []byte
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	// Display-only enrichment from catalog (not persisted).
+	ItemName string
+	ItemSKU  string
 }

@@ -30,9 +30,10 @@ func NewApplication(registry *database.Registry) *application.Application {
 			UpdateItem:                  commands.NewUpdateItemCommand(repo, repo, repo),
 		},
 		Queries: application.Queries{
-			GetItemByID:  queries.NewGetItemByIDQuery(repo, repo),
-			GetItemNames: queries.NewGetItemNamesQuery(repo),
-			ListItems:    queries.NewListItemsQuery(repo, repo),
+			GetItemByID:     queries.NewGetItemByIDQuery(repo, repo),
+			GetItemNames:    queries.NewGetItemNamesQuery(repo),
+			GetItemDisplays: queries.NewGetItemDisplaysQuery(repo, repo),
+			ListItems:       queries.NewListItemsQuery(repo, repo),
 		},
 	}
 }

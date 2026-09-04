@@ -38,6 +38,9 @@ func (q *GetInvoiceByIDQuery) Execute(ctx context.Context, id string) (*InvoiceD
 	if err := q.enrichSuggestionNames(ctx, lines); err != nil {
 		return nil, err
 	}
+	if err := q.enrichLinkedItemDisplays(ctx, lines); err != nil {
+		return nil, err
+	}
 
 	return &InvoiceDetails{
 		Header: *header,
@@ -90,6 +93,38 @@ func (q *GetInvoiceByIDQuery) enrichSuggestionNames(ctx context.Context, lines [
 			return err
 		}
 		lines[i].Suggestions = raw
+	}
+	return nil
+}
+
+func (q *GetInvoiceByIDQuery) enrichLinkedItemDisplays(ctx context.Context, lines []domain.InvoiceLineRecord) error {
+	if q.catalog == nil || len(lines) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line.ItemID != "" {
+			ids = append(ids, line.ItemID)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	displays, err := q.catalog.GetItemDisplays(ctx, ids)
+	if err != nil {
+		return err
+	}
+
+	for i := range lines {
+		if lines[i].ItemID == "" {
+			continue
+		}
+		if d, ok := displays[lines[i].ItemID]; ok {
+			lines[i].ItemName = d.Name
+			lines[i].ItemSKU = d.InternalSKU
+		}
 	}
 	return nil
 }

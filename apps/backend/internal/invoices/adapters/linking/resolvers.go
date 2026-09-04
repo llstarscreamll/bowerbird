@@ -88,4 +88,19 @@ func (a *CatalogNamesAdapter) GetItemNames(ctx context.Context, ids []string) (m
 	return a.app.Queries.GetItemNames.Execute(ctx, ids)
 }
 
+func (a *CatalogNamesAdapter) GetItemDisplays(ctx context.Context, ids []string) (map[string]ports.ItemDisplay, error) {
+	if a == nil || a.app == nil || a.app.Queries.GetItemDisplays == nil {
+		return map[string]ports.ItemDisplay{}, nil
+	}
+	raw, err := a.app.Queries.GetItemDisplays.Execute(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]ports.ItemDisplay, len(raw))
+	for id, d := range raw {
+		out[id] = ports.ItemDisplay{Name: d.Name, InternalSKU: d.InternalSKU}
+	}
+	return out, nil
+}
+
 var _ ports.CatalogService = (*CatalogNamesAdapter)(nil)

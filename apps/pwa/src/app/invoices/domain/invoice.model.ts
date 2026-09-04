@@ -39,6 +39,8 @@ export interface InvoiceLine {
   line_tax_total: number;
   line_total: number;
   item_id?: string | null;
+  item_name?: string | null;
+  item_sku?: string | null;
   link_status?: string;
   link_method?: string | null;
   link_locked?: boolean;

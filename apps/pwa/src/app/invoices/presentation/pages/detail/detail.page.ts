@@ -126,70 +126,83 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
           } @else {
             <div class="space-y-3">
               @for (line of inv.lines; track line.id || $index; let i = $index) {
-                <hlm-card class="overflow-hidden p-0">
-                  <div class="grid grid-cols-1 gap-0 lg:grid-cols-12">
-                    <div class="space-y-3 border-b border-border p-5 lg:col-span-8 lg:border-b-0 lg:border-r">
-                      <div class="flex flex-wrap items-start justify-between gap-2">
-                        <div class="min-w-0 flex-1">
-                          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Línea {{ line.line_number || i + 1 }}</p>
-                          <p class="mt-1 text-base font-medium leading-snug break-words">{{ line.description || 'Sin descripción' }}</p>
-                          <p class="mt-1 font-mono text-xs text-muted-foreground">Código proveedor: {{ line.item_code || '—' }}</p>
-                        </div>
-                        <span hlmBadge [variant]="lineBadgeVariant(line)">{{ lineStatusLabel(line) }}</span>
+                <hlm-card class="space-y-4 p-5">
+                  <div class="space-y-3">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                      <div class="min-w-0 flex-1">
+                        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Línea {{ line.line_number || i + 1 }}</p>
+                        <p class="mt-1 text-base font-medium leading-snug break-words">{{ line.description || 'Sin descripción' }}</p>
+                        <p class="mt-1.5 text-sm">
+                          <span class="text-muted-foreground">Código proveedor:</span>
+                          <span class="ml-1.5 font-mono tabular-nums">{{ line.item_code || '—' }}</span>
+                        </p>
                       </div>
-
-                      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <div>
-                          <p class="text-xs text-muted-foreground">Cantidad</p>
-                          <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.quantity }}</p>
-                        </div>
-                        <div>
-                          <p class="text-xs text-muted-foreground">Precio unit.</p>
-                          <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.unit_price | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
-                        </div>
-                        <div>
-                          <p class="text-xs text-muted-foreground">Impuesto</p>
-                          <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.line_tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
-                        </div>
-                        <div>
-                          <p class="text-xs text-muted-foreground">Total línea</p>
-                          <p class="mt-0.5 text-sm font-semibold tabular-nums">{{ line.line_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
-                        </div>
-                      </div>
+                      <span hlmBadge [variant]="lineBadgeVariant(line)">{{ lineStatusLabel(line) }}</span>
                     </div>
 
-                    <div class="flex flex-col justify-between gap-3 bg-muted/30 p-5 lg:col-span-4">
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
-                        <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Catálogo</p>
-                        @if (line.item_id && line.link_status === 'linked') {
-                          <p class="mt-2 text-sm">
-                            Ítem
-                            <a class="font-mono text-xs text-primary hover:underline" [routerLink]="['/', tenantId(), 'catalog']">{{ shortId(line.item_id) }}</a>
-                          </p>
-                          @if (line.link_method) {
-                            <p class="mt-1 text-xs text-muted-foreground">Método: {{ methodLabel(line.link_method) }}</p>
-                          }
-                          @if (line.link_locked) {
-                            <p class="mt-1 text-xs text-muted-foreground">Bloqueado por el usuario</p>
-                          }
-                        } @else if (line.link_status === 'rejected') {
-                          <p class="mt-2 text-sm text-muted-foreground">Vinculación rechazada.</p>
-                        } @else {
-                          <p class="mt-2 text-sm text-muted-foreground">Sin ítem de catálogo vinculado.</p>
-                        }
+                        <p class="text-xs text-muted-foreground">Cantidad</p>
+                        <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.quantity }}</p>
                       </div>
-
-                      @if (line.id && needsLinking(line)) {
-                        <app-catalog-linker
-                          [invoiceId]="inv.id"
-                          [lineId]="line.id"
-                          [description]="line.description"
-                          [itemCode]="line.item_code"
-                          [suggestions]="line.suggestions || []"
-                          (resolved)="onLineResolved()"
-                        />
-                      }
+                      <div>
+                        <p class="text-xs text-muted-foreground">Precio unit.</p>
+                        <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.unit_price | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-muted-foreground">Impuesto</p>
+                        <p class="mt-0.5 text-sm font-medium tabular-nums">{{ line.line_tax_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-muted-foreground">Total línea</p>
+                        <p class="mt-0.5 text-sm font-semibold tabular-nums">{{ line.line_total | currency: inv.currency_code : 'symbol' : '1.2-2' }}</p>
+                      </div>
                     </div>
+                  </div>
+
+                  <div class="space-y-1.5 border-t border-border pt-3">
+                    @if (line.item_id && line.link_status === 'linked') {
+                      <p class="text-sm">
+                        <span class="text-muted-foreground">Ítem de catálogo:</span>
+                        <a class="ml-1.5 font-medium text-primary hover:underline break-words" [routerLink]="['/', tenantId(), 'catalog', line.item_id]">{{
+                          line.item_name || shortId(line.item_id)
+                        }}</a>
+                        <span class="ml-1.5 font-mono text-xs text-muted-foreground tabular-nums">SKU {{ line.item_sku || '—' }}</span>
+                      </p>
+                      @if (line.link_method || line.link_locked) {
+                        <p class="text-sm">
+                          <span class="text-muted-foreground">Método:</span>
+                          <span class="ml-1.5">
+                            {{ line.link_method ? methodLabel(line.link_method) : '—' }}
+                            @if (line.link_locked) {
+                              <span class="text-muted-foreground"> · bloqueado</span>
+                            }
+                          </span>
+                        </p>
+                      }
+                    } @else if (line.link_status === 'rejected') {
+                      <p class="text-sm">
+                        <span class="text-muted-foreground">Ítem de catálogo:</span>
+                        <span class="ml-1.5 text-muted-foreground">Vinculación rechazada</span>
+                      </p>
+                    } @else {
+                      <p class="text-sm">
+                        <span class="text-muted-foreground">Ítem de catálogo:</span>
+                        <span class="ml-1.5 text-muted-foreground">Sin vínculo</span>
+                      </p>
+                    }
+
+                    @if (line.id && needsLinking(line)) {
+                      <app-catalog-linker
+                        class="block pt-1"
+                        [invoiceId]="inv.id"
+                        [lineId]="line.id"
+                        [description]="line.description"
+                        [itemCode]="line.item_code"
+                        [suggestions]="line.suggestions || []"
+                        (resolved)="onLineResolved()"
+                      />
+                    }
                   </div>
                 </hlm-card>
               }
