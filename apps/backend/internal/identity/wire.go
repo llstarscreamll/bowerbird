@@ -73,7 +73,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 	}
 
 	handler := httpV1.NewAuthHandler(
-		app.Commands.Auth,
+		app.Commands,
 		app.Identity,
 		googleConfig,
 		microsoftConfig,

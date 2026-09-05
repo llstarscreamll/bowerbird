@@ -19,7 +19,7 @@ import (
 )
 
 type AuthHandler struct {
-	authService     *application.AuthService
+	cmds            application.Commands
 	identityService *application.IdentityService
 	googleConfig    *oauth2.Config
 	microsoftConfig *oauth2.Config
@@ -29,7 +29,7 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(
-	authService *application.AuthService,
+	cmds application.Commands,
 	identityService *application.IdentityService,
 	googleConfig *oauth2.Config,
 	microsoftConfig *oauth2.Config,
@@ -37,7 +37,7 @@ func NewAuthHandler(
 	refreshTTL time.Duration,
 ) *AuthHandler {
 	return &AuthHandler{
-		authService:     authService,
+		cmds:            cmds,
 		identityService: identityService,
 		googleConfig:    googleConfig,
 		microsoftConfig: microsoftConfig,
@@ -128,7 +128,7 @@ func (h *AuthHandler) RegisterLocal(w http.ResponseWriter, r *http.Request) erro
 		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request")
 	}
 
-	tokens, err := h.authService.RegisterLocal(r.Context(), req.Email, req.Password)
+	tokens, err := h.cmds.RegisterLocal.Execute(r.Context(), req.Email, req.Password)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -146,7 +146,7 @@ func (h *AuthHandler) LoginLocal(w http.ResponseWriter, r *http.Request) error {
 		return appErrors.Wrap(err, appErrors.CodeValidation, "invalid request")
 	}
 
-	tokens, err := h.authService.LoginLocal(r.Context(), req.Email, req.Password)
+	tokens, err := h.cmds.LoginLocal.Execute(r.Context(), req.Email, req.Password)
 	if err != nil {
 		return mapAuthError(err)
 	}
@@ -164,7 +164,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) error
 		return appErrors.Wrap(err, appErrors.CodeUnauthorized, "missing refresh token")
 	}
 
-	tokens, err := h.authService.RefreshToken(r.Context(), cookie.Value)
+	tokens, err := h.cmds.RefreshToken.Execute(r.Context(), cookie.Value)
 	if err != nil {
 		h.clearRefreshTokenCookie(w)
 		return mapAuthError(err)
@@ -179,7 +179,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) error
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) error {
 	if cookie, err := r.Cookie("refresh_token"); err == nil && cookie.Value != "" {
-		_ = h.authService.RevokeRefreshToken(r.Context(), cookie.Value)
+		_ = h.cmds.RevokeRefreshToken.Execute(r.Context(), cookie.Value)
 	}
 	h.clearRefreshTokenCookie(w)
 	w.WriteHeader(http.StatusOK)
@@ -248,7 +248,7 @@ func (h *AuthHandler) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request
 		return redirectOnError("failed parsing user info", err)
 	}
 
-	tokens, err := h.authService.OAuthLogin(
+	tokens, err := h.cmds.OAuthLogin.Execute(
 		r.Context(),
 		userInfo.Email,
 		"google",
@@ -328,7 +328,7 @@ func (h *AuthHandler) OAuthMicrosoftCallback(w http.ResponseWriter, r *http.Requ
 	}
 
 	email, verified := microsoftEmail(userInfo.Mail, userInfo.UserPrincipalName)
-	tokens, err := h.authService.OAuthLogin(r.Context(), email, "microsoft", userInfo.ID, userInfo.Name, "", verified)
+	tokens, err := h.cmds.OAuthLogin.Execute(r.Context(), email, "microsoft", userInfo.ID, userInfo.Name, "", verified)
 	if err != nil {
 		return redirectOnError("oauth login failed", err)
 	}
@@ -405,7 +405,7 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) erro
 		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
-	_ = h.authService.RevokeAllRefreshTokens(r.Context(), claims.UserID)
+	_ = h.cmds.RevokeAllRefreshTokens.Execute(r.Context(), claims.UserID)
 
 	err := h.identityService.DeleteAccount(r.Context(), claims.UserID)
 	if err != nil {

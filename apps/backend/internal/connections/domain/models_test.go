@@ -36,14 +36,17 @@ func TestNewConnectionStartsActiveAndPrivateByDefault(t *testing.T) {
 	assert.Equal(t, []string{"mail.read"}, conn.GrantedScopes)
 }
 
-func TestAssignEncryptedCredentials(t *testing.T) {
-	conn, err := NewConnection("c-1", "user-1", "gmail", "a@b.com", nil, SharingPolicyPrivate, time.Now())
+func TestSealCredentials(t *testing.T) {
+	now := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
+	conn, err := NewConnection("c-1", "user-1", "gmail", "a@b.com", nil, SharingPolicyPrivate, now)
 	require.NoError(t, err)
 
-	assert.ErrorIs(t, conn.AssignEncryptedCredentials(nil), ErrCredentialsRequired)
+	assert.ErrorIs(t, conn.SealCredentials(nil, now), ErrCredentialsRequired)
 
-	require.NoError(t, conn.AssignEncryptedCredentials([]byte("cipher")))
+	sealedAt := now.Add(time.Minute)
+	require.NoError(t, conn.SealCredentials([]byte("cipher"), sealedAt))
 	assert.Equal(t, []byte("cipher"), conn.EncryptedCredentials)
+	assert.Equal(t, sealedAt, conn.UpdatedAt)
 }
 
 func TestMarkRequiresReconnectRequiresReason(t *testing.T) {

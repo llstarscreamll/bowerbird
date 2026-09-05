@@ -82,7 +82,7 @@ func NewConnection(id, ownerUserID, provider, providerAccountEmail string, grant
 	}, nil
 }
 
-func (c *Connection) AssignEncryptedCredentials(ciphertext []byte) error {
+func (c *Connection) SealCredentials(ciphertext []byte, at time.Time) error {
 	if c == nil {
 		return ErrNilConnection
 	}
@@ -90,6 +90,7 @@ func (c *Connection) AssignEncryptedCredentials(ciphertext []byte) error {
 		return ErrCredentialsRequired
 	}
 	c.EncryptedCredentials = append([]byte(nil), ciphertext...)
+	c.UpdatedAt = at.UTC()
 	return nil
 }
 

@@ -4,26 +4,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bowerbird/internal/connections/application/commands"
 	"github.com/bowerbird/internal/connections/application/ports"
 )
 
 type DecryptCredentialsQuery struct {
-	repo               ports.ConnectionRepository
-	credentialsService *commands.CredentialsService
+	repo        ports.ConnectionRepository
+	credentials ports.Credentials
 }
 
-func NewDecryptCredentialsQuery(repo ports.ConnectionRepository, credentialsService *commands.CredentialsService) *DecryptCredentialsQuery {
+func NewDecryptCredentialsQuery(repo ports.ConnectionRepository, credentials ports.Credentials) *DecryptCredentialsQuery {
 	if repo == nil {
 		panic("connection repository is required")
 	}
-	if credentialsService == nil {
-		panic("credentials service is required")
+	if credentials == nil {
+		panic("credentials are required")
 	}
 
 	return &DecryptCredentialsQuery{
-		repo:               repo,
-		credentialsService: credentialsService,
+		repo:        repo,
+		credentials: credentials,
 	}
 }
 
@@ -36,5 +35,5 @@ func (q *DecryptCredentialsQuery) Execute(ctx context.Context, connectionID stri
 		return nil, fmt.Errorf("connection not found")
 	}
 
-	return q.credentialsService.ReadDecryptedCredentials(conn)
+	return q.credentials.Decrypt(conn.EncryptedCredentials)
 }

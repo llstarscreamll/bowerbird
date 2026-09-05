@@ -29,6 +29,14 @@ func (u *User) IsPlatformOperator() bool {
 	return u != nil && u.PlatformRole == PlatformRoleOperator
 }
 
+func (u *User) GrantPlatformOperator() {
+	if u == nil || u.IsPlatformOperator() {
+		return
+	}
+	u.PlatformRole = PlatformRoleOperator
+	u.UpdatedAt = time.Now().UTC()
+}
+
 // UserIdentity represents a linked authentication provider for a user
 type UserIdentity struct {
 	ID         string

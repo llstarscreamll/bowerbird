@@ -15,11 +15,8 @@ func EnsureOperatorRole(ctx context.Context, repo ports.Repository, operatorEmai
 	if !isOperatorEmail(user.Email, operatorEmails) {
 		return nil
 	}
-	if err := repo.SetPlatformRole(ctx, user.ID, domain.PlatformRoleOperator); err != nil {
-		return err
-	}
-	user.PlatformRole = domain.PlatformRoleOperator
-	return nil
+	user.GrantPlatformOperator()
+	return repo.SetPlatformRole(ctx, user.ID, domain.PlatformRoleOperator)
 }
 
 func isOperatorEmail(email string, operatorEmails []string) bool {

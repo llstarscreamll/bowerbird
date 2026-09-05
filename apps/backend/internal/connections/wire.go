@@ -27,9 +27,9 @@ func NewApplication(registry *database.Registry, cipher application.CredentialsC
 	}
 
 	connectionsRepo := repositorypostgres.NewPostgresRepository(registry)
-	credentialsService := application.NewCredentialsService(cipher)
+	credentials := application.NewCredentials(cipher)
 
-	return application.NewApplication(connectionsRepo, credentialsService)
+	return application.NewApplication(connectionsRepo, credentials)
 }
 
 func NewInternalService(app *application.Application) api.InternalService {
@@ -54,7 +54,8 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 	}
 
 	repo := repositorypostgres.NewPostgresRepository(registry)
-	credentialsService := application.NewCredentialsService(cipher)
+	credentials := application.NewCredentials(cipher)
+	app := application.NewApplication(repo, credentials)
 
 	var googleConfig *oauth2.Config
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -80,7 +81,7 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 
 	controller := httpV1.NewController(
 		repo,
-		credentialsService,
+		app.Commands.UpsertMailboxConnection,
 		googleConfig,
 		microsoftConfig,
 		tokenValidator,

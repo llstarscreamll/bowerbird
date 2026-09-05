@@ -2,6 +2,7 @@ package application
 
 import (
 	"github.com/bowerbird/internal/connections/application/commands"
+	"github.com/bowerbird/internal/connections/application/ports"
 	"github.com/bowerbird/internal/connections/application/queries"
 	"github.com/bowerbird/internal/connections/domain"
 )
@@ -12,7 +13,8 @@ type Application struct {
 }
 
 type Commands struct {
-	MarkRequiresReconnect *commands.MarkRequiresReconnectCommand
+	MarkRequiresReconnect   *commands.MarkRequiresReconnectCommand
+	UpsertMailboxConnection *commands.UpsertMailboxConnectionCommand
 }
 
 type Queries struct {
@@ -21,20 +23,21 @@ type Queries struct {
 	GetSharingPolicy     *queries.GetSharingPolicyQuery
 }
 
-func NewApplication(repo domain.Repository, credentialsService *commands.CredentialsService) *Application {
+func NewApplication(repo domain.Repository, credentials ports.Credentials) *Application {
 	if repo == nil {
 		panic("connection repository is required")
 	}
-	if credentialsService == nil {
-		panic("credentials service is required")
+	if credentials == nil {
+		panic("credentials are required")
 	}
 	return &Application{
 		Commands: Commands{
-			MarkRequiresReconnect: commands.NewMarkRequiresReconnectCommand(repo),
+			MarkRequiresReconnect:   commands.NewMarkRequiresReconnectCommand(repo),
+			UpsertMailboxConnection: commands.NewUpsertMailboxConnectionCommand(repo, credentials),
 		},
 		Queries: Queries{
 			GetActiveConnections: queries.NewGetActiveConnectionsQuery(repo),
-			DecryptCredentials:   queries.NewDecryptCredentialsQuery(repo, credentialsService),
+			DecryptCredentials:   queries.NewDecryptCredentialsQuery(repo, credentials),
 			GetSharingPolicy:     queries.NewGetSharingPolicyQuery(repo),
 		},
 	}

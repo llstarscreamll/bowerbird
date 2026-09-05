@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bowerbird/internal/connections/application/commands"
 	"github.com/bowerbird/internal/connections/domain"
 	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	"github.com/bowerbird/internal/platform/auth"
@@ -20,10 +21,6 @@ import (
 	"github.com/bowerbird/internal/platform/tenant"
 	"golang.org/x/oauth2"
 )
-
-type ConnectionCredentialsSetter interface {
-	SetEncryptedCredentials(account *domain.Connection, plaintext []byte) error
-}
 
 type TokenValidator interface {
 	ValidateAccessToken(tokenString string) (*auth.CustomClaims, error)
@@ -40,7 +37,7 @@ type EventPublisher interface {
 
 type Controller struct {
 	repo            domain.Repository
-	credSetter      ConnectionCredentialsSetter
+	upsert          *commands.UpsertMailboxConnectionCommand
 	googleConfig    *oauth2.Config
 	microsoftConfig *oauth2.Config
 	tokenGen        TokenValidator
@@ -50,12 +47,12 @@ type Controller struct {
 	features        entitlementsapi.Features
 }
 
-func NewController(repo domain.Repository, credSetter ConnectionCredentialsSetter, googleConfig *oauth2.Config, microsoftConfig *oauth2.Config, tokenGen TokenValidator, stateProtect StateProtector, publisher EventPublisher, frontendURL string, features entitlementsapi.Features) *Controller {
+func NewController(repo domain.Repository, upsert *commands.UpsertMailboxConnectionCommand, googleConfig *oauth2.Config, microsoftConfig *oauth2.Config, tokenGen TokenValidator, stateProtect StateProtector, publisher EventPublisher, frontendURL string, features entitlementsapi.Features) *Controller {
 	if repo == nil {
 		panic("connections repository is required")
 	}
-	if credSetter == nil {
-		panic("credentials setter is required")
+	if upsert == nil {
+		panic("upsert mailbox connection command is required")
 	}
 
 	if tokenGen == nil {
@@ -70,7 +67,7 @@ func NewController(repo domain.Repository, credSetter ConnectionCredentialsSette
 
 	return &Controller{
 		repo:            repo,
-		credSetter:      credSetter,
+		upsert:          upsert,
 		googleConfig:    googleConfig,
 		microsoftConfig: microsoftConfig,
 		tokenGen:        tokenGen,
@@ -288,24 +285,16 @@ func (c *Controller) GoogleCallback(w http.ResponseWriter, r *http.Request) erro
 
 	tokenBytes, _ := json.Marshal(token)
 
-	connection, err := domain.NewConnection(
-		id.NewULID(),
-		userID,
-		"gmail",
-		userInfo.Email,
-		oauthCfg.Scopes,
-		domain.SharingPolicyPrivate,
-		time.Now(),
-	)
+	connection, err := c.upsert.Execute(ctx, commands.UpsertMailboxConnectionInput{
+		ID:                   id.NewULID(),
+		OwnerUserID:          userID,
+		Provider:             "gmail",
+		ProviderAccountEmail: userInfo.Email,
+		GrantedScopes:        oauthCfg.Scopes,
+		SharingPolicy:        domain.SharingPolicyPrivate,
+		TokenJSON:            tokenBytes,
+	})
 	if err != nil {
-		return redirectOnError(tenantID, fmt.Sprintf("create connection failed: %v", err))
-	}
-
-	if err := c.credSetter.SetEncryptedCredentials(connection, tokenBytes); err != nil {
-		return redirectOnError(tenantID, fmt.Sprintf("encrypt credentials failed: %v", err))
-	}
-
-	if err := c.repo.Upsert(ctx, connection); err != nil {
 		return redirectOnError(tenantID, fmt.Sprintf("save connection failed: %v", err))
 	}
 
@@ -456,23 +445,16 @@ func (c *Controller) MicrosoftCallback(w http.ResponseWriter, r *http.Request) e
 	}
 
 	tokenBytes, _ := json.Marshal(token)
-	connection, err := domain.NewConnection(
-		id.NewULID(),
-		userID,
-		"microsoft",
-		email,
-		oauthCfg.Scopes,
-		domain.SharingPolicyPrivate,
-		time.Now(),
-	)
+	connection, err := c.upsert.Execute(ctx, commands.UpsertMailboxConnectionInput{
+		ID:                   id.NewULID(),
+		OwnerUserID:          userID,
+		Provider:             "microsoft",
+		ProviderAccountEmail: email,
+		GrantedScopes:        oauthCfg.Scopes,
+		SharingPolicy:        domain.SharingPolicyPrivate,
+		TokenJSON:            tokenBytes,
+	})
 	if err != nil {
-		return redirectOnError(tenantID, fmt.Sprintf("create connection failed: %v", err))
-	}
-	if err := c.credSetter.SetEncryptedCredentials(connection, tokenBytes); err != nil {
-		return redirectOnError(tenantID, fmt.Sprintf("encrypt credentials failed: %v", err))
-	}
-
-	if err := c.repo.Upsert(ctx, connection); err != nil {
 		return redirectOnError(tenantID, fmt.Sprintf("save connection failed: %v", err))
 	}
 

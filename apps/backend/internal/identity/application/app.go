@@ -16,9 +16,14 @@ type Application struct {
 }
 
 type Commands struct {
-	Auth          *commands.AuthService
-	LeaveTenant   *commands.LeaveTenantCommand
-	DeleteAccount *commands.DeleteAccountCommand
+	RegisterLocal          *commands.RegisterLocalCommand
+	LoginLocal             *commands.LoginLocalCommand
+	OAuthLogin             *commands.OAuthLoginCommand
+	RefreshToken           *commands.RefreshTokenCommand
+	RevokeRefreshToken     *commands.RevokeRefreshTokenCommand
+	RevokeAllRefreshTokens *commands.RevokeAllRefreshTokensCommand
+	LeaveTenant            *commands.LeaveTenantCommand
+	DeleteAccount          *commands.DeleteAccountCommand
 }
 
 type Queries struct {
@@ -43,9 +48,14 @@ func NewApplication(
 	}
 	return &Application{
 		Commands: Commands{
-			Auth:          commands.NewAuthService(repo, tokenGen, refreshStore, appEnv, operatorEmails),
-			LeaveTenant:   commands.NewLeaveTenantCommand(repo),
-			DeleteAccount: commands.NewDeleteAccountCommand(repo),
+			RegisterLocal:          commands.NewRegisterLocalCommand(repo, tokenGen, refreshStore, appEnv, operatorEmails),
+			LoginLocal:             commands.NewLoginLocalCommand(repo, tokenGen, refreshStore, appEnv, operatorEmails),
+			OAuthLogin:             commands.NewOAuthLoginCommand(repo, tokenGen, refreshStore, operatorEmails),
+			RefreshToken:           commands.NewRefreshTokenCommand(repo, tokenGen, refreshStore, operatorEmails),
+			RevokeRefreshToken:     commands.NewRevokeRefreshTokenCommand(tokenGen, refreshStore),
+			RevokeAllRefreshTokens: commands.NewRevokeAllRefreshTokensCommand(refreshStore),
+			LeaveTenant:            commands.NewLeaveTenantCommand(repo),
+			DeleteAccount:          commands.NewDeleteAccountCommand(repo),
 		},
 		Queries: Queries{
 			ListUserTenants: queries.NewListUserTenantsQuery(repo),
