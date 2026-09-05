@@ -10,7 +10,7 @@ import (
 func TestApplyManualDecision(t *testing.T) {
 	current := LineLink{Status: LinkStatusUnmatched}
 
-	linked, err := ApplyManualDecision(current, MemoryActionLink, "ITEM-1", true)
+	linked, err := current.ApplyManualDecision(MemoryActionLink, "ITEM-1", true)
 	require.NoError(t, err)
 	assert.True(t, linked.IsLinked())
 	assert.Equal(t, LinkMethodManual, linked.Method)
@@ -18,19 +18,19 @@ func TestApplyManualDecision(t *testing.T) {
 	require.NotNil(t, linked.ItemID)
 	assert.Equal(t, "ITEM-1", *linked.ItemID)
 
-	_, err = ApplyManualDecision(current, MemoryActionLink, "", true)
+	_, err = current.ApplyManualDecision(MemoryActionLink, "", true)
 	assert.ErrorIs(t, err, ErrItemIDRequired)
 
 	locked := LineLink{Status: LinkStatusLinked, Locked: true}
-	_, err = ApplyManualDecision(locked, MemoryActionLink, "ITEM-2", true)
+	_, err = locked.ApplyManualDecision(MemoryActionLink, "ITEM-2", true)
 	assert.ErrorIs(t, err, ErrLineLinkLocked)
 
-	rejected, err := ApplyManualDecision(current, MemoryActionNeverMatch, "", true)
+	rejected, err := current.ApplyManualDecision(MemoryActionNeverMatch, "", true)
 	require.NoError(t, err)
 	assert.Equal(t, LinkStatusRejected, rejected.Status)
 	assert.Nil(t, rejected.ItemID)
 
-	_, err = ApplyManualDecision(current, "nope", "", false)
+	_, err = current.ApplyManualDecision("nope", "", false)
 	assert.ErrorIs(t, err, ErrInvalidAction)
 }
 
@@ -45,6 +45,7 @@ func TestRememberedItemID(t *testing.T) {
 }
 
 func TestRecalculateLinkingStatus(t *testing.T) {
+	assert.Equal(t, LinkingStatusPending, RecalculateLinkingStatus(nil))
 	assert.Equal(t, LinkingStatusPending, RecalculateLinkingStatus([]string{LinkStatusLinked, LinkStatusUnmatched}))
 	assert.Equal(t, LinkingStatusLinked, RecalculateLinkingStatus([]string{LinkStatusLinked, LinkStatusRejected}))
 }

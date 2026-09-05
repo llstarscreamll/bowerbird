@@ -18,6 +18,12 @@ type GetItemDisplaysQuery struct {
 }
 
 func NewGetItemDisplaysQuery(items ports.ItemRepository, aliases ports.AliasRepository) *GetItemDisplaysQuery {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
 	return &GetItemDisplaysQuery{items: items, aliases: aliases}
 }
 

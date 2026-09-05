@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -22,6 +21,15 @@ type MintProvisionalFromEvidenceCommand struct {
 }
 
 func NewMintProvisionalFromEvidenceCommand(items ports.ItemRepository, aliases ports.AliasRepository, write ports.CatalogWriteRepository) *MintProvisionalFromEvidenceCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
+	if write == nil {
+		panic("catalog write repository is required")
+	}
 	return &MintProvisionalFromEvidenceCommand{
 		items:   items,
 		aliases: aliases,
@@ -38,9 +46,6 @@ type MintProvisionalFromEvidenceInput struct {
 }
 
 func (cmd *MintProvisionalFromEvidenceCommand) Execute(ctx context.Context, input MintProvisionalFromEvidenceInput) (string, error) {
-	if cmd.items == nil {
-		return "", fmt.Errorf("item repository is required")
-	}
 	now := cmd.now().UTC()
 	item, err := domain.NewProvisionalItem(cmd.newID(), input.Description, input.ItemCode, now)
 	if err != nil {
@@ -50,7 +55,7 @@ func (cmd *MintProvisionalFromEvidenceCommand) Execute(ctx context.Context, inpu
 		return "", err
 	}
 	normalized := domain.NormalizeItemCode(input.ItemCode)
-	if normalized != "" && strings.TrimSpace(input.PartyID) != "" && cmd.aliases != nil {
+	if normalized != "" && strings.TrimSpace(input.PartyID) != "" {
 		alias, aliasErr := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, input.PartyID, normalized, now)
 		if aliasErr != nil {
 			return "", aliasErr

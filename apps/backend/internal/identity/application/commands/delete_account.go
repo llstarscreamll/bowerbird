@@ -13,6 +13,9 @@ type DeleteAccountCommand struct {
 }
 
 func NewDeleteAccountCommand(repo ports.Repository) *DeleteAccountCommand {
+	if repo == nil {
+		panic("identity repository is required")
+	}
 	return &DeleteAccountCommand{repo: repo}
 }
 

@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	connections "github.com/bowerbird/internal/connections/application"
-	"github.com/bowerbird/internal/connections/domain"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/platform/tenant"
 )
 
@@ -22,15 +21,21 @@ type SyncAccountJobDispatcher interface {
 }
 
 type SyncAllAccountsCommand struct {
-	connectionsService connections.InternalService
+	connectionsService connectionsapi.InternalService
 	jobDispatcher      SyncAccountJobDispatcher
 	logger             *slog.Logger
 }
 
 func NewSyncAllAccountsCommand(
-	connectionsService connections.InternalService,
+	connectionsService connectionsapi.InternalService,
 	jobDispatcher SyncAccountJobDispatcher,
 ) *SyncAllAccountsCommand {
+	if connectionsService == nil {
+		panic("connections service is required")
+	}
+	if jobDispatcher == nil {
+		panic("sync account job dispatcher is required")
+	}
 	return &SyncAllAccountsCommand{
 		connectionsService: connectionsService,
 		jobDispatcher:      jobDispatcher,
@@ -56,7 +61,7 @@ func (c *SyncAllAccountsCommand) Execute(ctx context.Context, requestorUserID st
 
 	var dispatchErr error
 	for _, account := range accounts {
-		if account.SharingPolicy == domain.SharingPolicyPrivate && account.OwnerUserID != requestorUserID {
+		if account.IsPrivate() && account.OwnerUserID != requestorUserID {
 			continue
 		}
 
@@ -78,21 +83,4 @@ func (c *SyncAllAccountsCommand) Execute(ctx context.Context, requestorUserID st
 	}
 
 	return nil
-}
-
-type InlineSyncAccountJobDispatcher struct {
-	command *SyncAccountCommand
-}
-
-func NewInlineSyncAccountJobDispatcher(command *SyncAccountCommand) *InlineSyncAccountJobDispatcher {
-	return &InlineSyncAccountJobDispatcher{command: command}
-}
-
-func (d *InlineSyncAccountJobDispatcher) DispatchSyncAccount(ctx context.Context, job SyncAccountJob) error {
-	if d.command == nil {
-		return errors.New("sync account command is nil")
-	}
-
-	jobCtx := tenant.WithTenantID(ctx, job.TenantID)
-	return d.command.Execute(jobCtx, SyncAccountCommandInput{AccountID: job.AccountID})
 }

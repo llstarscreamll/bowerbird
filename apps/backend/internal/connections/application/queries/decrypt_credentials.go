@@ -17,6 +17,9 @@ func NewDecryptCredentialsQuery(repo ports.ConnectionRepository, credentialsServ
 	if repo == nil {
 		panic("connection repository is required")
 	}
+	if credentialsService == nil {
+		panic("credentials service is required")
+	}
 
 	return &DecryptCredentialsQuery{
 		repo:               repo,
@@ -31,10 +34,6 @@ func (q *DecryptCredentialsQuery) Execute(ctx context.Context, connectionID stri
 	}
 	if conn == nil {
 		return nil, fmt.Errorf("connection not found")
-	}
-
-	if q.credentialsService == nil {
-		return nil, commands.ErrCipherNotConfigured
 	}
 
 	return q.credentialsService.ReadDecryptedCredentials(conn)

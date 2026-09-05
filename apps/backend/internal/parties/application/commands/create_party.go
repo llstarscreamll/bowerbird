@@ -18,6 +18,9 @@ type CreatePartyCommand struct {
 }
 
 func NewCreatePartyCommand(repo ports.PartyRepository) *CreatePartyCommand {
+	if repo == nil {
+		panic("party repository is required")
+	}
 	return &CreatePartyCommand{repo: repo, now: time.Now, newID: id.NewULID}
 }
 

@@ -29,19 +29,56 @@ Broker and storage implementations are selected by `DEPLOYMENT_TARGET` at compos
 
 ### Feature modules (bounded contexts)
 
-Follow `internal/invoices`-style layout:
+Every bounded context lives under `internal/<bc>/`:
 
-| Layer          | Role                                      |
-| -------------- | ----------------------------------------- |
-| `domain/`      | Pure model and outbound interfaces        |
-| `application/` | Use cases (`commands`, `queries`) + ports |
-| `contracts/`   | Cross-boundary DTOs (jobs/events)         |
-| `adapters/`    | HTTP, jobs/events, repos, providers       |
-| `wire.go`      | Composition root for the feature          |
+```text
+internal/<bc>/
+  wire.go         # only Go facade other packages import
+  api/            # Open Host Service (interfaces + DTOs)
+  domain/         # rich model; no infra
+  application/    # commands, queries, ports, OHS impl
+  adapters/       # HTTP, events, jobs, repos, providers
+  contracts/      # job/event JSON payloads only
+```
 
-Dependency direction: `adapters → application → domain`. Features must not import other features’ adapters; couple via IDs or integration events/jobs.
+| Layer          | Role                                                        |
+| -------------- | ----------------------------------------------------------- |
+| `wire.go`      | Composition root. Host imports this package only.           |
+| `api/`         | Published language for other BCs. No `application` imports. |
+| `contracts/`   | Message payloads on the wire. Not OHS interfaces.           |
+| `adapters/`    | Drivers. Other BCs must not import this layer.              |
+| `application/` | Use cases. Other BCs must not import this layer.            |
+| `domain/`      | Pure model. Other BCs must not import this layer.           |
 
-Wire features in `cmd/api/main.go`, `cmd/worker/main.go`, and Lambda entrypoints — not inside domain/application.
+Import rules:
+
+- Host (`cmd/*`, `internal/platform/messaging`) imports the module
+  root only (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`,
+  `RegisterJobs`, OHS constructors).
+- Another BC's ACL imports `{bc}/api` (and
+  `internal/contracts/events` for platform events).
+- Never import another BC's `application/`, `adapters/`, or
+  `domain/`.
+
+`wire.go` constructors (add only what the module needs):
+
+| Function         | When                                                                         |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `NewApplication` | Always                                                                       |
+| `NewHTTPHandler` | HTTP surface                                                                 |
+| `RegisterEvents` | Integration event subscribers                                                |
+| `RegisterJobs`   | Job handlers                                                                 |
+| OHS constructors | Cross-BC sync calls (`NewInvoiceSupport`, `NewInternalService`, and similar) |
+
+Do not add empty `RegisterEvents` / `RegisterJobs` on modules that
+have no consumers.
+
+Dependency direction inside a module: `adapters → application →
+domain`. `api/` is implemented by `application/` and consumed by
+other modules' adapters.
+
+Wire features in `cmd/api/main.go`, `cmd/worker/main.go`, and Lambda
+entrypoints — not inside domain or application.
 
 ## Entrypoints
 

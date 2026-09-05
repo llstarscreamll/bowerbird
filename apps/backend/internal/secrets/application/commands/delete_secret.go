@@ -42,7 +42,7 @@ func (cmd *DeleteSecretCommand) Execute(ctx context.Context, idValue, actorUserI
 	}
 
 	secretID := existing.ID
-	_ = cmd.repo.AppendAudit(ctx, domain.AuditEvent{
+	return cmd.repo.AppendAudit(ctx, domain.AuditEvent{
 		ID:          id.NewULID(),
 		SecretID:    &secretID,
 		Purpose:     existing.Purpose,
@@ -50,5 +50,4 @@ func (cmd *DeleteSecretCommand) Execute(ctx context.Context, idValue, actorUserI
 		ActorUserID: actorUserID,
 		CreatedAt:   time.Now().UTC(),
 	})
-	return nil
 }

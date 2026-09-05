@@ -81,6 +81,46 @@ func TestInvoiceDocumentTotalsMapsPayableAndAllowance(t *testing.T) {
 	}
 }
 
+func TestInvoiceDocumentToHeaderRecordStartsPending(t *testing.T) {
+	doc := &InvoiceDocument{
+		CUFE:           "CUFE-1",
+		InvoiceID:      "INV-1",
+		CurrencyCode:   "COP",
+		DueDate:        "2026-08-08",
+		Issuer:         Party{Name: "Issuer", TaxID: "900"},
+		Receiver:       Party{Name: "Receiver", TaxID: "901"},
+		LineExtension:  100,
+		AllowanceTotal: 10,
+		PayableAmount:  90,
+		Lines:          []InvoiceLine{{LineID: "1", ItemCode: "SKU", ItemDescription: "Widget", Quantity: 1, UnitPrice: 100, LineExtension: 100}},
+	}
+	now := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
+
+	header := doc.ToHeaderRecord(InvoiceReceipt{
+		ID:               "HDR-1",
+		SourceName:       "inbox",
+		SourceID:         "msg-1",
+		ExtractionSource: "xml",
+		StorageKey:       "s3/key",
+		RawData:          []byte(`{}`),
+		ReceivedAt:       now,
+	})
+	if header.LinkingStatus != LinkingStatusPending {
+		t.Fatalf("expected pending linking, got %q", header.LinkingStatus)
+	}
+	if header.CUFE != "CUFE-1" || header.GrandTotal != 90 || header.AllowanceTotal != 10 {
+		t.Fatalf("unexpected header mapping: %#v", header)
+	}
+
+	line := doc.Lines[0].ToLineRecord("LINE-1", "HDR-1", 1, []byte(`{}`), now)
+	if line.LinkStatus != LinkStatusUnmatched {
+		t.Fatalf("expected unmatched line, got %q", line.LinkStatus)
+	}
+	if line.LineNumber != 1 || line.ItemCode != "SKU" {
+		t.Fatalf("unexpected line mapping: %#v", line)
+	}
+}
+
 func TestInvoiceLineNumberOrDefault(t *testing.T) {
 	line := InvoiceLine{LineID: "3"}
 	if got := line.NumberOrDefault(1); got != 3 {

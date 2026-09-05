@@ -52,6 +52,9 @@ func NewCreateInvoicesFromFilesCommand(
 	if create == nil {
 		panic("create invoice command is required")
 	}
+	if passwordResolver == nil {
+		panic("document password resolver is required")
+	}
 
 	return &CreateInvoicesFromFilesCommand{
 		fileStore:        fileStore,
@@ -164,9 +167,6 @@ func (cmd *CreateInvoicesFromFilesCommand) Execute(ctx context.Context, input co
 }
 
 func (cmd *CreateInvoicesFromFilesCommand) loadDocumentPasswords(ctx context.Context) ([]string, []string, error) {
-	if cmd.passwordResolver == nil {
-		return nil, nil, nil
-	}
 	candidates, err := cmd.passwordResolver.ResolveCandidates(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -184,7 +184,7 @@ func (cmd *CreateInvoicesFromFilesCommand) loadDocumentPasswords(ctx context.Con
 }
 
 func (cmd *CreateInvoicesFromFilesCommand) markPasswordUsed(ctx context.Context, secretID string) {
-	if cmd.passwordResolver == nil || secretID == "" {
+	if secretID == "" {
 		return
 	}
 	if err := cmd.passwordResolver.MarkUsed(ctx, secretID); err != nil {

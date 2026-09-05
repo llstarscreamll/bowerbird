@@ -39,6 +39,16 @@ func NewCreateInvoiceCommand(
 	partyResolver ports.IssuerPartyResolver,
 	lineResolver ports.CatalogLineResolver,
 ) *CreateInvoiceCommand {
+	if repo == nil {
+		panic("invoice write repository is required")
+	}
+	if partyResolver == nil {
+		panic("issuer party resolver is required")
+	}
+	if lineResolver == nil {
+		panic("catalog line resolver is required")
+	}
+
 	return &CreateInvoiceCommand{
 		repo:          repo,
 		partyResolver: partyResolver,
@@ -50,9 +60,6 @@ func NewCreateInvoiceCommand(
 }
 
 func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoiceInput) (*CreateInvoiceResult, error) {
-	if cmd.repo == nil {
-		return nil, fmt.Errorf("invoice write repository is required")
-	}
 	if input.Invoice == nil {
 		return nil, fmt.Errorf("invoice is required")
 	}
@@ -67,56 +74,26 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 		return nil, fmt.Errorf("normalize invoice raw data: %w", err)
 	}
 
-	totals := input.Invoice.Totals()
-	header := domain.InvoiceHeaderRecord{
+	header := input.Invoice.ToHeaderRecord(domain.InvoiceReceipt{
 		ID:               headerID,
 		SourceName:       input.SourceName,
 		SourceID:         input.SourceID,
-		CUFE:             input.Invoice.CUFE,
-		InvoiceNumber:    input.Invoice.InvoiceID,
-		IssuerName:       input.Invoice.Issuer.Name,
-		IssuerTaxID:      input.Invoice.Issuer.TaxID,
-		ReceiverName:     input.Invoice.Receiver.Name,
-		ReceiverTaxID:    input.Invoice.Receiver.TaxID,
-		CurrencyCode:     input.Invoice.CurrencyCode,
-		IssueDate:        input.Invoice.IssueDateTimeUTC(),
-		DueDate:          input.Invoice.DueDateTimeUTC(),
-		PaymentCode:      input.Invoice.PaymentMeansCode,
-		Subtotal:         totals.Subtotal,
-		TaxTotal:         totals.TaxTotal,
-		AllowanceTotal:   totals.AllowanceTotal,
-		GrandTotal:       totals.GrandTotal,
-		DocumentRefS3Key: input.StorageKey,
 		ExtractionSource: input.ExtractionSource,
+		StorageKey:       input.StorageKey,
 		RawData:          headerRawData,
-		CreatedAt:        now,
-		UpdatedAt:        now,
-	}
+		ReceivedAt:       now,
+	})
 
 	lines := make([]domain.InvoiceLineRecord, 0, len(input.Invoice.Lines))
 	lineIDs := make([]string, 0, len(input.Invoice.Lines))
 	for idx, line := range input.Invoice.Lines {
 		lineID := cmd.newID()
-		lineNumber := line.NumberOrDefault(idx + 1)
 		lineRawData, err := json.Marshal(line)
 		if err != nil {
 			return nil, fmt.Errorf("marshal invoice line raw data: %w", err)
 		}
 
-		lines = append(lines, domain.InvoiceLineRecord{
-			ID:              lineID,
-			InvoiceHeaderID: headerID,
-			LineNumber:      lineNumber,
-			ItemCode:        line.ItemCode,
-			Description:     line.ItemDescription,
-			Quantity:        line.Quantity,
-			UnitPrice:       line.UnitPrice,
-			LineTaxTotal:    line.TaxAmount,
-			LineTotal:       line.LineExtension,
-			RawData:         lineRawData,
-			CreatedAt:       now,
-			UpdatedAt:       now,
-		})
+		lines = append(lines, line.ToLineRecord(lineID, headerID, idx+1, lineRawData, now))
 		lineIDs = append(lineIDs, lineID)
 	}
 
@@ -127,30 +104,24 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 
 	if err := cmd.applyLinking(ctx, header, lines); err != nil {
 		cmd.logger.Error("invoice catalog linking failed after persist", "header_id", headerID, "error", err)
-		// Invoice financial write is kept; applyLinking persists partial results + failed/pending status when possible.
+		return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, fmt.Errorf("catalog linking: %w", err)
 	}
 
 	return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil
 }
 
 func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
-	if cmd.partyResolver == nil && cmd.lineResolver == nil {
-		return nil
-	}
-
 	var partyID string
 	var resolveErr error
-	if cmd.partyResolver != nil {
-		resolved, err := cmd.partyResolver.ResolveIssuerPartyID(ctx, header.IssuerTaxID, header.IssuerName)
-		if err != nil {
-			resolveErr = err
-		} else {
-			partyID = resolved
-		}
+	resolved, err := cmd.partyResolver.ResolveIssuerPartyID(ctx, header.IssuerTaxID, header.IssuerName)
+	if err != nil {
+		resolveErr = err
+	} else {
+		partyID = resolved
 	}
 
 	updates := make([]ports.LineLinkUpdate, 0, len(lines))
-	if resolveErr == nil && cmd.lineResolver != nil {
+	if resolveErr == nil {
 		for _, line := range lines {
 			result, err := cmd.lineResolver.ResolveLine(ctx, ports.CatalogLineResolveInput{
 				LineID:      line.ID,

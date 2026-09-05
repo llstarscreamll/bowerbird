@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
@@ -16,7 +16,7 @@ var errPayloadRejected = errors.New("sync payload rejected")
 var statusCodePattern = regexp.MustCompile(`(?i)status\s+(\d{3})`)
 var retryAfterPattern = regexp.MustCompile(`(?i)retry-after\s*=\s*"?([0-9]+)"?`)
 
-func classifySyncError(account connectionsApp.ConnectionInfo, err error) error {
+func classifySyncError(account connectionsapi.ConnectionInfo, err error) error {
 	if err == nil {
 		return nil
 	}

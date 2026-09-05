@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
 	"github.com/bowerbird/internal/inbox/domain"
 	platformEvents "github.com/bowerbird/internal/platform/events"
@@ -42,7 +42,7 @@ func TestSyncAccountCommand_RequiresAccountID(t *testing.T) {
 func TestSyncAccountCommand_FailsWhenAccountIsNotActive(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-2", Provider: "gmail", ProviderAccountEmail: "other@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-2", Provider: "gmail", ProviderAccountEmail: "other@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{}
 	publisher := &fakeInboxEventPublisher{}
@@ -60,7 +60,7 @@ func TestSyncAccountCommand_FailsWhenAccountIsNotActive(t *testing.T) {
 func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{}
 	publisher := &fakeInboxEventPublisher{}
@@ -96,7 +96,7 @@ func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T
 	})
 
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{}
 	publisher := &fakeInboxEventPublisher{}
@@ -115,7 +115,7 @@ func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T
 func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{
 		refs: []domain.MessageRef{{ID: "m-invalid"}, {ID: "m-valid"}},
@@ -153,7 +153,7 @@ func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 func TestSyncAccountCommand_DoesNotRepublishExistingMessage(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	mail := &domain.MailMessage{
 		ID:            "m-1",
@@ -187,7 +187,7 @@ func TestSyncAccountCommand_UsesHistoryWhenCursorHasHistoryID(t *testing.T) {
 	repo := newFakeInboxRepo()
 	repo.cursors["acc-1"] = cursor
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	mail := &domain.MailMessage{
 		ID:            "m-hist",
@@ -218,7 +218,7 @@ func TestSyncAccountCommand_UsesHistoryWhenCursorHasHistoryID(t *testing.T) {
 func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{
 		refs: []domain.MessageRef{{ID: "provider-msg-1"}},
@@ -253,7 +253,7 @@ func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testin
 func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{
 		refs: []domain.MessageRef{{ID: "provider-msg-1"}},
@@ -285,7 +285,7 @@ func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{listErr: errors.New("list failed with status 401")}
 	publisher := &fakeInboxEventPublisher{}
@@ -380,11 +380,11 @@ func (f *fakeInboxRepo) UpsertMessageAttachment(ctx context.Context, attachment 
 }
 
 type fakeConnectionsInternalService struct {
-	activeConnections  []connectionsApp.ConnectionInfo
+	activeConnections  []connectionsapi.ConnectionInfo
 	markReconnectCalls int
 }
 
-func (f *fakeConnectionsInternalService) GetActiveConnections(ctx context.Context) ([]connectionsApp.ConnectionInfo, error) {
+func (f *fakeConnectionsInternalService) GetActiveConnections(ctx context.Context) ([]connectionsapi.ConnectionInfo, error) {
 	return f.activeConnections, nil
 }
 
@@ -557,7 +557,7 @@ type attachmentDownloadCall struct {
 	attachmentID string
 }
 
-var _ connectionsApp.InternalService = (*fakeConnectionsInternalService)(nil)
+var _ connectionsapi.InternalService = (*fakeConnectionsInternalService)(nil)
 var _ domain.SyncCursorRepository = (*fakeInboxRepo)(nil)
 var _ domain.MessageRepository = (*fakeInboxRepo)(nil)
 var _ domain.MailProviderClient = (*fakeProviderClient)(nil)

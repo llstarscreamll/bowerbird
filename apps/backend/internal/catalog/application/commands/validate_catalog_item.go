@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/bowerbird/internal/catalog/application/ports"
 	appErrors "github.com/bowerbird/internal/platform/errors"
@@ -13,13 +12,13 @@ type ValidateCatalogItemCommand struct {
 }
 
 func NewValidateCatalogItemCommand(items ports.ItemRepository) *ValidateCatalogItemCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
 	return &ValidateCatalogItemCommand{items: items}
 }
 
 func (cmd *ValidateCatalogItemCommand) Execute(ctx context.Context, itemID string) error {
-	if cmd.items == nil {
-		return fmt.Errorf("item repository is required")
-	}
 	item, err := cmd.items.GetItemByID(ctx, itemID)
 	if err != nil {
 		return err

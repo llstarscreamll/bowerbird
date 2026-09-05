@@ -20,6 +20,12 @@ type GetItemByIDQuery struct {
 }
 
 func NewGetItemByIDQuery(items ports.ItemRepository, aliases ports.AliasRepository) *GetItemByIDQuery {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
 	return &GetItemByIDQuery{items: items, aliases: aliases}
 }
 

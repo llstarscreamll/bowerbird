@@ -31,6 +31,11 @@ Connected accounts, messages, folders, provider clients, encrypted OAuth credent
 
 ### `invoices` (`internal/invoices`)
 
-Document classification, XML/LLM extractors, dedup repositories, invoice persistence. Keep coupling via events/jobs, not direct feature imports.
+Document classification, XML/LLM extractors, dedup repositories,
+invoice persistence.
 
-See also: [Events vs jobs](./events-vs-jobs.md).
+Cross-context sync calls go through `{bc}/api` (catalog invoice
+support, parties issuer lookup, secrets document passwords). Async
+coupling stays on events and jobs. See [Backend
+architecture](./backend-api.md) and [Events vs
+jobs](./events-vs-jobs.md).

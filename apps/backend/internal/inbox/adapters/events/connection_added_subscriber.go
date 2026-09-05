@@ -6,9 +6,8 @@ import (
 	"log"
 
 	contractevents "github.com/bowerbird/internal/contracts/events"
-	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
-	inboxPorts "github.com/bowerbird/internal/inbox/application/ports"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/tenant"
@@ -16,10 +15,16 @@ import (
 
 type ConnectionAddedSubscriber struct {
 	dispatcher inboxCommands.SyncAccountJobDispatcher
-	features   inboxPorts.FeatureChecker
+	features   entitlementsapi.Features
 }
 
-func NewConnectionAddedSubscriber(dispatcher inboxCommands.SyncAccountJobDispatcher, features inboxPorts.FeatureChecker) *ConnectionAddedSubscriber {
+func NewConnectionAddedSubscriber(dispatcher inboxCommands.SyncAccountJobDispatcher, features entitlementsapi.Features) *ConnectionAddedSubscriber {
+	if dispatcher == nil {
+		panic("sync account job dispatcher is required")
+	}
+	if features == nil {
+		panic("feature checker is required")
+	}
 	return &ConnectionAddedSubscriber{dispatcher: dispatcher, features: features}
 }
 
@@ -28,25 +33,19 @@ func (s *ConnectionAddedSubscriber) DetailType() string {
 }
 
 func (s *ConnectionAddedSubscriber) Handle(ctx context.Context, event platformEvents.IntegrationEvent) error {
-	if s.dispatcher == nil {
-		return nil
-	}
-
 	decoded, err := contractevents.UnmarshalConnectionAdded(event.Detail)
 	if err != nil {
 		return err
 	}
 
 	msgCtx := tenant.WithTenantID(ctx, decoded.TenantSlug)
-	if s.features != nil {
-		if err := s.features.RequireAny(msgCtx, entitlementsDomain.FeatureMailInbox, entitlementsDomain.FeatureInvoicingCaptureFromEmail); err != nil {
-			var appErr *appErrors.AppError
-			if errors.As(err, &appErr) && appErr.Code == appErrors.CodeForbidden {
-				log.Printf("skipping inbox sync after connection added: feature not available")
-				return nil
-			}
-			return err
+	if err := s.features.RequireAny(msgCtx, entitlementsapi.FeatureMailInbox, entitlementsapi.FeatureInvoicingCaptureFromEmail); err != nil {
+		var appErr *appErrors.AppError
+		if errors.As(err, &appErr) && appErr.Code == appErrors.CodeForbidden {
+			log.Printf("skipping inbox sync after connection added: feature not available")
+			return nil
 		}
+		return err
 	}
 
 	return s.dispatcher.DispatchSyncAccount(msgCtx, inboxCommands.SyncAccountJob{

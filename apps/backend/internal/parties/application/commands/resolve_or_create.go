@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/bowerbird/internal/parties/application/ports"
@@ -18,14 +17,13 @@ type ResolveOrCreateFromIssuerCommand struct {
 }
 
 func NewResolveOrCreateFromIssuerCommand(repo ports.PartyRepository) *ResolveOrCreateFromIssuerCommand {
+	if repo == nil {
+		panic("party repository is required")
+	}
 	return &ResolveOrCreateFromIssuerCommand{repo: repo, now: time.Now, newID: id.NewULID}
 }
 
 func (cmd *ResolveOrCreateFromIssuerCommand) Execute(ctx context.Context, taxIDRaw, name string) (*domain.Party, error) {
-	if cmd.repo == nil {
-		return nil, fmt.Errorf("party repository is required")
-	}
-
 	taxID, err := domain.ParseTaxID(taxIDRaw)
 	if err != nil {
 		if errors.Is(err, domain.ErrMissingTaxID) {

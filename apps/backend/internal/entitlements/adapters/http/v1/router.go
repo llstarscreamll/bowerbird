@@ -3,7 +3,7 @@ package v1
 import (
 	"net/http"
 
-	"github.com/bowerbird/internal/entitlements/application"
+	identityapi "github.com/bowerbird/internal/identity/api"
 	"github.com/bowerbird/internal/platform/auth"
 	"github.com/bowerbird/internal/platform/config"
 	appErrors "github.com/bowerbird/internal/platform/errors"
@@ -12,10 +12,10 @@ import (
 
 type Router struct {
 	controller *Controller
-	operators  application.OperatorDirectory
+	operators  identityapi.OperatorDirectory
 }
 
-func NewRouter(controller *Controller, operators application.OperatorDirectory) *Router {
+func NewRouter(controller *Controller, operators identityapi.OperatorDirectory) *Router {
 	if controller == nil {
 		panic("entitlements controller is required")
 	}

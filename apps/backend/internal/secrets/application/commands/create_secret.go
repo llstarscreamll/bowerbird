@@ -87,14 +87,16 @@ func (cmd *CreateSecretCommand) Execute(ctx context.Context, input CreateSecretI
 	}
 
 	secretID := secret.ID
-	_ = cmd.repo.AppendAudit(ctx, domain.AuditEvent{
+	if err := cmd.repo.AppendAudit(ctx, domain.AuditEvent{
 		ID:          id.NewULID(),
 		SecretID:    &secretID,
 		Purpose:     purpose,
 		Action:      domain.AuditActionCreate,
 		ActorUserID: input.ActorUserID,
 		CreatedAt:   now,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	secret.Ciphertext = nil
 	return &secret, nil

@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -19,6 +18,13 @@ type ApplyLineDecisionCommand struct {
 }
 
 func NewApplyLineDecisionCommand(links ports.InvoiceLineLinkRepository, catalog ports.CatalogMatchingPort) *ApplyLineDecisionCommand {
+	if links == nil {
+		panic("invoice line link repository is required")
+	}
+	if catalog == nil {
+		panic("catalog matching port is required")
+	}
+
 	return &ApplyLineDecisionCommand{
 		links:   links,
 		catalog: catalog,
@@ -39,13 +45,6 @@ type ApplyLineDecisionInput struct {
 }
 
 func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLineDecisionInput) error {
-	if cmd.links == nil {
-		return fmt.Errorf("invoice line link repository is required")
-	}
-	if cmd.catalog == nil {
-		return fmt.Errorf("catalog matching port is required")
-	}
-
 	line, err := cmd.links.GetLineForDecision(ctx, input.LineID)
 	if err != nil {
 		return err
@@ -81,7 +80,7 @@ func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLin
 		input.Lock = true
 	}
 
-	next, err := domain.ApplyManualDecision(line.Link, action, input.ItemID, input.Lock)
+	next, err := line.Link.ApplyManualDecision(action, input.ItemID, input.Lock)
 	if err != nil {
 		if errors.Is(err, domain.ErrLineLinkLocked) {
 			return appErrors.New(appErrors.CodeConflict, "line link is locked")
@@ -140,9 +139,6 @@ func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLin
 }
 
 func (cmd *ApplyLineDecisionCommand) logDecision(lineID, headerID, action, outcome string) {
-	if cmd.logger == nil {
-		return
-	}
 	cmd.logger.Info("invoices.apply_line_decision",
 		"line_id", lineID,
 		"invoice_header_id", headerID,

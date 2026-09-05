@@ -4,19 +4,17 @@ import (
 	"context"
 
 	"github.com/bowerbird/internal/entitlements/application"
-	orgdomain "github.com/bowerbird/internal/tenant/domain"
+	tenantapi "github.com/bowerbird/internal/tenant/api"
 )
 
-type Source interface {
-	ListAll(ctx context.Context) ([]orgdomain.Tenant, error)
-	ExistsByID(ctx context.Context, id string) (bool, error)
-}
-
 type Directory struct {
-	source Source
+	source tenantapi.Directory
 }
 
-func NewDirectory(source Source) *Directory {
+func NewDirectory(source tenantapi.Directory) *Directory {
+	if source == nil {
+		panic("tenant directory is required")
+	}
 	return &Directory{source: source}
 }
 

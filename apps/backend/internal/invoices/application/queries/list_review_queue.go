@@ -13,6 +13,12 @@ type ListReviewQueueQuery struct {
 }
 
 func NewListReviewQueueQuery(links ports.InvoiceLineLinkRepository, catalog ports.CatalogService) *ListReviewQueueQuery {
+	if links == nil {
+		panic("invoice line link repository is required")
+	}
+	if catalog == nil {
+		panic("catalog service is required")
+	}
 	return &ListReviewQueueQuery{links: links, catalog: catalog}
 }
 
@@ -21,7 +27,7 @@ func (q *ListReviewQueueQuery) Execute(ctx context.Context) ([]ports.ReviewLine,
 	if err != nil {
 		return nil, err
 	}
-	if q.catalog == nil || len(lines) == 0 {
+	if len(lines) == 0 {
 		return lines, nil
 	}
 

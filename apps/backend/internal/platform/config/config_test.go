@@ -90,4 +90,6 @@ func TestLoad_AWSRequiresEventBusName(t *testing.T) {
 func init() {
 	_ = os.Setenv("JWT_ACCESS_SECRET", "test-access")
 	_ = os.Setenv("JWT_REFRESH_SECRET", "test-refresh")
+	_ = os.Setenv("AWS_ACCESS_KEY_ID", "bowerbird")
+	_ = os.Setenv("AWS_SECRET_ACCESS_KEY", "bowerbirdsecret")
 }

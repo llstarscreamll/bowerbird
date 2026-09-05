@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/inbox/domain"
 	"github.com/bowerbird/internal/platform/tenant"
 )
@@ -23,15 +23,24 @@ const (
 
 type ModifyMessageCommand struct {
 	messageRepo        domain.MessageRepository
-	connectionsService connectionsApp.InternalService
+	connectionsService connectionsapi.InternalService
 	providerFactory    ProviderClientFactory
 }
 
 func NewModifyMessageCommand(
 	messageRepo domain.MessageRepository,
-	connectionsService connectionsApp.InternalService,
+	connectionsService connectionsapi.InternalService,
 	providerFactory ProviderClientFactory,
 ) *ModifyMessageCommand {
+	if messageRepo == nil {
+		panic("message repository is required")
+	}
+	if connectionsService == nil {
+		panic("connections service is required")
+	}
+	if providerFactory == nil {
+		panic("provider factory is required")
+	}
 	return &ModifyMessageCommand{
 		messageRepo:        messageRepo,
 		connectionsService: connectionsService,

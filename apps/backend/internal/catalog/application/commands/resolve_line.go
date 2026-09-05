@@ -30,6 +30,21 @@ func NewResolveInvoiceLineCommand(
 	memories ports.MatchMemoryRepository,
 	matcher ports.SoftMatcher,
 ) *ResolveInvoiceLineCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
+	if write == nil {
+		panic("catalog write repository is required")
+	}
+	if memories == nil {
+		panic("match memory repository is required")
+	}
+	if matcher == nil {
+		panic("soft matcher is required")
+	}
 	return &ResolveInvoiceLineCommand{
 		items:    items,
 		aliases:  aliases,
@@ -77,7 +92,7 @@ func (cmd *ResolveInvoiceLineCommand) Execute(ctx context.Context, input domain.
 	}
 
 	var suggestions []domain.Suggestion
-	if cmd.matcher != nil && strings.TrimSpace(input.Description) != "" {
+	if strings.TrimSpace(input.Description) != "" {
 		soft, err := cmd.matcher.Match(ctx, input.Description)
 		if err != nil {
 			return nil, err
@@ -119,7 +134,7 @@ func (cmd *ResolveInvoiceLineCommand) continueAfterNegativeMemory(
 	}
 
 	var suggestions []domain.Suggestion
-	if cmd.matcher != nil && strings.TrimSpace(input.Description) != "" {
+	if strings.TrimSpace(input.Description) != "" {
 		soft, err := cmd.matcher.Match(ctx, input.Description)
 		if err != nil {
 			return nil, err

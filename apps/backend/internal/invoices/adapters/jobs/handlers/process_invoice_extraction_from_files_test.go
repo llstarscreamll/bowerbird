@@ -90,8 +90,42 @@ func (e *processorLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []by
 	return nil, nil
 }
 
+type processorPasswordResolver struct{}
+
+func (processorPasswordResolver) ResolveCandidates(ctx context.Context) ([]invoicingPorts.PasswordCandidate, error) {
+	return nil, nil
+}
+
+func (processorPasswordResolver) MarkUsed(ctx context.Context, secretID string) error {
+	return nil
+}
+
+type processorPartyResolver struct{}
+
+func (processorPartyResolver) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
+	return "", nil
+}
+
+type processorLineResolver struct{}
+
+func (processorLineResolver) ResolveLine(ctx context.Context, input invoicingPorts.CatalogLineResolveInput) (*invoicingPorts.CatalogLineResolveResult, error) {
+	return &invoicingPorts.CatalogLineResolveResult{Status: "unmatched"}, nil
+}
+
+func newProcessorCommand() *invoicingCommands.CreateInvoicesFromFilesCommand {
+	repo := &processorRepo{}
+	return invoicingCommands.NewCreateInvoicesFromFilesCommand(
+		&processorFileStore{},
+		&processorXMLExtractor{},
+		&processorLLMExtractor{},
+		repo,
+		processorPasswordResolver{},
+		invoicingCommands.NewCreateInvoiceCommand(repo, processorPartyResolver{}, processorLineResolver{}),
+	)
+}
+
 func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil, invoicingCommands.NewCreateInvoiceCommand(&processorRepo{}, nil, nil))
+	cmd := newProcessorCommand()
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
@@ -114,7 +148,7 @@ func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
 }
 
 func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) {
-	cmd := invoicingCommands.NewCreateInvoicesFromFilesCommand(&processorFileStore{}, &processorXMLExtractor{}, &processorLLMExtractor{}, &processorRepo{}, nil, invoicingCommands.NewCreateInvoiceCommand(&processorRepo{}, nil, nil))
+	cmd := newProcessorCommand()
 	processor := NewProcessInvoiceExtractionFromFiles(cmd)
 
 	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{

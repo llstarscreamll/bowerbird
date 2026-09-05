@@ -4,12 +4,12 @@ import (
 	"errors"
 	"testing"
 
-	connectionsapp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
 func TestClassifySyncError_Reauth(t *testing.T) {
-	account := connectionsapp.ConnectionInfo{Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}
+	account := connectionsapi.ConnectionInfo{Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}
 	err := classifySyncError(account, errors.New("provider request failed with status 401"))
 
 	var syncErr *appErrors.SyncError
@@ -25,7 +25,7 @@ func TestClassifySyncError_Reauth(t *testing.T) {
 }
 
 func TestClassifySyncError_RateLimitedRetryAfter(t *testing.T) {
-	account := connectionsapp.ConnectionInfo{Provider: "yahoo", ProviderAccountEmail: "user@yahoo.com"}
+	account := connectionsapi.ConnectionInfo{Provider: "yahoo", ProviderAccountEmail: "user@yahoo.com"}
 	err := classifySyncError(account, errors.New("request failed with status 429 (retry-after=\"180\")"))
 
 	var syncErr *appErrors.SyncError
@@ -41,7 +41,7 @@ func TestClassifySyncError_RateLimitedRetryAfter(t *testing.T) {
 }
 
 func TestClassifySyncError_PayloadRejected(t *testing.T) {
-	account := connectionsapp.ConnectionInfo{Provider: "outlook", ProviderAccountEmail: "user@outlook.com"}
+	account := connectionsapi.ConnectionInfo{Provider: "outlook", ProviderAccountEmail: "user@outlook.com"}
 	err := classifySyncError(account, errors.Join(errors.New("payload too large"), errPayloadRejected))
 
 	var syncErr *appErrors.SyncError

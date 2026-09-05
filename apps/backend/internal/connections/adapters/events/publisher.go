@@ -24,7 +24,10 @@ func NewPublisher(eventBus platformEvents.EventBus) *Publisher {
 }
 
 func (p *Publisher) PublishConnectionAdded(ctx context.Context, connection *domain.Connection) error {
-	tenantSlug, _ := tenant.TenantIDFromContext(ctx)
+	tenantSlug, err := tenant.TenantIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
 
 	event := contractEvents.ConnectionAdded{
 		EventID:              id.NewULID(),

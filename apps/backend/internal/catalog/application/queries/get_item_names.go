@@ -11,6 +11,9 @@ type GetItemNamesQuery struct {
 }
 
 func NewGetItemNamesQuery(repo ports.ItemRepository) *GetItemNamesQuery {
+	if repo == nil {
+		panic("item repository is required")
+	}
 	return &GetItemNamesQuery{repo: repo}
 }
 

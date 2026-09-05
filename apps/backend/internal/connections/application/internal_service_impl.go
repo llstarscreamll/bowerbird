@@ -3,9 +3,9 @@ package application
 import (
 	"context"
 
+	"github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/connections/application/commands"
 	"github.com/bowerbird/internal/connections/application/queries"
-	"github.com/bowerbird/internal/connections/domain"
 )
 
 type internalService struct {
@@ -15,11 +15,22 @@ type internalService struct {
 	getSharingPolicy     *queries.GetSharingPolicyQuery
 }
 
-func NewInternalService(
-	repo domain.Repository,
-	credentialsService *CredentialsService,
-) InternalService {
-	app := NewApplication(repo, credentialsService)
+func NewInternalService(app *Application) api.InternalService {
+	if app == nil {
+		panic("connections application is required")
+	}
+	if app.Queries.GetActiveConnections == nil {
+		panic("get active connections query is required")
+	}
+	if app.Queries.DecryptCredentials == nil {
+		panic("decrypt credentials query is required")
+	}
+	if app.Commands.MarkRequiresReconnect == nil {
+		panic("mark requires reconnect command is required")
+	}
+	if app.Queries.GetSharingPolicy == nil {
+		panic("get sharing policy query is required")
+	}
 
 	return &internalService{
 		getActiveConnections: app.Queries.GetActiveConnections,
@@ -29,8 +40,22 @@ func NewInternalService(
 	}
 }
 
-func (s *internalService) GetActiveConnections(ctx context.Context) ([]ConnectionInfo, error) {
-	return s.getActiveConnections.Execute(ctx)
+func (s *internalService) GetActiveConnections(ctx context.Context) ([]api.ConnectionInfo, error) {
+	items, err := s.getActiveConnections.Execute(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]api.ConnectionInfo, 0, len(items))
+	for _, item := range items {
+		out = append(out, api.ConnectionInfo{
+			ID:                   item.ID,
+			Provider:             item.Provider,
+			ProviderAccountEmail: item.ProviderAccountEmail,
+			OwnerUserID:          item.OwnerUserID,
+			SharingPolicy:        item.SharingPolicy,
+		})
+	}
+	return out, nil
 }
 
 func (s *internalService) DecryptCredentials(ctx context.Context, connectionID string) ([]byte, error) {
@@ -44,3 +69,5 @@ func (s *internalService) MarkRequiresReconnect(ctx context.Context, connectionI
 func (s *internalService) GetSharingPolicy(ctx context.Context, connectionID string) (string, error) {
 	return s.getSharingPolicy.Execute(ctx, connectionID)
 }
+
+var _ api.InternalService = (*internalService)(nil)

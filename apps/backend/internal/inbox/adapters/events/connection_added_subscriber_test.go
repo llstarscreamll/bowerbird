@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	contractevents "github.com/bowerbird/internal/contracts/events"
+	eventsV1 "github.com/bowerbird/internal/inbox/adapters/events"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
-	eventsV1 "github.com/bowerbird/internal/inbox/presentation/events"
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 	"github.com/bowerbird/internal/platform/tenant"
@@ -22,11 +22,19 @@ func (q *fakeTaskQueue) Enqueue(_ context.Context, job jobs.Job) error {
 	return nil
 }
 
+type allowAllFeatures struct{}
+
+func (allowAllFeatures) Require(context.Context, string) error { return nil }
+func (allowAllFeatures) RequireAny(context.Context, ...string) error {
+	return nil
+}
+func (allowAllFeatures) Has(context.Context, string) (bool, error) { return true, nil }
+
 func TestConnectionAddedSubscriberEnqueuesSyncJob(t *testing.T) {
 	queue := &fakeTaskQueue{}
 	subscriber := eventsV1.NewConnectionAddedSubscriber(
 		inboxCommands.NewOutboxSyncAccountJobDispatcher(queue),
-		nil,
+		allowAllFeatures{},
 	)
 
 	detail, err := contractevents.MarshalConnectionAdded(contractevents.ConnectionAdded{

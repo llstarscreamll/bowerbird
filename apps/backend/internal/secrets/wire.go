@@ -6,9 +6,10 @@ import (
 
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
-	rbacApp "github.com/bowerbird/internal/rbac/application"
+	rbacapi "github.com/bowerbird/internal/rbac/api"
 	httpV1 "github.com/bowerbird/internal/secrets/adapters/http/v1"
 	secretsRepo "github.com/bowerbird/internal/secrets/adapters/repository/postgres"
+	"github.com/bowerbird/internal/secrets/api"
 	"github.com/bowerbird/internal/secrets/application"
 	"github.com/bowerbird/internal/secrets/application/commands"
 	"github.com/bowerbird/internal/secrets/application/ports"
@@ -43,7 +44,7 @@ func NewApplication(registry *database.Registry, cipher ports.SecretCipher) *app
 func NewHTTPHandler(
 	mux *http.ServeMux,
 	app *application.Application,
-	rbac *rbacApp.Service,
+	rbac rbacapi.Authorizer,
 	authMiddleware func(http.Handler) http.Handler,
 	cfg config.Config,
 ) {
@@ -57,22 +58,29 @@ func NewHTTPHandler(
 	httpV1.NewRouter(controller).Register(mux, cfg, authMiddleware)
 }
 
-// DocumentPasswordResolver adapts secrets resolve/mark-used for invoice extraction.
-type DocumentPasswordResolver struct {
+type documentPasswordResolver struct {
 	app *application.Application
 }
 
-func NewDocumentPasswordResolver(app *application.Application) *DocumentPasswordResolver {
+func NewDocumentPasswordResolver(app *application.Application) api.DocumentPasswordResolver {
 	if app == nil {
 		panic("secrets application is required")
 	}
-	return &DocumentPasswordResolver{app: app}
+	return &documentPasswordResolver{app: app}
 }
 
-func (r *DocumentPasswordResolver) ResolveCandidates(ctx context.Context) ([]domain.ResolvedSecret, error) {
-	return r.app.Queries.ResolveByPurpose.Execute(ctx, domain.PurposeInvoicingDocumentPassword)
+func (r *documentPasswordResolver) ResolveCandidates(ctx context.Context) ([]api.PasswordCandidate, error) {
+	resolved, err := r.app.Queries.ResolveByPurpose.Execute(ctx, domain.PurposeInvoicingDocumentPassword)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]api.PasswordCandidate, 0, len(resolved))
+	for _, item := range resolved {
+		out = append(out, api.PasswordCandidate{ID: item.ID, Value: item.Value})
+	}
+	return out, nil
 }
 
-func (r *DocumentPasswordResolver) MarkUsed(ctx context.Context, secretID string) error {
+func (r *documentPasswordResolver) MarkUsed(ctx context.Context, secretID string) error {
 	return r.app.Commands.MarkSecretUsed.Execute(ctx, secretID)
 }

@@ -32,6 +32,15 @@ func NewApplication(
 	appEnv string,
 	operatorEmails []string,
 ) *Application {
+	if repo == nil {
+		panic("identity repository is required")
+	}
+	if tokenGen == nil {
+		panic("token generator is required")
+	}
+	if refreshStore == nil {
+		panic("refresh token store is required")
+	}
 	return &Application{
 		Commands: Commands{
 			Auth:          commands.NewAuthService(repo, tokenGen, refreshStore, appEnv, operatorEmails),
@@ -46,8 +55,5 @@ func NewApplication(
 }
 
 func (a *Application) IsPlatformOperator(ctx context.Context, userID string) (bool, error) {
-	if a.Identity == nil {
-		return false, nil
-	}
 	return a.Identity.IsPlatformOperator(ctx, userID)
 }

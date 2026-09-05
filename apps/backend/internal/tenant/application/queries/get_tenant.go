@@ -12,6 +12,9 @@ type GetTenantQuery struct {
 }
 
 func NewGetTenantQuery(repo ports.TenantRepository) *GetTenantQuery {
+	if repo == nil {
+		panic("tenant repository is required")
+	}
 	return &GetTenantQuery{repo: repo}
 }
 

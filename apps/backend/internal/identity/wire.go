@@ -1,12 +1,15 @@
 package identity
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
+	httpV1 "github.com/bowerbird/internal/identity/adapters/http/v1"
+	identitypostgres "github.com/bowerbird/internal/identity/adapters/repository/postgres"
+	"github.com/bowerbird/internal/identity/api"
 	"github.com/bowerbird/internal/identity/application"
-	identityinfra "github.com/bowerbird/internal/identity/infrastructure"
-	identityhttp "github.com/bowerbird/internal/identity/presentation/http"
+	"github.com/bowerbird/internal/identity/domain"
 	"github.com/bowerbird/internal/platform/auth"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
@@ -27,13 +30,13 @@ func NewApplication(cfg config.Config, controlDB *pgxpool.Pool, tenantRegistry *
 		panic("token generator is required")
 	}
 
-	identityRepo := identityinfra.NewPostgresRepository(controlDB, tenantRegistry)
-	refreshStore := identityinfra.NewRefreshTokenRepository(controlDB)
+	identityRepo := identitypostgres.NewPostgresRepository(controlDB, tenantRegistry)
+	refreshStore := identitypostgres.NewRefreshTokenRepository(controlDB)
 
 	return application.NewApplication(identityRepo, tokenGen, refreshStore, cfg.AppEnv, cfg.PlatformOperatorEmails)
 }
 
-func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB *pgxpool.Pool, tenantRegistry *database.Registry, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *identityhttp.AuthHandler {
+func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB *pgxpool.Pool, tenantRegistry *database.Registry, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *httpV1.AuthHandler {
 	if mux == nil {
 		panic("http mux is required")
 	}
@@ -69,7 +72,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 		}
 	}
 
-	handler := identityhttp.NewAuthHandler(
+	handler := httpV1.NewAuthHandler(
 		app.Commands.Auth,
 		app.Identity,
 		googleConfig,
@@ -81,3 +84,27 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 
 	return handler
 }
+
+func NewOperatorDirectory(app *application.Application) api.OperatorDirectory {
+	if app == nil {
+		panic("identity application is required")
+	}
+	return app
+}
+
+type UserStore interface {
+	FindUserByEmail(ctx context.Context, email string) (*domain.User, error)
+	CreateUser(ctx context.Context, user *domain.User) error
+}
+
+func NewUserStore(controlDB *pgxpool.Pool, tenantRegistry *database.Registry) UserStore {
+	if controlDB == nil {
+		panic("control plane db pool is required")
+	}
+	if tenantRegistry == nil {
+		panic("tenant registry is required")
+	}
+	return identitypostgres.NewPostgresRepository(controlDB, tenantRegistry)
+}
+
+var _ api.OperatorDirectory = (*application.Application)(nil)

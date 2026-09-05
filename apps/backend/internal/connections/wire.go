@@ -1,14 +1,15 @@
 package connections
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
 	eventsadapter "github.com/bowerbird/internal/connections/adapters/events"
 	httpV1 "github.com/bowerbird/internal/connections/adapters/http/v1"
 	repositorypostgres "github.com/bowerbird/internal/connections/adapters/repository/postgres"
+	"github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/connections/application"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
@@ -17,13 +18,12 @@ import (
 	"golang.org/x/oauth2/microsoft"
 )
 
-type internalService struct {
-	app *application.Application
-}
-
 func NewApplication(registry *database.Registry, cipher application.CredentialsCipher) *application.Application {
 	if registry == nil {
 		panic("database registry is required")
+	}
+	if cipher == nil {
+		panic("credentials cipher is required")
 	}
 
 	connectionsRepo := repositorypostgres.NewPostgresRepository(registry)
@@ -32,31 +32,11 @@ func NewApplication(registry *database.Registry, cipher application.CredentialsC
 	return application.NewApplication(connectionsRepo, credentialsService)
 }
 
-func NewInternalService(app *application.Application) application.InternalService {
-	if app == nil {
-		panic("connections application is required")
-	}
-
-	return &internalService{app: app}
+func NewInternalService(app *application.Application) api.InternalService {
+	return application.NewInternalService(app)
 }
 
-func (s *internalService) GetActiveConnections(ctx context.Context) ([]application.ConnectionInfo, error) {
-	return s.app.Queries.GetActiveConnections.Execute(ctx)
-}
-
-func (s *internalService) DecryptCredentials(ctx context.Context, connectionID string) ([]byte, error) {
-	return s.app.Queries.DecryptCredentials.Execute(ctx, connectionID)
-}
-
-func (s *internalService) MarkRequiresReconnect(ctx context.Context, connectionID, reason string) error {
-	return s.app.Commands.MarkRequiresReconnect.Execute(ctx, connectionID, reason)
-}
-
-func (s *internalService) GetSharingPolicy(ctx context.Context, connectionID string) (string, error) {
-	return s.app.Queries.GetSharingPolicy.Execute(ctx, connectionID)
-}
-
-func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Registry, cipher application.CredentialsCipher, tokenValidator httpV1.TokenValidator, stateProtector httpV1.StateProtector, eventBus events.EventBus, authMiddleware func(http.Handler) http.Handler, features httpV1.FeatureChecker) *httpV1.Router {
+func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Registry, cipher application.CredentialsCipher, tokenValidator httpV1.TokenValidator, stateProtector httpV1.StateProtector, eventBus events.EventBus, authMiddleware func(http.Handler) http.Handler, features entitlementsapi.Features) *httpV1.Router {
 	if mux == nil {
 		panic("http mux is required")
 	}
@@ -65,6 +45,12 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 	}
 	if tokenValidator == nil {
 		panic("token validator is required")
+	}
+	if eventBus == nil {
+		panic("event bus is required")
+	}
+	if features == nil {
+		panic("feature checker is required")
 	}
 
 	repo := repositorypostgres.NewPostgresRepository(registry)
@@ -92,11 +78,6 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 		}
 	}
 
-	var eventPublisher httpV1.EventPublisher
-	if eventBus != nil {
-		eventPublisher = eventsadapter.NewPublisher(eventBus)
-	}
-
 	controller := httpV1.NewController(
 		repo,
 		credentialsService,
@@ -104,7 +85,7 @@ func NewHTTPHandler(mux *http.ServeMux, cfg config.Config, registry *database.Re
 		microsoftConfig,
 		tokenValidator,
 		stateProtector,
-		eventPublisher,
+		eventsadapter.NewPublisher(eventBus),
 		strings.TrimRight(cfg.FrontendURL, "/"),
 		features,
 	)

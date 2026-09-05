@@ -22,14 +22,16 @@ type DownloadAttachmentCommand struct {
 }
 
 func NewDownloadAttachmentCommand(messageRepo domain.MessageRepository, fileStore platformStorage.FileStore) *DownloadAttachmentCommand {
+	if messageRepo == nil {
+		panic("message repository is required")
+	}
+	if fileStore == nil {
+		panic("file store is required")
+	}
 	return &DownloadAttachmentCommand{messageRepo: messageRepo, fileStore: fileStore}
 }
 
 func (c *DownloadAttachmentCommand) Execute(ctx context.Context, messageID, attachmentID string) (*DownloadAttachmentResult, error) {
-	if c.fileStore == nil {
-		return nil, fmt.Errorf("file store is required")
-	}
-
 	if _, err := c.messageRepo.GetInboxMessageByID(ctx, messageID); err != nil {
 		return nil, err
 	}

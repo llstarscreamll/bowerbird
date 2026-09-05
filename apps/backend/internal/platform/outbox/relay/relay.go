@@ -42,10 +42,13 @@ func (r *Relay) RunOnce(ctx context.Context) error {
 		return err
 	}
 
-	pendingEvents, pendingJobs, _ := r.store.CountPending(ctx)
-	tenantID, _ := tenant.TenantIDFromContext(ctx)
-	if tenantID == "" {
-		tenantID = "-"
+	pendingEvents, pendingJobs, err := r.store.CountPending(ctx)
+	if err != nil {
+		return err
+	}
+	tenantID, err := tenant.TenantIDFromContext(ctx)
+	if err != nil {
+		return err
 	}
 	log.Printf(
 		"outbox relay tick: tenant=%s delivered_events=%d failed_events=%d delivered_jobs=%d failed_jobs=%d pending_events=%d pending_jobs=%d",

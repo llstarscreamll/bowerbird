@@ -121,7 +121,7 @@ func TestCreateInvoice_LinkFailureKeepsPersistedInvoice(t *testing.T) {
 		SourceID:         "src-2",
 		ExtractionSource: "xml",
 	})
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.NotNil(t, result)
 	assert.True(t, repo.persisted)
 	assert.True(t, repo.applied)
@@ -172,7 +172,7 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 		SourceID:         "src-3",
 		ExtractionSource: "xml",
 	})
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, "failed", repo.status)
 	require.NotNil(t, repo.partyID)
@@ -184,7 +184,7 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 
 func TestCreateInvoice_MapsDueDateAndAllowance(t *testing.T) {
 	repo := &linkingRepoStub{}
-	cmd := NewCreateInvoiceCommand(repo, nil, nil)
+	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{})
 	cmd.newID = func() string { return "ID-1" }
 
 	result, err := cmd.Execute(context.Background(), CreateInvoiceInput{

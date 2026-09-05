@@ -35,6 +35,15 @@ func NewAuthService(
 	appEnv string,
 	operatorEmails []string,
 ) *AuthService {
+	if repo == nil {
+		panic("identity repository is required")
+	}
+	if tokenGen == nil {
+		panic("token generator is required")
+	}
+	if refreshStore == nil {
+		panic("refresh token store is required")
+	}
 	return &AuthService{
 		repo:           repo,
 		tokenGen:       tokenGen,
@@ -52,11 +61,9 @@ func (s *AuthService) issueTokens(ctx context.Context, user *domain.User) (*auth
 	if err != nil {
 		return nil, err
 	}
-	if s.refreshStore != nil {
-		expiresAt := time.Now().Add(s.tokenGen.RefreshTTL())
-		if err := s.refreshStore.Save(ctx, tokens.RefreshJTI, user.ID, expiresAt); err != nil {
-			return nil, fmt.Errorf("persist refresh token: %w", err)
-		}
+	expiresAt := time.Now().Add(s.tokenGen.RefreshTTL())
+	if err := s.refreshStore.Save(ctx, tokens.RefreshJTI, user.ID, expiresAt); err != nil {
+		return nil, fmt.Errorf("persist refresh token: %w", err)
 	}
 	return tokens, nil
 }
@@ -166,14 +173,12 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*a
 		return nil, err
 	}
 
-	if s.refreshStore != nil {
-		storedUserID, err := s.refreshStore.Consume(ctx, jti)
-		if err != nil {
-			return nil, err
-		}
-		if storedUserID != userID {
-			return nil, auth.ErrInvalidToken
-		}
+	storedUserID, err := s.refreshStore.Consume(ctx, jti)
+	if err != nil {
+		return nil, err
+	}
+	if storedUserID != userID {
+		return nil, auth.ErrInvalidToken
 	}
 
 	user, err := s.repo.FindUserByID(ctx, userID)
@@ -185,9 +190,6 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*a
 }
 
 func (s *AuthService) RevokeRefreshToken(ctx context.Context, refreshToken string) error {
-	if s.refreshStore == nil {
-		return nil
-	}
 	_, jti, err := s.tokenGen.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		// Cookie may already be expired; treat as logged out.
@@ -197,8 +199,5 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, refreshToken strin
 }
 
 func (s *AuthService) RevokeAllRefreshTokens(ctx context.Context, userID string) error {
-	if s.refreshStore == nil {
-		return nil
-	}
 	return s.refreshStore.RevokeAllForUser(ctx, userID)
 }

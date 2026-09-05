@@ -30,13 +30,15 @@
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
 - Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
-- Feature architecture: follow the `internal/<feature>` modular layout used in `internal/invoices`:
-  - `domain/`: core business model and pure domain logic (no infra/framework concerns).
-  - `application/`: use cases (`commands`, `queries`) and `ports` interfaces.
-  - `contracts/`: cross-boundary payload contracts (feature jobs/events DTOs).
-  - `adapters/`: HTTP, events/jobs handlers, repository and external provider implementations.
-  - `wire.go`: feature composition root (instantiate adapters and inject into application commands/queries).
-- Dependency rule for backend features: keep dependencies inward (`adapters -> application -> domain`), with contracts shared across boundaries; do not import adapters from `domain` or `application`.
+- Feature architecture: every bounded context is `internal/<bc>/` with this public surface:
+  - `wire.go`: only Go facade other packages import (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`, `RegisterJobs`, OHS constructors). Host (`cmd/*`, `platform/messaging`) imports the module root only.
+  - `api/`: Open Host Service (interfaces + DTOs) for other BCs. No `application` imports.
+  - `domain/`: core business model (no infra).
+  - `application/`: use cases (`commands`, `queries`), consumer `ports`, and OHS implementations.
+  - `contracts/`: job/event JSON payloads only — not OHS interfaces.
+  - `adapters/`: HTTP, events, jobs, repos, providers. Other BCs must not import this layer.
+- Import rules: other BCs consume `{bc}/api` (and `internal/contracts/events` for platform events). Never import another BC's `application/`, `adapters/`, or `domain/`. Do not add empty `RegisterEvents`/`RegisterJobs` on modules with no consumers.
+- Dependency rule inside a module: `adapters -> application -> domain`. Do not import adapters from `domain` or `application`.
 - Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
 - Domain Errors: Wrap or create errors using `appErrors.Wrap(err, appErrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
 - Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.

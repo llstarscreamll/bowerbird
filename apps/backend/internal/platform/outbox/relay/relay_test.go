@@ -9,6 +9,7 @@ import (
 
 	"github.com/bowerbird/internal/platform/outbox/relay"
 	"github.com/bowerbird/internal/platform/outbox/store"
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +91,7 @@ func TestRelayFairMultiTenantCap(t *testing.T) {
 	tr := &mockTransport{}
 	r := relay.New(st, tr, relay.Config{BatchSize: 4, PerTenantCap: 1})
 
-	require.NoError(t, r.RunOnce(context.Background()))
+	require.NoError(t, r.RunOnce(tenant.WithTenantID(context.Background(), "a")))
 	require.Equal(t, []string{"a", "b"}, tr.events)
 }
 
@@ -118,6 +119,6 @@ func TestRelayPoisonPillMarksFailed(t *testing.T) {
 		events: []store.EventRow{{ID: "evt-1", TenantSlug: "a", Attempts: 3, MaxAttempts: 3}},
 	}}
 	r := relay.New(st, failingTransport{}, relay.Config{BatchSize: 1})
-	require.NoError(t, r.RunOnce(context.Background()))
+	require.NoError(t, r.RunOnce(tenant.WithTenantID(context.Background(), "a")))
 	require.Equal(t, []string{"evt-1"}, st.failed)
 }

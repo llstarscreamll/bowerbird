@@ -22,6 +22,12 @@ type Queries struct {
 }
 
 func NewApplication(repo domain.Repository, credentialsService *commands.CredentialsService) *Application {
+	if repo == nil {
+		panic("connection repository is required")
+	}
+	if credentialsService == nil {
+		panic("credentials service is required")
+	}
 	return &Application{
 		Commands: Commands{
 			MarkRequiresReconnect: commands.NewMarkRequiresReconnectCommand(repo),

@@ -12,6 +12,12 @@ type ListItemsQuery struct {
 }
 
 func NewListItemsQuery(items ports.ItemRepository, aliases ports.AliasRepository) *ListItemsQuery {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
 	return &ListItemsQuery{items: items, aliases: aliases}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/bowerbird/internal/platform/database"
 	httpV1 "github.com/bowerbird/internal/rbac/adapters/http/v1"
 	rbacRepo "github.com/bowerbird/internal/rbac/adapters/repository/postgres"
+	rbacapi "github.com/bowerbird/internal/rbac/api"
 	"github.com/bowerbird/internal/rbac/application"
 )
 
@@ -27,3 +28,5 @@ func NewHTTPHandler(mux *http.ServeMux, svc *application.Service, authMiddleware
 	controller := httpV1.NewController(svc)
 	httpV1.NewRouter(controller).Register(mux, cfg, authMiddleware)
 }
+
+var _ rbacapi.Authorizer = (*application.Service)(nil)

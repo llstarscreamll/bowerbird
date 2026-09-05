@@ -21,14 +21,13 @@ type RequestDownloadURLCommand struct {
 }
 
 func NewRequestDownloadURLCommand(fileStore platformStorage.FileStore) *RequestDownloadURLCommand {
+	if fileStore == nil {
+		panic("file store is required")
+	}
 	return &RequestDownloadURLCommand{fileStore: fileStore}
 }
 
 func (cmd *RequestDownloadURLCommand) Execute(ctx context.Context, input RequestDownloadURLInput) (*platformStorage.PresignDownloadResult, error) {
-	if cmd.fileStore == nil {
-		return nil, fmt.Errorf("file store is required")
-	}
-
 	tenantID, err := tenant.TenantIDFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant id from context: %w", err)

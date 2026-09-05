@@ -78,7 +78,7 @@ flowchart TD
 
 - **Purpose**: `POST /sync` does not block.
 - **Location**: `commands/sqs_sync_dispatcher.go`, `adapters/jobs/sync_account_processor.go`, `contracts/jobs/`
-- **Fallback**: Without a queue, keep the inline dispatcher (tests/local without SQS).
+- **Queue**: Required. `POST /sync` enqueues `InboxSyncAccount` via outbox; workers run the sync.
 
 ### Mail commands
 

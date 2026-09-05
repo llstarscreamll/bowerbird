@@ -18,6 +18,9 @@ type ListUserTenantsQuery struct {
 }
 
 func NewListUserTenantsQuery(repo ports.Repository) *ListUserTenantsQuery {
+	if repo == nil {
+		panic("identity repository is required")
+	}
 	return &ListUserTenantsQuery{repo: repo}
 }
 

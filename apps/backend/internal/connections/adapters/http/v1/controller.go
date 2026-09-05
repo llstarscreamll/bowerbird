@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/bowerbird/internal/connections/domain"
-	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	"github.com/bowerbird/internal/platform/auth"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
@@ -38,11 +38,6 @@ type EventPublisher interface {
 	PublishConnectionAdded(ctx context.Context, connection *domain.Connection) error
 }
 
-type FeatureChecker interface {
-	RequireAny(ctx context.Context, featureKeys ...string) error
-	Has(ctx context.Context, featureKey string) (bool, error)
-}
-
 type Controller struct {
 	repo            domain.Repository
 	credSetter      ConnectionCredentialsSetter
@@ -52,16 +47,25 @@ type Controller struct {
 	stateProtect    StateProtector
 	publisher       EventPublisher
 	frontendURL     string
-	features        FeatureChecker
+	features        entitlementsapi.Features
 }
 
-func NewController(repo domain.Repository, credSetter ConnectionCredentialsSetter, googleConfig *oauth2.Config, microsoftConfig *oauth2.Config, tokenGen TokenValidator, stateProtect StateProtector, publisher EventPublisher, frontendURL string, features FeatureChecker) *Controller {
+func NewController(repo domain.Repository, credSetter ConnectionCredentialsSetter, googleConfig *oauth2.Config, microsoftConfig *oauth2.Config, tokenGen TokenValidator, stateProtect StateProtector, publisher EventPublisher, frontendURL string, features entitlementsapi.Features) *Controller {
 	if repo == nil {
 		panic("connections repository is required")
+	}
+	if credSetter == nil {
+		panic("credentials setter is required")
 	}
 
 	if tokenGen == nil {
 		panic("token validator is required")
+	}
+	if publisher == nil {
+		panic("event publisher is required")
+	}
+	if features == nil {
+		panic("feature checker is required")
 	}
 
 	return &Controller{
@@ -78,10 +82,7 @@ func NewController(repo domain.Repository, credSetter ConnectionCredentialsSette
 }
 
 func (c *Controller) requireConnectionAccess(ctx context.Context) error {
-	if c.features == nil {
-		return nil
-	}
-	return c.features.RequireAny(ctx, entitlementsDomain.FeatureMailInbox, entitlementsDomain.FeatureInvoicingCaptureFromEmail)
+	return c.features.RequireAny(ctx, entitlementsapi.FeatureMailInbox, entitlementsapi.FeatureInvoicingCaptureFromEmail)
 }
 
 const gmailSendScope = "https://www.googleapis.com/auth/gmail.send"
@@ -102,10 +103,7 @@ func (c *Controller) oauthConfigFor(ctx context.Context, base *oauth2.Config, se
 		return nil, appErrors.New(appErrors.CodeInternal, "oauth config is required")
 	}
 	clone := *base
-	if c.features == nil {
-		return &clone, nil
-	}
-	hasSend, err := c.features.Has(ctx, entitlementsDomain.FeatureMailSend)
+	hasSend, err := c.features.Has(ctx, entitlementsapi.FeatureMailSend)
 	if err != nil {
 		return nil, err
 	}
@@ -290,16 +288,17 @@ func (c *Controller) GoogleCallback(w http.ResponseWriter, r *http.Request) erro
 
 	tokenBytes, _ := json.Marshal(token)
 
-	connection := &domain.Connection{
-		ID:                   id.NewULID(),
-		OwnerUserID:          userID,
-		Provider:             "gmail",
-		ProviderAccountEmail: userInfo.Email,
-		Status:               domain.ConnectionStatusActive,
-		GrantedScopes:        oauthCfg.Scopes,
-		SharingPolicy:        domain.SharingPolicyPrivate,
-		CreatedAt:            time.Now().UTC(),
-		UpdatedAt:            time.Now().UTC(),
+	connection, err := domain.NewConnection(
+		id.NewULID(),
+		userID,
+		"gmail",
+		userInfo.Email,
+		oauthCfg.Scopes,
+		domain.SharingPolicyPrivate,
+		time.Now(),
+	)
+	if err != nil {
+		return redirectOnError(tenantID, fmt.Sprintf("create connection failed: %v", err))
 	}
 
 	if err := c.credSetter.SetEncryptedCredentials(connection, tokenBytes); err != nil {
@@ -312,10 +311,8 @@ func (c *Controller) GoogleCallback(w http.ResponseWriter, r *http.Request) erro
 
 	slog.Info("Google connection saved successfully", "connection_id", connection.ID, "email", userInfo.Email, "user_id", userID, "tenant_id", tenantID)
 
-	if c.publisher != nil {
-		if err := c.publisher.PublishConnectionAdded(ctx, connection); err != nil {
-			slog.Error("failed to publish ConnectionAdded event", "error", err, "connection_id", connection.ID)
-		}
+	if err := c.publisher.PublishConnectionAdded(ctx, connection); err != nil {
+		return redirectOnError(tenantID, fmt.Sprintf("publish connection added failed: %v", err))
 	}
 
 	slog.Info("ConnectionAdded event published successfully", "connection_id", connection.ID)
@@ -459,16 +456,17 @@ func (c *Controller) MicrosoftCallback(w http.ResponseWriter, r *http.Request) e
 	}
 
 	tokenBytes, _ := json.Marshal(token)
-	connection := &domain.Connection{
-		ID:                   id.NewULID(),
-		OwnerUserID:          userID,
-		Provider:             "microsoft",
-		ProviderAccountEmail: email,
-		Status:               domain.ConnectionStatusActive,
-		GrantedScopes:        oauthCfg.Scopes,
-		SharingPolicy:        domain.SharingPolicyPrivate,
-		CreatedAt:            time.Now().UTC(),
-		UpdatedAt:            time.Now().UTC(),
+	connection, err := domain.NewConnection(
+		id.NewULID(),
+		userID,
+		"microsoft",
+		email,
+		oauthCfg.Scopes,
+		domain.SharingPolicyPrivate,
+		time.Now(),
+	)
+	if err != nil {
+		return redirectOnError(tenantID, fmt.Sprintf("create connection failed: %v", err))
 	}
 	if err := c.credSetter.SetEncryptedCredentials(connection, tokenBytes); err != nil {
 		return redirectOnError(tenantID, fmt.Sprintf("encrypt credentials failed: %v", err))
@@ -478,10 +476,8 @@ func (c *Controller) MicrosoftCallback(w http.ResponseWriter, r *http.Request) e
 		return redirectOnError(tenantID, fmt.Sprintf("save connection failed: %v", err))
 	}
 
-	if c.publisher != nil {
-		if err := c.publisher.PublishConnectionAdded(ctx, connection); err != nil {
-			slog.Error("failed to publish ConnectionAdded event", "error", err, "connection_id", connection.ID)
-		}
+	if err := c.publisher.PublishConnectionAdded(ctx, connection); err != nil {
+		return redirectOnError(tenantID, fmt.Sprintf("publish connection added failed: %v", err))
 	}
 
 	frontendURL := c.frontendURL

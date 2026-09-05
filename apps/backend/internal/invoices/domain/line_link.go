@@ -61,24 +61,24 @@ func (l LineForDecision) BelongsToInvoice(invoiceID string) bool {
 	return id != "" && l.InvoiceHeaderID == id
 }
 
-// ApplyManualDecision applies link | never_match to the current LineLink.
-func ApplyManualDecision(current LineLink, action, itemID string, lock bool) (LineLink, error) {
+// ApplyManualDecision applies link | never_match to this LineLink.
+func (l LineLink) ApplyManualDecision(action, itemID string, lock bool) (LineLink, error) {
 	action = strings.TrimSpace(action)
 	if action == "" {
 		action = MemoryActionLink
 	}
 	switch action {
 	case MemoryActionLink:
-		return ApplyManualLink(current, itemID, lock)
+		return l.ApplyManualLink(itemID, lock)
 	case MemoryActionNeverMatch:
-		return RejectLink(current, lock)
+		return l.Reject(lock)
 	default:
 		return LineLink{}, ErrInvalidAction
 	}
 }
 
-func ApplyManualLink(current LineLink, itemID string, lock bool) (LineLink, error) {
-	if current.Locked {
+func (l LineLink) ApplyManualLink(itemID string, lock bool) (LineLink, error) {
+	if l.Locked {
 		return LineLink{}, ErrLineLinkLocked
 	}
 	idCopy := strings.TrimSpace(itemID)
@@ -94,8 +94,8 @@ func ApplyManualLink(current LineLink, itemID string, lock bool) (LineLink, erro
 	}, nil
 }
 
-func RejectLink(current LineLink, lock bool) (LineLink, error) {
-	if current.Locked {
+func (l LineLink) Reject(lock bool) (LineLink, error) {
+	if l.Locked {
 		return LineLink{}, ErrLineLinkLocked
 	}
 	return LineLink{
@@ -124,6 +124,9 @@ func RememberedItemID(action string, linkedItemID *string, blockedSuggestionID s
 }
 
 func RecalculateLinkingStatus(lineStatuses []string) string {
+	if len(lineStatuses) == 0 {
+		return LinkingStatusPending
+	}
 	for _, status := range lineStatuses {
 		if status == LinkStatusUnmatched || status == LinkStatusSuggested {
 			return LinkingStatusPending

@@ -6,9 +6,8 @@ import (
 	"errors"
 	"log"
 
-	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
-	inboxPorts "github.com/bowerbird/internal/inbox/application/ports"
 	inboxJobs "github.com/bowerbird/internal/inbox/contracts/jobs"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	platformJobs "github.com/bowerbird/internal/platform/jobs"
@@ -17,10 +16,16 @@ import (
 
 type ProcessInboxSyncAccount struct {
 	command  *inboxCommands.SyncAccountCommand
-	features inboxPorts.FeatureChecker
+	features entitlementsapi.Features
 }
 
-func NewProcessInboxSyncAccount(command *inboxCommands.SyncAccountCommand, features inboxPorts.FeatureChecker) *ProcessInboxSyncAccount {
+func NewProcessInboxSyncAccount(command *inboxCommands.SyncAccountCommand, features entitlementsapi.Features) *ProcessInboxSyncAccount {
+	if command == nil {
+		panic("sync account command is required")
+	}
+	if features == nil {
+		panic("feature checker is required")
+	}
 	return &ProcessInboxSyncAccount{command: command, features: features}
 }
 
@@ -29,21 +34,16 @@ func (h *ProcessInboxSyncAccount) JobType() string {
 }
 
 func (h *ProcessInboxSyncAccount) Handle(ctx context.Context, msg platformJobs.JobMessage) error {
-	if h.command == nil {
-		return errors.New("sync account command is required")
-	}
 	if _, err := tenant.TenantIDFromContext(ctx); err != nil {
 		return errors.New("tenant id is required")
 	}
-	if h.features != nil {
-		if err := h.features.RequireAny(ctx, entitlementsDomain.FeatureMailInbox, entitlementsDomain.FeatureInvoicingCaptureFromEmail); err != nil {
-			var appErr *appErrors.AppError
-			if errors.As(err, &appErr) && appErr.Code == appErrors.CodeForbidden {
-				log.Printf("skipping inbox sync job %s: feature not available", msg.MessageID)
-				return nil
-			}
-			return err
+	if err := h.features.RequireAny(ctx, entitlementsapi.FeatureMailInbox, entitlementsapi.FeatureInvoicingCaptureFromEmail); err != nil {
+		var appErr *appErrors.AppError
+		if errors.As(err, &appErr) && appErr.Code == appErrors.CodeForbidden {
+			log.Printf("skipping inbox sync job %s: feature not available", msg.MessageID)
+			return nil
 		}
+		return err
 	}
 
 	body, err := extractJobPayload(msg.Body)

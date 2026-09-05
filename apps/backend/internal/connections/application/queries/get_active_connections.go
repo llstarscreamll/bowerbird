@@ -15,6 +15,10 @@ type ConnectionInfo struct {
 	SharingPolicy        string
 }
 
+func (c ConnectionInfo) IsPrivate() bool {
+	return c.SharingPolicy == "private"
+}
+
 type GetActiveConnectionsQuery struct {
 	repo ports.ConnectionRepository
 }

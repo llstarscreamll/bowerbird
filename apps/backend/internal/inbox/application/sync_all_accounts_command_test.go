@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
 	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,7 @@ import (
 
 func TestSyncAllConnectionsCommand_DispatchesJobPerActiveAccount(t *testing.T) {
 	connectionsService := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{
+		activeConnections: []connectionsapi.ConnectionInfo{
 			{ID: "acc-1", Provider: "gmail"},
 			{ID: "acc-2", Provider: "outlook"},
 		},
@@ -47,7 +47,7 @@ func TestSyncAllConnectionsCommand_NoActiveAccountsDoesNothing(t *testing.T) {
 
 func TestSyncAllConnectionsCommand_ReturnsDispatchErrors(t *testing.T) {
 	connectionsService := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{
+		activeConnections: []connectionsapi.ConnectionInfo{
 			{ID: "acc-1", Provider: "gmail"},
 			{ID: "acc-2", Provider: "gmail"},
 		},
@@ -64,7 +64,7 @@ func TestSyncAllConnectionsCommand_ReturnsDispatchErrors(t *testing.T) {
 
 func TestSyncAllConnectionsCommand_SkipsPrivateAccountsFromOtherUsers(t *testing.T) {
 	connectionsService := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{
+		activeConnections: []connectionsapi.ConnectionInfo{
 			{ID: "acc-private-me", Provider: "gmail", SharingPolicy: "private", OwnerUserID: "user-1"},
 			{ID: "acc-private-other", Provider: "gmail", SharingPolicy: "private", OwnerUserID: "user-2"},
 			{ID: "acc-shared", Provider: "gmail", SharingPolicy: "organization", OwnerUserID: "user-2"},

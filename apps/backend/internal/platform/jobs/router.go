@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sort"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/bowerbird/internal/platform/messaging/attestation"
@@ -16,6 +17,9 @@ type Router struct {
 }
 
 func NewRouter(verifier *attestation.Verifier, handlers ...JobHandler) Router {
+	if verifier == nil {
+		panic("attestation verifier is required")
+	}
 	routes := make(map[string]JobHandler)
 	for _, handler := range handlers {
 		if handler == nil {
@@ -36,16 +40,14 @@ func (r Router) JobTypes() []string {
 }
 
 func (r Router) HandleJob(ctx context.Context, msg JobMessage) error {
-	if r.verifier != nil {
-		if err := r.verifier.Verify(msg.MessageID, msg.TenantSlug, msg.JobType, msg.TenantAttestation); err != nil {
-			return err
-		}
+	if strings.TrimSpace(msg.TenantSlug) == "" {
+		return tenant.ErrNoTenantIdInContext
+	}
+	if err := r.verifier.Verify(msg.MessageID, msg.TenantSlug, msg.JobType, msg.TenantAttestation); err != nil {
+		return err
 	}
 
-	msgCtx := ctx
-	if msg.TenantSlug != "" {
-		msgCtx = tenant.WithTenantID(msgCtx, msg.TenantSlug)
-	}
+	msgCtx := tenant.WithTenantID(ctx, msg.TenantSlug)
 
 	if handler, found := r.handlers[msg.JobType]; found {
 		if err := handler.Handle(msgCtx, msg); err != nil {

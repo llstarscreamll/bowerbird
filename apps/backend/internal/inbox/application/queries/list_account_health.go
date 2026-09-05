@@ -3,7 +3,7 @@ package queries
 import (
 	"context"
 
-	"github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/inbox/domain"
 )
 
@@ -17,10 +17,16 @@ type AccountSyncStatus struct {
 
 type ListAccountHealthQuery struct {
 	repo               domain.SyncCursorRepository
-	connectionsService application.InternalService
+	connectionsService connectionsapi.InternalService
 }
 
-func NewListAccountHealthQuery(repo domain.SyncCursorRepository, connectionsService application.InternalService) *ListAccountHealthQuery {
+func NewListAccountHealthQuery(repo domain.SyncCursorRepository, connectionsService connectionsapi.InternalService) *ListAccountHealthQuery {
+	if repo == nil {
+		panic("sync cursor repository is required")
+	}
+	if connectionsService == nil {
+		panic("connections service is required")
+	}
 	return &ListAccountHealthQuery{repo: repo, connectionsService: connectionsService}
 }
 

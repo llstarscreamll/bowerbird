@@ -1,13 +1,10 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/bowerbird/internal/connections/domain"
 )
-
-var ErrCipherNotConfigured = errors.New("credentials cipher is not configured")
 
 type CredentialsCipher interface {
 	Encrypt(plaintext []byte) ([]byte, error)
@@ -19,14 +16,13 @@ type CredentialsService struct {
 }
 
 func NewCredentialsService(cipher CredentialsCipher) *CredentialsService {
+	if cipher == nil {
+		panic("credentials cipher is required")
+	}
 	return &CredentialsService{cipher: cipher}
 }
 
 func (s *CredentialsService) EncryptForStorage(plaintext []byte) ([]byte, error) {
-	if s.cipher == nil {
-		return nil, ErrCipherNotConfigured
-	}
-
 	encrypted, err := s.cipher.Encrypt(plaintext)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt credentials: %w", err)
@@ -36,10 +32,6 @@ func (s *CredentialsService) EncryptForStorage(plaintext []byte) ([]byte, error)
 }
 
 func (s *CredentialsService) DecryptFromStorage(ciphertext []byte) ([]byte, error) {
-	if s.cipher == nil {
-		return nil, ErrCipherNotConfigured
-	}
-
 	plaintext, err := s.cipher.Decrypt(ciphertext)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt credentials: %w", err)
@@ -54,8 +46,7 @@ func (s *CredentialsService) SetEncryptedCredentials(account *domain.Connection,
 		return err
 	}
 
-	account.EncryptedCredentials = encrypted
-	return nil
+	return account.AssignEncryptedCredentials(encrypted)
 }
 
 func (s *CredentialsService) ReadDecryptedCredentials(account *domain.Connection) ([]byte, error) {

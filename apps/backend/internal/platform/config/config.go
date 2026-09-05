@@ -17,7 +17,6 @@ import (
 type Config struct {
 	AppEnv                        string    `json:"app_env"`
 	DeploymentTarget              string    `json:"deployment_target"`
-	DefaultTenantSlug             string    `json:"default_tenant_slug"`
 	Port                          string    `json:"port"`
 	DatabaseURL                   string    `json:"database_url"`
 	SQSQueueURL                   string    `json:"sqs_queue_url"`
@@ -71,15 +70,14 @@ func Load(ctx context.Context) (Config, error) {
 	cfg := Config{
 		AppEnv:                 getEnv("APP_ENV", "development"),
 		DeploymentTarget:       deploymentTarget,
-		DefaultTenantSlug:      getEnv("DEFAULT_TENANT_SLUG", "acme"),
 		Port:                   getEnv("PORT", "8080"),
 		AWSRegion:              getEnv("AWS_REGION", "us-east-1"),
 		AWSEndpointURL:         os.Getenv("AWS_ENDPOINT_URL"),
 		MinIOEndpointURL:       os.Getenv("MINIO_ENDPOINT_URL"),
 		RabbitMQURL:            os.Getenv("RABBITMQ_URL"),
 		S3PresignEndpointURL:   os.Getenv("S3_PRESIGN_ENDPOINT_URL"),
-		AWSAccessKeyID:         getEnv("AWS_ACCESS_KEY_ID", "test"),
-		AWSSecretAccessKey:     getEnv("AWS_SECRET_ACCESS_KEY", "test"),
+		AWSAccessKeyID:         os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey:     os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		AllowedOrigins:         getEnv("ALLOWED_ORIGINS", "https://app.bowerbird.dev,http://app.bowerbird.dev,http://localhost:4200"),
 		FrontendURL:            getEnv("FRONTEND_URL", "https://app.bowerbird.dev"),
 		BackendURL:             getEnv("BACKEND_URL", "https://api.bowerbird.dev"),
@@ -146,6 +144,9 @@ func Load(ctx context.Context) (Config, error) {
 	}
 	if cfg.DeploymentTarget == DeploymentTargetOnPrem && cfg.RabbitMQURL == "" {
 		panic("RABBITMQ_URL is required for onprem deployment")
+	}
+	if cfg.DeploymentTarget == DeploymentTargetOnPrem && (cfg.AWSAccessKeyID == "" || cfg.AWSSecretAccessKey == "") {
+		panic("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for onprem object storage")
 	}
 	if cfg.GeminiAPIKey == "" {
 		panic("GEMINI_API_KEY is required (from SSM or env)")

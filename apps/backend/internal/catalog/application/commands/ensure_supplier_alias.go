@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/bowerbird/internal/catalog/application/ports"
@@ -18,6 +17,9 @@ type EnsureSupplierAliasCommand struct {
 }
 
 func NewEnsureSupplierAliasCommand(aliases ports.AliasRepository) *EnsureSupplierAliasCommand {
+	if aliases == nil {
+		panic("alias repository is required")
+	}
 	return &EnsureSupplierAliasCommand{
 		aliases: aliases,
 		now:     time.Now,
@@ -26,9 +28,6 @@ func NewEnsureSupplierAliasCommand(aliases ports.AliasRepository) *EnsureSupplie
 }
 
 func (cmd *EnsureSupplierAliasCommand) Execute(ctx context.Context, partyID, code, itemID string) error {
-	if cmd.aliases == nil {
-		return fmt.Errorf("alias repository is required")
-	}
 	existing, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, partyID, code)
 	if err != nil {
 		return err

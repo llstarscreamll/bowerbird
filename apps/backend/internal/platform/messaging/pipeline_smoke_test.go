@@ -22,6 +22,7 @@ import (
 	awsbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/aws"
 	rabbitmq "github.com/bowerbird/internal/platform/outbox/relay/broker/rabbitmq"
 	"github.com/bowerbird/internal/platform/outbox/store"
+	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -152,7 +153,8 @@ func TestPipelineAWSSmoke(t *testing.T) {
 	transport := awsbroker.NewTransportWithClients(eb, sqsClient, "bus", "https://sqs.example/queue", smokeAttestationSecret)
 
 	r := relay.New(st, transport, relay.Config{BatchSize: 10})
-	require.NoError(t, r.RunOnce(context.Background()))
+	ctx := tenant.WithTenantID(context.Background(), "acme")
+	require.NoError(t, r.RunOnce(ctx))
 	require.Equal(t, store.StatusProcessed, st.status["evt-smoke-1"])
 	require.Equal(t, store.StatusProcessed, st.status["job-smoke-1"])
 	require.NotNil(t, eb.last)
@@ -324,12 +326,8 @@ func outboxDSN(t *testing.T) string {
 	if base == "" {
 		t.Skip("TEST_DATABASE_URL or DATABASE_URL required for on-prem pipeline smoke")
 	}
-	slug := os.Getenv("DEFAULT_TENANT_SLUG")
-	if slug == "" {
-		slug = "acme"
-	}
 	u, err := url.Parse(base)
 	require.NoError(t, err)
-	u.Path = "/tenant_" + strings.ReplaceAll(slug, "-", "_")
+	u.Path = "/tenant_acme"
 	return u.String()
 }

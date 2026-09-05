@@ -12,6 +12,9 @@ type ListInvoicesQuery struct {
 }
 
 func NewListInvoicesQuery(repo ports.InvoiceQueryRepository) *ListInvoicesQuery {
+	if repo == nil {
+		panic("invoice query repository is required")
+	}
 	return &ListInvoicesQuery{repo: repo}
 }
 

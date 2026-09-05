@@ -3,6 +3,7 @@ package sweeper
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/bowerbird/internal/platform/database"
@@ -15,16 +16,18 @@ import (
 const defaultOutboxRetention = 7 * 24 * time.Hour
 
 type Handler struct {
-	registry   *database.Registry
-	tenantSlug string
-	retention  time.Duration
+	registry  *database.Registry
+	retention time.Duration
 }
 
-func NewHandler(registry *database.Registry, tenantSlug string, retention time.Duration) *Handler {
+func NewHandler(registry *database.Registry, retention time.Duration) *Handler {
+	if registry == nil {
+		panic("tenant registry is required")
+	}
 	if retention <= 0 {
 		retention = defaultOutboxRetention
 	}
-	return &Handler{registry: registry, tenantSlug: tenantSlug, retention: retention}
+	return &Handler{registry: registry, retention: retention}
 }
 
 func (h *Handler) JobType() string {
@@ -32,9 +35,9 @@ func (h *Handler) JobType() string {
 }
 
 func (h *Handler) Handle(ctx context.Context, msg jobs.JobMessage) error {
-	slug := msg.TenantSlug
+	slug := strings.TrimSpace(msg.TenantSlug)
 	if slug == "" {
-		slug = h.tenantSlug
+		return tenant.ErrNoTenantIdInContext
 	}
 	tenantCtx := tenant.WithTenantID(ctx, slug)
 	pool, err := h.registry.GetPool(tenantCtx)

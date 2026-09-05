@@ -88,14 +88,16 @@ func (cmd *UpdateSecretCommand) Execute(ctx context.Context, input UpdateSecretI
 		if rotated {
 			auditAction = domain.AuditActionRotate
 		}
-		_ = cmd.repo.AppendAudit(ctx, domain.AuditEvent{
+		if err := cmd.repo.AppendAudit(ctx, domain.AuditEvent{
 			ID:          id.NewULID(),
 			SecretID:    &secretID,
 			Purpose:     existing.Purpose,
 			Action:      auditAction,
 			ActorUserID: input.ActorUserID,
 			CreatedAt:   existing.UpdatedAt,
-		})
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	existing.Ciphertext = nil

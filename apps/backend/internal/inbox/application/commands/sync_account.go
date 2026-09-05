@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	contractEvents "github.com/bowerbird/internal/contracts/events"
 	inboxMappers "github.com/bowerbird/internal/inbox/application/mappers"
 	"github.com/bowerbird/internal/inbox/domain"
@@ -31,7 +31,7 @@ type UnitOfWorkRunner interface {
 type SyncAccountCommand struct {
 	cursorRepo         domain.SyncCursorRepository
 	messageRepo        domain.MessageRepository
-	connectionsService connectionsApp.InternalService
+	connectionsService connectionsapi.InternalService
 	providerFactory    ProviderClientFactory
 	eventBus           platformEvents.EventBus
 	fileStore          platformStorage.FileStore
@@ -50,7 +50,7 @@ type SyncAccountCommandInput struct {
 func NewSyncAccountCommand(
 	cursorRepo domain.SyncCursorRepository,
 	messageRepo domain.MessageRepository,
-	connectionsService connectionsApp.InternalService,
+	connectionsService connectionsapi.InternalService,
 	providerFactory ProviderClientFactory,
 	eventBus platformEvents.EventBus,
 	fileStore platformStorage.FileStore,
@@ -119,10 +119,14 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 		err = classifySyncError(account, err)
 
 		cursor.MarkSyncFailed(err.Error())
-		_ = c.cursorRepo.UpsertSyncCursor(ctx, cursor)
+		if persistErr := c.cursorRepo.UpsertSyncCursor(ctx, cursor); persistErr != nil {
+			return fmt.Errorf("%w; persist sync cursor: %v", err, persistErr)
+		}
 
 		if shouldMarkRequiresReconnect(err) {
-			_ = c.connectionsService.MarkRequiresReconnect(ctx, account.ID, err.Error())
+			if markErr := c.connectionsService.MarkRequiresReconnect(ctx, account.ID, err.Error()); markErr != nil {
+				return fmt.Errorf("%w; mark requires reconnect: %v", err, markErr)
+			}
 		}
 
 		return err
@@ -131,14 +135,14 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 	return nil
 }
 
-func (c *SyncAccountCommand) resolveActiveAccount(ctx context.Context, accountID string) (connectionsApp.ConnectionInfo, error) {
+func (c *SyncAccountCommand) resolveActiveAccount(ctx context.Context, accountID string) (connectionsapi.ConnectionInfo, error) {
 	if accountID == "" {
-		return connectionsApp.ConnectionInfo{}, errors.New("account id is required")
+		return connectionsapi.ConnectionInfo{}, errors.New("account id is required")
 	}
 
 	accounts, err := c.connectionsService.GetActiveConnections(ctx)
 	if err != nil {
-		return connectionsApp.ConnectionInfo{}, fmt.Errorf("list active accounts: %w", err)
+		return connectionsapi.ConnectionInfo{}, fmt.Errorf("list active accounts: %w", err)
 	}
 
 	for _, account := range accounts {
@@ -147,7 +151,7 @@ func (c *SyncAccountCommand) resolveActiveAccount(ctx context.Context, accountID
 		}
 	}
 
-	return connectionsApp.ConnectionInfo{}, fmt.Errorf("active account not found: %s", accountID)
+	return connectionsapi.ConnectionInfo{}, fmt.Errorf("active account not found: %s", accountID)
 }
 
 func (c *SyncAccountCommand) ensureCursor(ctx context.Context, accountID string) (*domain.SyncCursor, error) {
@@ -172,7 +176,7 @@ func (c *SyncAccountCommand) ensureCursor(ctx context.Context, accountID string)
 	return cursor, nil
 }
 
-func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, account connectionsApp.ConnectionInfo, cursor *domain.SyncCursor) error {
+func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, account connectionsapi.ConnectionInfo, cursor *domain.SyncCursor) error {
 	credentialsJSON, err := c.connectionsService.DecryptCredentials(ctx, account.ID)
 	if err != nil {
 		return fmt.Errorf("decrypt account credentials: %w", err)
@@ -206,7 +210,7 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 func (c *SyncAccountCommand) processSingleMessage(
 	ctx context.Context,
 	tenantID string,
-	account connectionsApp.ConnectionInfo,
+	account connectionsapi.ConnectionInfo,
 	ref domain.MessageRef,
 	client domain.MailProviderClient,
 ) (retErr error) {
@@ -297,9 +301,6 @@ func (c *SyncAccountCommand) processSingleMessage(
 		return nil
 	}
 
-	if c.unitOfWork == nil {
-		return fmt.Errorf("unit of work is not configured")
-	}
 	return c.unitOfWork.Run(ctx, persist)
 }
 
@@ -456,7 +457,7 @@ func incrementalQuery(lastSyncedAt *time.Time) string {
 func (c *SyncAccountCommand) syncAccountFromList(
 	ctx context.Context,
 	tenantID string,
-	account connectionsApp.ConnectionInfo,
+	account connectionsapi.ConnectionInfo,
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
 ) error {
@@ -495,7 +496,7 @@ func (c *SyncAccountCommand) syncAccountFromList(
 func (c *SyncAccountCommand) syncAccountFromHistory(
 	ctx context.Context,
 	tenantID string,
-	account connectionsApp.ConnectionInfo,
+	account connectionsapi.ConnectionInfo,
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
 ) error {

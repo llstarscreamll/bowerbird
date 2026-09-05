@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	"github.com/bowerbird/internal/inbox/domain"
 	"github.com/bowerbird/internal/platform/id"
 	"github.com/bowerbird/internal/platform/tenant"
@@ -25,16 +25,25 @@ type SendMessageInput struct {
 
 type SendMessageCommand struct {
 	messageRepo        domain.MessageRepository
-	connectionsService connectionsApp.InternalService
+	connectionsService connectionsapi.InternalService
 	providerFactory    ProviderClientFactory
 	idGenerator        func() string
 }
 
 func NewSendMessageCommand(
 	messageRepo domain.MessageRepository,
-	connectionsService connectionsApp.InternalService,
+	connectionsService connectionsapi.InternalService,
 	providerFactory ProviderClientFactory,
 ) *SendMessageCommand {
+	if messageRepo == nil {
+		panic("message repository is required")
+	}
+	if connectionsService == nil {
+		panic("connections service is required")
+	}
+	if providerFactory == nil {
+		panic("provider factory is required")
+	}
 	return &SendMessageCommand{
 		messageRepo:        messageRepo,
 		connectionsService: connectionsService,

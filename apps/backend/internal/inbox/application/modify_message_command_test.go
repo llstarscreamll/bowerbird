@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
 	"github.com/bowerbird/internal/inbox/domain"
 	"github.com/bowerbird/internal/platform/tenant"
@@ -27,7 +27,7 @@ func TestModifyMessageCommand_ArchivesViaProvider(t *testing.T) {
 	require.NoError(t, err)
 	repo.messagesByID[message.ID()] = message
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{}
 	cmd := inboxCommands.NewModifyMessageCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient})
@@ -49,7 +49,7 @@ func TestSendMessageCommand_RequiresRecipient(t *testing.T) {
 func TestSendMessageCommand_PersistsSentCopy(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
-		activeConnections: []connectionsApp.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "me@gmail.com"}},
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "me@gmail.com"}},
 	}
 	providerClient := &fakeProviderClient{sendID: "gmail-sent-9"}
 	cmd := inboxCommands.NewSendMessageCommand(repo, connectionsSvc, &fakeProviderFactory{client: providerClient})

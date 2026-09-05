@@ -80,10 +80,16 @@ func (p *fakeProvisioner) SeedOwner(ctx context.Context, dbName string, owner do
 	return p.seedOwnerErr
 }
 
+type nopDefaultPack struct{}
+
+func (nopDefaultPack) ApplyDefaultPack(ctx context.Context, tenantID, actorUserID string) error {
+	return nil
+}
+
 func TestCreateTenantStartsProvisioningAndEndsActive(t *testing.T) {
 	repo := &fakeTenantRepo{}
 	provisioner := &fakeProvisioner{}
-	uc := NewCreateTenantUseCase(repo, provisioner)
+	uc := NewCreateTenantUseCase(repo, provisioner, nopDefaultPack{})
 
 	org, err := uc.Execute(context.Background(), CreateTenantCommand{
 		Name:           "Acme",
@@ -114,7 +120,7 @@ func TestCreateTenantStartsProvisioningAndEndsActive(t *testing.T) {
 func TestCreateTenantMarksFailedWhenProvisioningFails(t *testing.T) {
 	repo := &fakeTenantRepo{}
 	provisioner := &fakeProvisioner{createDatabaseErr: errors.New("db down")}
-	uc := NewCreateTenantUseCase(repo, provisioner)
+	uc := NewCreateTenantUseCase(repo, provisioner, nopDefaultPack{})
 
 	_, err := uc.Execute(context.Background(), CreateTenantCommand{
 		Name:           "Acme",

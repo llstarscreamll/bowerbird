@@ -14,6 +14,12 @@ type GetInvoiceByIDQuery struct {
 }
 
 func NewGetInvoiceByIDQuery(repo ports.InvoiceQueryRepository, catalog ports.CatalogService) *GetInvoiceByIDQuery {
+	if repo == nil {
+		panic("invoice query repository is required")
+	}
+	if catalog == nil {
+		panic("catalog service is required")
+	}
 	return &GetInvoiceByIDQuery{repo: repo, catalog: catalog}
 }
 
@@ -49,7 +55,7 @@ func (q *GetInvoiceByIDQuery) Execute(ctx context.Context, id string) (*InvoiceD
 }
 
 func (q *GetInvoiceByIDQuery) enrichSuggestionNames(ctx context.Context, lines []domain.InvoiceLineRecord) error {
-	if q.catalog == nil || len(lines) == 0 {
+	if len(lines) == 0 {
 		return nil
 	}
 
@@ -98,7 +104,7 @@ func (q *GetInvoiceByIDQuery) enrichSuggestionNames(ctx context.Context, lines [
 }
 
 func (q *GetInvoiceByIDQuery) enrichLinkedItemDisplays(ctx context.Context, lines []domain.InvoiceLineRecord) error {
-	if q.catalog == nil || len(lines) == 0 {
+	if len(lines) == 0 {
 		return nil
 	}
 

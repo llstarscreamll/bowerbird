@@ -73,7 +73,9 @@ Workers and the API use **Air** hot reload (`.air.toml`, `.air.worker-*.toml`).
 | Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint    | AWS S3                               |
 | Scheduler        | `internal/platform/scheduler`                  | In-process worker | EventBridge rules (where applicable) |
 
-Feature modules wire handlers in `wire.go`; `internal/platform/messaging.WireMessagingHandlers` registers shared consumer routes.
+Feature modules expose `RegisterEvents` and/or `RegisterJobs` on
+`wire.go`. `internal/platform/messaging.WireMessagingHandlers` calls
+those registrars and must not import feature adapters.
 
 ## Broker topology (onprem)
 

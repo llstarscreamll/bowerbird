@@ -3,18 +3,13 @@ package application
 import (
 	"context"
 
+	"github.com/bowerbird/internal/parties/api"
 	"github.com/bowerbird/internal/parties/application/commands"
 )
 
-// IssuerPartyLookup is the cross-context integration surface for invoice issuer resolution.
-type IssuerPartyLookup interface {
-	ResolveIssuerPartyID(ctx context.Context, taxID, name string) (partyID string, err error)
-}
-
-// NewIssuerPartyLookupFromApp builds the lookup from a wired Application.
-func NewIssuerPartyLookupFromApp(app *Application) IssuerPartyLookup {
+func NewIssuerPartyLookupFromApp(app *Application) api.IssuerPartyLookup {
 	if app == nil {
-		return NewIssuerPartyLookup(nil)
+		panic("parties application is required")
 	}
 	return NewIssuerPartyLookup(app.Commands.ResolveOrCreateFromIssuer)
 }
@@ -23,14 +18,14 @@ type issuerPartyLookup struct {
 	resolve *commands.ResolveOrCreateFromIssuerCommand
 }
 
-func NewIssuerPartyLookup(cmd *commands.ResolveOrCreateFromIssuerCommand) IssuerPartyLookup {
+func NewIssuerPartyLookup(cmd *commands.ResolveOrCreateFromIssuerCommand) api.IssuerPartyLookup {
+	if cmd == nil {
+		panic("resolve or create from issuer command is required")
+	}
 	return &issuerPartyLookup{resolve: cmd}
 }
 
 func (l *issuerPartyLookup) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
-	if l == nil || l.resolve == nil {
-		return "", nil
-	}
 	party, err := l.resolve.Execute(ctx, taxID, name)
 	if err != nil {
 		return "", err
@@ -40,3 +35,5 @@ func (l *issuerPartyLookup) ResolveIssuerPartyID(ctx context.Context, taxID, nam
 	}
 	return party.ID, nil
 }
+
+var _ api.IssuerPartyLookup = (*issuerPartyLookup)(nil)

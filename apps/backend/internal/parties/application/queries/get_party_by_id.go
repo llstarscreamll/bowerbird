@@ -13,6 +13,9 @@ type GetPartyByIDQuery struct {
 }
 
 func NewGetPartyByIDQuery(repo ports.PartyRepository) *GetPartyByIDQuery {
+	if repo == nil {
+		panic("party repository is required")
+	}
 	return &GetPartyByIDQuery{repo: repo}
 }
 

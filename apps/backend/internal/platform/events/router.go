@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/bowerbird/internal/platform/messaging/attestation"
@@ -17,6 +18,9 @@ type Router struct {
 }
 
 func NewRouter(verifier *attestation.Verifier, subscribers ...IntegrationEventHandler) Router {
+	if verifier == nil {
+		panic("attestation verifier is required")
+	}
 	routes := make(map[string]IntegrationEventHandler)
 	for _, subscriber := range subscribers {
 		if subscriber == nil {
@@ -28,16 +32,14 @@ func NewRouter(verifier *attestation.Verifier, subscribers ...IntegrationEventHa
 }
 
 func (r Router) HandleIntegrationEvent(ctx context.Context, event IntegrationEvent) error {
-	if r.verifier != nil {
-		if err := r.verifier.Verify(event.ID, event.TenantSlug, event.DetailType, event.TenantAttestation); err != nil {
-			return err
-		}
+	if strings.TrimSpace(event.TenantSlug) == "" {
+		return tenant.ErrNoTenantIdInContext
+	}
+	if err := r.verifier.Verify(event.ID, event.TenantSlug, event.DetailType, event.TenantAttestation); err != nil {
+		return err
 	}
 
-	msgCtx := ctx
-	if event.TenantSlug != "" {
-		msgCtx = tenant.WithTenantID(msgCtx, event.TenantSlug)
-	}
+	msgCtx := tenant.WithTenantID(ctx, event.TenantSlug)
 
 	if handler, ok := r.handlers[event.DetailType]; ok {
 		if err := handler.Handle(msgCtx, event); err != nil {

@@ -6,8 +6,8 @@ import (
 	"os"
 
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
+	identityModule "github.com/bowerbird/internal/identity"
 	"github.com/bowerbird/internal/identity/domain"
-	idinfra "github.com/bowerbird/internal/identity/infrastructure"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	tenantModule "github.com/bowerbird/internal/tenant"
@@ -42,7 +42,7 @@ func main() {
 	// Because the AddMembership requires a foreign key to users.id
 	dbRegistry := database.NewRegistry(pool, cfg.DatabaseURL)
 	defer dbRegistry.CloseAll()
-	idRepo := idinfra.NewPostgresRepository(pool, dbRegistry)
+	idRepo := identityModule.NewUserStore(pool, dbRegistry)
 
 	email := "admin@acme.com"
 	user, err := idRepo.FindUserByEmail(ctx, email)

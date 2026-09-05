@@ -12,6 +12,9 @@ type LeaveTenantCommand struct {
 }
 
 func NewLeaveTenantCommand(repo ports.Repository) *LeaveTenantCommand {
+	if repo == nil {
+		panic("identity repository is required")
+	}
 	return &LeaveTenantCommand{repo: repo}
 }
 

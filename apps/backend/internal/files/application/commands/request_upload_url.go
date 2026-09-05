@@ -30,14 +30,13 @@ type RequestUploadURLCommand struct {
 }
 
 func NewRequestUploadURLCommand(fileStore platformStorage.FileStore) *RequestUploadURLCommand {
+	if fileStore == nil {
+		panic("file store is required")
+	}
 	return &RequestUploadURLCommand{fileStore: fileStore}
 }
 
 func (cmd *RequestUploadURLCommand) Execute(ctx context.Context, input RequestUploadURLInput) (*platformStorage.PresignUploadResult, error) {
-	if cmd.fileStore == nil {
-		return nil, fmt.Errorf("file store is required")
-	}
-
 	tenantID, err := tenant.TenantIDFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant id from context: %w", err)

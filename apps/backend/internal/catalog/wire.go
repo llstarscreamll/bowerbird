@@ -6,6 +6,7 @@ import (
 	httpV1 "github.com/bowerbird/internal/catalog/adapters/http/v1"
 	"github.com/bowerbird/internal/catalog/adapters/matchers"
 	catalogRepo "github.com/bowerbird/internal/catalog/adapters/repository/postgres"
+	"github.com/bowerbird/internal/catalog/api"
 	"github.com/bowerbird/internal/catalog/application"
 	"github.com/bowerbird/internal/catalog/application/commands"
 	"github.com/bowerbird/internal/catalog/application/queries"
@@ -46,4 +47,8 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 		panic("catalog application is required")
 	}
 	httpV1.NewRouter(httpV1.NewController(app)).Register(mux, cfg, authMiddleware)
+}
+
+func NewInvoiceSupport(app *application.Application) api.InvoiceSupport {
+	return application.NewInvoiceSupport(app)
 }

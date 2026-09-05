@@ -6,7 +6,6 @@ import (
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
-	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	platformCrypto "github.com/bowerbird/internal/platform/crypto"
@@ -26,9 +25,11 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 	cfg := platformModule.Config
 	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
 
-	secretsCipher, _ := platformCrypto.NewAESCipherFromBase64Key(cfg.TenantSecretsEncryptionKey)
+	secretsCipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.TenantSecretsEncryptionKey)
+	if err != nil {
+		panic("tenant secrets cipher is required")
+	}
 	secretsApp := secretsModule.NewApplication(platformModule.TenantRegistry, secretsCipher)
-	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
 
 	partiesApp := partiesModule.NewApplication(platformModule.TenantRegistry)
 	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry)
@@ -39,14 +40,15 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 		platformModule.TaskQueue,
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
-		documentPasswordResolver,
-		invoiceLinking.NewPartyResolverAdapter(partiesModule.NewIssuerPartyLookup(partiesApp)),
-		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
-		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
-		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),
+		secretsModule.NewDocumentPasswordResolver(secretsApp),
+		catalogModule.NewInvoiceSupport(catalogApp),
+		partiesModule.NewIssuerPartyLookup(partiesApp),
 	)
 
-	cipher, _ := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+	if err != nil {
+		panic("inbox credentials cipher is required")
+	}
 	connectionsApp := connectionsModule.NewApplication(platformModule.TenantRegistry, cipher)
 	connectionsService := connectionsModule.NewInternalService(connectionsApp)
 
@@ -59,9 +61,11 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 		platformModule.TaskQueue,
 	)
 
-	invoiceEvents, invoiceJobs := invoicesModule.RegisterMessaging(invoicingApp)
-	inboxEvents, inboxJobs := inboxModule.RegisterMessaging(inboxApp, entitlementsApp, platformModule.TaskQueue)
-	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, cfg.DefaultTenantSlug, 0)
+	invoiceEvents := invoicesModule.RegisterEvents(invoicingApp)
+	invoiceJobs := invoicesModule.RegisterJobs(invoicingApp)
+	inboxEvents := inboxModule.RegisterEvents(entitlementsApp, platformModule.TaskQueue)
+	inboxJobs := inboxModule.RegisterJobs(inboxApp, entitlementsApp)
+	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, 0)
 
 	eventHandlers := append(append([]platformEvents.IntegrationEventHandler{}, invoiceEvents...), inboxEvents...)
 	jobHandlers := append(append(append([]platformJobs.JobHandler{}, invoiceJobs...), inboxJobs...), sweeper)

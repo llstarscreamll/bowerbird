@@ -18,6 +18,12 @@ type CreateItemCommand struct {
 }
 
 func NewCreateItemCommand(items ports.ItemRepository, write ports.CatalogWriteRepository) *CreateItemCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if write == nil {
+		panic("catalog write repository is required")
+	}
 	return &CreateItemCommand{items: items, write: write, now: time.Now, newID: id.NewULID}
 }
 

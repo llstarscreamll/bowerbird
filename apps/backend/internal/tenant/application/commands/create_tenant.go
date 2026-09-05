@@ -29,6 +29,15 @@ type CreateTenantCommand struct {
 }
 
 func NewCreateTenantCommand(repo ports.TenantRepository, provisioner ports.Provisioner, defaults ports.DefaultPackApplier) *CreateTenantCommand {
+	if repo == nil {
+		panic("tenant repository is required")
+	}
+	if provisioner == nil {
+		panic("tenant provisioner is required")
+	}
+	if defaults == nil {
+		panic("default pack applier is required")
+	}
 	return &CreateTenantCommand{repo: repo, provisioner: provisioner, defaults: defaults}
 }
 
@@ -89,10 +98,8 @@ func (cmd *CreateTenantCommand) Execute(ctx context.Context, input CreateTenantI
 	}
 	org.Status = domain.StatusActive
 
-	if cmd.defaults != nil {
-		if err := cmd.defaults.ApplyDefaultPack(ctx, org.ID, input.OwnerID); err != nil {
-			return nil, fmt.Errorf("failed to apply default entitlements: %w", err)
-		}
+	if err := cmd.defaults.ApplyDefaultPack(ctx, org.ID, input.OwnerID); err != nil {
+		return nil, fmt.Errorf("failed to apply default entitlements: %w", err)
 	}
 
 	return org, nil

@@ -17,6 +17,9 @@ type IdentityService struct {
 }
 
 func NewIdentityService(repo ports.Repository, operatorEmails []string) *IdentityService {
+	if repo == nil {
+		panic("identity repository is required")
+	}
 	return &IdentityService{
 		repo:            repo,
 		operatorEmails:  operatorEmails,

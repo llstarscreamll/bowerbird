@@ -16,8 +16,8 @@ type CreateTenantUseCase struct {
 	command *commands.CreateTenantCommand
 }
 
-func NewCreateTenantUseCase(repo ports.TenantRepository, provisioner ports.Provisioner) *CreateTenantUseCase {
-	return &CreateTenantUseCase{command: commands.NewCreateTenantCommand(repo, provisioner, nil)}
+func NewCreateTenantUseCase(repo ports.TenantRepository, provisioner ports.Provisioner, defaults ports.DefaultPackApplier) *CreateTenantUseCase {
+	return &CreateTenantUseCase{command: commands.NewCreateTenantCommand(repo, provisioner, defaults)}
 }
 
 func NewCreateTenantUseCaseFromCommand(command *commands.CreateTenantCommand) *CreateTenantUseCase {

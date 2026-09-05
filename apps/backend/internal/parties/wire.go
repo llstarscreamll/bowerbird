@@ -5,6 +5,7 @@ import (
 
 	httpV1 "github.com/bowerbird/internal/parties/adapters/http/v1"
 	partiesRepo "github.com/bowerbird/internal/parties/adapters/repository/postgres"
+	"github.com/bowerbird/internal/parties/api"
 	"github.com/bowerbird/internal/parties/application"
 	"github.com/bowerbird/internal/parties/application/commands"
 	"github.com/bowerbird/internal/parties/application/queries"
@@ -41,6 +42,6 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	httpV1.NewRouter(controller).Register(mux, cfg, authMiddleware)
 }
 
-func NewIssuerPartyLookup(app *application.Application) application.IssuerPartyLookup {
+func NewIssuerPartyLookup(app *application.Application) api.IssuerPartyLookup {
 	return application.NewIssuerPartyLookupFromApp(app)
 }

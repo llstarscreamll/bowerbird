@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	entitlementsDomain "github.com/bowerbird/internal/entitlements/domain"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
 	inboxCommands "github.com/bowerbird/internal/inbox/application/commands"
 	"github.com/bowerbird/internal/inbox/application/ports"
 	inboxQueries "github.com/bowerbird/internal/inbox/application/queries"
@@ -26,7 +26,7 @@ type Controller struct {
 	modifyMessageCommand       *inboxCommands.ModifyMessageCommand
 	sendMessageCommand         *inboxCommands.SendMessageCommand
 	downloadAttachmentCommand  *inboxCommands.DownloadAttachmentCommand
-	features                   ports.FeatureChecker
+	features                   entitlementsapi.Features
 }
 
 func NewController(
@@ -37,8 +37,11 @@ func NewController(
 	modifyMessageCommand *inboxCommands.ModifyMessageCommand,
 	sendMessageCommand *inboxCommands.SendMessageCommand,
 	downloadAttachmentCommand *inboxCommands.DownloadAttachmentCommand,
-	features ports.FeatureChecker,
+	features entitlementsapi.Features,
 ) *Controller {
+	if features == nil {
+		panic("feature checker is required")
+	}
 	return &Controller{
 		listAccountSyncStatusQuery: listAccountHealthUseCase,
 		listMessagesUseCase:        listMessagesUseCase,
@@ -52,24 +55,15 @@ func NewController(
 }
 
 func (c *Controller) requireMailInbox(ctx context.Context) error {
-	if c.features == nil {
-		return nil
-	}
-	return c.features.Require(ctx, entitlementsDomain.FeatureMailInbox)
+	return c.features.Require(ctx, entitlementsapi.FeatureMailInbox)
 }
 
 func (c *Controller) requireMailSend(ctx context.Context) error {
-	if c.features == nil {
-		return nil
-	}
-	return c.features.Require(ctx, entitlementsDomain.FeatureMailSend)
+	return c.features.Require(ctx, entitlementsapi.FeatureMailSend)
 }
 
 func (c *Controller) requireSyncAccess(ctx context.Context) error {
-	if c.features == nil {
-		return nil
-	}
-	return c.features.RequireAny(ctx, entitlementsDomain.FeatureMailInbox, entitlementsDomain.FeatureInvoicingCaptureFromEmail)
+	return c.features.RequireAny(ctx, entitlementsapi.FeatureMailInbox, entitlementsapi.FeatureInvoicingCaptureFromEmail)
 }
 
 func (c *Controller) Sync(w http.ResponseWriter, r *http.Request) error {

@@ -12,14 +12,12 @@ import (
 
 	catalogModule "github.com/bowerbird/internal/catalog"
 	connectionsModule "github.com/bowerbird/internal/connections"
-	connectionsApp "github.com/bowerbird/internal/connections/application"
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	filesModule "github.com/bowerbird/internal/files"
 	"github.com/bowerbird/internal/health"
 	identityModule "github.com/bowerbird/internal/identity"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
-	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	"github.com/bowerbird/internal/platform/auth"
@@ -60,10 +58,7 @@ func main() {
 	identityModule.NewHTTPHandler(mux, identityApp, pool, tenantsDbRegistry, authMiddleware, cfg)
 
 	entitlementsApp := entitlementsModule.NewApplication(pool)
-	entitlementsModule.NewHTTPHandler(mux, entitlementsApp, identityApp, pool, authMiddleware, cfg)
 
-	// Setup Organization Context
-	// Provide the root directory for migrations relative to the running binary (or use an env var)
 	migrationsDir := os.Getenv("TENANT_MIGRATIONS_DIR")
 	if migrationsDir == "" {
 		migrationsDir = "migrations/tenant"
@@ -73,6 +68,14 @@ func main() {
 	}
 	organizationApp := tenantModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsApp)
 	tenantModule.NewHTTPHandler(mux, organizationApp, authMiddleware, cfg)
+	entitlementsModule.NewHTTPHandler(
+		mux,
+		entitlementsApp,
+		identityModule.NewOperatorDirectory(identityApp),
+		tenantModule.NewDirectory(organizationApp),
+		authMiddleware,
+		cfg,
+	)
 
 	if cfg.S3BucketName != "" {
 		filesApp := filesModule.NewApplication(platformModule.FileStore)
@@ -83,21 +86,13 @@ func main() {
 
 	var connectionsEventBus events.EventBus = platformModule.EventBus
 
-	// Setup Connections Context
-	var connectionsService connectionsApp.InternalService
-	if cfg.InboxCredentialsEncryptionKey != "" {
-		cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
-		if err != nil {
-			log.Fatalf("new cipher failed: %v", err)
-		}
-		connectionsApp := connectionsModule.NewApplication(tenantsDbRegistry, cipher)
-		connectionsService = connectionsModule.NewInternalService(connectionsApp)
-		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, cipher, tokenGen, cipher, connectionsEventBus, authMiddleware, entitlementsApp)
-	} else {
-		connectionsApp := connectionsModule.NewApplication(tenantsDbRegistry, nil)
-		connectionsService = connectionsModule.NewInternalService(connectionsApp)
-		connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, nil, tokenGen, nil, connectionsEventBus, authMiddleware, entitlementsApp)
+	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+	if err != nil {
+		log.Fatalf("new cipher failed: %v", err)
 	}
+	connectionsApp := connectionsModule.NewApplication(tenantsDbRegistry, cipher)
+	connectionsService := connectionsModule.NewInternalService(connectionsApp)
+	connectionsModule.NewHTTPHandler(mux, cfg, tenantsDbRegistry, cipher, tokenGen, cipher, connectionsEventBus, authMiddleware, entitlementsApp)
 
 	// Setup Inbox Context
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" && cfg.S3BucketName == "" {
@@ -123,7 +118,6 @@ func main() {
 	}
 	secretsApp := secretsModule.NewApplication(tenantsDbRegistry, secretsCipher)
 	secretsModule.NewHTTPHandler(mux, secretsApp, rbacService, authMiddleware, cfg)
-	documentPasswordResolver := invoicesModule.NewSecretsPasswordAdapter(secretsModule.NewDocumentPasswordResolver(secretsApp))
 
 	partiesApp := partiesModule.NewApplication(tenantsDbRegistry)
 	partiesModule.NewHTTPHandler(mux, partiesApp, authMiddleware, cfg)
@@ -136,11 +130,9 @@ func main() {
 		platformModule.TaskQueue,
 		platformModule.FileStore,
 		tenantsDbRegistry,
-		documentPasswordResolver,
-		invoiceLinking.NewPartyResolverAdapter(partiesModule.NewIssuerPartyLookup(partiesApp)),
-		invoiceLinking.NewCatalogResolverAdapter(catalogApp),
-		invoiceLinking.NewCatalogNamesAdapter(catalogApp),
-		invoiceLinking.NewCatalogMatchingAdapter(catalogApp),
+		secretsModule.NewDocumentPasswordResolver(secretsApp),
+		catalogModule.NewInvoiceSupport(catalogApp),
+		partiesModule.NewIssuerPartyLookup(partiesApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

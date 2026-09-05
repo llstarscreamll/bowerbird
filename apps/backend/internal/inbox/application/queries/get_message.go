@@ -46,6 +46,9 @@ type GetMessageQuery struct {
 }
 
 func NewGetMessageQuery(repo ports.MessageQueryRepository) *GetMessageQuery {
+	if repo == nil {
+		panic("message query repository is required")
+	}
 	return &GetMessageQuery{repo: repo}
 }
 

@@ -5,22 +5,25 @@ import (
 	"fmt"
 	"net/http"
 
+	catalogapi "github.com/bowerbird/internal/catalog/api"
 	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	invoicingLLM "github.com/bowerbird/internal/invoices/adapters/extractors/llm"
 	invoicingXML "github.com/bowerbird/internal/invoices/adapters/extractors/xml"
 	httpV1 "github.com/bowerbird/internal/invoices/adapters/http/v1"
 	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
+	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	invoicingRepo "github.com/bowerbird/internal/invoices/adapters/repository/postgres"
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
 	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/application/queries"
+	partiesapi "github.com/bowerbird/internal/parties/api"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
-	secretsModule "github.com/bowerbird/internal/secrets"
+	secretsapi "github.com/bowerbird/internal/secrets/api"
 )
 
 func NewApplication(
@@ -29,11 +32,9 @@ func NewApplication(
 	jobQueue jobs.TaskQueue,
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
-	passwordResolver ports.DocumentPasswordResolver,
-	partyResolver ports.IssuerPartyResolver,
-	lineResolver ports.CatalogLineResolver,
-	catalogService ports.CatalogService,
-	catalogMatching ports.CatalogMatchingPort,
+	passwords secretsapi.DocumentPasswordResolver,
+	catalog catalogapi.InvoiceSupport,
+	parties partiesapi.IssuerPartyLookup,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -50,6 +51,19 @@ func NewApplication(
 	if cfg.GeminiAPIKey == "" {
 		panic("gemini api key is required")
 	}
+	if passwords == nil {
+		panic("document password resolver is required")
+	}
+	if catalog == nil {
+		panic("catalog invoice support is required")
+	}
+	if parties == nil {
+		panic("issuer party lookup is required")
+	}
+
+	passwordResolver := newSecretsPasswordAdapter(passwords)
+	partyResolver := invoiceLinking.NewPartyResolverAdapter(parties)
+	catalogACL := invoiceLinking.NewCatalogACL(catalog)
 
 	invoiceRepository := invoicingRepo.NewRepository(registry)
 	xmlExtractor := invoicingXML.NewDianUBL21Parser()
@@ -63,7 +77,7 @@ func NewApplication(
 		panic(fmt.Sprintf("new Gemini invoice extractor failed: %v", err))
 	}
 
-	createInvoice := commands.NewCreateInvoiceCommand(invoiceRepository, partyResolver, lineResolver)
+	createInvoice := commands.NewCreateInvoiceCommand(invoiceRepository, partyResolver, catalogACL)
 
 	return &application.Application{
 		Commands: application.Commands{
@@ -78,12 +92,12 @@ func NewApplication(
 				createInvoice,
 			),
 			CreateInvoice:     createInvoice,
-			ApplyLineDecision: commands.NewApplyLineDecisionCommand(invoiceRepository, catalogMatching),
+			ApplyLineDecision: commands.NewApplyLineDecisionCommand(invoiceRepository, catalogACL),
 		},
 		Queries: application.Queries{
-			GetInvoiceByID:  queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogService),
+			GetInvoiceByID:  queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogACL),
 			ListInvoices:    queries.NewListInvoicesQuery(invoiceRepository),
-			ListReviewQueue: queries.NewListReviewQueueQuery(invoiceRepository, catalogService),
+			ListReviewQueue: queries.NewListReviewQueueQuery(invoiceRepository, catalogACL),
 		},
 	}
 }
@@ -104,26 +118,29 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	return handler
 }
 
-// RegisterMessaging wires invoices integration event and job handlers for the messaging composition root.
-func RegisterMessaging(app *application.Application) ([]events.IntegrationEventHandler, []jobs.JobHandler) {
+func RegisterEvents(app *application.Application) []events.IntegrationEventHandler {
 	if app == nil {
 		panic("invoicing application is required")
 	}
 	return []events.IntegrationEventHandler{
-			invoicesEvents.NewInboxMessageReceivedSubscriber(app.Commands.CreateInvoicesFromInboxMessage),
-		}, []jobs.JobHandler{
-			invoicesJobs.NewInvoiceExtractionRequestedProcessor(app.Commands.ProcessInvoiceExtractionJob),
-		}
+		invoicesEvents.NewInboxMessageReceivedSubscriber(app.Commands.CreateInvoicesFromInboxMessage),
+	}
+}
+
+func RegisterJobs(app *application.Application) []jobs.JobHandler {
+	if app == nil {
+		panic("invoicing application is required")
+	}
+	return []jobs.JobHandler{
+		invoicesJobs.NewInvoiceExtractionRequestedProcessor(app.Commands.ProcessInvoiceExtractionJob),
+	}
 }
 
 type secretsPasswordAdapter struct {
-	inner *secretsModule.DocumentPasswordResolver
+	inner secretsapi.DocumentPasswordResolver
 }
 
-func NewSecretsPasswordAdapter(resolver *secretsModule.DocumentPasswordResolver) ports.DocumentPasswordResolver {
-	if resolver == nil {
-		return nil
-	}
+func newSecretsPasswordAdapter(resolver secretsapi.DocumentPasswordResolver) ports.DocumentPasswordResolver {
 	return &secretsPasswordAdapter{inner: resolver}
 }
 

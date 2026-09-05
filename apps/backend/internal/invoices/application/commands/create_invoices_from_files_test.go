@@ -120,13 +120,39 @@ func (e *createFilesLLMExtractorStub) ExtractFromPDF(ctx context.Context, pdfDat
 	return e.invoice, nil
 }
 
+type nopPasswordResolver struct{}
+
+func (nopPasswordResolver) ResolveCandidates(context.Context) ([]ports.PasswordCandidate, error) {
+	return nil, nil
+}
+
+func (nopPasswordResolver) MarkUsed(context.Context, string) error {
+	return nil
+}
+
+func newTestCreateInvoicesFromFilesCommand(
+	store platformStorage.FileStore,
+	xmlExtractor ports.InvoiceXMLExtractor,
+	llmExtractor ports.InvoiceLLMExtractor,
+	repo ports.InvoiceRepository,
+) *CreateInvoicesFromFilesCommand {
+	return NewCreateInvoicesFromFilesCommand(
+		store,
+		xmlExtractor,
+		llmExtractor,
+		repo,
+		nopPasswordResolver{},
+		NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{}),
+	)
+}
+
 func TestCreateInvoicesFromFilesSkipsAlreadyProcessedSource(t *testing.T) {
 	store := &createFilesStoreStub{data: map[string][]byte{"k1": []byte("zipdata")}}
 	xmlExtractor := &createFilesXMLExtractorStub{}
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{alreadyProcessed: true}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "inbox-message",
@@ -145,7 +171,7 @@ func TestCreateInvoicesFromFilesSkipsUnsupportedInputFiles(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -165,7 +191,7 @@ func TestCreateInvoicesFromFilesProcessesZipAndPersistsInvoice(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -192,7 +218,7 @@ func TestCreateInvoicesFromFilesSkipsPDFWhenXMLInZipSucceeds(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -216,7 +242,7 @@ func TestCreateInvoicesFromFilesFallsBackToPDFWhenXMLInZipFails(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -240,7 +266,7 @@ func TestCreateInvoicesFromFilesSkipsPDFWhenSingleXMLAndPDFHaveDifferentNames(t 
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -264,7 +290,7 @@ func TestCreateInvoicesFromFilesSkipsPDFWhenXMLInZipSkippedByCUFE(t *testing.T) 
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{cufeExists: true}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -286,7 +312,7 @@ func TestCreateInvoicesFromFilesNormalizesXMLRawDataToJSON(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	cmd.create.newID = func() string { return "id_1" }
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
@@ -312,7 +338,7 @@ func TestCreateInvoicesFromFilesSkipsZipWithoutSupportedFiles(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{}
 	repo := &createFilesRepoStub{}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",
@@ -332,7 +358,7 @@ func TestCreateInvoicesFromFilesSkipsWhenCUFEAlreadyExists(t *testing.T) {
 	llmExtractor := &createFilesLLMExtractorStub{invoice: validInvoiceDoc("CUFE-LLM")}
 	repo := &createFilesRepoStub{cufeExists: true}
 
-	cmd := NewCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo, nil, NewCreateInvoiceCommand(repo, nil, nil))
+	cmd := newTestCreateInvoicesFromFilesCommand(store, xmlExtractor, llmExtractor, repo)
 	err := cmd.Execute(context.Background(), contractJobs.ExtractInvoicesFromFilesJob{
 		ID:         "job-1",
 		SourceName: "files-uploaded-by-user",

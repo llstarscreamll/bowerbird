@@ -191,6 +191,9 @@ func (s *stubMatcher) Match(ctx context.Context, description string) ([]domain.S
 }
 
 func newResolveCmd(store *catalogStore, memories *memMemories, matcher ports.SoftMatcher) *ResolveInvoiceLineCommand {
+	if matcher == nil {
+		matcher = &stubMatcher{}
+	}
 	cmd := NewResolveInvoiceLineCommand(store, store, store, memories, matcher)
 	n := 0
 	cmd.newID = func() string {

@@ -15,6 +15,9 @@ type UpdatePartyCommand struct {
 }
 
 func NewUpdatePartyCommand(repo ports.PartyRepository) *UpdatePartyCommand {
+	if repo == nil {
+		panic("party repository is required")
+	}
 	return &UpdatePartyCommand{repo: repo, now: time.Now}
 }
 

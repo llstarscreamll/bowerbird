@@ -14,8 +14,12 @@ See [Outbox relay](./outbox-relay.md) for the full pipeline and [Runtime profile
 | Publish events | `EventBus` → `OutboxEventPublisher` → `outbox_events` |
 | Enqueue jobs   | `TaskQueue` → `OutboxTaskQueue` → `outbox_jobs`       |
 | Relay          | `internal/platform/outbox/relay` → broker adapter     |
-| Handle events  | `IntegrationEventHandler` in consumers / Lambdas      |
-| Handle jobs    | `JobHandler` in consumers / Lambdas                   |
+| Handle events  | `RegisterEvents` on the owning module `wire.go`       |
+| Handle jobs    | `RegisterJobs` on the owning module `wire.go`         |
+
+`internal/platform/messaging.WireMessagingHandlers` calls those
+registrars. It must not import feature `adapters/`. Split event and
+job registration; do not bundle them in one `RegisterMessaging`.
 
 ## Decision guide
 

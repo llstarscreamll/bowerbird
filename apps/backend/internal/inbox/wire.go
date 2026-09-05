@@ -3,7 +3,9 @@ package inbox
 import (
 	"net/http"
 
-	connectionsApp "github.com/bowerbird/internal/connections/application"
+	connectionsapi "github.com/bowerbird/internal/connections/api"
+	entitlementsapi "github.com/bowerbird/internal/entitlements/api"
+	eventsV1 "github.com/bowerbird/internal/inbox/adapters/events"
 	httpV1 "github.com/bowerbird/internal/inbox/adapters/http/v1"
 	inboxJobs "github.com/bowerbird/internal/inbox/adapters/jobs"
 	"github.com/bowerbird/internal/inbox/adapters/provider"
@@ -12,9 +14,7 @@ import (
 	inboxRepo "github.com/bowerbird/internal/inbox/adapters/repository/postgres"
 	"github.com/bowerbird/internal/inbox/application"
 	"github.com/bowerbird/internal/inbox/application/commands"
-	inboxPorts "github.com/bowerbird/internal/inbox/application/ports"
 	"github.com/bowerbird/internal/inbox/application/queries"
-	eventsV1 "github.com/bowerbird/internal/inbox/presentation/events"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
@@ -24,7 +24,7 @@ import (
 
 func NewApplication(
 	cfg config.Config,
-	connectionsService connectionsApp.InternalService,
+	connectionsService connectionsapi.InternalService,
 	eventBus events.EventBus,
 	fileStore platformStorage.FileStore,
 	registry *database.Registry,
@@ -35,6 +35,9 @@ func NewApplication(
 	}
 	if registry == nil {
 		panic("database registry is required")
+	}
+	if jobQueue == nil {
+		panic("job queue is required")
 	}
 
 	inboxRepository := inboxRepo.NewPostgresRepository(registry)
@@ -79,13 +82,10 @@ func NewApplication(
 		sendMessageCommand = commands.NewSendMessageCommand(inboxRepository, connectionsService, providerFactory)
 		downloadAttachmentCommand = commands.NewDownloadAttachmentCommand(inboxRepository, fileStore)
 
-		var dispatcher commands.SyncAccountJobDispatcher
-		if jobQueue != nil {
-			dispatcher = commands.NewOutboxSyncAccountJobDispatcher(jobQueue)
-		} else {
-			dispatcher = commands.NewInlineSyncAccountJobDispatcher(syncAccountCommand)
-		}
-		syncAllAccountsCommand = commands.NewSyncAllAccountsCommand(connectionsService, dispatcher)
+		syncAllAccountsCommand = commands.NewSyncAllAccountsCommand(
+			connectionsService,
+			commands.NewOutboxSyncAccountJobDispatcher(jobQueue),
+		)
 	}
 
 	return &application.Application{
@@ -104,12 +104,15 @@ func NewApplication(
 	}
 }
 
-func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddleware func(http.Handler) http.Handler, cfg config.Config, features inboxPorts.FeatureChecker) *httpV1.Router {
+func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddleware func(http.Handler) http.Handler, cfg config.Config, features entitlementsapi.Features) *httpV1.Router {
 	if mux == nil {
 		panic("http mux is required")
 	}
 	if app == nil {
 		panic("inbox application is required")
+	}
+	if features == nil {
+		panic("feature checker is required")
 	}
 
 	controller := httpV1.NewController(
@@ -127,26 +130,37 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	return handler
 }
 
-// RegisterMessaging wires inbox integration event and job handlers for the messaging composition root.
-func RegisterMessaging(
-	app *application.Application,
-	features inboxPorts.FeatureChecker,
+func RegisterEvents(
+	features entitlementsapi.Features,
 	taskQueue jobs.TaskQueue,
-) ([]events.IntegrationEventHandler, []jobs.JobHandler) {
+) []events.IntegrationEventHandler {
+	if features == nil {
+		panic("feature checker is required")
+	}
+	if taskQueue == nil {
+		panic("job queue is required")
+	}
+
+	return []events.IntegrationEventHandler{
+		eventsV1.NewConnectionAddedSubscriber(
+			commands.NewOutboxSyncAccountJobDispatcher(taskQueue),
+			features,
+		),
+	}
+}
+
+func RegisterJobs(
+	app *application.Application,
+	features entitlementsapi.Features,
+) []jobs.JobHandler {
 	if app == nil {
 		panic("inbox application is required")
 	}
-
-	var eventHandlers []events.IntegrationEventHandler
-	if taskQueue != nil {
-		eventHandlers = append(eventHandlers, eventsV1.NewConnectionAddedSubscriber(
-			commands.NewOutboxSyncAccountJobDispatcher(taskQueue),
-			features,
-		))
+	if features == nil {
+		panic("feature checker is required")
 	}
 
-	jobHandlers := []jobs.JobHandler{
+	return []jobs.JobHandler{
 		inboxJobs.NewProcessInboxSyncAccount(app.Commands.SyncAccount, features),
 	}
-	return eventHandlers, jobHandlers
 }

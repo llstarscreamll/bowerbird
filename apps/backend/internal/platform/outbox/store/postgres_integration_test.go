@@ -23,13 +23,9 @@ func outboxDSN(t *testing.T) string {
 	if base == "" {
 		t.Skip("TEST_DATABASE_URL or DATABASE_URL required")
 	}
-	slug := os.Getenv("DEFAULT_TENANT_SLUG")
-	if slug == "" {
-		slug = "acme"
-	}
 	u, err := url.Parse(base)
 	require.NoError(t, err)
-	u.Path = "/tenant_" + strings.ReplaceAll(slug, "-", "_")
+	u.Path = "/tenant_acme"
 	return u.String()
 }
 

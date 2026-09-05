@@ -20,6 +20,15 @@ type UpdateItemCommand struct {
 }
 
 func NewUpdateItemCommand(items ports.ItemRepository, aliases ports.AliasRepository, write ports.CatalogWriteRepository) *UpdateItemCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
+	if write == nil {
+		panic("catalog write repository is required")
+	}
 	return &UpdateItemCommand{items: items, aliases: aliases, write: write, now: time.Now, newID: id.NewULID}
 }
 

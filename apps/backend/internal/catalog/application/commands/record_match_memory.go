@@ -3,7 +3,6 @@ package commands
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/bowerbird/internal/catalog/application/ports"
@@ -19,6 +18,9 @@ type RecordMatchMemoryCommand struct {
 }
 
 func NewRecordMatchMemoryCommand(memories ports.MatchMemoryRepository) *RecordMatchMemoryCommand {
+	if memories == nil {
+		panic("match memory repository is required")
+	}
 	return &RecordMatchMemoryCommand{
 		memories: memories,
 		now:      time.Now,
@@ -35,9 +37,6 @@ type RecordMatchMemoryInput struct {
 }
 
 func (cmd *RecordMatchMemoryCommand) Execute(ctx context.Context, input RecordMatchMemoryInput) error {
-	if cmd.memories == nil {
-		return fmt.Errorf("match memory repository is required")
-	}
 	mem, err := domain.NewMatchMemory(cmd.newID(), input.PartyID, input.ItemCode, input.Description, input.Action, input.ItemID, cmd.now())
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidMemoryAction) {

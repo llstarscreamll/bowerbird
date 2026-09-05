@@ -9,8 +9,7 @@ import (
 	"github.com/bowerbird/internal/platform/config"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
-	rbacApp "github.com/bowerbird/internal/rbac/application"
-	rbacDomain "github.com/bowerbird/internal/rbac/domain"
+	rbacapi "github.com/bowerbird/internal/rbac/api"
 	"github.com/bowerbird/internal/secrets/application"
 	"github.com/bowerbird/internal/secrets/application/commands"
 	"github.com/bowerbird/internal/secrets/domain"
@@ -18,10 +17,10 @@ import (
 
 type Controller struct {
 	app  *application.Application
-	rbac *rbacApp.Service
+	rbac rbacapi.Authorizer
 }
 
-func NewController(app *application.Application, rbac *rbacApp.Service) *Controller {
+func NewController(app *application.Application, rbac rbacapi.Authorizer) *Controller {
 	if app == nil {
 		panic("secrets application is required")
 	}
@@ -82,7 +81,7 @@ type updateSecretRequest struct {
 }
 
 func (c *Controller) ListSecrets(w http.ResponseWriter, r *http.Request) error {
-	if err := c.rbac.RequirePermission(r.Context(), rbacDomain.PermissionSecretsRead); err != nil {
+	if err := c.rbac.RequirePermission(r.Context(), rbacapi.PermissionSecretsRead); err != nil {
 		return err
 	}
 
@@ -100,7 +99,7 @@ func (c *Controller) ListSecrets(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (c *Controller) GetSecret(w http.ResponseWriter, r *http.Request) error {
-	if err := c.rbac.RequirePermission(r.Context(), rbacDomain.PermissionSecretsRead); err != nil {
+	if err := c.rbac.RequirePermission(r.Context(), rbacapi.PermissionSecretsRead); err != nil {
 		return err
 	}
 
@@ -112,7 +111,7 @@ func (c *Controller) GetSecret(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (c *Controller) CreateSecret(w http.ResponseWriter, r *http.Request) error {
-	if err := c.rbac.RequirePermission(r.Context(), rbacDomain.PermissionSecretsWrite); err != nil {
+	if err := c.rbac.RequirePermission(r.Context(), rbacapi.PermissionSecretsWrite); err != nil {
 		return err
 	}
 
@@ -144,7 +143,7 @@ func (c *Controller) CreateSecret(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (c *Controller) UpdateSecret(w http.ResponseWriter, r *http.Request) error {
-	if err := c.rbac.RequirePermission(r.Context(), rbacDomain.PermissionSecretsWrite); err != nil {
+	if err := c.rbac.RequirePermission(r.Context(), rbacapi.PermissionSecretsWrite); err != nil {
 		return err
 	}
 
@@ -175,7 +174,7 @@ func (c *Controller) UpdateSecret(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (c *Controller) DeleteSecret(w http.ResponseWriter, r *http.Request) error {
-	if err := c.rbac.RequirePermission(r.Context(), rbacDomain.PermissionSecretsDelete); err != nil {
+	if err := c.rbac.RequirePermission(r.Context(), rbacapi.PermissionSecretsDelete); err != nil {
 		return err
 	}
 

@@ -13,6 +13,7 @@ import (
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 	outboxPublisher "github.com/bowerbird/internal/platform/outbox/publisher"
+	"github.com/bowerbird/internal/platform/outbox/relay"
 	outboxStore "github.com/bowerbird/internal/platform/outbox/store"
 	"github.com/bowerbird/internal/platform/scheduler"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -55,7 +56,7 @@ func NewModule(ctx context.Context) (*Dependencies, error) {
 		EventBus:       outboxPublisher.NewOutboxEventPublisher(outbox),
 		TaskQueue:      outboxPublisher.NewOutboxTaskQueue(outbox),
 	}
-	deps.Scheduler = scheduler.NewOutboxScheduler(deps.TaskQueue, time.Hour)
+	deps.Scheduler = scheduler.NewOutboxScheduler(deps.TaskQueue, relay.NewControlPlaneTenantLister(controlDB), time.Hour)
 
 	switch cfg.DeploymentTarget {
 	case config.DeploymentTargetAWS:

@@ -67,13 +67,11 @@ func TestCredentialsServiceSetAndReadOnConnection(t *testing.T) {
 	}
 }
 
-func TestCredentialsServiceFailsWhenCipherNotConfigured(t *testing.T) {
-	svc := NewCredentialsService(nil)
-	if _, err := svc.EncryptForStorage([]byte("x")); err == nil {
-		t.Fatal("expected error when cipher is not configured")
-	}
-
-	if _, err := svc.DecryptFromStorage([]byte("x")); err == nil {
-		t.Fatal("expected error when cipher is not configured")
-	}
+func TestCredentialsServicePanicsWhenCipherMissing(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic when cipher is missing")
+		}
+	}()
+	NewCredentialsService(nil)
 }

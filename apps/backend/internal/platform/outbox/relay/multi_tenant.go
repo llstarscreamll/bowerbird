@@ -10,13 +10,13 @@ import (
 	"github.com/bowerbird/internal/platform/outbox/relay/broker"
 	"github.com/bowerbird/internal/platform/outbox/store"
 	"github.com/bowerbird/internal/platform/tenant"
-	tenantDomain "github.com/bowerbird/internal/tenant/domain"
+	tenantapi "github.com/bowerbird/internal/tenant/api"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TenantLister returns slugs of tenants whose outbox should be relayed.
+// TenantLister returns slugs of active tenants.
 type TenantLister interface {
-	ListRelayTenantSlugs(ctx context.Context) ([]string, error)
+	ListActiveTenantSlugs(ctx context.Context) ([]string, error)
 }
 
 // ControlPlaneTenantLister lists active tenants from the control-plane database.
@@ -31,10 +31,10 @@ func NewControlPlaneTenantLister(pool *pgxpool.Pool) *ControlPlaneTenantLister {
 	return &ControlPlaneTenantLister{pool: pool}
 }
 
-func (l *ControlPlaneTenantLister) ListRelayTenantSlugs(ctx context.Context) ([]string, error) {
+func (l *ControlPlaneTenantLister) ListActiveTenantSlugs(ctx context.Context) ([]string, error) {
 	rows, err := l.pool.Query(ctx, `
 		SELECT slug FROM tenants WHERE status = $1 ORDER BY slug
-	`, tenantDomain.StatusActive)
+	`, tenantapi.StatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("list active tenants: %w", err)
 	}
@@ -69,7 +69,7 @@ func NewMultiTenantRelay(registry *database.Registry, lister TenantLister, trans
 }
 
 func (m *MultiTenantRelay) RunOnce(ctx context.Context) error {
-	slugs, err := m.lister.ListRelayTenantSlugs(ctx)
+	slugs, err := m.lister.ListActiveTenantSlugs(ctx)
 	if err != nil {
 		return err
 	}
