@@ -8,54 +8,6 @@ import (
 	"github.com/bowerbird/internal/secrets/domain"
 )
 
-type ListSecretsQuery struct {
-	repo ports.SecretRepository
-}
-
-func NewListSecretsQuery(repo ports.SecretRepository) *ListSecretsQuery {
-	if repo == nil {
-		panic("secret repository is required")
-	}
-	return &ListSecretsQuery{repo: repo}
-}
-
-func (q *ListSecretsQuery) Execute(ctx context.Context, purpose string) ([]domain.Secret, error) {
-	secrets, err := q.repo.List(ctx, domain.NormalizePurpose(purpose))
-	if err != nil {
-		return nil, err
-	}
-	for i := range secrets {
-		secrets[i].Ciphertext = nil
-	}
-	return secrets, nil
-}
-
-type GetSecretByIDQuery struct {
-	repo ports.SecretRepository
-}
-
-func NewGetSecretByIDQuery(repo ports.SecretRepository) *GetSecretByIDQuery {
-	if repo == nil {
-		panic("secret repository is required")
-	}
-	return &GetSecretByIDQuery{repo: repo}
-}
-
-func (q *GetSecretByIDQuery) Execute(ctx context.Context, id string) (*domain.Secret, error) {
-	if id == "" {
-		return nil, appErrors.New(appErrors.CodeValidation, "secret id is required")
-	}
-	secret, err := q.repo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if secret == nil {
-		return nil, appErrors.New(appErrors.CodeNotFound, "secret not found")
-	}
-	secret.Ciphertext = nil
-	return secret, nil
-}
-
 type ResolveByPurposeQuery struct {
 	repo   ports.SecretRepository
 	cipher ports.SecretCipher
