@@ -73,7 +73,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/onprem/Dockerfile
-    command: ['./bin/worker', 'relay']
+    command: ['./bin/relay']
     env_file: .env
     depends_on:
       api:
@@ -83,7 +83,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/onprem/Dockerfile
-    command: ['./bin/worker', 'events']
+    command: ['./bin/events-consumer']
     env_file: .env
     depends_on:
       api:
@@ -93,7 +93,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/onprem/Dockerfile
-    command: ['./bin/worker', 'jobs']
+    command: ['./bin/jobs-consumer']
     env_file: .env
     environment:
       BOWERBIRD_WORK_TEMP_DIR: /var/lib/bowerbird/work-tmp
@@ -107,7 +107,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/onprem/Dockerfile
-    command: ['./bin/worker', 'scheduler']
+    command: ['./bin/scheduler']
     env_file: .env
     depends_on:
       api:

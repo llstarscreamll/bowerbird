@@ -35,7 +35,7 @@ Relay iterates **all active tenants** from the control-plane on every profile (o
 
 | Profile        | Events                    | Jobs                   |
 | -------------- | ------------------------- | ---------------------- |
-| onprem / local | `worker events` (AMQP)    | `worker jobs` (AMQP)   |
+| onprem / local | `events-consumer` (AMQP)  | `jobs-consumer` (AMQP) |
 | aws            | Lambda `events-processor` | Lambda `sqs-processor` |
 
 Handlers are shared via `internal/platform/messaging.WireMessagingHandlers`.

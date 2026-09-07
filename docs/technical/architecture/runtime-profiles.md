@@ -41,13 +41,13 @@ There is **no LocalStack** and **no Redis** in the local stack.
 
 ### On-prem / local dev
 
-| Process         | Entrypoint             | Dev runner                                   |
-| --------------- | ---------------------- | -------------------------------------------- |
-| HTTP API        | `cmd/api`              | `pnpm --filter @bowerbird/backend dev` (Air) |
-| Outbox relay    | `cmd/worker relay`     | `dev:relay`                                  |
-| Events consumer | `cmd/worker events`    | `dev:events-consumer`                        |
-| Jobs consumer   | `cmd/worker jobs`      | `dev:jobs-consumer`                          |
-| Scheduler       | `cmd/worker scheduler` | `dev:scheduler`                              |
+| Process         | Entrypoint            | Dev runner                                   |
+| --------------- | --------------------- | -------------------------------------------- |
+| HTTP API        | `cmd/api`             | `pnpm --filter @bowerbird/backend dev` (Air) |
+| Outbox relay    | `cmd/relay`           | `dev:relay`                                  |
+| Events consumer | `cmd/events-consumer` | `dev:events-consumer`                        |
+| Jobs consumer   | `cmd/jobs-consumer`   | `dev:jobs-consumer`                          |
+| Scheduler       | `cmd/scheduler`       | `dev:scheduler`                              |
 
 Root `pnpm run dev` starts infra, API, all four workers, and the PWA via Turbo.
 

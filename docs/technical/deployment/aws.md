@@ -13,7 +13,9 @@ Outbox flow: API → RDS outbox → `outbox-relay` Lambda → EventBridge / SQS 
 
 ### Future: relay on Fargate
 
-Replace the scheduled `outbox-relay` Lambda with a long-running Fargate task executing `worker relay` for lower latency and simpler batching. EventBridge/SQS consumers and broker contracts stay unchanged.
+Replace the scheduled `outbox-relay` Lambda with a long-running Fargate
+task executing the `relay` binary for lower latency and simpler
+batching. EventBridge/SQS consumers and broker contracts stay unchanged.
 
 ## Domains
 

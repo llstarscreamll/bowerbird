@@ -2,9 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/worker-scheduler ./cmd/worker"
-bin = "./tmp/worker-scheduler"
-args_bin = ["scheduler"]
+cmd = "go build -o ./tmp/scheduler ./cmd/scheduler"
+bin = "./tmp/scheduler"
 delay = 1000
 exclude_dir = ["bin", "tmp", "vendor", "testdata", "node_modules"]
 exclude_regex = ["_test.go"]

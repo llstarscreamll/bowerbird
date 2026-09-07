@@ -29,7 +29,7 @@
 ## Backend (`apps/backend`)
 
 - API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
-- Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
+- Worker entrypoints: `cmd/relay`, `cmd/events-consumer`, `cmd/jobs-consumer`, `cmd/scheduler`. Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
 - Feature architecture: every bounded context is `internal/<bc>/` with this public surface:
   - `wire.go`: only Go facade other packages import (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`, `RegisterJobs`, OHS constructors). Host (`cmd/*`, `platform/messaging`) imports the module root only.
   - `api/`: Open Host Service (interfaces + DTOs) for other BCs. No `application` imports.

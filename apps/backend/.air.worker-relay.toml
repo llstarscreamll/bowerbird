@@ -2,9 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/worker-relay ./cmd/worker"
-bin = "./tmp/worker-relay"
-args_bin = ["relay"]
+cmd = "go build -o ./tmp/relay ./cmd/relay"
+bin = "./tmp/relay"
 delay = 1000
 exclude_dir = ["bin", "tmp", "vendor", "testdata", "node_modules"]
 exclude_regex = ["_test.go"]

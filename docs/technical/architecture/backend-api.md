@@ -77,18 +77,20 @@ Dependency direction inside a module: `adapters → application →
 domain`. `api/` is implemented by `application/` and consumed by
 other modules' adapters.
 
-Wire features in `cmd/api/main.go`, `cmd/worker/main.go`, and Lambda
-entrypoints — not inside domain or application.
+Wire features in `cmd/api/main.go`, the worker binaries
+(`cmd/relay`, `cmd/events-consumer`, `cmd/jobs-consumer`,
+`cmd/scheduler`), and Lambda entrypoints — not inside domain or
+application.
 
 ## Entrypoints
 
 | Binary                    | Role                                      |
 | ------------------------- | ----------------------------------------- |
 | `cmd/api`                 | HTTP API                                  |
-| `cmd/worker relay`        | Drains outbox → broker                    |
-| `cmd/worker events`       | Integration event handlers                |
-| `cmd/worker jobs`         | Background job handlers                   |
-| `cmd/worker scheduler`    | Periodic job enqueue (e.g. inbox sweeper) |
+| `cmd/relay`               | Drains outbox → broker                    |
+| `cmd/events-consumer`     | Integration event handlers                |
+| `cmd/jobs-consumer`       | Background job handlers                   |
+| `cmd/scheduler`           | Periodic job enqueue (e.g. inbox sweeper) |
 | `cmd/lambda/outbox-relay` | AWS relay (scheduled)                     |
 | `cmd/lambda/eventbridge`  | AWS events consumer                       |
 | `cmd/lambda/sqs`          | AWS jobs consumer                         |
