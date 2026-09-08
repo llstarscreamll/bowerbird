@@ -54,20 +54,24 @@ export class PlatformApiClient {
     }
 
     const body = await response.text();
-    throw new Error(`Failed to register local user. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`);
+    throw new Error(`POST /api/v1/auth/register-local failed: HTTP ${response.status()} at ${this.apiBaseUrl}. body=${body}`);
   }
 
-  async loginLocalOrFail(credentials: LocalUserCredentials): Promise<AuthSession> {
-    const response = await this.request.post(`${this.apiBaseUrl}/api/v1/auth/login-local`, {
+  loginLocal(credentials: LocalUserCredentials): Promise<APIResponse> {
+    return this.request.post(`${this.apiBaseUrl}/api/v1/auth/login-local`, {
       data: {
         email: credentials.email,
         password: credentials.password,
       },
     });
+  }
+
+  async loginLocalOrFail(credentials: LocalUserCredentials): Promise<AuthSession> {
+    const response = await this.loginLocal(credentials);
 
     if (!response.ok()) {
       const body = await response.text();
-      throw new Error(`Failed to login local user. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`);
+      throw new Error(`POST /api/v1/auth/login-local failed: HTTP ${response.status()} at ${this.apiBaseUrl}. body=${body}`);
     }
 
     const payload = (await response.json()) as LoginLocalResponse;
@@ -76,12 +80,12 @@ export class PlatformApiClient {
     };
   }
 
-  async createOrganizationOrFail(auth: AuthSession, input: { name: string; slug: string }): Promise<TenantContext> {
-    const response = await this.createOrganization(auth, input);
+  async createTenantOrFail(auth: AuthSession, input: { name: string; slug: string }): Promise<TenantContext> {
+    const response = await this.createTenant(auth, input);
 
     if (!response.ok()) {
       const body = await response.text();
-      throw new Error(`Failed to create organization. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`);
+      throw new Error(`POST /api/v1/tenants failed: HTTP ${response.status()} at ${this.apiBaseUrl}. body=${body}`);
     }
 
     const payload = (await response.json()) as OrganizationSummary;
@@ -91,8 +95,8 @@ export class PlatformApiClient {
     };
   }
 
-  createOrganization(auth: AuthSession, input: { name: string; slug: string }): Promise<APIResponse> {
-    return this.request.post(`${this.apiBaseUrl}/api/v1/organizations`, {
+  createTenant(auth: AuthSession, input: { name: string; slug: string }): Promise<APIResponse> {
+    return this.request.post(`${this.apiBaseUrl}/api/v1/tenants`, {
       headers: {
         Authorization: `Bearer ${auth.accessToken}`,
       },
@@ -103,8 +107,8 @@ export class PlatformApiClient {
     });
   }
 
-  getOrganization(auth: AuthSession, organizationId: string): Promise<APIResponse> {
-    return this.request.get(`${this.apiBaseUrl}/api/v1/organizations/${encodeURIComponent(organizationId)}`, {
+  getTenant(auth: AuthSession, tenantId: string): Promise<APIResponse> {
+    return this.request.get(`${this.apiBaseUrl}/api/v1/tenants/${encodeURIComponent(tenantId)}`, {
       headers: {
         Authorization: `Bearer ${auth.accessToken}`,
       },
@@ -115,7 +119,7 @@ export class PlatformApiClient {
     const response = await this.listConnections(auth, tenant, traceId);
     if (!response.ok()) {
       const body = await response.text();
-      throw new Error(`Failed to list connections. status=${response.status()} baseUrl=${this.apiBaseUrl} body=${body}`);
+      throw new Error(`GET /api/v1/connections failed: HTTP ${response.status()} at ${this.apiBaseUrl}. body=${body}`);
     }
 
     return (await response.json()) as ConnectionListResponse;
@@ -156,6 +160,45 @@ export class PlatformApiClient {
     return this.request.post(`${this.apiBaseUrl}/api/v1/inbox/messages`, {
       headers: this.authHeaders(auth, tenant, traceId),
       data: payload,
+    });
+  }
+
+  call(
+    path: string,
+    init: {
+      method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+      auth?: AuthSession;
+      token?: string;
+      tenant?: TenantContext;
+      tenantIdHeader?: string;
+      data?: unknown;
+      rawBody?: string;
+      contentType?: string;
+      traceId?: string;
+    } = {},
+  ): Promise<APIResponse> {
+    const headers: Record<string, string> = {};
+    if (init.token) {
+      headers.Authorization = `Bearer ${init.token}`;
+    } else if (init.auth) {
+      headers.Authorization = `Bearer ${init.auth.accessToken}`;
+    }
+    if (init.tenantIdHeader !== undefined) {
+      headers['X-Tenant-ID'] = init.tenantIdHeader;
+    } else if (init.tenant) {
+      headers['X-Tenant-ID'] = init.tenant.tenantSlug;
+    }
+    if (init.contentType) {
+      headers['Content-Type'] = init.contentType;
+    }
+    if (init.traceId) {
+      headers['sentry-trace'] = init.traceId;
+    }
+
+    return this.request.fetch(`${this.apiBaseUrl}${path}`, {
+      method: init.method ?? 'GET',
+      headers,
+      ...(init.rawBody !== undefined ? { data: init.rawBody } : init.data !== undefined ? { data: init.data } : {}),
     });
   }
 

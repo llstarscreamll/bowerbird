@@ -38,6 +38,7 @@ export default defineConfig({
     {
       name: 'http',
       testMatch: 'http/**/*.spec.ts',
+      workers: 1,
     },
   ],
 });

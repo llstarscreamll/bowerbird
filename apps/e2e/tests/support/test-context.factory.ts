@@ -4,6 +4,7 @@ import type { AuthSession, PlatformApiClient, TenantContext } from './platform-a
 export type AuthenticatedTenantContext = {
   auth: AuthSession;
   tenant: TenantContext;
+  user: LocalUserCredentials;
 };
 
 export async function bootstrapAuthenticatedTenantContext(newUser: LocalUserCredentials, platformApi: PlatformApiClient): Promise<AuthenticatedTenantContext> {
@@ -11,10 +12,10 @@ export async function bootstrapAuthenticatedTenantContext(newUser: LocalUserCred
   const auth = await platformApi.loginLocalOrFail(newUser);
 
   const randomId = Date.now();
-  const tenant = await platformApi.createOrganizationOrFail(auth, {
+  const tenant = await platformApi.createTenantOrFail(auth, {
     name: `E2E Inbox ${randomId}`,
     slug: `e2e-inbox-${randomId}`,
   });
 
-  return { auth, tenant };
+  return { auth, tenant, user: newUser };
 }
