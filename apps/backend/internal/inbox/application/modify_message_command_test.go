@@ -39,6 +39,15 @@ func TestModifyMessageCommand_ArchivesViaProvider(t *testing.T) {
 	assert.Equal(t, domain.MailFolderArchive, repo.messagesByID["msg-1"].Folder())
 }
 
+func TestModifyMessageCommand_RejectsUnknownActionBeforeLookup(t *testing.T) {
+	repo := newFakeInboxRepo()
+	cmd := inboxCommands.NewModifyMessageCommand(repo, &fakeConnectionsInternalService{}, &fakeProviderFactory{client: &fakeProviderClient{}})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	err := cmd.Execute(ctx, "missing", inboxCommands.MessageAction("explode"))
+	require.ErrorIs(t, err, inboxCommands.ErrInvalidMessageAction)
+}
+
 func TestSendMessageCommand_RequiresRecipient(t *testing.T) {
 	cmd := inboxCommands.NewSendMessageCommand(newFakeInboxRepo(), &fakeConnectionsInternalService{}, &fakeProviderFactory{client: &fakeProviderClient{}})
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")

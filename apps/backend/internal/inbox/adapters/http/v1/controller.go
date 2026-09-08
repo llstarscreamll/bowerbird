@@ -177,9 +177,16 @@ func (c *Controller) ModifyMessage(w http.ResponseWriter, r *http.Request) error
 		return appErrors.New(appErrors.CodeValidation, "message id is required")
 	}
 
+	if !inboxCommands.IsValidMessageAction(action) {
+		return appErrors.New(appErrors.CodeValidation, "invalid message action")
+	}
+
 	if err := c.modifyMessageCommand.Execute(r.Context(), messageID, action); err != nil {
 		if errors.Is(err, domain.ErrInboxMessageNotFound) {
 			return appErrors.Wrap(err, appErrors.CodeNotFound, "message not found")
+		}
+		if errors.Is(err, inboxCommands.ErrInvalidMessageAction) {
+			return appErrors.Wrap(err, appErrors.CodeValidation, "invalid message action")
 		}
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to modify message")
 	}

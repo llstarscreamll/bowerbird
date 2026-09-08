@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,6 +21,17 @@ const (
 	MessageActionArchive MessageAction = "archive"
 	MessageActionTrash   MessageAction = "trash"
 )
+
+var ErrInvalidMessageAction = errors.New("unsupported message action")
+
+func IsValidMessageAction(action MessageAction) bool {
+	switch action {
+	case MessageActionRead, MessageActionUnread, MessageActionStar, MessageActionUnstar, MessageActionArchive, MessageActionTrash:
+		return true
+	default:
+		return false
+	}
+}
 
 type ModifyMessageCommand struct {
 	messageRepo        domain.MessageRepository
@@ -51,6 +63,10 @@ func NewModifyMessageCommand(
 func (c *ModifyMessageCommand) Execute(ctx context.Context, messageID string, action MessageAction) error {
 	if _, err := tenant.TenantIDFromContext(ctx); err != nil {
 		return err
+	}
+
+	if !IsValidMessageAction(action) {
+		return fmt.Errorf("%w: %s", ErrInvalidMessageAction, action)
 	}
 
 	message, err := c.messageRepo.GetInboxMessageByID(ctx, messageID)
@@ -101,7 +117,7 @@ func (c *ModifyMessageCommand) Execute(ctx context.Context, messageID string, ac
 		}
 		message.MoveToTrash(now)
 	default:
-		return fmt.Errorf("unsupported message action %q", action)
+		return fmt.Errorf("%w: %s", ErrInvalidMessageAction, action)
 	}
 
 	return c.messageRepo.UpdateInboxMessageFlags(ctx, message)
