@@ -61,6 +61,17 @@ test.describe(OPERATION, () => {
     }
   });
 
+  test('404 si review-queue ya no existe', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth, tenant } = sharedTenant;
+
+    // when
+    const response = await platformApi.call('/api/v1/catalog/review-queue', { auth, tenant });
+
+    // then
+    await expectStatus(response, 404, 'GET /api/v1/catalog/review-queue');
+  });
+
   test('401 sin token', async ({ sharedTenant, platformApi }) => {
     // given
     const { tenant } = sharedTenant;

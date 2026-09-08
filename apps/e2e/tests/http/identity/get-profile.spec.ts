@@ -24,6 +24,21 @@ test.describe(OPERATION, () => {
     expect(payload.platform_operator, `${OPERATION}: platform_operator`).toBe(false);
   });
 
+  test('403 si X-Tenant-ID es de otro tenant', async ({ sharedTenant, foreignTenant, platformApi }) => {
+    // given
+
+    // when
+    const response = await platformApi.call('/api/v1/identity/me', {
+      auth: sharedTenant.auth,
+      tenant: foreignTenant.tenant,
+    });
+
+    // then
+    await expectStatus(response, 403, OPERATION);
+    const payload = await readJson<{ errors: Array<{ code?: string }> }>(response, OPERATION);
+    expect(payload.errors[0].code, `${OPERATION}: errors[0].code`).toBe('ERR_FORBIDDEN');
+  });
+
   test('401 sin token', async ({ platformApi }) => {
     // given
 

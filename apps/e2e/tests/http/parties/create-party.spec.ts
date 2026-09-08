@@ -83,6 +83,22 @@ test.describe(OPERATION, () => {
     await expectStatus(response, 400, OPERATION);
   });
 
+  test('400 si roles está vacío', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth, tenant } = sharedTenant;
+
+    // when
+    const response = await platformApi.call('/api/v1/parties', {
+      method: 'POST',
+      auth,
+      tenant,
+      data: { data: { attributes: { name: 'No roles', tax_id: `907${Date.now()}`, roles: [] } } },
+    });
+
+    // then
+    await expectStatus(response, 400, OPERATION);
+  });
+
   test('400 si falta tax id', async ({ sharedTenant, platformApi }) => {
     // given
     const { auth, tenant } = sharedTenant;

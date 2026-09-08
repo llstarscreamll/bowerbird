@@ -31,4 +31,32 @@ test.describe(OPERATION, () => {
     const payload = await readJson<{ data: { attributes: { name: string } } }>(response, OPERATION);
     expect(payload.data.attributes.name, `${OPERATION}: name`).toBe(name);
   });
+
+  test('ignora un tax_id distinto en el patch', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth, tenant } = sharedTenant;
+    const taxId = `905${Date.now()}`;
+    const created = await platformApi.call('/api/v1/parties', {
+      method: 'POST',
+      auth,
+      tenant,
+      data: { data: { attributes: { name: `Keep tax ${Date.now()}`, tax_id: taxId, roles: ['supplier'] } } },
+    });
+    await expectStatus(created, 201, 'POST /api/v1/parties');
+    const createdBody = await readJson<{ data: { id: string } }>(created, 'POST /api/v1/parties');
+
+    // when
+    const response = await platformApi.call(`/api/v1/parties/${createdBody.data.id}`, {
+      method: 'PATCH',
+      auth,
+      tenant,
+      data: { data: { attributes: { name: 'Renamed', tax_id: `999${Date.now()}` } } },
+    });
+
+    // then
+    await expectStatus(response, 200, OPERATION);
+    const payload = await readJson<{ data: { attributes: { tax_id: string; name: string } } }>(response, OPERATION);
+    expect(payload.data.attributes.tax_id, `${OPERATION}: tax_id must stay immutable`).toBe(taxId);
+    expect(payload.data.attributes.name, `${OPERATION}: name`).toBe('Renamed');
+  });
 });

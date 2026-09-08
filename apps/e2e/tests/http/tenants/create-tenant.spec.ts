@@ -67,6 +67,34 @@ test.describe(OPERATION, () => {
     await expectStatus(response, 401, OPERATION);
   });
 
+  test('400 si falta el nombre', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth } = sharedTenant;
+
+    // when
+    const response = await platformApi.createTenant(auth, {
+      name: '',
+      slug: `e2e-missing-name-${Date.now()}`,
+    });
+
+    // then
+    await expectStatus(response, 400, OPERATION);
+  });
+
+  test('400 si falta el slug', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth } = sharedTenant;
+
+    // when
+    const response = await platformApi.createTenant(auth, {
+      name: 'Missing slug',
+      slug: '',
+    });
+
+    // then
+    await expectStatus(response, 400, OPERATION);
+  });
+
   test('rechaza slug malicioso', async ({ sharedTenant, platformApi }) => {
     // given
     const { auth } = sharedTenant;

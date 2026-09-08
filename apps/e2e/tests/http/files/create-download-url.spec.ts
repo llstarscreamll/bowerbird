@@ -5,6 +5,22 @@ import { expectClientError, expectStatus, readJson } from '../../support/http-as
 const OPERATION = 'POST /api/v1/files/downloads/presigned';
 
 test.describe(OPERATION, () => {
+  test('400 si falta la key', async ({ sharedTenant, platformApi }) => {
+    // given
+    const { auth, tenant } = sharedTenant;
+
+    // when
+    const response = await platformApi.call('/api/v1/files/downloads/presigned', {
+      method: 'POST',
+      auth,
+      tenant,
+      data: { key: '' },
+    });
+
+    // then
+    await expectStatus(response, 400, OPERATION);
+  });
+
   test('404 si el archivo no existe', async ({ sharedTenant, platformApi }) => {
     // given
     const { auth, tenant } = sharedTenant;
