@@ -96,3 +96,21 @@ func TestQueueInvoiceExtractionRequestDocumentValidateAcceptsTextXML(t *testing.
 		t.Fatalf("expected valid request, got error: %v", err)
 	}
 }
+
+func TestQueueInvoiceExtractionRequestDocumentValidateRejectsPathTraversal(t *testing.T) {
+	req := queueInvoiceExtractionRequestDocument{
+		Data: jsonApiDocument[queueInvoiceExtractionRequestDataAttrs]{
+			ID:   testULID,
+			Type: queueInvoiceExtractionDataType,
+			Attributes: queueInvoiceExtractionRequestDataAttrs{
+				Files: []file{
+					{Name: "invoice.pdf", Path: "../../etc/passwd.pdf", MimeType: "application/pdf"},
+				},
+			},
+		},
+	}
+
+	if err := req.Validate(); err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+}

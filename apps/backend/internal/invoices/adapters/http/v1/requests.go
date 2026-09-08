@@ -83,6 +83,10 @@ func (r file) Validate() error {
 		return fmt.Errorf("path is required")
 	}
 
+	if err := validateObjectPath(r.Path); err != nil {
+		return fmt.Errorf("path: %w", err)
+	}
+
 	fileType, err := mimeTypeToFileType(r.MimeType)
 	if err != nil {
 		return err
@@ -112,6 +116,27 @@ func mimeTypeToFileType(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("mime_type must be one of: application/zip, application/xml, text/xml, application/pdf")
 	}
+}
+
+func validateObjectPath(value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fmt.Errorf("is required")
+	}
+	if strings.Contains(trimmed, `\`) || strings.ContainsRune(trimmed, 0) {
+		return fmt.Errorf("must not contain path traversal")
+	}
+	if path.IsAbs(trimmed) || strings.HasPrefix(trimmed, "/") {
+		return fmt.Errorf("must be a relative object path")
+	}
+	if strings.Contains(trimmed, "..") {
+		return fmt.Errorf("must not contain path traversal")
+	}
+	cleaned := path.Clean("/" + trimmed)
+	if cleaned == "/" || strings.Contains(cleaned, "..") {
+		return fmt.Errorf("must not contain path traversal")
+	}
+	return nil
 }
 
 func validateFileExtensionMatchesType(value, expectedType string) error {
