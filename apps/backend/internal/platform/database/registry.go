@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/bowerbird/internal/platform/auth"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -99,28 +100,39 @@ func (r *Registry) GetPoolByDBName(ctx context.Context, dbName string) (*pgxpool
 	return newPool, nil
 }
 
+// AssertMember returns ERR_FORBIDDEN when the user is not an active member of the tenant.
+func (r *Registry) AssertMember(ctx context.Context, identifier, userID string) error {
+	_, err := r.lookupMemberDatabase(ctx, identifier, userID)
+	return err
+}
+
+func (r *Registry) lookupMemberDatabase(ctx context.Context, identifier, userID string) (string, error) {
+	var dbName string
+	query := `
+		SELECT t.db_name
+		FROM tenants t
+		INNER JOIN tenant_memberships m
+			ON m.tenant_id = t.id
+			AND m.user_id = $2
+			AND m.deleted_at IS NULL
+		WHERE (t.id = $1 OR t.slug = $1) AND t.status = 'active'
+	`
+	err := r.controlDB.QueryRow(ctx, query, identifier, userID).Scan(&dbName)
+	if err != nil {
+		return "", appErrors.New(appErrors.CodeForbidden, "tenant access denied")
+	}
+	return dbName, nil
+}
+
 // resolveTenantDatabase looks up the database name for a given tenant identifier (ID or slug).
 // When the request carries authenticated user claims, membership is required (blocks cross-tenant IDOR).
 // Background workers set tenant context without claims and keep the unrestricted lookup.
 func (r *Registry) resolveTenantDatabase(ctx context.Context, identifier string) (string, error) {
-	var dbName string
 	if claims, ok := auth.ClaimsFromContext(ctx); ok {
-		query := `
-			SELECT t.db_name
-			FROM tenants t
-			INNER JOIN tenant_memberships m
-				ON m.tenant_id = t.id
-				AND m.user_id = $2
-				AND m.deleted_at IS NULL
-			WHERE (t.id = $1 OR t.slug = $1) AND t.status = 'active'
-		`
-		err := r.controlDB.QueryRow(ctx, query, identifier, claims.UserID).Scan(&dbName)
-		if err != nil {
-			return "", fmt.Errorf("tenant access denied: %w", err)
-		}
-		return dbName, nil
+		return r.lookupMemberDatabase(ctx, identifier, claims.UserID)
 	}
 
+	var dbName string
 	query := `SELECT db_name FROM tenants WHERE (id = $1 OR slug = $1) AND status = 'active'`
 	err := r.controlDB.QueryRow(ctx, query, identifier).Scan(&dbName)
 	if err != nil {

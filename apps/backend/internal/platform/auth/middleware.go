@@ -45,6 +45,10 @@ func ClaimsFromContext(ctx context.Context) (*CustomClaims, bool) {
 	return claims, ok
 }
 
+func WithClaims(ctx context.Context, claims *CustomClaims) context.Context {
+	return context.WithValue(ctx, userContextKey, claims)
+}
+
 func writeUnauthorized(w http.ResponseWriter, r *http.Request) {
 	api.RespondWithError(w, r, appErrors.New(appErrors.CodeUnauthorized, "unauthorized"), false)
 }

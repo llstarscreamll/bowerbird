@@ -52,7 +52,9 @@ func main() {
 
 	// Setup Auth & Identity
 	tokenGen := auth.NewTokenGenerator(cfg.JWT.AccessSecret, cfg.JWT.RefreshSecret, cfg.JWT.AccessTTL, cfg.JWT.RefreshTTL)
-	authMiddleware := auth.Middleware(tokenGen)
+	authMiddleware := func(next http.Handler) http.Handler {
+		return auth.Middleware(tokenGen)(tenant.RequireMembership(tenantsDbRegistry, cfg.Debug)(next))
+	}
 
 	identityApp := identityModule.NewApplication(cfg, pool, tenantsDbRegistry, tokenGen)
 	identityModule.NewHTTPHandler(mux, identityApp, pool, tenantsDbRegistry, authMiddleware, cfg)
