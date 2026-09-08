@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sort"
 	"strings"
@@ -88,24 +89,60 @@ func (r Router) handleTenantJob(ctx context.Context, handler JobHandler, found b
 
 func (r Router) HandleSQSEvent(ctx context.Context, event events.SQSEvent) error {
 	for _, record := range event.Records {
-		msg := JobMessage{MessageID: record.MessageId, Body: []byte(record.Body)}
-		if attr, ok := record.MessageAttributes["TenantID"]; ok && attr.StringValue != nil {
-			msg.TenantSlug = *attr.StringValue
-		}
-		if attr, ok := record.MessageAttributes["JobType"]; ok && attr.StringValue != nil {
-			msg.JobType = *attr.StringValue
-		}
-		if attr, ok := record.MessageAttributes["CorrelationID"]; ok && attr.StringValue != nil {
-			msg.CorrelationID = *attr.StringValue
-		}
-		if attr, ok := record.MessageAttributes["TenantAttestation"]; ok && attr.StringValue != nil {
-			msg.TenantAttestation = *attr.StringValue
-		}
-		if err := r.HandleJob(ctx, msg); err != nil {
+		if err := r.HandleJob(ctx, jobMessageFromSQS(record)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func jobMessageFromSQS(record events.SQSMessage) JobMessage {
+	msg := JobMessage{MessageID: record.MessageId, Body: []byte(record.Body)}
+	if attr, ok := record.MessageAttributes["MessageID"]; ok && attr.StringValue != nil {
+		msg.MessageID = *attr.StringValue
+	}
+	if attr, ok := record.MessageAttributes["TenantID"]; ok && attr.StringValue != nil {
+		msg.TenantSlug = *attr.StringValue
+	}
+	if attr, ok := record.MessageAttributes["JobType"]; ok && attr.StringValue != nil {
+		msg.JobType = *attr.StringValue
+	}
+	if attr, ok := record.MessageAttributes["CorrelationID"]; ok && attr.StringValue != nil {
+		msg.CorrelationID = *attr.StringValue
+	}
+	if attr, ok := record.MessageAttributes["TenantAttestation"]; ok && attr.StringValue != nil {
+		msg.TenantAttestation = *attr.StringValue
+	}
+	applyJobEnvelope(&msg)
+	return msg
+}
+
+func applyJobEnvelope(msg *JobMessage) {
+	var envelope struct {
+		MessageID         string `json:"message_id"`
+		JobType           string `json:"job_type"`
+		TenantSlug        string `json:"tenant_slug"`
+		CorrelationID     string `json:"correlation_id"`
+		TenantAttestation string `json:"tenant_attestation"`
+	}
+	if err := json.Unmarshal(msg.Body, &envelope); err != nil {
+		return
+	}
+	if envelope.MessageID != "" {
+		msg.MessageID = envelope.MessageID
+	}
+	if envelope.JobType != "" {
+		msg.JobType = envelope.JobType
+	}
+	if envelope.TenantSlug != "" {
+		msg.TenantSlug = envelope.TenantSlug
+	}
+	if envelope.CorrelationID != "" {
+		msg.CorrelationID = envelope.CorrelationID
+	}
+	if envelope.TenantAttestation != "" {
+		msg.TenantAttestation = envelope.TenantAttestation
+	}
 }
 
 func NewHandler(verifier *attestation.Verifier, handlers ...JobHandler) Router {

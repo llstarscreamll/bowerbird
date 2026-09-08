@@ -121,6 +121,20 @@ func (e *Engine) runRule(ctx context.Context, rule compiledRule) {
 	}
 }
 
+func (e *Engine) Fire(ctx context.Context, name string) error {
+	if name == "" {
+		return fmt.Errorf("rule name is required")
+	}
+	for _, rule := range e.rules {
+		if rule.Name == name {
+			e.fire(ctx, rule.Rule)
+			return nil
+		}
+	}
+	log.Printf("scheduler rule %s skipped: not registered", name)
+	return nil
+}
+
 func (e *Engine) fire(ctx context.Context, rule Rule) {
 	jobID := id.NewULID()
 	if err := e.transport.DeliverJob(ctx, store.JobRow{

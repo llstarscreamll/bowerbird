@@ -4,6 +4,8 @@ node_modules/
 .turbo/
 dist/
 cdk.out/
+.build/
+.pulumi/
 coverage/
 apps/backend/bin/
 apps/backend/tmp/

@@ -43,13 +43,14 @@ globals.
 1. Copy `.env.example` → `.env` at the monorepo root.
 2. For local API: keep `DEPLOYMENT_TARGET=onprem` and `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
 3. Provide secrets (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`, `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
-4. For CDK deploy: set `ENV`, `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, `APP_SUBDOMAIN`, `API_SUBDOMAIN` in the same file.
+4. For AWS/Pulumi deploy: set `ENV`, `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`,
+   `ROOT_DOMAIN`, Cloudflare, Neon, and Gemini keys in the same file.
 
 Backend, infra, and e2e scripts load the root `.env` automatically (`pnpm` / `turbo` tasks included).
 
-| Source      | Use for                                                                     |
-| ----------- | --------------------------------------------------------------------------- |
-| Root `.env` | Backend (local/onprem), CDK (`ENV`, account, domains), optional E2E origins |
+| Source      | Use for                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| Root `.env` | Backend (local/onprem), Pulumi (`ENV`, account, domains, Neon, Cloudflare), optional E2E origins |
 
 Typical local backend values:
 

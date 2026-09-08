@@ -13,26 +13,27 @@
 
 - Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
 - Use `pnpm` only. Workspace roots are `apps/*` and `packages/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
-- Single repo-root `.env` / `.env.example` for backend, infra CDK, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `deploy/onprem/.env` separate.
+- Single repo-root `.env` / `.env.example` for backend, infra Pulumi, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `deploy/onprem/.env` separate.
 
 ## Commands that matter
 
 - Root dev flow: `pnpm run dev` (always runs `pnpm run infra:up` first, then `turbo run dev`).
 - Root verification flow: `pnpm run lint && pnpm run test && pnpm run build`.
-- Root deploy: `pnpm run deploy` (builds first, deploys only `@bowerbird/infra`).
+- Root deploy: `pnpm run deploy` (builds first, deploys only `@bowerbird/infra` via Pulumi).
 - Backend targeted: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
 - Backend tests: always `pnpm --filter @bowerbird/backend test` (full `go test ./...`). Never verify with package-scoped or `-run` filtered `go test`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
 - E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:browser|test:e2e:http|test:e2e:ui`.
-- Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy`.
+- Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`.
 
 ## Backend (`apps/backend`)
 
 - Entrypoints live under `cmd/onprem/` (local + client VM) and `cmd/aws/lambda/` (AWS Lambda).
-- API entrypoint is `cmd/onprem/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
+- API entrypoint is `cmd/onprem/api/main.go`; AWS HTTP is `cmd/aws/lambda/http`. Local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
 - Worker entrypoints: `cmd/onprem/relay`, `cmd/onprem/events-consumer`, `cmd/onprem/jobs-consumer`, `cmd/onprem/scheduler`. Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
+- AWS Lambda entrypoints: `cmd/aws/lambda/http`, `cmd/aws/lambda/outbox-relay`, `cmd/aws/lambda/eventbridge`, `cmd/aws/lambda/sqs`, `cmd/aws/lambda/scheduler`.
 - Feature architecture: every bounded context is `internal/<bc>/` with this public surface:
-  - `wire.go`: only Go facade other packages import (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`, `RegisterJobs`, OHS constructors). Host (`cmd/*`, `platform/messaging`) imports the module root only.
+  - `wire.go`: only Go facade other packages import (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`, `RegisterJobs`, OHS constructors). Host (`cmd/*`, `platform/messaging`, `platform/http/host`) imports the module root only.
   - `api/`: Open Host Service (interfaces + DTOs) for other BCs. No `application` imports.
   - `domain/`: core business model (no infra).
   - `application/`: use cases (`commands`, `queries`), consumer `ports`, and OHS implementations.
@@ -45,7 +46,7 @@
 - Migrations CLI is `cmd/onprem/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
 - Runtime config (`internal/platform/config/config.go`):
   - `onprem` (local + client deploy): plain `.env` — `MINIO_ENDPOINT_URL`, `RABBITMQ_URL`, encryption keys, API keys.
-  - `aws`: SSM SecureString at `SSM_PARAMETER_NAME` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)).
+  - `aws`: Secrets Manager JSON at `SECRET_ARN` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)).
 - Local dev object storage: MinIO in root `docker-compose.yml` (`:9000` API, `:9001` console). Bucket bootstrap: `apps/backend/scripts/init-minio.sh` via `pnpm run infra:up` (`minio-init` service).
 
 ## PWA (`apps/pwa`)
@@ -78,11 +79,11 @@
 
 - `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
 - `Caddyfile` maps `app.bowerbird.dev -> :4200` and `api.bowerbird.dev -> :8080`; use these domains locally for cookie/routing behavior.
-- Infra CDK entrypoint is `packages/infra/bin/index.ts` and loads the repo-root `.env`:
-  - `ENV` and `AWS_ACCOUNT_ID` must be set.
-  - `AWS_REGION` must be `us-east-1` (enforced).
-- Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before infra deploy/synth checks that depend on assets.
-- In `bowerbird-stack.ts`, S3 deployments use `prune: false` for assets/entrypoints; do not change casually.
+- Infra Pulumi entrypoint is `packages/infra/index.ts` and loads the repo-root `.env`:
+  - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, and `GEMINI_API_KEY` must be set.
+  - `AWS_REGION` must be `us-east-1` (CloudFront certificates and CloudFront WAF).
+  - Postgres is Neon (not RDS). DNS is Cloudflare.
+- Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before infra deploy.
 
 ## Hooks, formatting, and docs
 

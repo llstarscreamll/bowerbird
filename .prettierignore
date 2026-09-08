@@ -11,3 +11,4 @@ apps/backend/tmp/
 apps/pwa/dist/
 apps/pwa/coverage/
 packages/infra/dist/
+pnpm-lock.yaml

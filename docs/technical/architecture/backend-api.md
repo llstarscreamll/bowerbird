@@ -52,7 +52,7 @@ internal/<bc>/
 
 Import rules:
 
-- Host (`cmd/*`, `internal/platform/messaging`) imports the module
+- Host (`cmd/*`, `internal/platform/messaging`, `internal/platform/http/host`) imports the module
   root only (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`,
   `RegisterJobs`, OHS constructors).
 - Another BC's ACL imports `{bc}/api` (and
@@ -77,10 +77,10 @@ Dependency direction inside a module: `adapters → application →
 domain`. `api/` is implemented by `application/` and consumed by
 other modules' adapters.
 
-Wire features in `cmd/onprem/api/main.go`, the worker binaries
-(`cmd/onprem/relay`, `cmd/onprem/events-consumer`,
-`cmd/onprem/jobs-consumer`, `cmd/onprem/scheduler`), and Lambda
-entrypoints — not inside domain or application.
+Wire features in `internal/platform/http/host` (HTTP),
+`internal/platform/messaging` (consumers/scheduler), and the
+`cmd/onprem/*` / `cmd/aws/lambda/*` entrypoints — not inside domain or
+application.
 
 ## Entrypoints
 
@@ -96,15 +96,16 @@ entrypoints — not inside domain or application.
 | `cmd/aws/lambda/outbox-relay` | AWS relay (scheduled)          |
 | `cmd/aws/lambda/eventbridge`  | AWS events consumer            |
 | `cmd/aws/lambda/sqs`          | AWS jobs consumer              |
+| `cmd/aws/lambda/scheduler`    | AWS named-rule ticks           |
 
 Local dev runs API + workers via Air; see [Getting started](../getting-started.md).
 
 ## Config and secrets
 
-| Profile                          | Secrets source                                                                                       |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `onprem` (local + client deploy) | Plain `.env` (`DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys)       |
-| `aws`                            | SSM SecureString JSON at `SSM_PARAMETER_NAME` — see [SSM secrets JSON](../deployment/ssm-secrets.md) |
+| Profile                          | Secrets source                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `onprem` (local + client deploy) | Plain `.env` (`DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys) |
+| `aws`                            | Secrets Manager JSON at `SECRET_ARN` — see [AWS secrets](../deployment/ssm-secrets.md)         |
 
 ## Local development runtime
 

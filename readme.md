@@ -1,6 +1,6 @@
 # Bowerbird
 
-Monorepo: Angular PWA + Go API/Lambdas + AWS CDK, orchestrated with Turbo and pnpm.
+Monorepo: Angular PWA + Go API/Lambdas + Pulumi (AWS Lambda + Neon + Cloudflare), orchestrated with Turbo and pnpm.
 
 ## Quick start
 
@@ -20,11 +20,11 @@ Open `https://app.bowerbird.dev` (see [Getting started](./docs/technical/getting
 
 ## Commands
 
-| Command                            | Purpose                           |
-| ---------------------------------- | --------------------------------- |
-| `pnpm run build`                   | Build all packages                |
-| `pnpm run test`                    | Unit/integration tests            |
-| `pnpm run test:e2e`                | Playwright e2e                    |
-| `pnpm run lint`                    | Lint all packages                 |
-| `pnpm run format` / `format:check` | Prettier                          |
-| `pnpm run deploy`                  | Build + deploy `@bowerbird/infra` |
+| Command                            | Purpose                                  |
+| ---------------------------------- | ---------------------------------------- |
+| `pnpm run build`                   | Build all packages                       |
+| `pnpm run test`                    | Unit/integration tests                   |
+| `pnpm run test:e2e`                | Playwright e2e                           |
+| `pnpm run lint`                    | Lint all packages                        |
+| `pnpm run format` / `format:check` | Prettier                                 |
+| `pnpm run deploy`                  | Build + Pulumi deploy `@bowerbird/infra` |

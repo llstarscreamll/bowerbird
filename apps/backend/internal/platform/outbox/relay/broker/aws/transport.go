@@ -81,6 +81,10 @@ func (t *Transport) DeliverJob(ctx context.Context, row store.JobRow) error {
 	}
 
 	attrs := map[string]sqsTypes.MessageAttributeValue{
+		"MessageID": {
+			DataType:    aws.String("String"),
+			StringValue: aws.String(row.ID),
+		},
 		"JobType": {
 			DataType:    aws.String("String"),
 			StringValue: aws.String(row.JobType),

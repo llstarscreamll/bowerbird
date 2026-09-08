@@ -40,6 +40,25 @@ func TestEngineDeliversOneTenantlessJob(t *testing.T) {
 	assert.Equal(t, transport.jobs[0].ID, transport.jobs[0].CorrelationID)
 }
 
+func TestEngineFireLooksUpRuleByName(t *testing.T) {
+	transport := &fakeTransport{}
+	engine, err := NewEngine(transport, []Rule{{
+		Name:     "outbox-sweeper",
+		Schedule: "rate(1 hour)",
+		JobType:  OutboxSweeperJobType,
+	}})
+	require.NoError(t, err)
+
+	require.NoError(t, engine.Fire(context.Background(), "outbox-sweeper"))
+	require.Len(t, transport.jobs, 1)
+	assert.Equal(t, OutboxSweeperJobType, transport.jobs[0].JobType)
+
+	require.NoError(t, engine.Fire(context.Background(), "missing"))
+	require.Len(t, transport.jobs, 1)
+
+	require.Error(t, engine.Fire(context.Background(), ""))
+}
+
 func TestNewEngineRejectsInvalidCatalog(t *testing.T) {
 	transport := &fakeTransport{}
 

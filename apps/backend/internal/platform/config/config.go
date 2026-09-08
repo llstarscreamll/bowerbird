@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
 )
@@ -19,6 +20,7 @@ type Config struct {
 	DeploymentTarget              string    `json:"deployment_target"`
 	Port                          string    `json:"port"`
 	DatabaseURL                   string    `json:"database_url"`
+	DatabaseDirectURL             string    `json:"database_direct_url"`
 	SQSQueueURL                   string    `json:"sqs_queue_url"`
 	EventBridgeQueueURL           string    `json:"eventbridge_queue_url"`
 	EventBusName                  string    `json:"event_bus_name"`
@@ -31,6 +33,9 @@ type Config struct {
 	AWSAccessKeyID                string    `json:"aws_access_key_id"`
 	AWSSecretAccessKey            string    `json:"aws_secret_access_key"`
 	SSMParameterName              string    `json:"ssm_parameter_name"`
+	SecretsManagerSecretID        string    `json:"secrets_manager_secret_id"`
+	JWTAccessSecret               string    `json:"jwt_access_secret"`
+	JWTRefreshSecret              string    `json:"jwt_refresh_secret"`
 	AllowedOrigins                string    `json:"allowed_origins"`
 	Debug                         bool      `json:"debug"`
 	GoogleClientID                string    `json:"google_client_id"`
@@ -88,12 +93,17 @@ func Load(ctx context.Context) (Config, error) {
 	cfg.Debug = getEnvAsBool("DEBUG", defaultDebug)
 
 	if cfg.DeploymentTarget == DeploymentTargetAWS {
-		cfg.SSMParameterName = getEnv("SSM_PARAMETER_NAME", "/bowerbird/local/secrets")
+		cfg.SecretsManagerSecretID = firstNonEmpty(os.Getenv("SECRET_ARN"), os.Getenv("SECRETS_MANAGER_SECRET_ID"))
+		cfg.SSMParameterName = os.Getenv("SSM_PARAMETER_NAME")
 		awsCfg, err := awsConfig.Load(ctx, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
 		if err != nil {
-			return cfg, fmt.Errorf("load aws config for ssm: %w", err)
+			return cfg, fmt.Errorf("load aws config for secrets: %w", err)
 		}
-		if cfg.SSMParameterName != "" {
+		if cfg.SecretsManagerSecretID != "" {
+			if err := loadSecretsManagerSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
+				return cfg, fmt.Errorf("load secrets manager: %w", err)
+			}
+		} else if cfg.SSMParameterName != "" {
 			if err := loadSSMSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
 				return cfg, fmt.Errorf("load ssm secrets: %w", err)
 			}
@@ -103,6 +113,9 @@ func Load(ctx context.Context) (Config, error) {
 	// Fallback to env vars
 	if cfg.DatabaseURL == "" {
 		cfg.DatabaseURL = os.Getenv("DATABASE_URL")
+	}
+	if cfg.DatabaseDirectURL == "" {
+		cfg.DatabaseDirectURL = os.Getenv("DATABASE_DIRECT_URL")
 	}
 	if cfg.RabbitMQURL == "" {
 		cfg.RabbitMQURL = os.Getenv("RABBITMQ_URL")
@@ -128,13 +141,16 @@ func Load(ctx context.Context) (Config, error) {
 	}
 
 	if cfg.DatabaseURL == "" {
-		panic("DATABASE_URL is required (from SSM or env)")
+		panic("DATABASE_URL is required (from secrets or env)")
+	}
+	if cfg.DatabaseDirectURL == "" {
+		cfg.DatabaseDirectURL = cfg.DatabaseURL
 	}
 	if cfg.InboxCredentialsEncryptionKey == "" {
-		panic("inbox_credentials_encryption_key is required from SSM or env")
+		panic("inbox_credentials_encryption_key is required from secrets or env")
 	}
 	if cfg.TenantSecretsEncryptionKey == "" {
-		panic("tenant_secrets_encryption_key is required from SSM or env")
+		panic("tenant_secrets_encryption_key is required from secrets or env")
 	}
 	if cfg.EventBusName == "" && cfg.DeploymentTarget == DeploymentTargetAWS {
 		panic("EVENT_BUS_NAME is required for aws deployment")
@@ -149,7 +165,7 @@ func Load(ctx context.Context) (Config, error) {
 		panic("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for onprem object storage")
 	}
 	if cfg.GeminiAPIKey == "" {
-		panic("GEMINI_API_KEY is required (from SSM or env)")
+		panic("GEMINI_API_KEY is required (from secrets or env)")
 	}
 
 	if cfg.MessagingAttestationSecret == "" {
@@ -162,7 +178,7 @@ func Load(ctx context.Context) (Config, error) {
 		panic(err.Error())
 	}
 
-	accessSecret := os.Getenv("JWT_ACCESS_SECRET")
+	accessSecret := firstNonEmpty(os.Getenv("JWT_ACCESS_SECRET"), cfg.JWTAccessSecret)
 	if accessSecret == "" {
 		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
 			accessSecret = "local-dev-access-secret-do-not-use-in-prod"
@@ -171,7 +187,7 @@ func Load(ctx context.Context) (Config, error) {
 		}
 	}
 
-	refreshSecret := os.Getenv("JWT_REFRESH_SECRET")
+	refreshSecret := firstNonEmpty(os.Getenv("JWT_REFRESH_SECRET"), cfg.JWTRefreshSecret)
 	if refreshSecret == "" {
 		if cfg.AppEnv == "local" || cfg.AppEnv == "development" {
 			refreshSecret = "local-dev-refresh-secret-do-not-use-in-prod"
@@ -248,6 +264,28 @@ func validateSecurityConfig(cfg Config) error {
 	return nil
 }
 
+func loadSecretsManagerSecrets(ctx context.Context, awsCfg aws.Config, endpointURL string, cfg *Config) error {
+	var client *secretsmanager.Client
+	if endpointURL != "" {
+		client = secretsmanager.NewFromConfig(awsCfg, func(o *secretsmanager.Options) {
+			o.BaseEndpoint = &endpointURL
+		})
+	} else {
+		client = secretsmanager.NewFromConfig(awsCfg)
+	}
+
+	out, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: &cfg.SecretsManagerSecretID,
+	})
+	if err != nil {
+		return err
+	}
+	if out.SecretString == nil || *out.SecretString == "" {
+		return fmt.Errorf("secret %s is empty", cfg.SecretsManagerSecretID)
+	}
+	return json.Unmarshal([]byte(*out.SecretString), cfg)
+}
+
 func loadSSMSecrets(ctx context.Context, awsCfg aws.Config, endpointURL string, cfg *Config) error {
 	var client *ssm.Client
 	if endpointURL != "" {
@@ -288,6 +326,15 @@ func parseCSVList(value string) []string {
 	return out
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -307,4 +354,13 @@ func getEnvAsBool(key string, fallback bool) bool {
 	}
 
 	return parsed
+}
+
+// DirectDatabaseURL is the non-pooled Postgres URL. Neon CREATE DATABASE and
+// golang-migrate need it; Lambda request paths use DatabaseURL (PgBouncer).
+func (c Config) DirectDatabaseURL() string {
+	if strings.TrimSpace(c.DatabaseDirectURL) != "" {
+		return c.DatabaseDirectURL
+	}
+	return c.DatabaseURL
 }

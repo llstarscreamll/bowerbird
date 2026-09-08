@@ -12,6 +12,6 @@ Avoid:
 - **Account** for an organization (collides with ledger / AR / bank accounts).
 - **Workspace** (too informal for finance).
 
-Infrastructure, middleware, and interceptors keep the industry term `Tenant` (`X-Tenant-ID`, pools, CDK). User-facing copy and product docs use **Organization**.
+Infrastructure, middleware, and interceptors keep the industry term `Tenant` (`X-Tenant-ID`, pools, Pulumi). User-facing copy and product docs use **Organization**.
 
 Colombian e-invoicing domain terms stay in Spanish / official form: **DIAN**, **CUFE**, UBL 2.1 field names as defined by DIAN.

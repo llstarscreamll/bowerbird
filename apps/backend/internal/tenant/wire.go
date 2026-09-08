@@ -25,7 +25,7 @@ func NewApplication(pool *pgxpool.Pool, databaseURL, migrationsDir string, defau
 	}
 
 	tenantRepo := repositorypostgres.NewPostgresRepository(pool)
-	tenantProvisioner := provisionerpostgres.NewPostgresProvisioner(pool, databaseURL, migrationsDir)
+	tenantProvisioner := provisionerpostgres.NewPostgresProvisioner(databaseURL, migrationsDir)
 
 	return application.NewApplication(tenantRepo, tenantProvisioner, defaults)
 }

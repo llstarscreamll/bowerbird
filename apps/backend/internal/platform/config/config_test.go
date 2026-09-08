@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+func TestDirectDatabaseURLFallsBackToDatabaseURL(t *testing.T) {
+	cfg := Config{DatabaseURL: "postgres://pooled/bowerbird"}
+	if got := cfg.DirectDatabaseURL(); got != cfg.DatabaseURL {
+		t.Fatalf("expected fallback %q, got %q", cfg.DatabaseURL, got)
+	}
+	cfg.DatabaseDirectURL = "postgres://direct/bowerbird"
+	if got := cfg.DirectDatabaseURL(); got != cfg.DatabaseDirectURL {
+		t.Fatalf("expected direct url, got %q", got)
+	}
+}
+
 func TestLoad_DefaultDeploymentTargetOnPrem(t *testing.T) {
 	os.Unsetenv("DEPLOYMENT_TARGET")
 	t.Setenv("APP_ENV", "local")
@@ -49,6 +60,23 @@ func TestLoad_RejectsExampleEncryptionKeysOutsideLocal(t *testing.T) {
 		}
 	}()
 	_, _ = Load(context.Background())
+}
+
+func TestLoad_AWSUsesSecretsManagerSecretID(t *testing.T) {
+	t.Setenv("APP_ENV", "local")
+	t.Setenv("DEPLOYMENT_TARGET", DeploymentTargetAWS)
+	t.Setenv("SECRET_ARN", "arn:aws:secretsmanager:us-east-1:123456789012:secret:bowerbird/test")
+	t.Setenv("DATABASE_URL", "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable")
+	t.Setenv("S3_BUCKET_NAME", "test-bucket")
+	t.Setenv("GEMINI_API_KEY", "test-key")
+	t.Setenv("EVENT_BUS_NAME", "test-bus")
+	t.Setenv("INBOX_CREDENTIALS_ENCRYPTION_KEY", "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=")
+	t.Setenv("TENANT_SECRETS_ENCRYPTION_KEY", "Ym93ZXJiaXJkLWxvY2FsLXNlY3JldHMta2V5LTMyYiE=")
+
+	_, err := Load(context.Background())
+	if err == nil {
+		t.Fatal("expected Secrets Manager load error without secret present")
+	}
 }
 
 func TestLoad_AWSUsesSSMParameterName(t *testing.T) {

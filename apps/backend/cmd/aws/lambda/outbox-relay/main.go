@@ -4,41 +4,38 @@ import (
 	"context"
 	"log"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/bowerbird/internal/platform"
-	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
-	"github.com/bowerbird/internal/platform/config"
+	platformMessaging "github.com/bowerbird/internal/platform/messaging"
 	"github.com/bowerbird/internal/platform/outbox/relay"
-	awsbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/aws"
 )
 
-func main() {
-	lambda.Start(handle)
-}
+var runner *relay.MultiTenantRelay
 
-func handle(ctx context.Context) error {
-	deps, err := platform.NewModule(ctx)
+func init() {
+	deps, err := platform.NewModule(context.Background())
 	if err != nil {
-		return err
+		log.Fatalf("failed to build dependencies at boot: %v", err)
 	}
-	defer deps.ControlDB.Close()
-	defer deps.TenantRegistry.CloseAll()
 
-	cfg := deps.Config
-	transport := awsbroker.NewTransport(
-		awsConfig.NewEventBridgeClient(deps.AWSConfig, cfg.AWSEndpointURL),
-		awsConfig.NewSQSClient(deps.AWSConfig, cfg.AWSEndpointURL),
-		cfg.EventBusName,
-		cfg.SQSQueueURL,
-		cfg.MessagingAttestationSecret,
-	)
+	transport, _, err := platformMessaging.NewBrokerTransport(deps)
+	if err != nil {
+		log.Fatalf("failed to build broker transport: %v", err)
+	}
 
 	lister := relay.NewControlPlaneTenantLister(deps.ControlDB)
-	multi := relay.NewMultiTenantRelay(deps.TenantRegistry, lister, transport, relay.Config{BatchSize: 50, PerTenantCap: 10})
-	if err := multi.RunOnce(ctx); err != nil {
+	runner = relay.NewMultiTenantRelay(deps.TenantRegistry, lister, transport, relay.Config{BatchSize: 50, PerTenantCap: 10})
+}
+
+func handle(ctx context.Context, _ events.CloudWatchEvent) error {
+	if err := runner.RunOnce(ctx); err != nil {
 		log.Printf("outbox relay error: %v", err)
 		return err
 	}
-	log.Printf("outbox relay completed (target=%s, multi-tenant)", config.DeploymentTargetAWS)
 	return nil
+}
+
+func main() {
+	lambda.Start(handle)
 }

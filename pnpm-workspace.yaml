@@ -1,10 +1,13 @@
 packages:
   - apps/*
   - packages/*
+  - packages/infra/sdks/neon
 allowBuilds:
   '@parcel/watcher': true
+  '@pulumi/neon': true
   esbuild: true
   less: true
   lmdb: false
   msgpackr-extract: false
   nx: false
+  protobufjs: true

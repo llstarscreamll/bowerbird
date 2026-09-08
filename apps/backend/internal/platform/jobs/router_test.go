@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/bowerbird/internal/platform/messaging/attestation"
 	"github.com/bowerbird/internal/platform/tenant"
 	"github.com/stretchr/testify/assert"
@@ -98,6 +99,22 @@ func TestHandleJobPlatformRejectsTenantSlug(t *testing.T) {
 	})
 	require.ErrorIs(t, err, ErrJobScopeMismatch)
 	assert.Empty(t, handler.handled)
+}
+
+func TestHandleSQSEventUsesEnvelopeMessageID(t *testing.T) {
+	handler := &stubHandler{jobType: "TenantJob"}
+	verifier := attestation.NewVerifier("secret")
+	router := NewRouter(verifier, handler)
+	attestationValue := verifier.Sign("job-1", "acme", "TenantJob")
+	sqsID := "aws-sqs-id"
+
+	err := router.HandleSQSEvent(context.Background(), events.SQSEvent{Records: []events.SQSMessage{{
+		MessageId: sqsID,
+		Body:      `{"message_id":"job-1","job_type":"TenantJob","tenant_slug":"acme","tenant_attestation":"` + attestationValue + `","payload":{}}`,
+	}}})
+	require.NoError(t, err)
+	assert.Equal(t, "job-1", handler.handled)
+	assert.Equal(t, "acme", handler.tenant)
 }
 
 func TestHandleJobPlatformRejectsInvalidAttestation(t *testing.T) {

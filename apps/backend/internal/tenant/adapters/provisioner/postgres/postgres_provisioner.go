@@ -8,20 +8,19 @@ import (
 
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/tenant/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var validDBName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 type PostgresProvisioner struct {
-	pool          *pgxpool.Pool
 	baseURL       string
 	migrationsDir string
 }
 
-func NewPostgresProvisioner(pool *pgxpool.Pool, baseURL string, migrationsDir string) *PostgresProvisioner {
+func NewPostgresProvisioner(baseURL string, migrationsDir string) *PostgresProvisioner {
 	return &PostgresProvisioner{
-		pool:          pool,
 		baseURL:       baseURL,
 		migrationsDir: migrationsDir,
 	}
@@ -32,11 +31,16 @@ func (p *PostgresProvisioner) CreateDatabase(ctx context.Context, dbName string)
 		return fmt.Errorf("invalid database name: %s", dbName)
 	}
 
-	// CREATE DATABASE cannot run inside a transaction block or as a prepared statement easily in pgx
-	// We must execute it directly.
-	query := fmt.Sprintf("CREATE DATABASE %s", dbName)
-	_, err := p.pool.Exec(ctx, query)
+	// CREATE DATABASE cannot run inside a transaction, as a prepared statement,
+	// or through Neon's PgBouncer pooler. Use the direct endpoint.
+	conn, err := pgx.Connect(ctx, p.baseURL)
 	if err != nil {
+		return fmt.Errorf("connect for create database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	query := fmt.Sprintf("CREATE DATABASE %s", dbName)
+	if _, err := conn.Exec(ctx, query); err != nil {
 		return fmt.Errorf("execute create database: %w", err)
 	}
 

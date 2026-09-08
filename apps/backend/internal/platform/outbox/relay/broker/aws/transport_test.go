@@ -67,6 +67,7 @@ func TestTransportDeliverJobSetsAttributes(t *testing.T) {
 	}
 	require.NoError(t, tr.DeliverJob(context.Background(), row))
 	require.NotNil(t, sqsClient.last)
+	require.Equal(t, aws.String("job-1"), sqsClient.last.MessageAttributes["MessageID"].StringValue)
 	require.Equal(t, aws.String("InvoiceExtractionRequested"), sqsClient.last.MessageAttributes["JobType"].StringValue)
 	require.Equal(t, aws.String("acme"), sqsClient.last.MessageAttributes["TenantID"].StringValue)
 	require.Equal(t, aws.String("corr-2"), sqsClient.last.MessageAttributes["CorrelationID"].StringValue)

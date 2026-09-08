@@ -22,7 +22,7 @@ How it works and how to run it.
 - [Database migrations](./technical/architecture/database-migrations.md)
 - [Spartan UI](./technical/frontend/spartan-ui.md)
 - [AWS deploy](./technical/deployment/aws.md)
-- [SSM secrets JSON (AWS)](./technical/deployment/ssm-secrets.md)
+- [AWS secrets](./technical/deployment/ssm-secrets.md)
 - [MinIO](./technical/tooling/minio.md)
 - [CodeGraph](./technical/tooling/codegraph.md)
 - [Dev quality](./technical/quality/development-quality.md)
