@@ -28,3 +28,11 @@ func TestCreateTenantRequestValidateMissingSlug(t *testing.T) {
 		t.Fatal("expected validation error, got nil")
 	}
 }
+
+func TestCreateTenantRequestValidateRejectsMaliciousSlug(t *testing.T) {
+	req := createTenantRequest{Name: "Evil", Slug: "../admin;drop-table"}
+
+	if err := req.Validate(); err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+}

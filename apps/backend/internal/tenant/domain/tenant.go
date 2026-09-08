@@ -33,13 +33,21 @@ type Tenant struct {
 	CurrentUserRole string
 }
 
+func ValidateSlug(slug string) error {
+	normalized := strings.ToLower(strings.TrimSpace(slug))
+	if normalized == "" || !slugRegex.MatchString(normalized) {
+		return ErrInvalidSlug
+	}
+	return nil
+}
+
 // NewTenant creates a new tenant entity with valid defaults.
 func NewTenant(name, slug string) (*Tenant, error) {
-	slug = strings.ToLower(strings.TrimSpace(slug))
-
-	if !slugRegex.MatchString(slug) {
-		return nil, ErrInvalidSlug
+	if err := ValidateSlug(slug); err != nil {
+		return nil, err
 	}
+
+	slug = strings.ToLower(strings.TrimSpace(slug))
 
 	dbName := "tenant_" + strings.ReplaceAll(slug, "-", "_")
 

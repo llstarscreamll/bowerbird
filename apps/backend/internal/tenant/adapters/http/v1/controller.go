@@ -2,12 +2,14 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/bowerbird/internal/platform/auth"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
 	"github.com/bowerbird/internal/tenant/application"
+	"github.com/bowerbird/internal/tenant/domain"
 )
 
 type Controller struct {
@@ -59,8 +61,11 @@ func (c *Controller) CreateTenant(w http.ResponseWriter, r *http.Request) error 
 
 	org, err := c.createUseCase.Execute(r.Context(), cmd)
 	if err != nil {
-		if err == application.ErrSlugAlreadyExists {
+		if errors.Is(err, application.ErrSlugAlreadyExists) {
 			return appErrors.Wrap(err, appErrors.CodeConflict, "slug already exists")
+		}
+		if errors.Is(err, domain.ErrInvalidSlug) {
+			return appErrors.Wrap(err, appErrors.CodeValidation, "invalid slug")
 		}
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to create tenant")
 	}
