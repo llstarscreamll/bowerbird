@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="antialiased">
+<html lang="en" class="antialiased" ngCspNonce="bowerbird">
   <head>
     <meta charset="utf-8" />
     <title>Bowerbird</title>
@@ -20,16 +20,9 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
 
-    <script>
-      // Apply theme on load to prevent FOUC
-      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    </script>
+    <script src="/theme-init.js"></script>
   </head>
   <body class="bg-background text-foreground min-h-screen selection:bg-primary/30">
-    <app-root></app-root>
+    <app-root ngCspNonce="bowerbird"></app-root>
   </body>
 </html>

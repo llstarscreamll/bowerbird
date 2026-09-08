@@ -183,7 +183,7 @@ export class BowerbirdStack extends cdk.Stack {
         contentSecurityPolicy: {
           // SPA CSP via response headers (not index.html meta). No localhost / local HMR hosts.
           contentSecurityPolicy:
-            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; connect-src 'self' https://" +
+            "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'nonce-bowerbird'; style-src 'self' 'nonce-bowerbird' https://cdn.jsdelivr.net; style-src-attr 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; connect-src 'self' https://" +
             apiDomain +
             "; frame-src 'self' blob:; form-action 'self'",
           override: true,
@@ -200,7 +200,30 @@ export class BowerbirdStack extends cdk.Stack {
           preload: true,
           override: true,
         },
-        xssProtection: { protection: true, modeBlock: true, override: true },
+      },
+      customHeadersBehavior: {
+        customHeaders: [
+          {
+            header: 'Permissions-Policy',
+            value: 'geolocation=(), microphone=(), camera=()',
+            override: true,
+          },
+          {
+            header: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
+            override: true,
+          },
+          {
+            header: 'Cross-Origin-Embedder-Policy',
+            value: 'credentialless',
+            override: true,
+          },
+          {
+            header: 'Cross-Origin-Resource-Policy',
+            value: 'same-origin',
+            override: true,
+          },
+        ],
       },
     });
 

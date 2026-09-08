@@ -47,9 +47,9 @@ globals.
 
 Backend, infra, and e2e scripts load the root `.env` automatically (`pnpm` / `turbo` tasks included).
 
-| Source      | Use for                                                                           |
-| ----------- | --------------------------------------------------------------------------------- |
-| Root `.env` | Backend (local/onprem), CDK (`ENV`, account, domains), optional E2E URL overrides |
+| Source      | Use for                                                                     |
+| ----------- | --------------------------------------------------------------------------- |
+| Root `.env` | Backend (local/onprem), CDK (`ENV`, account, domains), optional E2E origins |
 
 Typical local backend values:
 
@@ -165,6 +165,34 @@ See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./
 - Media: `https://media.bowerbird.dev/bowerbird-local-bucket/<key>`
 
 `infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO, Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old LocalStack) are removed automatically.
+
+## E2E against local, staging, or production
+
+Playwright uses one origin group. Unset values default to local
+(`https://app.bowerbird.dev`, `https://api.bowerbird.dev`,
+`https://media.bowerbird.dev`). Point the same variables at another
+environment to run the suite there.
+
+| Variable             | Origin |
+| -------------------- | ------ |
+| `E2E_BASE_URL`       | PWA    |
+| `E2E_API_BASE_URL`   | API    |
+| `E2E_MEDIA_BASE_URL` | Media  |
+
+If `E2E_BASE_URL` is an `app.*` host, API and media are derived by swapping
+the first label unless you set those two explicitly.
+
+```bash
+pnpm run test:e2e
+E2E_BASE_URL=https://app.staging.money-path.co pnpm run test:e2e
+E2E_BASE_URL=https://app.money-path.co \
+  E2E_API_BASE_URL=https://api.money-path.co \
+  E2E_MEDIA_BASE_URL=https://media.money-path.co \
+  pnpm run test:e2e
+```
+
+Auth-setup tests call `/api/v1/auth/register-local`. That endpoint is only
+enabled when the target backend is in `local` or `development` mode.
 
 ## Commands
 

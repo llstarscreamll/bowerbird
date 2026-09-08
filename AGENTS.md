@@ -67,7 +67,8 @@
 
 - Uses Playwright. Always run `pnpm run test:e2e:install` to ensure the local browser is present before running tests.
 - Specs are split into two Playwright projects: `tests/browser/` (real browser) and `tests/http/` (API contracts). Shared clients/factories live in `tests/support/`.
-- Execution requires the local backend to be running (`pnpm run dev`) with `api.bowerbird.dev` accessible (Caddy routing).
+- Default origins are local (`https://app.bowerbird.dev` / `https://api.bowerbird.dev` / `https://media.bowerbird.dev`). Override with `E2E_BASE_URL`, `E2E_API_BASE_URL`, and `E2E_MEDIA_BASE_URL` (see `.env.example`).
+- Local runs require the backend (`pnpm run dev`) with `api.bowerbird.dev` accessible (Caddy routing).
 - To test the full auth flow, the backend must be in `local` or `development` mode so the `/api/v1/auth/register-local` endpoint is enabled.
 - UI doesn't have a signup form yet, so fixtures rely on the API `registerLocalOrFail` directly for setup.
 - Commands from root: `pnpm run test:e2e` (all), `pnpm run test:e2e:browser`, `pnpm run test:e2e:http`, `pnpm run test:e2e:ui` (interactive).
