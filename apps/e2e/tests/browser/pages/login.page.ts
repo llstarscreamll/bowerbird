@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import type { LocalUserCredentials } from '../support/user.factory';
+import type { LocalUserCredentials } from '../../support/user.factory';
 
 export class LoginPage {
   constructor(private readonly page: Page) {}

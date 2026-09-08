@@ -27,11 +27,17 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chromium',
+      testMatch: 'browser/**/*.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'webkit',
+      testMatch: 'browser/**/*.spec.ts',
       use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'http',
+      testMatch: 'http/**/*.spec.ts',
     },
   ],
 });

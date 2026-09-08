@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { test } from '../fixtures/test.fixture';
+import { test } from '../support/api.fixture';
 import { expectJsonApiError } from '../support/jsonapi-assertions';
 import { bootstrapAuthenticatedTenantContext } from '../support/test-context.factory';
 

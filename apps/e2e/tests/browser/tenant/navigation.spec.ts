@@ -1,4 +1,4 @@
-import { test } from '../fixtures/test.fixture';
+import { test } from '../fixtures';
 import { expect } from '@playwright/test';
 
 test.describe('Tenant: navegación', () => {

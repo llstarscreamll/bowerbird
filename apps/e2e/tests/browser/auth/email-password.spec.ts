@@ -1,5 +1,5 @@
-import { buildLocalUserCredentials } from '../support/user.factory';
-import { test } from '../fixtures/test.fixture';
+import { buildLocalUserCredentials } from '../../support/user.factory';
+import { test } from '../fixtures';
 
 test.describe('Auth: email y password', () => {
   test('visitante crea cuenta y accede al lobby', async ({ authApi, loginPage, lobbyPage, newUser }) => {

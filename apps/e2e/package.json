@@ -6,6 +6,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "test:e2e:install": "playwright install chromium",
     "test:e2e": "playwright test",
+    "test:e2e:browser": "playwright test --project=desktop-chromium --project=webkit",
+    "test:e2e:http": "playwright test --project=http",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui"
   },

@@ -1,4 +1,4 @@
-import { test } from '../fixtures/test.fixture';
+import { test } from '../fixtures';
 
 test.describe('Tenant: creación', () => {
   test('usuario autenticado puede crear un nuevo tenant', async ({ authApi, loginPage, lobbyPage, newUser }) => {
