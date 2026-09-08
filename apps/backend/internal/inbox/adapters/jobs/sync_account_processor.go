@@ -33,6 +33,10 @@ func (h *ProcessInboxSyncAccount) JobType() string {
 	return inboxJobs.InboxSyncAccountType
 }
 
+func (h *ProcessInboxSyncAccount) Scope() platformJobs.Scope {
+	return platformJobs.ScopeTenant
+}
+
 func (h *ProcessInboxSyncAccount) Handle(ctx context.Context, msg platformJobs.JobMessage) error {
 	if _, err := tenant.TenantIDFromContext(ctx); err != nil {
 		return errors.New("tenant id is required")

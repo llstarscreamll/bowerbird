@@ -17,6 +17,8 @@ require (
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/pdfcpu/pdfcpu v0.11.1
+	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0
@@ -51,7 +53,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect

@@ -25,7 +25,11 @@ One Postgres database per organization. All operational business tables live her
 
 ### Shared AWS resources
 
-SQS / EventBridge / S3 are shared with logical isolation. Async handlers restore `TenantID` from message attributes into context so DB routing matches HTTP.
+SQS / EventBridge / S3 are shared with logical isolation. Tenant job
+and event handlers restore `TenantID` from message attributes into
+context so DB routing matches HTTP. Platform jobs (scheduler ticks)
+have no tenant on the message; the handler lists active tenants and
+sets tenant context per iteration.
 
 CORS allows app origins for the configured root domain.
 

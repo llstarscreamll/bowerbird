@@ -23,7 +23,7 @@ Cross-cutting adapters only (no business logic):
 | Messaging      | `messaging`, `events/adapters`, `jobs/adapters` — broker abstraction |
 | Outbox         | `outbox`, `outbox/relay` — transactional publish                     |
 | Object storage | `storage/s3` — S3/MinIO `FileStore`                                  |
-| Scheduler      | `scheduler` — periodic outbox job ticks (onprem worker)              |
+| Scheduler      | `scheduler` — named rules; tick publishes jobs to the broker         |
 
 Broker and storage implementations are selected by `DEPLOYMENT_TARGET` at composition root (`internal/platform/wire.go`).
 
@@ -84,17 +84,17 @@ application.
 
 ## Entrypoints
 
-| Binary                    | Role                                      |
-| ------------------------- | ----------------------------------------- |
-| `cmd/api`                 | HTTP API                                  |
-| `cmd/relay`               | Drains outbox → broker                    |
-| `cmd/events-consumer`     | Integration event handlers                |
-| `cmd/jobs-consumer`       | Background job handlers                   |
-| `cmd/scheduler`           | Periodic job enqueue (e.g. inbox sweeper) |
-| `cmd/lambda/outbox-relay` | AWS relay (scheduled)                     |
-| `cmd/lambda/eventbridge`  | AWS events consumer                       |
-| `cmd/lambda/sqs`          | AWS jobs consumer                         |
-| `cmd/migrate`             | DB migrations CLI                         |
+| Binary                    | Role                           |
+| ------------------------- | ------------------------------ |
+| `cmd/api`                 | HTTP API                       |
+| `cmd/relay`               | Drains outbox → broker         |
+| `cmd/events-consumer`     | Integration event handlers     |
+| `cmd/jobs-consumer`       | Background job handlers        |
+| `cmd/scheduler`           | Named-rule clock → broker jobs |
+| `cmd/lambda/outbox-relay` | AWS relay (scheduled)          |
+| `cmd/lambda/eventbridge`  | AWS events consumer            |
+| `cmd/lambda/sqs`          | AWS jobs consumer              |
+| `cmd/migrate`             | DB migrations CLI              |
 
 Local dev runs API + workers via Air; see [Getting started](../getting-started.md).
 

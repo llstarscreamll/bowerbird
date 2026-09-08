@@ -16,10 +16,13 @@ See [Outbox relay](./outbox-relay.md) for the full pipeline and [Runtime profile
 | Relay          | `internal/platform/outbox/relay` → broker adapter     |
 | Handle events  | `RegisterEvents` on the owning module `wire.go`       |
 | Handle jobs    | `RegisterJobs` on the owning module `wire.go`         |
+| Schedule ticks | `RegisterSchedules` → `WireScheduler` → `DeliverJob`  |
 
 `internal/platform/messaging.WireMessagingHandlers` calls those
-registrars. It must not import feature `adapters/`. Split event and
-job registration; do not bundle them in one `RegisterMessaging`.
+registrars. `WireScheduler` assembles named schedule rules
+(`RegisterSchedules` on modules that have them). It must not import
+feature `adapters/`. Split event and job registration; do not bundle
+them in one `RegisterMessaging`.
 
 ## Decision guide
 
@@ -32,16 +35,19 @@ job registration; do not bundle them in one `RegisterMessaging`.
 
 ## Examples
 
-| Flow                | Pattern                                            |
-| ------------------- | -------------------------------------------------- |
-| Inbox message saved | Event `InboxMessageReceived`                       |
-| Invoice extraction  | Job `InvoiceExtractionRequested`                   |
-| Connection added    | Event → handler enqueues sync **job**              |
-| Periodic inbox sync | Scheduler tick → **job** (not a fake domain event) |
+| Flow                | Pattern                                                                      |
+| ------------------- | ---------------------------------------------------------------------------- |
+| Inbox message saved | Event `InboxMessageReceived`                                                 |
+| Invoice extraction  | Job `InvoiceExtractionRequested`                                             |
+| Connection added    | Event → handler enqueues sync **job**                                        |
+| Periodic inbox sync | Scheduler rule → **job** on the broker (not outbox; not a fake domain event) |
 
 ## Contracts
 
-- Events on the wire: **CloudEvents 1.0 JSON** after relay (`type`, `data`, `tenant_slug`, `correlation_id`).
-- Jobs on the wire: internal envelope + `tenant_slug`, `job_type`, `correlation_id`, `message_id`.
+- Events on the wire: **CloudEvents 1.0 JSON** after relay (`type`,
+  `data`, `tenant_slug`, `correlation_id`).
+- Jobs on the wire: internal envelope + `tenant_slug`, `job_type`,
+  `correlation_id`, `message_id`. Tenant jobs require `tenant_slug`.
+  Platform jobs (scheduler ticks) omit it and attest as `_platform`.
 
 Label every new message contract as `event` or `job` in PRs.

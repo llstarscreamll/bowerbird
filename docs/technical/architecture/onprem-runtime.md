@@ -4,17 +4,17 @@ Single-VM Docker Compose deployment (`deploy/onprem/`).
 
 ## Services
 
-| Service           | Role                                         |
-| ----------------- | -------------------------------------------- |
-| `api`             | HTTP API                                     |
-| `outbox-relay`    | Drains outbox → RabbitMQ                     |
-| `events-consumer` | Integration event handlers                   |
-| `jobs-consumer`   | Background job handlers                      |
-| `scheduler`       | Enqueues periodic outbox jobs (e.g. sweeper) |
-| `rabbitmq`        | Message broker                               |
-| `postgres`        | Control-plane + tenant DB (seed separately)  |
-| `minio`           | S3-compatible object storage                 |
-| `caddy`           | HTTPS reverse proxy                          |
+| Service           | Role                                        |
+| ----------------- | ------------------------------------------- |
+| `api`             | HTTP API                                    |
+| `outbox-relay`    | Drains outbox → RabbitMQ                    |
+| `events-consumer` | Integration event handlers                  |
+| `jobs-consumer`   | Background job handlers                     |
+| `scheduler`       | Named-rule clock → RabbitMQ jobs            |
+| `rabbitmq`        | Message broker                              |
+| `postgres`        | Control-plane + tenant DB (seed separately) |
+| `minio`           | S3-compatible object storage                |
+| `caddy`           | HTTPS reverse proxy                         |
 
 ## Quick start
 

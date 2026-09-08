@@ -64,18 +64,26 @@ Workers and the API use **Air** hot reload (`.air.toml`, `.air.worker-*.toml`).
 
 ## Platform adapters (by concern)
 
-| Concern          | Package                                        | `onprem`          | `aws`                                |
-| ---------------- | ---------------------------------------------- | ----------------- | ------------------------------------ |
-| Config / secrets | `internal/platform/config`                     | `.env`            | SSM JSON merge                       |
-| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic    | EventBridge                          |
-| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct   | SQS                                  |
-| Broker transport | `internal/platform/messaging`                  | AMQP              | AWS SDK                              |
-| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint    | AWS S3                               |
-| Scheduler        | `internal/platform/scheduler`                  | In-process worker | EventBridge rules (where applicable) |
+| Concern          | Package                                        | `onprem`                                            | `aws`                                |
+| ---------------- | ---------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| Config / secrets | `internal/platform/config`                     | `.env`                                              | SSM JSON merge                       |
+| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                      | EventBridge                          |
+| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                     | SQS                                  |
+| Broker transport | `internal/platform/messaging`                  | AMQP                                                | AWS SDK                              |
+| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint                                      | AWS S3                               |
+| Scheduler        | `internal/platform/scheduler`                  | Named-rule process (`cmd/scheduler`) → `DeliverJob` | EventBridge rules (where applicable) |
+
+On-prem rules use EventBridge `rate(N unit)` or Unix crontab (5
+fields, UTC). AWS EventBridge cron is 6-field with `?`; map crontab
+when adding equivalent rules. The clock does not write `outbox_jobs`
+and does not list tenants: one platform job per rule; handlers fan
+out.
 
 Feature modules expose `RegisterEvents` and/or `RegisterJobs` on
-`wire.go`. `internal/platform/messaging.WireMessagingHandlers` calls
-those registrars and must not import feature adapters.
+`wire.go`. Modules with periodic jobs also expose `RegisterSchedules`.
+`internal/platform/messaging.WireMessagingHandlers` and
+`WireScheduler` call those registrars and must not import feature
+adapters.
 
 ## Broker topology (onprem)
 

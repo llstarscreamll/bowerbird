@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bowerbird/internal/platform"
+	platformMessaging "github.com/bowerbird/internal/platform/messaging"
 )
 
 func main() {
@@ -50,9 +51,15 @@ func main() {
 }
 
 func run(ctx context.Context, deps *platform.Dependencies) error {
-	log.Printf("outbox scheduler started")
-	err := deps.Scheduler.Start(ctx)
-	stopErr := deps.Scheduler.Stop(context.WithoutCancel(ctx))
+	engine, closeTransport, err := platformMessaging.WireScheduler(deps)
+	if err != nil {
+		return err
+	}
+	defer closeTransport()
+
+	log.Printf("scheduler started")
+	err = engine.Start(ctx)
+	stopErr := engine.Stop(context.WithoutCancel(ctx))
 	if err != nil && ctx.Err() == nil {
 		return err
 	}

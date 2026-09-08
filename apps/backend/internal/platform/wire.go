@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
@@ -13,9 +12,7 @@ import (
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
 	outboxPublisher "github.com/bowerbird/internal/platform/outbox/publisher"
-	"github.com/bowerbird/internal/platform/outbox/relay"
 	outboxStore "github.com/bowerbird/internal/platform/outbox/store"
-	"github.com/bowerbird/internal/platform/scheduler"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
 	platformS3 "github.com/bowerbird/internal/platform/storage/s3"
 	"github.com/bowerbird/internal/platform/tenant"
@@ -31,7 +28,6 @@ type Dependencies struct {
 	EventBus       events.EventBus
 	TaskQueue      jobs.TaskQueue
 	OutboxAppender outboxStore.Appender
-	Scheduler      scheduler.Scheduler
 }
 
 func NewModule(ctx context.Context) (*Dependencies, error) {
@@ -56,7 +52,6 @@ func NewModule(ctx context.Context) (*Dependencies, error) {
 		EventBus:       outboxPublisher.NewOutboxEventPublisher(outbox),
 		TaskQueue:      outboxPublisher.NewOutboxTaskQueue(outbox),
 	}
-	deps.Scheduler = scheduler.NewOutboxScheduler(deps.TaskQueue, relay.NewControlPlaneTenantLister(controlDB), time.Hour)
 
 	switch cfg.DeploymentTarget {
 	case config.DeploymentTargetAWS:

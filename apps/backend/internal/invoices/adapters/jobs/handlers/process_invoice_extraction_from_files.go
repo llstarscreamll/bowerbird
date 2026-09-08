@@ -27,6 +27,10 @@ func (h *ProcessInvoiceExtractionFromFiles) JobType() string {
 	return contractJobs.InvoiceExtractionRequestedType
 }
 
+func (h *ProcessInvoiceExtractionFromFiles) Scope() jobs.Scope {
+	return jobs.ScopeTenant
+}
+
 func (h *ProcessInvoiceExtractionFromFiles) Handle(ctx context.Context, msg jobs.JobMessage) error {
 	if _, err := tenant.TenantIDFromContext(ctx); err != nil {
 		return errors.New("tenant id is required")

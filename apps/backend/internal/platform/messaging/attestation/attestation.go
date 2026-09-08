@@ -6,9 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 )
 
-const HeaderKey = "tenant_attestation"
+const (
+	HeaderKey       = "tenant_attestation"
+	PlatformSubject = "_platform"
+)
 
 var (
 	ErrMissingAttestation = errors.New("missing tenant attestation")
@@ -23,9 +27,16 @@ func NewVerifier(secret string) *Verifier {
 	return &Verifier{secret: []byte(secret)}
 }
 
+func Subject(tenantSlug string) string {
+	if strings.TrimSpace(tenantSlug) == "" {
+		return PlatformSubject
+	}
+	return tenantSlug
+}
+
 func Sign(secret, messageID, tenantSlug, kind string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = mac.Write([]byte(messageID + "|" + tenantSlug + "|" + kind))
+	_, _ = mac.Write([]byte(messageID + "|" + Subject(tenantSlug) + "|" + kind))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 

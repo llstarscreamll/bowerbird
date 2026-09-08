@@ -128,7 +128,8 @@ type smokeJobHandler struct {
 	handled string
 }
 
-func (h *smokeJobHandler) JobType() string { return "SmokeJob" }
+func (h *smokeJobHandler) JobType() string           { return "SmokeJob" }
+func (h *smokeJobHandler) Scope() platformJobs.Scope { return platformJobs.ScopeTenant }
 func (h *smokeJobHandler) Handle(_ context.Context, msg platformJobs.JobMessage) error {
 	h.handled = msg.MessageID
 	return nil
@@ -199,6 +200,7 @@ func TestPipelineOnPremSmoke(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	ctx = tenant.WithTenantID(ctx, "acme")
 
 	pool := connectPool(t, ctx, dsn)
 	defer pool.Close()

@@ -74,21 +74,77 @@ El sistema MUST mantener tablas/handlers distintos para integration events (`out
 
 ### Requirement: Task queue multi-tenant
 
-Al encolar un background job, el sistema MUST asociar el tenant del contexto de ejecución al mensaje de forma que el processor pueda restaurar el tenant antes de ejecutar la lógica de negocio.
+Al encolar un background job de tenant, el sistema MUST asociar el
+tenant del contexto de ejecución al mensaje de forma que el processor
+pueda restaurar el tenant antes de ejecutar la lógica de negocio.
 
 #### Scenario: Job procesado con tenant
 
-- **WHEN** un consumer recibe un job desde el broker
-- **THEN** el processor ejecuta la lógica con ese tenant disponible en el contexto (header/atributo del mensaje)
+- **WHEN** un consumer recibe un job de tenant desde el broker
+- **THEN** el processor ejecuta la lógica con ese tenant disponible
+  en el contexto (header/atributo del mensaje)
+
+### Requirement: Alcance plataforma vs tenant en jobs
+
+Cada `JobHandler` MUST declarar `Scope` (`tenant` o `platform`). Los
+jobs de tenant MUST exigir `tenant_slug` no vacío y HMAC
+`HMAC(messageID|tenantSlug|jobType)`. El router MUST inyectar
+`WithTenantID`. Los jobs de plataforma MUST exigir `tenant_slug`
+vacío/ausente y HMAC ligado al sujeto reservado `_platform`. El
+router MUST NOT inyectar tenant en el contexto del handler de
+plataforma. Un mismatch (handler de plataforma con slug, o handler de
+tenant sin slug o con `_platform`) MUST rechazarse. Los integration
+events MUST permanecer tenant-scoped. El tick del scheduler MUST
+modelarse como job de plataforma, no como evento de dominio.
+
+#### Scenario: Job de plataforma sin tenant
+
+- **WHEN** el consumer recibe `InboxSyncAllAccounts` o
+  `platform.OutboxSweeper` con `tenant_slug` vacío y attestation de
+  `_platform`
+- **THEN** el router verifica el HMAC con `_platform` y ejecuta el
+  handler sin `WithTenantID`
+
+#### Scenario: Mismatch de alcance
+
+- **WHEN** un job de plataforma llega con `tenant_slug`, o un job de
+  tenant llega sin slug o con slug `_platform`
+- **THEN** el router rechaza el mensaje
 
 ### Requirement: Scheduler es concern separado
 
-Las tareas periódicas MUST modelarse como disparos de scheduler que encolan commands/jobs, no como integration events de dominio ni como parte del event bus.
+Las tareas periódicas MUST modelarse como rules nombradas con expresión
+`rate()` (dialecto EventBridge) o crontab Unix de 5 campos (UTC). El
+tick MUST publicar un único background job de plataforma por rule al
+broker vía `BrokerTransport.DeliverJob`, sin listar tenants. MUST NOT
+insertar `outbox_jobs` en el tick ni publicar integration events de
+dominio ficticios. Los use cases siguen escribiendo jobs por
+transactional outbox.
 
 #### Scenario: Tick de sync periódico
 
-- **WHEN** el scheduler dispara un tick configurado para sincronización de inbox
-- **THEN** el sistema encola background job(s) de sync y no publica un “evento de dominio” ficticio solo por el tick
+- **WHEN** el scheduler dispara la rule `inbox-sync-all`
+- **THEN** publica un job `InboxSyncAllAccounts` al broker (sin
+  tenant, sin outbox) y no publica un evento de dominio ficticio
+
+#### Scenario: Fan-out de tenants en el handler
+
+- **WHEN** el consumer ejecuta `InboxSyncAllAccounts`
+- **THEN** lista tenants activos, aplica entitlements por tenant y
+  encola `InboxSyncAccount` por cuenta activa vía `TaskQueue` /
+  `outbox_jobs`, copiando el `correlation_id` del padre
+
+#### Scenario: Sweeper recorre tenants en el handler
+
+- **WHEN** el consumer ejecuta `platform.OutboxSweeper`
+- **THEN** lista tenants activos y purga outbox de cada tenant DB
+  (sin un job hijo por tenant)
+
+#### Scenario: Entitlements dentro del loop de tenant
+
+- **WHEN** un tenant no tiene la feature requerida
+- **THEN** el handler de plataforma omite ese tenant y continúa con
+  los demás
 
 ### Requirement: Relay solo publica al broker
 

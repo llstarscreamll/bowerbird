@@ -11,13 +11,8 @@ import (
 	"time"
 
 	"github.com/bowerbird/internal/platform"
-	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
-	"github.com/bowerbird/internal/platform/config"
 	platformMessaging "github.com/bowerbird/internal/platform/messaging"
 	"github.com/bowerbird/internal/platform/outbox/relay"
-	"github.com/bowerbird/internal/platform/outbox/relay/broker"
-	awsbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/aws"
-	rabbitmqbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/rabbitmq"
 )
 
 func main() {
@@ -57,7 +52,7 @@ func main() {
 }
 
 func run(ctx context.Context, deps *platform.Dependencies) error {
-	transport, closeTransport, err := newBrokerTransport(deps)
+	transport, closeTransport, err := platformMessaging.NewBrokerTransport(deps)
 	if err != nil {
 		return err
 	}
@@ -69,31 +64,6 @@ func run(ctx context.Context, deps *platform.Dependencies) error {
 	log.Printf("outbox relay started (target=%s, multi-tenant)", deps.Config.DeploymentTarget)
 	multi.RunLoop(ctx)
 	return nil
-}
-
-func newBrokerTransport(deps *platform.Dependencies) (broker.Transport, func(), error) {
-	cfg := deps.Config
-	handlers := platformMessaging.WireMessagingHandlers(deps)
-	jobKeys := handlers.Jobs.JobTypes()
-
-	switch cfg.DeploymentTarget {
-	case config.DeploymentTargetAWS:
-		return awsbroker.NewTransport(
-			awsConfig.NewEventBridgeClient(deps.AWSConfig, cfg.AWSEndpointURL),
-			awsConfig.NewSQSClient(deps.AWSConfig, cfg.AWSEndpointURL),
-			cfg.EventBusName,
-			cfg.SQSQueueURL,
-			cfg.MessagingAttestationSecret,
-		), func() {}, nil
-	default:
-		conn := rabbitmqbroker.NewConnection(cfg.RabbitMQURL)
-		transport, err := rabbitmqbroker.NewTransport(conn, cfg.MessagingAttestationSecret, jobKeys...)
-		if err != nil {
-			_ = conn.Close()
-			return nil, func() {}, err
-		}
-		return transport, func() { _ = conn.Close() }, nil
-	}
 }
 
 func waitExit(name string, errCh <-chan error) {

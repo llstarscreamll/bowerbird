@@ -127,6 +127,17 @@ func (c *Connection) UpdateSharingPolicy(policy string, at time.Time) error {
 	return nil
 }
 
+func (c *Connection) IsPrivate() bool {
+	return c != nil && c.SharingPolicy == SharingPolicyPrivate
+}
+
+func (c *Connection) VisibleTo(userID string) bool {
+	if c == nil {
+		return false
+	}
+	return !c.IsPrivate() || c.OwnerUserID == userID
+}
+
 type Repository interface {
 	GetByID(ctx context.Context, id string) (*Connection, error)
 	ListAll(ctx context.Context) ([]*Connection, error)

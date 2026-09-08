@@ -6,7 +6,10 @@ Homogeneous flow in every deployment profile:
 HTTP use case ──► outbox (DB tx) ──► relay ──► broker ──► consumer ──► handler
 ```
 
-Application code **never** publishes directly to RabbitMQ, EventBridge, or SQS.
+Application code **never** publishes directly to RabbitMQ, EventBridge,
+or SQS. The on-prem **scheduler clock** is not application code: named
+rules call `BrokerTransport.DeliverJob` (same hop as an EventBridge
+rule target). Use cases still go through the outbox.
 
 ## Outbox tables (tenant DB)
 
@@ -51,7 +54,11 @@ Job queue bindings are declared at worker boot from registered `JobHandler.JobTy
 
 Integration events use **CloudEvents 1.0 JSON** (`data` = business payload; extension attributes `tenant_slug`, `correlation_id`).
 
-Jobs use an internal JSON envelope + headers (`tenant_slug`, `job_type`, `correlation_id`, `message_id`).
+Jobs use an internal JSON envelope + headers (`tenant_slug`,
+`job_type`, `correlation_id`, `message_id`). Tenant jobs require
+`tenant_slug` and HMAC over that slug. Platform jobs (scheduler
+ticks) omit `tenant_slug`; HMAC binds the reserved subject
+`_platform`. Events stay tenant-scoped.
 
 Dead letters: RabbitMQ `bowerbird.dlx` / `bowerbird.deadletter`; AWS SQS DLQ.
 
@@ -66,6 +73,33 @@ pnpm --filter @bowerbird/backend dev:scheduler
 ```
 
 Or root `pnpm run dev` (Turbo runs api + workers + PWA).
+
+## Scheduler (on-prem)
+
+`cmd/scheduler` is a named-rule clock, not an outbox writer:
+
+```text
+rule (name + rate()/crontab) ──► one platform job ──► jobs-consumer
+                                      │
+                                      └── handler lists tenants / enqueues children
+```
+
+The clock has no tenant list. Each rule publishes one job with empty
+`tenant_slug`. Handlers that need tenants list them from the control
+plane.
+
+| Name             | Schedule          | Job                      | Handler                           |
+| ---------------- | ----------------- | ------------------------ | --------------------------------- |
+| `outbox-sweeper` | `rate(1 hour)`    | `platform.OutboxSweeper` | List tenants; purge each DB       |
+| `inbox-sync-all` | `rate(5 minutes)` | `InboxSyncAllAccounts`   | List tenants; enqueue per account |
+
+`rate()` matches EventBridge. Crontab is Unix 5-field UTC (not AWS
+`cron()` 6-field / `?`). Translate crontab to EventBridge cron when
+you add AWS rules later.
+
+Child work (`InboxSyncAccount`) still goes through `TaskQueue` /
+outbox and stays tenant-scoped. Entitlement checks run inside the
+tenant loop, not on the platform parent.
 
 ## Related
 

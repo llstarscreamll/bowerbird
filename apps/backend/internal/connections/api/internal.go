@@ -16,6 +16,10 @@ func (c ConnectionInfo) IsPrivate() bool {
 	return c.SharingPolicy == SharingPolicyPrivate
 }
 
+func (c ConnectionInfo) VisibleTo(userID string) bool {
+	return !c.IsPrivate() || c.OwnerUserID == userID
+}
+
 // InternalService is the connections Open Host Service for inbox sync.
 type InternalService interface {
 	GetActiveConnections(ctx context.Context) ([]ConnectionInfo, error)

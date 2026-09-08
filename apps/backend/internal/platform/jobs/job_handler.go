@@ -1,6 +1,18 @@
 package jobs
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var ErrJobScopeMismatch = errors.New("job scope mismatch")
+
+type Scope string
+
+const (
+	ScopeTenant   Scope = "tenant"
+	ScopePlatform Scope = "platform"
+)
 
 type JobMessage struct {
 	MessageID         string
@@ -13,5 +25,6 @@ type JobMessage struct {
 
 type JobHandler interface {
 	JobType() string
+	Scope() Scope
 	Handle(ctx context.Context, msg JobMessage) error
 }

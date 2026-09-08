@@ -8,11 +8,18 @@ import (
 	invoicesModule "github.com/bowerbird/internal/invoices"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
+	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
+	"github.com/bowerbird/internal/platform/config"
 	platformCrypto "github.com/bowerbird/internal/platform/crypto"
 	platformEvents "github.com/bowerbird/internal/platform/events"
 	platformJobs "github.com/bowerbird/internal/platform/jobs"
 	"github.com/bowerbird/internal/platform/messaging/attestation"
+	"github.com/bowerbird/internal/platform/outbox/relay"
+	"github.com/bowerbird/internal/platform/outbox/relay/broker"
+	awsbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/aws"
+	rabbitmqbroker "github.com/bowerbird/internal/platform/outbox/relay/broker/rabbitmq"
 	outboxSweeper "github.com/bowerbird/internal/platform/outbox/sweeper"
+	"github.com/bowerbird/internal/platform/scheduler"
 	secretsModule "github.com/bowerbird/internal/secrets"
 )
 
@@ -64,8 +71,9 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 	invoiceEvents := invoicesModule.RegisterEvents(invoicingApp)
 	invoiceJobs := invoicesModule.RegisterJobs(invoicingApp)
 	inboxEvents := inboxModule.RegisterEvents(entitlementsApp, platformModule.TaskQueue)
-	inboxJobs := inboxModule.RegisterJobs(inboxApp, entitlementsApp)
-	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, 0)
+	tenantLister := relay.NewControlPlaneTenantLister(platformModule.ControlDB)
+	inboxJobs := inboxModule.RegisterJobs(inboxApp, entitlementsApp, tenantLister)
+	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, tenantLister, 0)
 
 	eventHandlers := append(append([]platformEvents.IntegrationEventHandler{}, invoiceEvents...), inboxEvents...)
 	jobHandlers := append(append(append([]platformJobs.JobHandler{}, invoiceJobs...), inboxJobs...), sweeper)
@@ -74,5 +82,43 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 	return Handlers{
 		Events: platformEvents.NewRouter(verifier, eventHandlers...),
 		Jobs:   platformJobs.NewRouter(verifier, jobHandlers...),
+	}
+}
+
+func WireScheduler(deps *platform.Dependencies) (*scheduler.Engine, func(), error) {
+	transport, closeTransport, err := NewBrokerTransport(deps)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	rules := append(scheduler.PlatformRules(), inboxModule.RegisterSchedules(deps.Config)...)
+	engine, err := scheduler.NewEngine(transport, rules)
+	if err != nil {
+		closeTransport()
+		return nil, func() {}, err
+	}
+	return engine, closeTransport, nil
+}
+
+func NewBrokerTransport(deps *platform.Dependencies) (broker.Transport, func(), error) {
+	cfg := deps.Config
+	jobKeys := WireMessagingHandlers(deps).Jobs.JobTypes()
+
+	switch cfg.DeploymentTarget {
+	case config.DeploymentTargetAWS:
+		return awsbroker.NewTransport(
+			awsConfig.NewEventBridgeClient(deps.AWSConfig, cfg.AWSEndpointURL),
+			awsConfig.NewSQSClient(deps.AWSConfig, cfg.AWSEndpointURL),
+			cfg.EventBusName,
+			cfg.SQSQueueURL,
+			cfg.MessagingAttestationSecret,
+		), func() {}, nil
+	default:
+		conn := rabbitmqbroker.NewConnection(cfg.RabbitMQURL)
+		transport, err := rabbitmqbroker.NewTransport(conn, cfg.MessagingAttestationSecret, jobKeys...)
+		if err != nil {
+			_ = conn.Close()
+			return nil, func() {}, err
+		}
+		return transport, func() { _ = conn.Close() }, nil
 	}
 }

@@ -40,24 +40,49 @@ func (r Router) JobTypes() []string {
 }
 
 func (r Router) HandleJob(ctx context.Context, msg JobMessage) error {
-	if strings.TrimSpace(msg.TenantSlug) == "" {
+	handler, found := r.handlers[msg.JobType]
+	if found && handler.Scope() == ScopePlatform {
+		return r.handlePlatformJob(ctx, handler, msg)
+	}
+	return r.handleTenantJob(ctx, handler, found, msg)
+}
+
+func (r Router) handlePlatformJob(ctx context.Context, handler JobHandler, msg JobMessage) error {
+	if strings.TrimSpace(msg.TenantSlug) != "" {
+		return ErrJobScopeMismatch
+	}
+	if err := r.verifier.Verify(msg.MessageID, attestation.PlatformSubject, msg.JobType, msg.TenantAttestation); err != nil {
+		return err
+	}
+	if err := handler.Handle(ctx, msg); err != nil {
+		return err
+	}
+	log.Printf("job routed: id=%s type=%s tenant=%s", msg.MessageID, msg.JobType, attestation.PlatformSubject)
+	return nil
+}
+
+func (r Router) handleTenantJob(ctx context.Context, handler JobHandler, found bool, msg JobMessage) error {
+	slug := strings.TrimSpace(msg.TenantSlug)
+	if slug == "" {
 		return tenant.ErrNoTenantIdInContext
 	}
-	if err := r.verifier.Verify(msg.MessageID, msg.TenantSlug, msg.JobType, msg.TenantAttestation); err != nil {
+	if slug == attestation.PlatformSubject {
+		return ErrJobScopeMismatch
+	}
+	if err := r.verifier.Verify(msg.MessageID, slug, msg.JobType, msg.TenantAttestation); err != nil {
 		return err
 	}
 
-	msgCtx := tenant.WithTenantID(ctx, msg.TenantSlug)
-
-	if handler, found := r.handlers[msg.JobType]; found {
+	msgCtx := tenant.WithTenantID(ctx, slug)
+	if found {
 		if err := handler.Handle(msgCtx, msg); err != nil {
 			return err
 		}
-		log.Printf("job routed: id=%s type=%s tenant=%s", msg.MessageID, msg.JobType, msg.TenantSlug)
+		log.Printf("job routed: id=%s type=%s tenant=%s", msg.MessageID, msg.JobType, slug)
 		return nil
 	}
 
-	log.Printf("job processed without handler: id=%s type=%s tenant=%s", msg.MessageID, msg.JobType, msg.TenantSlug)
+	log.Printf("job processed without handler: id=%s type=%s tenant=%s", msg.MessageID, msg.JobType, slug)
 	return nil
 }
 

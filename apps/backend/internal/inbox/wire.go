@@ -14,11 +14,14 @@ import (
 	inboxRepo "github.com/bowerbird/internal/inbox/adapters/repository/postgres"
 	"github.com/bowerbird/internal/inbox/application"
 	"github.com/bowerbird/internal/inbox/application/commands"
+	"github.com/bowerbird/internal/inbox/application/ports"
 	"github.com/bowerbird/internal/inbox/application/queries"
+	inboxContracts "github.com/bowerbird/internal/inbox/contracts/jobs"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/jobs"
+	"github.com/bowerbird/internal/platform/scheduler"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
 )
 
@@ -48,9 +51,7 @@ func NewApplication(
 	var sendMessageCommand *commands.SendMessageCommand
 	var downloadAttachmentCommand *commands.DownloadAttachmentCommand
 
-	hasGmail := cfg.GoogleClientID != "" && cfg.GoogleClientSecret != ""
-	hasMicrosoft := cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != ""
-	if hasGmail || hasMicrosoft {
+	if mailSyncEnabled(cfg) {
 		if eventBus == nil {
 			panic("event bus is required for inbox sync")
 		}
@@ -152,6 +153,7 @@ func RegisterEvents(
 func RegisterJobs(
 	app *application.Application,
 	features entitlementsapi.Features,
+	tenants ports.ActiveTenantLister,
 ) []jobs.JobHandler {
 	if app == nil {
 		panic("inbox application is required")
@@ -160,7 +162,34 @@ func RegisterJobs(
 		panic("feature checker is required")
 	}
 
-	return []jobs.JobHandler{
-		inboxJobs.NewProcessInboxSyncAccount(app.Commands.SyncAccount, features),
+	var handlers []jobs.JobHandler
+	if app.Commands.SyncAccount != nil {
+		handlers = append(handlers, inboxJobs.NewProcessInboxSyncAccount(app.Commands.SyncAccount, features))
 	}
+	if app.Commands.SyncAllAccounts != nil {
+		if tenants == nil {
+			panic("tenant lister is required")
+		}
+		handlers = append(handlers, inboxJobs.NewProcessInboxSyncAllAccounts(
+			commands.NewPlatformSyncAllAccountsCommand(app.Commands.SyncAllAccounts, features, tenants),
+		))
+	}
+	return handlers
+}
+
+func RegisterSchedules(cfg config.Config) []scheduler.Rule {
+	if !mailSyncEnabled(cfg) {
+		return nil
+	}
+	return []scheduler.Rule{{
+		Name:     "inbox-sync-all",
+		Schedule: "rate(5 minutes)",
+		JobType:  inboxContracts.InboxSyncAllAccountsType,
+	}}
+}
+
+func mailSyncEnabled(cfg config.Config) bool {
+	hasGmail := cfg.GoogleClientID != "" && cfg.GoogleClientSecret != ""
+	hasMicrosoft := cfg.MicrosoftClientID != "" && cfg.MicrosoftClientSecret != ""
+	return hasGmail || hasMicrosoft
 }

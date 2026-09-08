@@ -62,6 +62,40 @@ func TestSyncAllConnectionsCommand_ReturnsDispatchErrors(t *testing.T) {
 	assert.Len(t, jobDispatcher.jobs, 2)
 }
 
+func TestSyncAllConnectionsCommand_ExecuteScheduledPartialDispatchDoesNotFail(t *testing.T) {
+	connectionsService := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{
+			{ID: "acc-1", Provider: "gmail"},
+			{ID: "acc-2", Provider: "gmail"},
+		},
+	}
+	jobDispatcher := &fakeSyncAccountJobDispatcher{failAccountID: "acc-1"}
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	err := cmd.ExecuteScheduled(ctx)
+
+	require.NoError(t, err)
+	assert.Len(t, jobDispatcher.jobs, 2)
+}
+
+func TestSyncAllConnectionsCommand_ExecuteScheduledAllDispatchFailuresReturnError(t *testing.T) {
+	connectionsService := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{
+			{ID: "acc-1", Provider: "gmail"},
+			{ID: "acc-2", Provider: "gmail"},
+		},
+	}
+	jobDispatcher := &fakeSyncAccountJobDispatcher{failAll: true}
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	err := cmd.ExecuteScheduled(ctx)
+
+	require.Error(t, err)
+	assert.Len(t, jobDispatcher.jobs, 2)
+}
+
 func TestSyncAllConnectionsCommand_SkipsPrivateAccountsFromOtherUsers(t *testing.T) {
 	connectionsService := &fakeConnectionsInternalService{
 		activeConnections: []connectionsapi.ConnectionInfo{
@@ -82,14 +116,36 @@ func TestSyncAllConnectionsCommand_SkipsPrivateAccountsFromOtherUsers(t *testing
 	assert.Equal(t, "acc-shared", jobDispatcher.jobs[1].AccountID)
 }
 
+func TestSyncAllConnectionsCommand_ExecuteScheduledIncludesPrivateAccounts(t *testing.T) {
+	connectionsService := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{
+			{ID: "acc-private-me", Provider: "gmail", SharingPolicy: "private", OwnerUserID: "user-1"},
+			{ID: "acc-private-other", Provider: "gmail", SharingPolicy: "private", OwnerUserID: "user-2"},
+			{ID: "acc-shared", Provider: "gmail", SharingPolicy: "organization", OwnerUserID: "user-2"},
+		},
+	}
+	jobDispatcher := &fakeSyncAccountJobDispatcher{}
+	cmd := inboxCommands.NewSyncAllAccountsCommand(connectionsService, jobDispatcher)
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	err := cmd.ExecuteScheduled(ctx)
+
+	require.NoError(t, err)
+	require.Len(t, jobDispatcher.jobs, 3)
+	assert.Equal(t, "acc-private-me", jobDispatcher.jobs[0].AccountID)
+	assert.Equal(t, "acc-private-other", jobDispatcher.jobs[1].AccountID)
+	assert.Equal(t, "acc-shared", jobDispatcher.jobs[2].AccountID)
+}
+
 type fakeSyncAccountJobDispatcher struct {
 	jobs          []inboxCommands.SyncAccountJob
 	failAccountID string
+	failAll       bool
 }
 
 func (f *fakeSyncAccountJobDispatcher) DispatchSyncAccount(ctx context.Context, job inboxCommands.SyncAccountJob) error {
 	f.jobs = append(f.jobs, job)
-	if job.AccountID == f.failAccountID {
+	if f.failAll || job.AccountID == f.failAccountID {
 		return errors.New("dispatch failed")
 	}
 	return nil

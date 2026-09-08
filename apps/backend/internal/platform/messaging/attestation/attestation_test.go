@@ -22,3 +22,12 @@ func TestVerifyRejectsMissingSignature(t *testing.T) {
 	v := NewVerifier("test-secret")
 	require.ErrorIs(t, v.Verify("msg-1", "acme", "SmokeJob", ""), ErrMissingAttestation)
 }
+
+func TestEmptySlugSignsAsPlatformSubject(t *testing.T) {
+	v := NewVerifier("test-secret")
+	empty := v.Sign("msg-1", "", "PlatformJob")
+	reserved := v.Sign("msg-1", PlatformSubject, "PlatformJob")
+	require.Equal(t, reserved, empty)
+	require.NoError(t, v.Verify("msg-1", "", "PlatformJob", reserved))
+	require.ErrorIs(t, v.Verify("msg-1", "acme", "PlatformJob", empty), ErrInvalidAttestation)
+}
