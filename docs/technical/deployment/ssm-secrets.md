@@ -1,25 +1,47 @@
-# AWS secrets (Secrets Manager)
+# AWS secrets (Parameter Store)
 
 Applies when `DEPLOYMENT_TARGET=aws`. Local and on-prem use plain `.env`
 ([backend-api](../architecture/backend-api.md#config-and-secrets)).
 
-AWS Lambdas load one JSON secret at boot (`config.Load()`). The primary store
-is **AWS Secrets Manager**. SSM Parameter Store SecureString remains a
-fallback for existing parameters.
+AWS Lambdas load one JSON blob at cold start (`config.Load()`), then
+`platform.NewModule()` uses that `Config` to open Postgres, S3, and the
+outbox adapters. The store is **SSM Parameter Store** (`SecureString`),
+encrypted with the stack customer-managed KMS key.
+
+Do not put this JSON in Lambda environment variables. Env holds
+non-secret routing only.
 
 ## Parameter
 
-| Setting                                    | Default | Description                          |
-| ------------------------------------------ | ------- | ------------------------------------ |
-| `SECRET_ARN` / `SECRETS_MANAGER_SECRET_ID` | (none)  | Secrets Manager name or ARN          |
-| `SSM_PARAMETER_NAME`                       | (none)  | Used only when `SECRET_ARN` is empty |
+| Setting              | Default | Description                         |
+| -------------------- | ------- | ----------------------------------- |
+| `SSM_PARAMETER_NAME` | (none)  | Required on `DEPLOYMENT_TARGET=aws` |
 
-Pulumi writes `/bowerbird/${ENV}/app` and sets `SECRET_ARN` on every Lambda.
-Keys use **snake_case** JSON field names matching struct tags in
-`apps/backend/internal/platform/config/config.go`.
+Pulumi writes `/bowerbird/${ENV}/secrets` as a Standard-tier
+`SecureString` (`keyId` = stack CMK) and sets `SSM_PARAMETER_NAME` on
+every Lambda.
 
-Do not put this JSON in Lambda environment variables. Env holds non-secret
-routing only (`DEPLOYMENT_TARGET`, `SECRET_ARN`, public URLs).
+`config.Load()` calls `GetParameter` with `WithDecryption: true` and
+unmarshals snake_case JSON into
+`apps/backend/internal/platform/config/config.go`. Empty
+`SSM_PARAMETER_NAME` on AWS is a boot error; there is no Secrets
+Manager path.
+
+Standard Parameter Store is 4 KB. Keep this payload under that limit.
+
+## Runtime path
+
+1. Lambda env: `DEPLOYMENT_TARGET=aws`, `SSM_PARAMETER_NAME`, public URLs.
+2. `config.Load()` decrypts the parameter and fills `Config` (Neon URLs,
+   queue URL, event bus, S3 bucket, JWT, encryption keys, Gemini, OAuth).
+3. `platform.NewModule()` instantiates the infrastructure layer from
+   that `Config` (control-plane pool, tenant registry, S3, outbox).
+4. Entrypoints (`cmd/aws/lambda/*`) consume the module. The migrate
+   Lambda calls `config.Load()` directly and uses
+   `DirectDatabaseURL()`.
+
+IAM on each function: `ssm:GetParameter` / `ssm:GetParameters` on the
+parameter ARN, plus `kms:Decrypt` on the CMK.
 
 ## Required fields (AWS)
 
@@ -56,21 +78,22 @@ EventBridge directly.
 | `backend_url`             | string  | API base URL                                 |
 | `debug`                   | boolean | Enable debug mode                            |
 
-## Not in the secret (Lambda env only)
+## Not in the parameter (Lambda env only)
 
 - `DEPLOYMENT_TARGET=aws`
 - `AWS_REGION`
-- `SECRET_ARN`
+- `SSM_PARAMETER_NAME`
 - `TENANT_MIGRATIONS_DIR` (HTTP and migrate Lambdas)
+- `ALLOWED_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` (also copied into JSON)
 
-On-prem-only keys (`rabbitmq_url`, `minio_endpoint_url`, …) belong in `.env`,
-not this secret.
+On-prem-only keys (`rabbitmq_url`, `minio_endpoint_url`, and similar)
+belong in `.env`, not this parameter.
 
 ## Neon URLs
 
-Use the pooler hostname (`-pooler`) for `database_url`. PgBouncer transaction
-mode cannot run `CREATE DATABASE` or some migration session features, so
-`database_direct_url` must omit `-pooler`.
+Use the pooler hostname (`-pooler`) for `database_url`. PgBouncer
+transaction mode cannot run `CREATE DATABASE` or some migration session
+features, so `database_direct_url` must omit `-pooler`.
 
 Pulumi fills both from the Neon project outputs.
 
@@ -98,5 +121,5 @@ Pulumi fills both from the Neon project outputs.
 }
 ```
 
-After updating the secret, deploy new Lambda versions or wait for cold starts
-so processes reload config.
+After you update the parameter, wait for a Lambda cold start so the
+process reloads config. You can also publish a new function version.

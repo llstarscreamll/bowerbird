@@ -10,7 +10,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.45.25
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.73.0
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.48.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.34.4
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.68.6
 	github.com/golang-jwt/jwt/v5 v5.3.1

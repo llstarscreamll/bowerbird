@@ -2,10 +2,10 @@
 
 `DEPLOYMENT_TARGET` selects infrastructure adapters at boot. Application code (use cases, domain, contracts) stays the same; only platform wiring changes.
 
-| Profile  | When                                    | Messaging         | Object storage        | Secrets              |
-| -------- | --------------------------------------- | ----------------- | --------------------- | -------------------- |
-| `onprem` | Local dev, client VM (`deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Plain `.env`         |
-| `aws`    | Production SaaS (Pulumi)                | EventBridge + SQS | AWS S3                | Secrets Manager JSON |
+| Profile  | When                                    | Messaging         | Object storage        | Secrets               |
+| -------- | --------------------------------------- | ----------------- | --------------------- | --------------------- |
+| `onprem` | Local dev, client VM (`deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Plain `.env`          |
+| `aws`    | Production SaaS (Pulumi)                | EventBridge + SQS | AWS S3                | SSM SecureString JSON |
 
 See [On-prem stack](./onprem-runtime.md), [AWS deploy](../deployment/aws.md),
 [AWS secrets](../deployment/ssm-secrets.md).
@@ -56,19 +56,23 @@ Workers and the API use **Air** hot reload (`.air.toml`, `.air.worker-*.toml`).
 
 ### AWS
 
-| Process         | Entrypoint                                                                       |
-| --------------- | -------------------------------------------------------------------------------- |
-| HTTP API        | Lambda (`cmd/aws/lambda/http`)                                                   |
-| Outbox relay    | Lambda (`cmd/aws/lambda/outbox-relay`), EventBridge Scheduler (`rate(1 minute)`) |
-| Events consumer | Lambda (`cmd/aws/lambda/eventbridge`)                                            |
-| Jobs consumer   | Lambda (`cmd/aws/lambda/sqs`)                                                    |
-| Scheduler       | Lambda (`cmd/aws/lambda/scheduler`) via EventBridge rules                        |
+Postgres is **Neon** (pooled URL for Lambdas, direct URL for migrations and
+`CREATE DATABASE`). There is no Amazon RDS.
+
+| Process         | Entrypoint                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------------- |
+| HTTP API        | Lambda (`cmd/aws/lambda/http`)                                                                                 |
+| Outbox relay    | Lambda (`cmd/aws/lambda/outbox-relay`), EventBridge Scheduler (`rate(1 minute)`)                               |
+| Events consumer | Lambda (`cmd/aws/lambda/eventbridge`)                                                                          |
+| Jobs consumer   | Lambda (`cmd/aws/lambda/sqs`)                                                                                  |
+| Scheduler       | Lambda (`cmd/aws/lambda/scheduler`) via EventBridge Scheduler                                                  |
+| Migrations      | Lambda (`cmd/aws/lambda/migrate`), invoked during `pulumi up` when its package changes, before other artifacts |
 
 ## Platform adapters (by concern)
 
 | Concern          | Package                                        | `onprem`                                                   | `aws`                                                         |
 | ---------------- | ---------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| Config / secrets | `internal/platform/config`                     | `.env`                                                     | Secrets Manager JSON (SSM fallback)                           |
+| Config / secrets | `internal/platform/config`                     | `.env`                                                     | SSM Parameter Store SecureString JSON                         |
 | Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                             | EventBridge                                                   |
 | Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                            | SQS                                                           |
 | Broker transport | `internal/platform/messaging`                  | AMQP                                                       | AWS SDK                                                       |

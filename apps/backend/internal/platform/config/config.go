@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
 )
@@ -33,7 +32,6 @@ type Config struct {
 	AWSAccessKeyID                string    `json:"aws_access_key_id"`
 	AWSSecretAccessKey            string    `json:"aws_secret_access_key"`
 	SSMParameterName              string    `json:"ssm_parameter_name"`
-	SecretsManagerSecretID        string    `json:"secrets_manager_secret_id"`
 	JWTAccessSecret               string    `json:"jwt_access_secret"`
 	JWTRefreshSecret              string    `json:"jwt_refresh_secret"`
 	AllowedOrigins                string    `json:"allowed_origins"`
@@ -93,20 +91,16 @@ func Load(ctx context.Context) (Config, error) {
 	cfg.Debug = getEnvAsBool("DEBUG", defaultDebug)
 
 	if cfg.DeploymentTarget == DeploymentTargetAWS {
-		cfg.SecretsManagerSecretID = firstNonEmpty(os.Getenv("SECRET_ARN"), os.Getenv("SECRETS_MANAGER_SECRET_ID"))
 		cfg.SSMParameterName = os.Getenv("SSM_PARAMETER_NAME")
+		if cfg.SSMParameterName == "" {
+			return cfg, fmt.Errorf("SSM_PARAMETER_NAME is required when DEPLOYMENT_TARGET=aws")
+		}
 		awsCfg, err := awsConfig.Load(ctx, cfg.AWSRegion, cfg.AWSEndpointURL, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey)
 		if err != nil {
-			return cfg, fmt.Errorf("load aws config for secrets: %w", err)
+			return cfg, fmt.Errorf("load aws config for ssm: %w", err)
 		}
-		if cfg.SecretsManagerSecretID != "" {
-			if err := loadSecretsManagerSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
-				return cfg, fmt.Errorf("load secrets manager: %w", err)
-			}
-		} else if cfg.SSMParameterName != "" {
-			if err := loadSSMSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
-				return cfg, fmt.Errorf("load ssm secrets: %w", err)
-			}
+		if err := loadSSMSecrets(ctx, awsCfg, cfg.AWSEndpointURL, &cfg); err != nil {
+			return cfg, fmt.Errorf("load ssm secrets: %w", err)
 		}
 	}
 
@@ -262,28 +256,6 @@ func validateSecurityConfig(cfg Config) error {
 		return fmt.Errorf("MESSAGING_ATTESTATION_SECRET must not use the local default outside APP_ENV=local")
 	}
 	return nil
-}
-
-func loadSecretsManagerSecrets(ctx context.Context, awsCfg aws.Config, endpointURL string, cfg *Config) error {
-	var client *secretsmanager.Client
-	if endpointURL != "" {
-		client = secretsmanager.NewFromConfig(awsCfg, func(o *secretsmanager.Options) {
-			o.BaseEndpoint = &endpointURL
-		})
-	} else {
-		client = secretsmanager.NewFromConfig(awsCfg)
-	}
-
-	out, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: &cfg.SecretsManagerSecretID,
-	})
-	if err != nil {
-		return err
-	}
-	if out.SecretString == nil || *out.SecretString == "" {
-		return fmt.Errorf("secret %s is empty", cfg.SecretsManagerSecretID)
-	}
-	return json.Unmarshal([]byte(*out.SecretString), cfg)
 }
 
 func loadSSMSecrets(ctx context.Context, awsCfg aws.Config, endpointURL string, cfg *Config) error {

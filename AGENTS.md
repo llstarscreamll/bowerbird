@@ -24,7 +24,7 @@
 - Backend tests: always `pnpm --filter @bowerbird/backend test` (full `go test ./...`). Never verify with package-scoped or `-run` filtered `go test`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
 - E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:browser|test:e2e:http|test:e2e:ui`.
-- Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`.
+- Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`. `deploy` invokes the migrate Lambda when that package changes, then publishes the other Lambdas and web assets.
 
 ## Backend (`apps/backend`)
 
@@ -46,7 +46,7 @@
 - Migrations CLI is `cmd/onprem/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
 - Runtime config (`internal/platform/config/config.go`):
   - `onprem` (local + client deploy): plain `.env` — `MINIO_ENDPOINT_URL`, `RABBITMQ_URL`, encryption keys, API keys.
-  - `aws`: Secrets Manager JSON at `SECRET_ARN` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)).
+  - `aws`: SSM Parameter Store SecureString JSON at `SSM_PARAMETER_NAME` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)). Loaded at Lambda boot by `config.Load()` before `platform.NewModule()`.
 - Local dev object storage: MinIO in root `docker-compose.yml` (`:9000` API, `:9001` console). Bucket bootstrap: `apps/backend/scripts/init-minio.sh` via `pnpm run infra:up` (`minio-init` service).
 
 ## PWA (`apps/pwa`)

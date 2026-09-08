@@ -62,20 +62,19 @@ func TestLoad_RejectsExampleEncryptionKeysOutsideLocal(t *testing.T) {
 	_, _ = Load(context.Background())
 }
 
-func TestLoad_AWSUsesSecretsManagerSecretID(t *testing.T) {
+func TestLoad_AWSRequiresSSMParameterName(t *testing.T) {
 	t.Setenv("APP_ENV", "local")
 	t.Setenv("DEPLOYMENT_TARGET", DeploymentTargetAWS)
-	t.Setenv("SECRET_ARN", "arn:aws:secretsmanager:us-east-1:123456789012:secret:bowerbird/test")
+	t.Setenv("SSM_PARAMETER_NAME", "")
 	t.Setenv("DATABASE_URL", "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable")
 	t.Setenv("S3_BUCKET_NAME", "test-bucket")
 	t.Setenv("GEMINI_API_KEY", "test-key")
-	t.Setenv("EVENT_BUS_NAME", "test-bus")
 	t.Setenv("INBOX_CREDENTIALS_ENCRYPTION_KEY", "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=")
 	t.Setenv("TENANT_SECRETS_ENCRYPTION_KEY", "Ym93ZXJiaXJkLWxvY2FsLXNlY3JldHMta2V5LTMyYiE=")
 
 	_, err := Load(context.Background())
 	if err == nil {
-		t.Fatal("expected Secrets Manager load error without secret present")
+		t.Fatal("expected error when SSM_PARAMETER_NAME is empty on aws")
 	}
 }
 
@@ -95,24 +94,6 @@ func TestLoad_AWSUsesSSMParameterName(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected SSM load error without parameter present")
 	}
-}
-
-func TestLoad_AWSRequiresEventBusName(t *testing.T) {
-	t.Setenv("APP_ENV", "local")
-	t.Setenv("DEPLOYMENT_TARGET", DeploymentTargetAWS)
-	t.Setenv("DATABASE_URL", "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable")
-	t.Setenv("S3_BUCKET_NAME", "test-bucket")
-	t.Setenv("GEMINI_API_KEY", "test-key")
-	t.Setenv("INBOX_CREDENTIALS_ENCRYPTION_KEY", "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=")
-	t.Setenv("TENANT_SECRETS_ENCRYPTION_KEY", "Ym93ZXJiaXJkLWxvY2FsLXNlY3JldHMta2V5LTMyYiE=")
-	t.Setenv("SSM_PARAMETER_NAME", "")
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic for missing EVENT_BUS_NAME on aws")
-		}
-	}()
-	_, _ = Load(context.Background())
 }
 
 func init() {

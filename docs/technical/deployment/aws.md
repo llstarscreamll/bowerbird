@@ -3,8 +3,8 @@
 Dual-runtime overview: [Runtime profiles](../architecture/runtime-profiles.md).
 
 This stack deploys the **aws/lambda** target. Postgres runs on **Neon**, not
-Amazon RDS. DNS is in **Cloudflare**. Application secrets live in **AWS
-Secrets Manager** under a customer-managed KMS key.
+Amazon RDS. DNS is in **Cloudflare**. Application secrets live in **SSM
+Parameter Store** (`SecureString`) under a customer-managed KMS key.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ Secrets Manager** under a customer-managed KMS key.
 | Platform schedules | EventBridge Scheduler → scheduler Lambda (`outbox-sweeper`, optional `inbox-sync-all`)                  |
 | Object storage     | Private S3 bucket (KMS), browser CORS for the app origin                                                |
 | Postgres           | Neon project in `aws-us-east-1` (pooled URL for Lambdas, direct URL for migrations / `CREATE DATABASE`) |
-| Secrets            | Secrets Manager JSON, CMK, rotation-ready                                                               |
+| Secrets            | SSM Parameter Store `SecureString` JSON, CMK                                                            |
 | DNS                | Cloudflare DNS-only (grey cloud) CNAMEs to CloudFront and API Gateway                                   |
 | Observability      | CloudWatch logs (30/90 day retention), X-Ray, Lambda/SQS alarms, optional SNS email                     |
 
@@ -34,14 +34,14 @@ EventBridge Scheduler's minimum rate is one minute, so AWS relay ticks at
 
 ## Well-Architected mapping
 
-| Pillar                 | How this stack applies it                                                                                                                                 |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Operational excellence | Pulumi TypeScript, tagged resources, CloudWatch alarms, X-Ray                                                                                             |
-| Security               | CMK, Secrets Manager (no secrets in Lambda env), IAM per function, S3 Block Public Access, WAF managed rules, TLS 1.2+, Cloudflare DNS validation for ACM |
-| Reliability            | Multi-AZ CloudFront/API Gateway/Lambda, SQS DLQ, Lambda DLQ, Neon HA + PITR history retention                                                             |
-| Performance            | Lambda arm64, Neon pooler for bursty connections, CloudFront cache split (hashed vs entry)                                                                |
-| Cost                   | No NAT/RDS/RDS Proxy, Lambda + Neon scale-to-zero on non-prod (`suspendTimeoutSeconds`)                                                                   |
-| Sustainability         | Graviton Lambdas, serverless data plane                                                                                                                   |
+| Pillar                 | How this stack applies it                                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Operational excellence | Pulumi TypeScript, tagged resources, CloudWatch alarms, X-Ray                                                                                              |
+| Security               | CMK, SSM SecureString (no secrets in Lambda env), IAM per function, S3 Block Public Access, WAF managed rules, TLS 1.2+, Cloudflare DNS validation for ACM |
+| Reliability            | Multi-AZ CloudFront/API Gateway/Lambda, SQS DLQ, Lambda DLQ, Neon HA + PITR history retention                                                              |
+| Performance            | Lambda arm64, Neon pooler for bursty connections, CloudFront cache split (hashed vs entry)                                                                 |
+| Cost                   | No NAT/RDS/RDS Proxy, Lambda + Neon scale-to-zero on non-prod (`suspendTimeoutSeconds`)                                                                    |
+| Sustainability         | Graviton Lambdas, serverless data plane                                                                                                                    |
 
 Account-level GuardDuty and CloudTrail stay outside this stack. Enable them on
 the AWS account.
@@ -64,17 +64,18 @@ hostname. Do not orange-cloud these names.
 
 See [AWS secrets](./ssm-secrets.md). Pulumi writes the JSON blob, including
 Neon `database_url` (pooler) and `database_direct_url` (direct). Lambdas
-receive only `SECRET_ARN`.
+receive only `SSM_PARAMETER_NAME`. At cold start, `config.Load()` decrypts
+the parameter and `platform.NewModule()` wires the infrastructure layer.
 
-Generated once and stored in Pulumi state + Secrets Manager:
+Generated once and stored in Pulumi state + Parameter Store:
 
 - JWT access/refresh secrets
 - Inbox and tenant encryption keys
 - Messaging attestation secret
 
-Pass `GEMINI_API_KEY` (required) and optional OAuth client IDs/secrets through
-`.env` at deploy time. They are copied into Secrets Manager, not Lambda
-environment variables.
+Pass `GEMINI_API_KEY` (required) and optional OAuth client IDs/secrets
+through `.env` at deploy time. They are copied into the SecureString
+parameter, not Lambda environment variables.
 
 ## Neon
 
@@ -89,7 +90,8 @@ Pulumi creates one Neon project per `ENV`:
 Set `NEON_API_KEY` (and optional `NEON_ORG_ID`) in `.env`. The provider reads
 the key from the Pulumi Neon provider config.
 
-After the first `pulumi up`, run control-plane migrations:
+After the first `pulumi up`, control-plane migrations already ran as
+part of that apply (see Deploy). Re-run them out of band with:
 
 ```bash
 pnpm --filter @bowerbird/infra migrate
@@ -121,8 +123,12 @@ That invokes the migrate Lambda, which uses the **direct** Neon URL.
    Root `pnpm run deploy` builds all packages (including PWA assets and Go
    Lambda zips) then runs `pulumi up --yes` for `@bowerbird/infra`.
 
-5. Run `pnpm --filter @bowerbird/infra migrate`.
-6. Confirm ACM DNS records in Cloudflare and `pulumi stack output`.
+   When the migrate Lambda package changes (control-plane or tenant SQL
+   lives in that zip), Pulumi updates it, invokes it, and only then
+   publishes the other Lambdas and web objects. If the invoke fails, the
+   apply stops and application artifacts stay on the previous version.
+
+5. Confirm ACM DNS records in Cloudflare and `pulumi stack output`.
 
 ## Constraints
 

@@ -11,7 +11,7 @@ import { defaultTags, resourcePrefix } from './names';
 export interface StackOutputs {
   webUrl: pulumi.Output<string>;
   apiUrl: pulumi.Output<string>;
-  secretArn: pulumi.Output<string>;
+  ssmParameterName: pulumi.Output<string>;
   neonProjectId: pulumi.Output<string>;
   jobsQueueUrl: pulumi.Output<string>;
   migrateFunctionName: pulumi.Output<string>;
@@ -131,16 +131,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
   const jwtRefresh = new random.RandomPassword('jwt-refresh', { length: 64, special: false });
   const attestation = new random.RandomPassword('attestation', { length: 64, special: false });
 
-  const secret = new aws.secretsmanager.Secret(
-    'app',
-    {
-      name: `/bowerbird/${cfg.envName}/app`,
-      kmsKeyId: key.arn,
-      recoveryWindowInDays: cfg.isProd ? 30 : 0,
-    },
-    { ...awsOpts, protect: true },
-  );
-
   const secretString = pulumi
     .all({
       pooled: neonProject.connectionUriPooler,
@@ -180,51 +170,74 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
       }),
     );
 
-  new aws.secretsmanager.SecretVersion('app', { secretId: secret.id, secretString }, awsOpts);
+  const secretsParam = new aws.ssm.Parameter(
+    'app',
+    {
+      name: `/bowerbird/${cfg.envName}/secrets`,
+      type: 'SecureString',
+      keyId: key.arn,
+      tier: 'Standard',
+      value: secretString,
+    },
+    { ...awsOpts, protect: true },
+  );
 
   const lambdaEnv = {
     DEPLOYMENT_TARGET: 'aws',
     APP_ENV: cfg.envName,
     AWS_REGION: cfg.awsRegion,
-    SECRET_ARN: secret.arn,
+    SSM_PARAMETER_NAME: secretsParam.name,
     TENANT_MIGRATIONS_DIR: 'migrations/tenant',
     ALLOWED_ORIGINS: `https://${cfg.appDomain},https://${cfg.rootDomain}`,
     FRONTEND_URL: `https://${cfg.appDomain}`,
     BACKEND_URL: `https://${cfg.apiDomain}`,
   };
 
-  const httpFn = goLambda(cfg, prefix, 'http', 'http', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
+  const migrateFn = goLambda(cfg, prefix, 'migrate', 'migrate', key, secretsParam, lambdaDlq, lambdaEnv, awsOpts, {
+    timeout: 120,
+    memory: 512,
+    extraStatements: [kmsDecrypt(key.arn)],
+    includeMigrations: true,
+  });
+  const migrateRun = new aws.lambda.Invocation(
+    'schema',
+    {
+      functionName: migrateFn.name,
+      input: '{}',
+      triggers: {
+        code: migrateFn.sourceCodeHash,
+      },
+    },
+    { ...awsOpts, dependsOn: [migrateFn, secretsParam] },
+  );
+  const afterSchema: AwsOpts = { ...awsOpts, dependsOn: [migrateRun] };
+
+  const httpFn = goLambda(cfg, prefix, 'http', 'http', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
     timeout: 29,
     memory: 512,
     extraStatements: [s3ObjectsPolicy(objectsBucket.arn), kmsDecrypt(key.arn)],
     includeMigrations: true,
   });
-  const jobsFn = goLambda(cfg, prefix, 'sqs', 'jobs', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
+  const jobsFn = goLambda(cfg, prefix, 'sqs', 'jobs', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
     timeout: 60,
     memory: 1024,
     ephemeralMb: 1024,
     extraStatements: [s3ObjectsPolicy(objectsBucket.arn), sqsConsume(jobsQueue.arn), kmsDecrypt(key.arn)],
   });
-  const eventsFn = goLambda(cfg, prefix, 'eventbridge', 'events', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
+  const eventsFn = goLambda(cfg, prefix, 'eventbridge', 'events', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
     timeout: 30,
     memory: 512,
     extraStatements: [s3ObjectsPolicy(objectsBucket.arn), kmsDecrypt(key.arn)],
   });
-  const relayFn = goLambda(cfg, prefix, 'outbox-relay', 'outbox-relay', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
+  const relayFn = goLambda(cfg, prefix, 'outbox-relay', 'outbox-relay', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
     timeout: 60,
     memory: 512,
     extraStatements: [allowEventBridge(eventBus.arn), allowSqsSend(jobsQueue.arn), kmsDecrypt(key.arn)],
   });
-  const schedulerFn = goLambda(cfg, prefix, 'scheduler', 'scheduler', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
+  const schedulerFn = goLambda(cfg, prefix, 'scheduler', 'scheduler', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
     timeout: 60,
     memory: 512,
     extraStatements: [allowEventBridge(eventBus.arn), allowSqsSend(jobsQueue.arn), kmsDecrypt(key.arn)],
-  });
-  const migrateFn = goLambda(cfg, prefix, 'migrate', 'migrate', key, secret, lambdaDlq, lambdaEnv, awsOpts, {
-    timeout: 120,
-    memory: 512,
-    extraStatements: [kmsDecrypt(key.arn)],
-    includeMigrations: true,
   });
 
   new aws.lambda.EventSourceMapping(
@@ -517,7 +530,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     awsOpts,
   );
 
-  syncWebAssets(cfg, webBucket, distribution, awsOpts);
+  syncWebAssets(cfg, webBucket, distribution, afterSchema);
 
   const apiWaf = apiWebAcl(prefix, awsOpts);
   new aws.wafv2.WebAclAssociation(
@@ -550,14 +563,14 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
   return {
     webUrl: pulumi.interpolate`https://${cfg.appDomain}`,
     apiUrl: pulumi.interpolate`https://${cfg.apiDomain}`,
-    secretArn: secret.arn,
+    ssmParameterName: secretsParam.name,
     neonProjectId: neonProject.id,
     jobsQueueUrl: jobsQueue.url,
     migrateFunctionName: migrateFn.name,
   };
 }
 
-type AwsOpts = { provider: aws.Provider };
+type AwsOpts = { provider: aws.Provider; dependsOn?: pulumi.Resource[] };
 
 function hardenBucket(name: string, bucket: aws.s3.Bucket, keyArn: pulumi.Input<string>, opts: AwsOpts, extra?: { cors?: aws.types.input.s3.BucketCorsConfigurationV2CorsRule[] }): void {
   new aws.s3.BucketPublicAccessBlock(
@@ -592,7 +605,7 @@ function goLambda(
   entry: string,
   name: string,
   key: aws.kms.Key,
-  secret: aws.secretsmanager.Secret,
+  secretsParam: aws.ssm.Parameter,
   dlq: aws.sqs.Queue,
   environment: Record<string, pulumi.Input<string>>,
   opts: AwsOpts,
@@ -613,6 +626,7 @@ function goLambda(
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(bootstrap, '');
   }
+  const { dependsOn, ...baseOpts } = opts;
   const role = new aws.iam.Role(
     `${name}-role`,
     {
@@ -622,10 +636,10 @@ function goLambda(
         Statement: [{ Effect: 'Allow', Principal: { Service: 'lambda.amazonaws.com' }, Action: 'sts:AssumeRole' }],
       }),
     },
-    opts,
+    baseOpts,
   );
-  const policy = pulumi.all([secret.arn, key.arn, dlq.arn, ...args.extraStatements]).apply((values) => {
-    const secretArn = values[0] as string;
+  const policy = pulumi.all([secretsParam.arn, key.arn, dlq.arn, ...args.extraStatements]).apply((values) => {
+    const parameterArn = values[0] as string;
     const keyArn = values[1] as string;
     const dlqArn = values[2] as string;
     const extra = values.slice(3) as Record<string, unknown>[];
@@ -638,16 +652,16 @@ function goLambda(
           Resource: `arn:aws:logs:${cfg.awsRegion}:${cfg.awsAccountId}:*`,
         },
         { Effect: 'Allow', Action: ['xray:PutTraceSegments', 'xray:PutTelemetryRecords'], Resource: '*' },
-        { Effect: 'Allow', Action: ['secretsmanager:GetSecretValue'], Resource: secretArn },
+        { Effect: 'Allow', Action: ['ssm:GetParameter', 'ssm:GetParameters'], Resource: parameterArn },
         { Effect: 'Allow', Action: ['kms:Decrypt', 'kms:DescribeKey'], Resource: keyArn },
         { Effect: 'Allow', Action: ['sqs:SendMessage'], Resource: dlqArn },
         ...extra,
       ],
     });
   });
-  new aws.iam.RolePolicy(`${name}-policy`, { role: role.id, policy }, opts);
+  new aws.iam.RolePolicy(`${name}-policy`, { role: role.id, policy }, baseOpts);
 
-  new aws.cloudwatch.LogGroup(`${name}-logs`, { name: `/aws/lambda/${prefix}-${name}`, retentionInDays: cfg.isProd ? 90 : 30 }, opts);
+  new aws.cloudwatch.LogGroup(`${name}-logs`, { name: `/aws/lambda/${prefix}-${name}`, retentionInDays: cfg.isProd ? 90 : 30 }, baseOpts);
 
   const archiveDir = fs.existsSync(dir) ? dir : cfg.lambdaBuildDir;
   return new aws.lambda.Function(
@@ -667,7 +681,7 @@ function goLambda(
       code: new pulumi.asset.FileArchive(archiveDir),
       kmsKeyArn: key.arn,
     },
-    opts,
+    { ...baseOpts, dependsOn },
   );
 }
 

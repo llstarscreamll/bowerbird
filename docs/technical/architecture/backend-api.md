@@ -18,7 +18,7 @@ Cross-cutting adapters only (no business logic):
 
 | Area           | Packages                                                             |
 | -------------- | -------------------------------------------------------------------- |
-| Config         | `config` — env + optional SSM merge                                  |
+| Config         | `config` — env (on-prem) or SSM SecureString (AWS)                   |
 | Database       | `database` — pools, transactions                                     |
 | Messaging      | `messaging`, `events/adapters`, `jobs/adapters` — broker abstraction |
 | Outbox         | `outbox`, `outbox/relay` — transactional publish                     |
@@ -102,10 +102,10 @@ Local dev runs API + workers via Air; see [Getting started](../getting-started.m
 
 ## Config and secrets
 
-| Profile                          | Secrets source                                                                                 |
-| -------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `onprem` (local + client deploy) | Plain `.env` (`DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys) |
-| `aws`                            | Secrets Manager JSON at `SECRET_ARN` — see [AWS secrets](../deployment/ssm-secrets.md)         |
+| Profile                          | Secrets source                                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `onprem` (local + client deploy) | Plain `.env` (`DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys)  |
+| `aws`                            | SSM SecureString JSON at `SSM_PARAMETER_NAME` — see [AWS secrets](../deployment/ssm-secrets.md) |
 
 ## Local development runtime
 
