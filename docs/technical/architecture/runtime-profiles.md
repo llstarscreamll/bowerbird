@@ -33,7 +33,7 @@ Root `docker-compose.yml` (started by `pnpm run infra:up`):
 Caddy routes (see root `Caddyfile`):
 
 - `app.bowerbird.dev` → Angular `:4200`
-- `api.bowerbird.dev` → Go API `:8080`
+- `app.bowerbird.dev/api*` → Go API `:8080`
 - `media.bowerbird.dev` → MinIO `:9000` (presigned uploads/downloads)
 
 There is **no LocalStack** and **no Redis** in the local stack.

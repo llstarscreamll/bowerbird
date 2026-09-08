@@ -75,7 +75,7 @@ EventBridge directly.
 | `app_env`                 | string  | Runtime environment label                    |
 | `allowed_origins`         | string  | Comma-separated CORS origins                 |
 | `frontend_url`            | string  | PWA base URL                                 |
-| `backend_url`             | string  | API base URL                                 |
+| `backend_url`             | string  | Public API origin (same host as the PWA)     |
 | `debug`                   | boolean | Enable debug mode                            |
 
 ## Not in the parameter (Lambda env only)

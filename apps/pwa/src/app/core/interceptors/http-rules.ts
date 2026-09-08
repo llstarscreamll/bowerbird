@@ -1,4 +1,4 @@
-export const GLOBAL_ROUTES = new Set(['', 'login', 'lobby', 'platform', 'workspaces', 'onboarding', 'profile']);
+export const GLOBAL_ROUTES = new Set(['', 'login', 'lobby', 'platform', 'workspaces', 'onboarding', 'profile', 'api']);
 
 const AUTH_COOKIE_ENDPOINT_PATHS = ['/api/v1/auth/login-local', '/api/v1/auth/register-local', '/api/v1/auth/refresh', '/api/v1/auth/logout'];
 

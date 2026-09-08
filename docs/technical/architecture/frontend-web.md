@@ -43,7 +43,12 @@ Keep feature orchestration in `*/application/*store.ts`; keep presentation thin.
 
 ## Key paths
 
-- Config: `app.config.ts`, `angular.json`, `ngsw-config.json`, `public/manifest.webmanifest`
+- Config: `app.config.ts`, `angular.json`, `ngsw-config.json`,
+  `public/manifest.webmanifest`
+- API origin: `src/environments/environment.ts` (`apiUrl`). Local
+  points at `https://app.bowerbird.dev`. The production build uses an
+  empty `apiUrl` so `/api/v1/...` stays same-origin on CloudFront and
+  on-prem.
 
 ## Verify PWA build
 

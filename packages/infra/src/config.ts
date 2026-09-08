@@ -15,10 +15,8 @@ export interface InfraConfig {
   awsRegion: 'us-east-1';
   rootDomain: string;
   appSubdomain: string;
-  apiSubdomain: string;
   mediaSubdomain: string;
   appDomain: string;
-  apiDomain: string;
   mediaDomain: string;
   cloudflareApiToken: string;
   neonApiKey: string;
@@ -59,7 +57,6 @@ export function loadConfig(): InfraConfig {
 
   const rootDomain = required('ROOT_DOMAIN');
   const appSubdomain = optional('APP_SUBDOMAIN', 'app');
-  const apiSubdomain = optional('API_SUBDOMAIN', 'api');
   const mediaSubdomain = optional('MEDIA_SUBDOMAIN', 'media');
 
   return {
@@ -69,10 +66,8 @@ export function loadConfig(): InfraConfig {
     awsRegion: awsRegion as 'us-east-1',
     rootDomain,
     appSubdomain,
-    apiSubdomain,
     mediaSubdomain,
     appDomain: `${appSubdomain}.${rootDomain}`,
-    apiDomain: `${apiSubdomain}.${rootDomain}`,
     mediaDomain: `${mediaSubdomain}.${rootDomain}`,
     cloudflareApiToken: required('CLOUDFLARE_API_TOKEN'),
     neonApiKey: required('NEON_API_KEY'),

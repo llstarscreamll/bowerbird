@@ -69,8 +69,8 @@
 
 - Uses Playwright. Always run `pnpm run test:e2e:install` to ensure the local browser is present before running tests.
 - Specs are split into two Playwright projects: `tests/browser/` (real browser) and `tests/http/` (API contracts). Shared clients/factories live in `tests/support/`.
-- Default origins are local (`https://app.bowerbird.dev` / `https://api.bowerbird.dev` / `https://media.bowerbird.dev`). Override with `E2E_BASE_URL`, `E2E_API_BASE_URL`, and `E2E_MEDIA_BASE_URL` (see `.env.example`).
-- Local runs require the backend (`pnpm run dev`) with `api.bowerbird.dev` accessible (Caddy routing).
+- Default origins are local (`https://app.bowerbird.dev` for PWA and API, `https://media.bowerbird.dev` for MinIO). Override with `E2E_BASE_URL`, `E2E_API_BASE_URL`, and `E2E_MEDIA_BASE_URL` (see `.env.example`).
+- Local runs require the backend (`pnpm run dev`) with `app.bowerbird.dev` accessible (Caddy routes `/api*` to the Go API).
 - To test the full auth flow, the backend must be in `local` or `development` mode so the `/api/v1/auth/register-local` endpoint is enabled.
 - UI doesn't have a signup form yet, so fixtures rely on the API `registerLocalOrFail` directly for setup.
 - Commands from root: `pnpm run test:e2e` (all), `pnpm run test:e2e:browser`, `pnpm run test:e2e:http`, `pnpm run test:e2e:ui` (interactive).
@@ -78,7 +78,7 @@
 ## Local infra and deploy constraints
 
 - `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
-- `Caddyfile` maps `app.bowerbird.dev -> :4200` and `api.bowerbird.dev -> :8080`; use these domains locally for cookie/routing behavior.
+- `Caddyfile` maps `app.bowerbird.dev` → Angular `:4200`, `app.bowerbird.dev/api*` → Go API `:8080`, and `media.bowerbird.dev` → MinIO `:9000`; use `app.bowerbird.dev` locally for cookie/routing behavior.
 - Infra Pulumi entrypoint is `packages/infra/index.ts` and loads the repo-root `.env`:
   - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, and `GEMINI_API_KEY` must be set.
   - `AWS_REGION` must be `us-east-1` (CloudFront certificates and CloudFront WAF).

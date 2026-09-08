@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://api.bowerbird.com', // Replace with production URL
+  // Same-origin /api on the app host (CloudFront and on-prem Caddy).
+  apiUrl: '',
 };

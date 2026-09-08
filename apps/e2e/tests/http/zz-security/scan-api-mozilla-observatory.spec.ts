@@ -21,16 +21,16 @@ const scanApi = async (
 };
 
 test.describe('Mozilla HTTP Observatory — API', () => {
-  test('GET /health tiene grado A+', async ({ request }) => {
+  test('GET /api/health tiene grado A+', async ({ request }) => {
     // given
-    const operation = 'observatory GET /health';
+    const operation = 'observatory GET /api/health';
     const origin = apiOrigin();
     const client = new PlatformApiClient(request, origin);
 
     // when
-    const response = await client.call('/health');
-    const cors = await probeCors(request, `${origin}/health`, OBSERVATORY_CORS_ORIGIN);
-    const httpRedirect = await probeHttpRedirect(request, `${origin}/health`);
+    const response = await client.call('/api/health');
+    const cors = await probeCors(request, `${origin}/api/health`, OBSERVATORY_CORS_ORIGIN);
+    const httpRedirect = await probeHttpRedirect(request, `${origin}/api/health`);
     const scan = await scanApi(response, { cors, httpRedirect });
 
     // then

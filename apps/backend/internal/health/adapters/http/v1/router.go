@@ -20,6 +20,5 @@ func NewRouter(controller *Controller) *Router {
 }
 
 func (h *Router) Register(mux *http.ServeMux, cfg config.Config) {
-	mux.Handle("GET /health", api.Wrap(h.controller.Health, cfg))
 	mux.Handle("GET /api/health", api.Wrap(h.controller.Health, cfg))
 }

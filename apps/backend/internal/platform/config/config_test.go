@@ -19,6 +19,8 @@ func TestDirectDatabaseURLFallsBackToDatabaseURL(t *testing.T) {
 
 func TestLoad_DefaultDeploymentTargetOnPrem(t *testing.T) {
 	os.Unsetenv("DEPLOYMENT_TARGET")
+	os.Unsetenv("BACKEND_URL")
+	os.Unsetenv("FRONTEND_URL")
 	t.Setenv("APP_ENV", "local")
 	t.Setenv("DATABASE_URL", "postgres://bowerbird:bowerbird@localhost:5432/bowerbird?sslmode=disable")
 	t.Setenv("S3_BUCKET_NAME", "test-bucket")
@@ -33,6 +35,12 @@ func TestLoad_DefaultDeploymentTargetOnPrem(t *testing.T) {
 	}
 	if cfg.DeploymentTarget != DeploymentTargetOnPrem {
 		t.Fatalf("expected onprem default, got %q", cfg.DeploymentTarget)
+	}
+	if cfg.BackendURL != "https://app.bowerbird.dev" {
+		t.Fatalf("expected same-origin backend URL, got %q", cfg.BackendURL)
+	}
+	if cfg.FrontendURL != "https://app.bowerbird.dev" {
+		t.Fatalf("expected frontend URL, got %q", cfg.FrontendURL)
 	}
 }
 

@@ -14,15 +14,19 @@ Single-VM Docker Compose deployment (`deploy/onprem/`).
 | `rabbitmq`        | Message broker                              |
 | `postgres`        | Control-plane + tenant DB (seed separately) |
 | `minio`           | S3-compatible object storage                |
-| `caddy`           | HTTPS reverse proxy                         |
+| `caddy`           | Serves the PWA at `/`; proxies `/api*`      |
 
 ## Quick start
 
+Build the PWA first so the Caddy image can copy
+`apps/pwa/dist/pwa/browser`:
+
 ```bash
+pnpm --filter @bowerbird/pwa build
 cd deploy/onprem
 cp .env.example .env
 docker compose config
-docker compose up -d
+docker compose up -d --build
 ```
 
 Run tenant migrations and seed via documented ops scripts after first boot.

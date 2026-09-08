@@ -71,7 +71,6 @@ For raw Go commands from `apps/backend`: `set -a && . ../../.env && set +a`.
 Add to `/etc/hosts`:
 
 ```text
-127.0.0.1   api.bowerbird.dev
 127.0.0.1   app.bowerbird.dev
 127.0.0.1   media.bowerbird.dev
 ```
@@ -79,7 +78,7 @@ Add to `/etc/hosts`:
 Caddy (Compose) uses `network_mode: host` and proxies:
 
 - `app.bowerbird.dev` → Angular `:4200`
-- `api.bowerbird.dev` → Go API `:8080`
+- `app.bowerbird.dev/api*` → Go API `:8080`
 - `media.bowerbird.dev` → MinIO `:9000`
 
 Host networking is required on Linux so Caddy can reach those host ports. A bridged `host.docker.internal` hop is dropped by UFW/nftables and the browser shows **502**.
@@ -162,7 +161,7 @@ See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./
 
 - App: `https://app.bowerbird.dev`
 - Tenant example: `https://app.bowerbird.dev/acme/dashboard`
-- API: `https://api.bowerbird.dev`
+- API: `https://app.bowerbird.dev/api/v1/...` (`/api/health` on the same host)
 - Media: `https://media.bowerbird.dev/bowerbird-local-bucket/<key>`
 
 `infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO, Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old LocalStack) are removed automatically.
@@ -170,24 +169,24 @@ See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./
 ## E2E against local, staging, or production
 
 Playwright uses one origin group. Unset values default to local
-(`https://app.bowerbird.dev`, `https://api.bowerbird.dev`,
-`https://media.bowerbird.dev`). Point the same variables at another
-environment to run the suite there.
+(`https://app.bowerbird.dev` for the PWA and API,
+`https://media.bowerbird.dev` for media). Point the same variables at
+another environment to run the suite there.
 
-| Variable             | Origin |
-| -------------------- | ------ |
-| `E2E_BASE_URL`       | PWA    |
-| `E2E_API_BASE_URL`   | API    |
-| `E2E_MEDIA_BASE_URL` | Media  |
+| Variable             | Origin                            |
+| -------------------- | --------------------------------- |
+| `E2E_BASE_URL`       | PWA                               |
+| `E2E_API_BASE_URL`   | API (same host as PWA by default) |
+| `E2E_MEDIA_BASE_URL` | Media                             |
 
-If `E2E_BASE_URL` is an `app.*` host, API and media are derived by swapping
-the first label unless you set those two explicitly.
+If `E2E_BASE_URL` is an `app.*` host, the API origin is that same host
+unless you set `E2E_API_BASE_URL`. Media is derived by swapping the
+first label unless you set `E2E_MEDIA_BASE_URL`.
 
 ```bash
 pnpm run test:e2e
 E2E_BASE_URL=https://app.staging.money-path.co pnpm run test:e2e
 E2E_BASE_URL=https://app.money-path.co \
-  E2E_API_BASE_URL=https://api.money-path.co \
   E2E_MEDIA_BASE_URL=https://media.money-path.co \
   pnpm run test:e2e
 ```

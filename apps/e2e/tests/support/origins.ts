@@ -6,7 +6,7 @@ export type E2EOrigins = {
 
 const LOCAL: E2EOrigins = {
   app: 'https://app.bowerbird.dev',
-  api: 'https://api.bowerbird.dev',
+  api: 'https://app.bowerbird.dev',
   media: 'https://media.bowerbird.dev',
 };
 
@@ -30,7 +30,7 @@ const parseOrigin = (value: string, name: string): string => {
   return url.origin;
 };
 
-function siblingOrigin(appOrigin: string, subdomain: 'api' | 'media'): string | undefined {
+function siblingOrigin(appOrigin: string, subdomain: 'media'): string | undefined {
   const url = new URL(appOrigin);
   const labels = url.hostname.split('.');
   if (labels[0] !== 'app' && labels.length < 3) {
@@ -45,12 +45,9 @@ export function resolveE2EOrigins(): E2EOrigins {
   const appOverride = env('E2E_BASE_URL');
   const app = parseOrigin(stripTrailingSlash(appOverride ?? LOCAL.app), 'E2E_BASE_URL');
 
-  const apiRaw = env('E2E_API_BASE_URL') ?? siblingOrigin(app, 'api') ?? (appOverride ? undefined : LOCAL.api);
+  const apiRaw = env('E2E_API_BASE_URL') ?? app;
   const mediaRaw = env('E2E_MEDIA_BASE_URL') ?? siblingOrigin(app, 'media') ?? (appOverride ? undefined : LOCAL.media);
 
-  if (!apiRaw) {
-    throw new Error(`Cannot derive API origin from ${app}. Set E2E_API_BASE_URL.`);
-  }
   if (!mediaRaw) {
     throw new Error(`Cannot derive media origin from ${app}. Set E2E_MEDIA_BASE_URL.`);
   }

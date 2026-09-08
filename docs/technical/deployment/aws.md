@@ -11,7 +11,7 @@ Parameter Store** (`SecureString`) under a customer-managed KMS key.
 | Concern            | Service                                                                                                 |
 | ------------------ | ------------------------------------------------------------------------------------------------------- |
 | PWA                | Private S3 + CloudFront (OAC, TLS 1.2+, WAF)                                                            |
-| HTTP API           | API Gateway HTTP API + Go Lambda (`provided.al2023`, arm64)                                             |
+| HTTP API           | CloudFront `/api*` → API Gateway HTTP API + Go Lambda (`provided.al2023`, arm64)                        |
 | Jobs               | SQS + Lambda, with a 14-day DLQ                                                                         |
 | Integration events | EventBridge custom bus (`source` prefix `bowerbird.`) + Lambda                                          |
 | Outbox relay       | EventBridge Scheduler `rate(1 minute)` → relay Lambda                                                   |
@@ -19,7 +19,7 @@ Parameter Store** (`SecureString`) under a customer-managed KMS key.
 | Object storage     | Private S3 bucket (KMS), browser CORS for the app origin                                                |
 | Postgres           | Neon project in `aws-us-east-1` (pooled URL for Lambdas, direct URL for migrations / `CREATE DATABASE`) |
 | Secrets            | SSM Parameter Store `SecureString` JSON, CMK                                                            |
-| DNS                | Cloudflare DNS-only (grey cloud) CNAMEs to CloudFront and API Gateway                                   |
+| DNS                | Cloudflare DNS-only (grey cloud) CNAMEs to CloudFront                                                   |
 | Observability      | CloudWatch logs (30/90 day retention), X-Ray, Lambda/SQS alarms, optional SNS email                     |
 
 Lambdas are **not** in a VPC. Neon is reached over TLS on the public pooled
@@ -53,8 +53,7 @@ Set these in the repo-root `.env`. Cloudflare must already host `ROOT_DOMAIN`.
 | Variable          | Example         | DNS record                                                                   |
 | ----------------- | --------------- | ---------------------------------------------------------------------------- |
 | `ROOT_DOMAIN`     | `money-path.co` | Apex CNAME (Cloudflare flattening) → CloudFront                              |
-| `APP_SUBDOMAIN`   | `app`           | `app.` → CloudFront                                                          |
-| `API_SUBDOMAIN`   | `api`           | `api.` → API Gateway custom domain                                           |
+| `APP_SUBDOMAIN`   | `app`           | `app.` → CloudFront (PWA at `/`, API at `/api`)                              |
 | `MEDIA_SUBDOMAIN` | `media`         | Covered by the ACM certificate; browser uploads use S3 presign + bucket CORS |
 
 Records are **DNS-only** (`proxied: false`) so CloudFront and ACM see the
@@ -139,10 +138,17 @@ That invokes the migrate Lambda, which uses the **direct** Neon URL.
 - S3 web deploy does not prune hashed bundles, so old clients can still load
   previous chunks.
 - Cloudflare API token needs Zone Read + DNS Edit on `ROOT_DOMAIN`.
+- OAuth redirect URIs at the identity provider must use the app host
+  (`https://app.<ROOT_DOMAIN>/api/v1/auth/.../callback`), not a
+  separate `api.` hostname.
 
 ## CloudFront / cache
 
-- SPA fallback: `403/404` → `/index.html`
+- `/api*` → API Gateway (cache disabled; origin request
+  policy `AllViewerExceptHostHeader` so API Gateway sees its own `Host`)
+- Other paths → S3 (PWA). A CloudFront Function rewrites extensionless
+  SPA routes to `/index.html`. Do not use distribution-wide 403/404
+  custom error pages: they would rewrite API 404s into the SPA shell.
 - Hashed assets: long-lived immutable cache
 - Entry points (`index.html`, `ngsw*`, manifest): short / must-revalidate
 - Invalidate entry points on deploy

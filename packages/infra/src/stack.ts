@@ -17,6 +17,10 @@ export interface StackOutputs {
   migrateFunctionName: pulumi.Output<string>;
 }
 
+const CLOUDFRONT_CACHE_OPTIMIZED = '658327ea-f89d-4fab-a63d-7e88639e58f6';
+const CLOUDFRONT_CACHE_DISABLED = '4135ea2d-6df8-44a3-9df3-4b5a84be39ad';
+const CLOUDFRONT_ORIGIN_ALL_VIEWER_EXCEPT_HOST = 'b689b0a8-53d0-40ab-baf2-68738e2966ac';
+
 export function deployStack(cfg: InfraConfig): StackOutputs {
   const prefix = resourcePrefix(cfg.envName);
   const tags = defaultTags(cfg.envName);
@@ -166,7 +170,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
         messaging_attestation_secret: v.attestation,
         allowed_origins: `https://${cfg.appDomain},https://${cfg.rootDomain}`,
         frontend_url: `https://${cfg.appDomain}`,
-        backend_url: `https://${cfg.apiDomain}`,
+        backend_url: `https://${cfg.appDomain}`,
       }),
     );
 
@@ -190,7 +194,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     TENANT_MIGRATIONS_DIR: 'migrations/tenant',
     ALLOWED_ORIGINS: `https://${cfg.appDomain},https://${cfg.rootDomain}`,
     FRONTEND_URL: `https://${cfg.appDomain}`,
-    BACKEND_URL: `https://${cfg.apiDomain}`,
+    BACKEND_URL: `https://${cfg.appDomain}`,
   };
 
   const migrateFn = goLambda(cfg, prefix, 'migrate', 'migrate', key, secretsParam, lambdaDlq, lambdaEnv, awsOpts, {
@@ -307,14 +311,14 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     'edge',
     {
       domainName: cfg.rootDomain,
-      subjectAlternativeNames: [cfg.appDomain, cfg.apiDomain, cfg.mediaDomain],
+      subjectAlternativeNames: [cfg.appDomain, cfg.mediaDomain],
       validationMethod: 'DNS',
     },
     awsOpts,
   );
 
   const zone = cloudflare.getZoneOutput({ name: cfg.rootDomain }, { provider: cfProvider });
-  const validationDomains = [cfg.rootDomain, cfg.appDomain, cfg.apiDomain, cfg.mediaDomain];
+  const validationDomains = [cfg.rootDomain, cfg.appDomain, cfg.mediaDomain];
   const validationRecords = validationDomains.map((domain, i) => {
     const dvo = cert.domainValidationOptions.apply((opts) => opts.find((o) => o.domainName === domain) ?? opts[0]);
     return new cloudflare.Record(
@@ -346,12 +350,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     {
       name: `${prefix}-http`,
       protocolType: 'HTTP',
-      corsConfiguration: {
-        allowHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
-        allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowOrigins: [`https://${cfg.appDomain}`, `https://${cfg.rootDomain}`],
-        maxAge: 86400,
-      },
     },
     awsOpts,
   );
@@ -410,20 +408,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     awsOpts,
   );
 
-  const apiDomain = new aws.apigatewayv2.DomainName(
-    'api',
-    {
-      domainName: cfg.apiDomain,
-      domainNameConfiguration: {
-        certificateArn: certValidation.certificateArn,
-        endpointType: 'REGIONAL',
-        securityPolicy: 'TLS_1_2',
-      },
-    },
-    awsOpts,
-  );
-  new aws.apigatewayv2.ApiMapping('api', { apiId: httpApi.id, domainName: apiDomain.domainName, stage: apiStage.name }, awsOpts);
-
   const oac = new aws.cloudfront.OriginAccessControl(
     'web',
     {
@@ -442,7 +426,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
       securityHeadersConfig: {
         contentSecurityPolicy: {
           override: true,
-          contentSecurityPolicy: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'nonce-bowerbird'; style-src 'self' 'nonce-bowerbird' https://cdn.jsdelivr.net; style-src-attr 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; connect-src 'self' https://${cfg.apiDomain}; frame-src 'self' blob:; form-action 'self'`,
+          contentSecurityPolicy: `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self' 'nonce-bowerbird'; style-src 'self' 'nonce-bowerbird' https://cdn.jsdelivr.net; style-src-attr 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; connect-src 'self' https://${cfg.mediaDomain}; frame-src 'self' blob:; form-action 'self'`,
         },
         contentTypeOptions: { override: true },
         frameOptions: { override: true, frameOption: 'DENY' },
@@ -466,6 +450,30 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     awsOpts,
   );
 
+  const spaFallback = new aws.cloudfront.Function(
+    'spa-fallback',
+    {
+      name: `${prefix}-spa-fallback`,
+      runtime: 'cloudfront-js-2.0',
+      publish: true,
+      comment: 'Rewrite SPA routes to /index.html; /api stays on the API origin',
+      code: `function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri === '/api' || uri.startsWith('/api/')) {
+    return request;
+  }
+  if (uri.includes('.')) {
+    return request;
+  }
+  request.uri = '/index.html';
+  return request;
+}
+`,
+    },
+    awsOpts,
+  );
+
   const webAcl = spaWebAcl(prefix, awsOpts);
   const distribution = new aws.cloudfront.Distribution(
     'web',
@@ -483,15 +491,27 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
           domainName: webBucket.bucketRegionalDomainName,
           originAccessControlId: oac.id,
         },
+        {
+          originId: 'api',
+          domainName: httpApi.apiEndpoint.apply((endpoint) => endpoint.replace(/^https?:\/\//, '')),
+          customOriginConfig: {
+            httpPort: 80,
+            httpsPort: 443,
+            originProtocolPolicy: 'https-only',
+            originSslProtocols: ['TLSv1.2'],
+          },
+        },
       ],
+      orderedCacheBehaviors: [cloudFrontApiBehavior('/api*')],
       defaultCacheBehavior: {
         targetOriginId: 'web',
         viewerProtocolPolicy: 'redirect-to-https',
         allowedMethods: ['GET', 'HEAD', 'OPTIONS'],
         cachedMethods: ['GET', 'HEAD'],
         compress: true,
-        cachePolicyId: '658327ea-f89d-4fab-a63d-7e88639e58f6',
+        cachePolicyId: CLOUDFRONT_CACHE_OPTIMIZED,
         responseHeadersPolicyId: responseHeaders.id,
+        functionAssociations: [{ eventType: 'viewer-request', functionArn: spaFallback.arn }],
       },
       restrictions: { geoRestriction: { restrictionType: 'none' } },
       viewerCertificate: {
@@ -499,10 +519,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
         sslSupportMethod: 'sni-only',
         minimumProtocolVersion: 'TLSv1.2_2021',
       },
-      customErrorResponses: [
-        { errorCode: 403, responseCode: 200, responsePagePath: '/index.html', errorCachingMinTtl: 60 },
-        { errorCode: 404, responseCode: 200, responsePagePath: '/index.html', errorCachingMinTtl: 60 },
-      ],
     },
     awsOpts,
   );
@@ -544,7 +560,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 
   dnsRecord(cfOpts, zone.id, cfg.appSubdomain, 'CNAME', distribution.domainName);
   dnsRecord(cfOpts, zone.id, '@', 'CNAME', distribution.domainName);
-  dnsRecord(cfOpts, zone.id, cfg.apiSubdomain, 'CNAME', apiDomain.domainNameConfiguration.targetDomainName);
 
   alarms(
     prefix,
@@ -562,7 +577,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 
   return {
     webUrl: pulumi.interpolate`https://${cfg.appDomain}`,
-    apiUrl: pulumi.interpolate`https://${cfg.apiDomain}`,
+    apiUrl: pulumi.interpolate`https://${cfg.appDomain}`,
     ssmParameterName: secretsParam.name,
     neonProjectId: neonProject.id,
     jobsQueueUrl: jobsQueue.url,
@@ -571,6 +586,19 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 }
 
 type AwsOpts = { provider: aws.Provider; dependsOn?: pulumi.Resource[] };
+
+function cloudFrontApiBehavior(pathPattern: string): aws.types.input.cloudfront.DistributionOrderedCacheBehavior {
+  return {
+    pathPattern,
+    targetOriginId: 'api',
+    viewerProtocolPolicy: 'redirect-to-https',
+    allowedMethods: ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'],
+    cachedMethods: ['GET', 'HEAD'],
+    compress: true,
+    cachePolicyId: CLOUDFRONT_CACHE_DISABLED,
+    originRequestPolicyId: CLOUDFRONT_ORIGIN_ALL_VIEWER_EXCEPT_HOST,
+  };
+}
 
 function hardenBucket(name: string, bucket: aws.s3.Bucket, keyArn: pulumi.Input<string>, opts: AwsOpts, extra?: { cors?: aws.types.input.s3.BucketCorsConfigurationV2CorsRule[] }): void {
   new aws.s3.BucketPublicAccessBlock(

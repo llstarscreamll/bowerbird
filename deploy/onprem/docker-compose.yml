@@ -64,7 +64,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:8080/health || exit 1']
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8080/api/health || exit 1']
       interval: 10s
       timeout: 5s
       retries: 6
@@ -114,7 +114,9 @@ services:
         condition: service_healthy
 
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ../..
+      dockerfile: deploy/onprem/Caddy.Dockerfile
     ports:
       - '80:80'
       - '443:443'

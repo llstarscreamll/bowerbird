@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://api.bowerbird.dev',
+  apiUrl: 'https://app.bowerbird.dev',
 };

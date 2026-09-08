@@ -5,13 +5,13 @@ import { expectAPlusSecurityHeaders, inspectSetCookie } from '../../support/secu
 import { buildLocalUserCredentials } from '../../support/user.factory';
 
 test.describe('securityheaders.com — API', () => {
-  test('GET /health (200) tiene grado A+', async ({ request }) => {
+  test('GET /api/health (200) tiene grado A+', async ({ request }) => {
     // given
-    const operation = 'GET /health';
+    const operation = 'GET /api/health';
     const client = new PlatformApiClient(request, apiOrigin());
 
     // when
-    const response = await client.call('/health');
+    const response = await client.call('/api/health');
 
     // then
     await expectAPlusSecurityHeaders(response, operation);
