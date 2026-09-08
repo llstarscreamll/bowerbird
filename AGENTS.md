@@ -12,19 +12,20 @@
 ## Toolchain and workspace
 
 - Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
-- Use `pnpm` only. Workspace roots are `apps/*` and `packages/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
-- Single repo-root `.env` / `.env.example` for backend, infra Pulumi, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `deploy/onprem/.env` separate.
+- Use `pnpm` only. Workspace roots are `apps/*`, `packages/*`, and `apps/deploy/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
+- Single repo-root `.env` / `.env.example` for backend, AWS Pulumi, on-prem fleet, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `apps/deploy/onprem/.env` on each client VM (Compose secrets). Do not commit `apps/deploy/onprem/hosts.json`.
 
 ## Commands that matter
 
 - Root dev flow: `pnpm run dev` (always runs `pnpm run infra:up` first, then `turbo run dev`).
 - Root verification flow: `pnpm run lint && pnpm run test && pnpm run build`.
-- Root deploy: `pnpm run deploy` (builds first, deploys only `@bowerbird/infra` via Pulumi).
+- Root deploy: `pnpm run deploy` runs AWS (`@bowerbird/infra`) and on-prem fleet (`@bowerbird/onprem`) in parallel. Use `deploy:aws` / `deploy:onprem` for one track. On-prem skips if `apps/deploy/onprem/hosts.json` is missing or empty.
 - Backend targeted: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
 - Backend tests: always `pnpm --filter @bowerbird/backend test` (full `go test ./...`). Never verify with package-scoped or `-run` filtered `go test`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
 - E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:browser|test:e2e:http|test:e2e:ui`.
-- Infra targeted: `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`. `deploy` invokes the migrate Lambda when that package changes, then publishes the other Lambdas and web assets.
+- AWS deploy (`apps/deploy/aws`, `@bowerbird/infra`): `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`. `deploy` invokes the migrate Lambda when that package changes, then publishes the other Lambdas and web assets.
+- On-prem fleet (`apps/deploy/onprem`, `@bowerbird/onprem`): `pnpm --filter @bowerbird/onprem lint|test|synth|deploy`. Pulumi SSHs each inventory host and loads Compose images tagged `ONPREM_RELEASE`.
 
 ## Backend (`apps/backend`)
 
@@ -79,11 +80,12 @@
 
 - `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
 - `Caddyfile` maps `app.bowerbird.dev` → Angular `:4200`, `app.bowerbird.dev/api*` → Go API `:8080`, and `media.bowerbird.dev` → MinIO `:9000`; use `app.bowerbird.dev` locally for cookie/routing behavior.
-- Infra Pulumi entrypoint is `packages/infra/index.ts` and loads the repo-root `.env`:
+- AWS Pulumi entrypoint is `apps/deploy/aws/index.ts` (`@bowerbird/infra`) and loads the repo-root `.env`:
   - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, and `GEMINI_API_KEY` must be set.
   - `AWS_REGION` must be `us-east-1` (CloudFront certificates and CloudFront WAF).
   - Postgres is Neon (not RDS). DNS is Cloudflare.
-- Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before infra deploy.
+- Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before AWS deploy.
+- On-prem fleet: `ONPREM_RELEASE`, `ONPREM_SSH_KEY_PATH`, and `apps/deploy/onprem/hosts.json` (see [On-prem fleet](docs/technical/deployment/onprem.md)). Each VM keeps its own `apps/deploy/onprem/.env`.
 
 ## Hooks, formatting, and docs
 

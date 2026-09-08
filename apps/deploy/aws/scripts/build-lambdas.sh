@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 BACKEND="$ROOT/apps/backend"
-OUT="$ROOT/packages/infra/.build/lambda"
+OUT="$ROOT/apps/deploy/aws/.build/lambda"
 
 build_one() {
   local name="$1"

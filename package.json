@@ -7,7 +7,9 @@
   },
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "apps/deploy/*",
+    "apps/deploy/aws/sdks/neon"
   ],
   "scripts": {
     "setup:local": "./scripts/setup-local.sh",
@@ -30,7 +32,9 @@
     "caddy:trust": "./scripts/caddy-trust.sh",
     "infra:up": "docker compose up -d --wait --wait-timeout 180 --remove-orphans && docker compose --profile init run --rm --no-TTY minio-init",
     "infra:down": "docker compose down",
-    "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
+    "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra --filter=@bowerbird/onprem",
+    "deploy:aws": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
+    "deploy:onprem": "turbo run deploy --filter=@bowerbird/onprem",
     "prepare": "husky"
   },
   "devDependencies": {

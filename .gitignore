@@ -14,7 +14,8 @@ apps/pwa/.turbo/
 apps/pwa/dist/
 apps/pwa/coverage/
 apps/pwa/node_modules/
-packages/infra/node_modules/
+apps/deploy/aws/node_modules/
+apps/deploy/onprem/hosts.json
 .cache
 
 # Entornos y Secretos

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "acme",
+    "address": "203.0.113.10",
+    "user": "bowerbird",
+    "port": 22,
+    "remoteDir": "/opt/bowerbird"
+  }
+]

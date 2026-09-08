@@ -1,9 +1,11 @@
 packages:
   - apps/*
   - packages/*
-  - packages/infra/sdks/neon
+  - apps/deploy/*
+  - apps/deploy/aws/sdks/neon
 allowBuilds:
   '@parcel/watcher': true
+  '@pulumi/command': true
   '@pulumi/neon': true
   esbuild: true
   less: true

@@ -39,9 +39,11 @@ services:
       retries: 10
 
   migrate:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/migrate', '-target', 'all']
     env_file: .env
     depends_on:
@@ -49,9 +51,11 @@ services:
         condition: service_healthy
 
   api:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/api']
     env_file: .env
     depends_on:
@@ -70,9 +74,11 @@ services:
       retries: 6
 
   outbox-relay:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/relay']
     env_file: .env
     depends_on:
@@ -80,9 +86,11 @@ services:
         condition: service_healthy
 
   events-consumer:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/events-consumer']
     env_file: .env
     depends_on:
@@ -90,9 +98,11 @@ services:
         condition: service_healthy
 
   jobs-consumer:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/jobs-consumer']
     env_file: .env
     environment:
@@ -104,9 +114,11 @@ services:
         condition: service_healthy
 
   scheduler:
+    image: bowerbird-onprem-app:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Dockerfile
     command: ['./bin/scheduler']
     env_file: .env
     depends_on:
@@ -114,9 +126,11 @@ services:
         condition: service_healthy
 
   caddy:
+    image: bowerbird-onprem-caddy:${ONPREM_RELEASE:-local}
+    pull_policy: never
     build:
-      context: ../..
-      dockerfile: deploy/onprem/Caddy.Dockerfile
+      context: ../../..
+      dockerfile: apps/deploy/onprem/Caddy.Dockerfile
     ports:
       - '80:80'
       - '443:443'

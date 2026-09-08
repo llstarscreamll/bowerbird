@@ -2,6 +2,10 @@
 
 Dual-runtime overview: [Runtime profiles](../architecture/runtime-profiles.md).
 
+Pulumi program: `apps/deploy/aws/` (`@bowerbird/infra`). On-prem fleet is a
+**separate** Pulumi project (`apps/deploy/onprem/`) — see
+[On-prem fleet](./onprem.md) and [Deploy](../../../apps/deploy/README.md).
+
 This stack deploys the **aws/lambda** target. Postgres runs on **Neon**, not
 Amazon RDS. DNS is in **Cloudflare**. Application secrets live in **SSM
 Parameter Store** (`SecureString`) under a customer-managed KMS key.
@@ -107,7 +111,7 @@ That invokes the migrate Lambda, which uses the **direct** Neon URL.
 3. Create or select the stack named after `ENV`:
 
    ```bash
-   cd packages/infra
+   cd apps/deploy/aws
    pulumi stack init "$ENV"   # first time only
    pulumi stack select "$ENV"
    ```

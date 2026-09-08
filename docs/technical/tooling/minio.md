@@ -34,7 +34,7 @@ docker compose --profile init run --rm --no-TTY minio-init
 
 ## On-prem production
 
-See [On-prem stack](../architecture/onprem-runtime.md) (`deploy/onprem/docker-compose.yml`). MinIO runs as an internal service; Caddy terminates HTTPS for API and media.
+See [On-prem stack](../architecture/onprem-runtime.md) (`apps/deploy/onprem/docker-compose.yml`). MinIO runs as an internal service; Caddy terminates HTTPS for API and media.
 
 ## AWS profile
 

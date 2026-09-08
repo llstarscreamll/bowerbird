@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import dotenv from 'dotenv';
 
-const repoRoot = path.resolve(__dirname, '../../..');
+const repoRoot = path.resolve(__dirname, '../../../..');
 const envPath = path.join(repoRoot, '.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });

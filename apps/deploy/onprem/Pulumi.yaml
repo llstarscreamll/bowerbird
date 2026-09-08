@@ -1,0 +1,7 @@
+name: bowerbird-onprem
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Bowerbird on-prem fleet (SSH + Docker Compose)
+main: index.ts

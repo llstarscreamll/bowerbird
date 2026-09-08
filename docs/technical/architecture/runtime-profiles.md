@@ -2,13 +2,13 @@
 
 `DEPLOYMENT_TARGET` selects infrastructure adapters at boot. Application code (use cases, domain, contracts) stays the same; only platform wiring changes.
 
-| Profile  | When                                    | Messaging         | Object storage        | Secrets               |
-| -------- | --------------------------------------- | ----------------- | --------------------- | --------------------- |
-| `onprem` | Local dev, client VM (`deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Plain `.env`          |
-| `aws`    | Production SaaS (Pulumi)                | EventBridge + SQS | AWS S3                | SSM SecureString JSON |
+| Profile  | When                                         | Messaging         | Object storage        | Secrets               |
+| -------- | -------------------------------------------- | ----------------- | --------------------- | --------------------- |
+| `onprem` | Local dev, client VM (`apps/deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Plain `.env`          |
+| `aws`    | Production SaaS (`apps/deploy/aws/` Pulumi)  | EventBridge + SQS | AWS S3                | SSM SecureString JSON |
 
-See [On-prem stack](./onprem-runtime.md), [AWS deploy](../deployment/aws.md),
-[AWS secrets](../deployment/ssm-secrets.md).
+See [On-prem stack](./onprem-runtime.md), [On-prem fleet](../deployment/onprem.md),
+[AWS deploy](../deployment/aws.md), [AWS secrets](../deployment/ssm-secrets.md).
 
 ## End-to-end flow (both profiles)
 

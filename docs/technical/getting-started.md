@@ -64,7 +64,10 @@ Typical local backend values:
 
 For raw Go commands from `apps/backend`: `set -a && . ../../.env && set +a`.
 
-`deploy/onprem/.env` stays separate (Docker hostnames for the on-prem VM Compose).
+Deployment artifacts live under `apps/deploy/`. AWS Pulumi and the on-prem
+fleet are parallel tracks (`pnpm run deploy` runs both).
+`apps/deploy/onprem/.env` is per client VM (Compose secrets).
+`apps/deploy/onprem/hosts.json` is the fleet inventory (gitignored).
 
 ## Local DNS and HTTPS
 

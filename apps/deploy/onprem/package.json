@@ -1,0 +1,21 @@
+{
+  "name": "@bowerbird/onprem",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types src/hosts.test.ts",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "synth": "pulumi preview",
+    "deploy": "bash ./scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@pulumi/command": "^1.1.0",
+    "@pulumi/pulumi": "^3.238.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.7.2"
+  }
+}

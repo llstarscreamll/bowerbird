@@ -1,6 +1,9 @@
 # On-prem stack
 
-Single-VM Docker Compose deployment (`deploy/onprem/`).
+Single-VM Docker Compose payload (`apps/deploy/onprem/`). Releases to a
+**pool of client IPs** are a separate Pulumi track; see
+[On-prem fleet](../deployment/onprem.md). AWS SaaS is parallel, not a
+substitute: [AWS deploy](../deployment/aws.md).
 
 ## Services
 
@@ -23,7 +26,7 @@ Build the PWA first so the Caddy image can copy
 
 ```bash
 pnpm --filter @bowerbird/pwa build
-cd deploy/onprem
+cd apps/deploy/onprem
 cp .env.example .env
 docker compose config
 docker compose up -d --build

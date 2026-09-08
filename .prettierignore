@@ -10,5 +10,6 @@ apps/backend/bin/
 apps/backend/tmp/
 apps/pwa/dist/
 apps/pwa/coverage/
-packages/infra/dist/
+apps/deploy/aws/dist/
+apps/deploy/onprem/dist/
 pnpm-lock.yaml
