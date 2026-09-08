@@ -7,7 +7,7 @@ Uses `golang-migrate` with two trees under `apps/backend/migrations/`:
 | `controlplane/` | Shared catalog DB     |
 | `tenant/`       | Every organization DB |
 
-CLI: `apps/backend/cmd/migrate/main.go`.
+CLI: `apps/backend/cmd/onprem/migrate/main.go`.
 
 ```bash
 pnpm run migrate:controlplane   # control plane only

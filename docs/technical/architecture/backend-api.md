@@ -77,24 +77,25 @@ Dependency direction inside a module: `adapters → application →
 domain`. `api/` is implemented by `application/` and consumed by
 other modules' adapters.
 
-Wire features in `cmd/api/main.go`, the worker binaries
-(`cmd/relay`, `cmd/events-consumer`, `cmd/jobs-consumer`,
-`cmd/scheduler`), and Lambda entrypoints — not inside domain or
-application.
+Wire features in `cmd/onprem/api/main.go`, the worker binaries
+(`cmd/onprem/relay`, `cmd/onprem/events-consumer`,
+`cmd/onprem/jobs-consumer`, `cmd/onprem/scheduler`), and Lambda
+entrypoints — not inside domain or application.
 
 ## Entrypoints
 
-| Binary                    | Role                           |
-| ------------------------- | ------------------------------ |
-| `cmd/api`                 | HTTP API                       |
-| `cmd/relay`               | Drains outbox → broker         |
-| `cmd/events-consumer`     | Integration event handlers     |
-| `cmd/jobs-consumer`       | Background job handlers        |
-| `cmd/scheduler`           | Named-rule clock → broker jobs |
-| `cmd/lambda/outbox-relay` | AWS relay (scheduled)          |
-| `cmd/lambda/eventbridge`  | AWS events consumer            |
-| `cmd/lambda/sqs`          | AWS jobs consumer              |
-| `cmd/migrate`             | DB migrations CLI              |
+| Binary                        | Role                           |
+| ----------------------------- | ------------------------------ |
+| `cmd/onprem/api`              | HTTP API                       |
+| `cmd/onprem/relay`            | Drains outbox → broker         |
+| `cmd/onprem/events-consumer`  | Integration event handlers     |
+| `cmd/onprem/jobs-consumer`    | Background job handlers        |
+| `cmd/onprem/scheduler`        | Named-rule clock → broker jobs |
+| `cmd/onprem/migrate`          | DB migrations CLI              |
+| `cmd/aws/lambda/http`         | AWS HTTP API                   |
+| `cmd/aws/lambda/outbox-relay` | AWS relay (scheduled)          |
+| `cmd/aws/lambda/eventbridge`  | AWS events consumer            |
+| `cmd/aws/lambda/sqs`          | AWS jobs consumer              |
 
 Local dev runs API + workers via Air; see [Getting started](../getting-started.md).
 

@@ -63,7 +63,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const httpLambda = new GoFunction(this, 'ApiHttpLambda', {
       functionName: `${prefix}-api`,
-      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/http'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/aws/lambda/http'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       environment: {
@@ -74,7 +74,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const sqsLambda = new GoFunction(this, 'ApiSQSLambda', {
       functionName: `${prefix}-sqs-processor`,
-      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/sqs'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/aws/lambda/sqs'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       ephemeralStorageSize: cdk.Size.mebibytes(1024),
@@ -86,7 +86,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const eventBridgeLambda = new GoFunction(this, 'ApiEventBridgeLambda', {
       functionName: `${prefix}-events-processor`,
-      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/eventbridge'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/aws/lambda/eventbridge'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(10),
       environment: {
@@ -97,7 +97,7 @@ export class BowerbirdStack extends cdk.Stack {
 
     const outboxRelayLambda = new GoFunction(this, 'OutboxRelayLambda', {
       functionName: `${prefix}-outbox-relay`,
-      entry: path.join(__dirname, '../../../apps/backend/cmd/lambda/outbox-relay'),
+      entry: path.join(__dirname, '../../../apps/backend/cmd/aws/lambda/outbox-relay'),
       architecture: cdk.aws_lambda.Architecture.ARM_64,
       timeout: cdk.Duration.seconds(30),
       environment: {

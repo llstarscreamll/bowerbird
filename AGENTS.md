@@ -28,8 +28,9 @@
 
 ## Backend (`apps/backend`)
 
-- API entrypoint is `cmd/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
-- Worker entrypoints: `cmd/relay`, `cmd/events-consumer`, `cmd/jobs-consumer`, `cmd/scheduler`. Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
+- Entrypoints live under `cmd/onprem/` (local + client VM) and `cmd/aws/lambda/` (AWS Lambda).
+- API entrypoint is `cmd/onprem/api/main.go`; local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
+- Worker entrypoints: `cmd/onprem/relay`, `cmd/onprem/events-consumer`, `cmd/onprem/jobs-consumer`, `cmd/onprem/scheduler`. Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
 - Feature architecture: every bounded context is `internal/<bc>/` with this public surface:
   - `wire.go`: only Go facade other packages import (`NewApplication`, `NewHTTPHandler`, `RegisterEvents`, `RegisterJobs`, OHS constructors). Host (`cmd/*`, `platform/messaging`) imports the module root only.
   - `api/`: Open Host Service (interfaces + DTOs) for other BCs. No `application` imports.
@@ -41,7 +42,7 @@
 - Dependency rule inside a module: `adapters -> application -> domain`. Do not import adapters from `domain` or `application`.
 - Error Handling & JSON:API: **Never** use `http.Error()`. Handlers must return `error` and be registered using `api.Wrap(handlerFunc, isDev)`.
 - Domain Errors: Wrap or create errors using `appErrors.Wrap(err, appErrors.CodeX, "msg")`. `api.Wrap` automatically converts these to JSON:API payloads and injects `meta._debug` stack traces when `isDev` is true.
-- Migrations CLI is `cmd/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
+- Migrations CLI is `cmd/onprem/migrate/main.go`; keep migration sets split between `migrations/controlplane` and `migrations/tenant`.
 - Runtime config (`internal/platform/config/config.go`):
   - `onprem` (local + client deploy): plain `.env` — `MINIO_ENDPOINT_URL`, `RABBITMQ_URL`, encryption keys, API keys.
   - `aws`: SSM SecureString at `SSM_PARAMETER_NAME` (shape in [docs/technical/deployment/ssm-secrets.md](../docs/technical/deployment/ssm-secrets.md)).

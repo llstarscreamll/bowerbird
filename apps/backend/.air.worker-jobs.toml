@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/jobs-consumer ./cmd/jobs-consumer"
+cmd = "go build -o ./tmp/jobs-consumer ./cmd/onprem/jobs-consumer"
 bin = "./tmp/jobs-consumer"
 delay = 1000
 exclude_dir = ["bin", "tmp", "vendor", "testdata", "node_modules"]

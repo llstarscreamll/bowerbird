@@ -76,7 +76,7 @@ Or root `pnpm run dev` (Turbo runs api + workers + PWA).
 
 ## Scheduler (on-prem)
 
-`cmd/scheduler` is a named-rule clock, not an outbox writer:
+`cmd/onprem/scheduler` is a named-rule clock, not an outbox writer:
 
 ```text
 rule (name + rate()/crontab) ──► one platform job ──► jobs-consumer

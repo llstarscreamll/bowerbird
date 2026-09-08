@@ -41,13 +41,13 @@ There is **no LocalStack** and **no Redis** in the local stack.
 
 ### On-prem / local dev
 
-| Process         | Entrypoint            | Dev runner                                   |
-| --------------- | --------------------- | -------------------------------------------- |
-| HTTP API        | `cmd/api`             | `pnpm --filter @bowerbird/backend dev` (Air) |
-| Outbox relay    | `cmd/relay`           | `dev:relay`                                  |
-| Events consumer | `cmd/events-consumer` | `dev:events-consumer`                        |
-| Jobs consumer   | `cmd/jobs-consumer`   | `dev:jobs-consumer`                          |
-| Scheduler       | `cmd/scheduler`       | `dev:scheduler`                              |
+| Process         | Entrypoint                   | Dev runner                                   |
+| --------------- | ---------------------------- | -------------------------------------------- |
+| HTTP API        | `cmd/onprem/api`             | `pnpm --filter @bowerbird/backend dev` (Air) |
+| Outbox relay    | `cmd/onprem/relay`           | `dev:relay`                                  |
+| Events consumer | `cmd/onprem/events-consumer` | `dev:events-consumer`                        |
+| Jobs consumer   | `cmd/onprem/jobs-consumer`   | `dev:jobs-consumer`                          |
+| Scheduler       | `cmd/onprem/scheduler`       | `dev:scheduler`                              |
 
 Root `pnpm run dev` starts infra, API, all four workers, and the PWA via Turbo.
 
@@ -55,23 +55,23 @@ Workers and the API use **Air** hot reload (`.air.toml`, `.air.worker-*.toml`).
 
 ### AWS
 
-| Process         | Entrypoint                                                      |
-| --------------- | --------------------------------------------------------------- |
-| HTTP API        | Lambda (`cmd/api` build)                                        |
-| Outbox relay    | Lambda (`cmd/lambda/outbox-relay`), EventBridge schedule (~30s) |
-| Events consumer | Lambda (`cmd/lambda/eventbridge`)                               |
-| Jobs consumer   | Lambda (`cmd/lambda/sqs`)                                       |
+| Process         | Entrypoint                                                          |
+| --------------- | ------------------------------------------------------------------- |
+| HTTP API        | Lambda (`cmd/aws/lambda/http`)                                      |
+| Outbox relay    | Lambda (`cmd/aws/lambda/outbox-relay`), EventBridge schedule (~30s) |
+| Events consumer | Lambda (`cmd/aws/lambda/eventbridge`)                               |
+| Jobs consumer   | Lambda (`cmd/aws/lambda/sqs`)                                       |
 
 ## Platform adapters (by concern)
 
-| Concern          | Package                                        | `onprem`                                            | `aws`                                |
-| ---------------- | ---------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
-| Config / secrets | `internal/platform/config`                     | `.env`                                              | SSM JSON merge                       |
-| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                      | EventBridge                          |
-| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                     | SQS                                  |
-| Broker transport | `internal/platform/messaging`                  | AMQP                                                | AWS SDK                              |
-| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint                                      | AWS S3                               |
-| Scheduler        | `internal/platform/scheduler`                  | Named-rule process (`cmd/scheduler`) → `DeliverJob` | EventBridge rules (where applicable) |
+| Concern          | Package                                        | `onprem`                                                   | `aws`                                |
+| ---------------- | ---------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ |
+| Config / secrets | `internal/platform/config`                     | `.env`                                                     | SSM JSON merge                       |
+| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                             | EventBridge                          |
+| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                            | SQS                                  |
+| Broker transport | `internal/platform/messaging`                  | AMQP                                                       | AWS SDK                              |
+| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint                                             | AWS S3                               |
+| Scheduler        | `internal/platform/scheduler`                  | Named-rule process (`cmd/onprem/scheduler`) → `DeliverJob` | EventBridge rules (where applicable) |
 
 On-prem rules use EventBridge `rate(N unit)` or Unix crontab (5
 fields, UTC). AWS EventBridge cron is 6-field with `?`; map crontab
