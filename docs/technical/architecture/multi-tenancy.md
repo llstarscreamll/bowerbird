@@ -21,7 +21,9 @@ One Postgres database per organization. All operational business tables live her
 
 1. `tenant.Middleware` reads `X-Tenant-ID` into `context.Context`.
 2. Repositories ask the tenant `Registry` for a `pgxpool`.
-3. Registry caches pools (`sync.Map`); on miss, resolves `db_name` from the control plane and opens a pool.
+3. Registry caches one pool per tenant database (`db_name`). On miss, it resolves `db_name` from the control plane and opens a pool.
+
+Pools are lazy (`MinConns=0`, `MaxConns=4`, idle 30s). The outbox relay lists every active tenant on each tick and `GetPool`s them, so a reserved `MinConns` per tenant would be held by API + relay + consumers + scheduler at once and exhaust Postgres (`53300 too many clients`) as soon as e2e (or any flow) creates many tenants.
 
 ### Shared AWS resources
 
