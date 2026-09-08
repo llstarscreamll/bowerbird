@@ -3,7 +3,6 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/bowerbird/internal/invoices/application/commands"
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
+	"github.com/bowerbird/internal/platform/id"
 )
 
 type Controller struct {
@@ -66,14 +66,14 @@ func (c *Controller) ListInvoices(w http.ResponseWriter, r *http.Request) error 
 		if err != nil {
 			return appErrors.Wrap(err, appErrors.CodeValidation, "invalid limit format, expected an integer")
 		}
+		if parsedLimit < 1 {
+			return appErrors.New(appErrors.CodeValidation, "limit must be a positive integer")
+		}
 		limit = parsedLimit
 	}
 
-	if cursor != "" {
-		match, _ := regexp.MatchString(`^[0-9A-HJKMNPQRSTVWXYZ]{26}$`, cursor)
-		if !match {
-			return appErrors.Wrap(nil, appErrors.CodeValidation, "invalid cursor format")
-		}
+	if cursor != "" && !id.IsValidULID(cursor) {
+		return appErrors.New(appErrors.CodeValidation, "invalid cursor format")
 	}
 
 	result, err := c.app.Queries.ListInvoices.Execute(r.Context(), limit, cursor)
