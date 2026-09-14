@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/application/queries"
 	"github.com/bowerbird/internal/invoices/domain"
+	platformStorage "github.com/bowerbird/internal/platform/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,4 +118,80 @@ func TestApplyLineDecisionHTTP(t *testing.T) {
 	err = ctrl.ListReviewQueue(listRR, listReq)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, listRR.Code)
+}
+
+type stubInvoiceQueryRepo struct {
+	header *domain.InvoiceHeaderRecord
+}
+
+func (s *stubInvoiceQueryRepo) GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error) {
+	if s.header == nil || s.header.ID != id {
+		return nil, nil, errors.New("invoice not found")
+	}
+	cp := *s.header
+	return &cp, nil, nil
+}
+
+func (s *stubInvoiceQueryRepo) ListInvoices(ctx context.Context, limit int, cursor string) ([]domain.InvoiceHeaderRecord, bool, error) {
+	return nil, false, nil
+}
+
+type stubInvoiceFileStore struct {
+	data map[string][]byte
+}
+
+func (s *stubInvoiceFileStore) WriteFileIfAbsent(ctx context.Context, input platformStorage.WriteFileIfAbsentInput) (*platformStorage.WriteFileIfAbsentResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubInvoiceFileStore) ReadFile(ctx context.Context, input platformStorage.ReadFileInput) ([]byte, error) {
+	payload, ok := s.data[input.Path]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return payload, nil
+}
+
+func (s *stubInvoiceFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	return errors.New("not implemented")
+}
+
+func (s *stubInvoiceFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
+	_, ok := s.data[input.Path]
+	return ok, nil
+}
+
+func (s *stubInvoiceFileStore) MoveFile(ctx context.Context, input platformStorage.MoveFileInput) error {
+	return nil
+}
+
+func (s *stubInvoiceFileStore) PresignUpload(ctx context.Context, input platformStorage.PresignUploadInput) (*platformStorage.PresignUploadResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubInvoiceFileStore) PresignDownload(ctx context.Context, input platformStorage.PresignDownloadInput) (*platformStorage.PresignDownloadResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func TestDownloadInvoiceDocumentHTTP(t *testing.T) {
+	key := "tenant/t1/inbox/fv123.zip"
+	app := &application.Application{
+		Commands: application.Commands{
+			DownloadInvoiceDocument: commands.NewDownloadInvoiceDocumentCommand(
+				&stubInvoiceQueryRepo{header: &domain.InvoiceHeaderRecord{ID: "INV-1", DocumentRefS3Key: key}},
+				&stubInvoiceFileStore{data: map[string][]byte{key: []byte("PK zip")}},
+			),
+		},
+	}
+	ctrl := NewController(app)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/invoicing/invoices/INV-1/document", nil)
+	req.SetPathValue("id", "INV-1")
+	rr := httptest.NewRecorder()
+	err := ctrl.DownloadInvoiceDocument(rr, req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/zip", rr.Header().Get("Content-Type"))
+	assert.Equal(t, `attachment; filename="fv123.zip"`, rr.Header().Get("Content-Disposition"))
+	assert.Equal(t, "PK zip", rr.Body.String())
 }

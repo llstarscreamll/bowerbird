@@ -16,6 +16,7 @@ type Commands struct {
 	ProcessInvoiceExtractionJob     *commands.CreateInvoicesFromFilesCommand
 	CreateInvoice                   *commands.CreateInvoiceCommand
 	ApplyLineDecision               *commands.ApplyLineDecisionCommand
+	DownloadInvoiceDocument         *commands.DownloadInvoiceDocumentCommand
 }
 
 type Queries struct {

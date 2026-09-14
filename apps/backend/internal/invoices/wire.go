@@ -91,8 +91,9 @@ func NewApplication(
 				passwordResolver,
 				createInvoice,
 			),
-			CreateInvoice:     createInvoice,
-			ApplyLineDecision: commands.NewApplyLineDecisionCommand(invoiceRepository, catalogACL),
+			CreateInvoice:           createInvoice,
+			ApplyLineDecision:       commands.NewApplyLineDecisionCommand(invoiceRepository, catalogACL),
+			DownloadInvoiceDocument: commands.NewDownloadInvoiceDocumentCommand(invoiceRepository, fileStore),
 		},
 		Queries: application.Queries{
 			GetInvoiceByID:  queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogACL),

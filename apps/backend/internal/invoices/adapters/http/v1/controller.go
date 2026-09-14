@@ -2,6 +2,7 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -101,6 +102,30 @@ func (c *Controller) GetInvoiceByID(w http.ResponseWriter, r *http.Request) erro
 
 	resp := newInvoiceDetailsResponse(result)
 	return api.Success(w, http.StatusOK, resp)
+}
+
+func (c *Controller) DownloadInvoiceDocument(w http.ResponseWriter, r *http.Request) error {
+	id := r.PathValue("id")
+	if strings.TrimSpace(id) == "" {
+		return appErrors.New(appErrors.CodeValidation, "invoice id is required")
+	}
+
+	result, err := c.app.Commands.DownloadInvoiceDocument.Execute(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, commands.ErrInvoiceNotFound) {
+			return appErrors.Wrap(err, appErrors.CodeNotFound, "invoice not found")
+		}
+		if errors.Is(err, commands.ErrInvoiceDocumentNotFound) {
+			return appErrors.Wrap(err, appErrors.CodeNotFound, "invoice document not found")
+		}
+		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to download invoice document")
+	}
+
+	w.Header().Set("Content-Type", result.ContentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+strings.ReplaceAll(result.Filename, `"`, "")+`"`)
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(result.Data)
+	return err
 }
 
 func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) error {

@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -53,6 +53,13 @@ export class InvoicesHttpService {
   applyLineDecision(invoiceId: string, lineId: string, payload: LineDecisionPayload): Observable<void> {
     return this.http.post<void>(`${this.apiDomain}/api/v1/invoicing/invoices/${invoiceId}/lines/${lineId}/decisions`, {
       data: { type: 'invoice_line_decisions', attributes: payload },
+    });
+  }
+
+  downloadOriginalDocument(id: string): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.apiDomain}/api/v1/invoicing/invoices/${id}/document`, {
+      responseType: 'blob',
+      observe: 'response',
     });
   }
 }

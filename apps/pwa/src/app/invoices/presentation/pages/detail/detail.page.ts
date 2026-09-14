@@ -47,9 +47,9 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
               · {{ inv.currency_code || 'COP' }}
             </p>
           </div>
-          <button hlmBtn variant="outline" class="shrink-0 self-start lg:self-auto">
+          <button hlmBtn type="button" variant="outline" class="shrink-0 self-start lg:self-auto" [disabled]="isDownloading()" (click)="downloadOriginal()">
             <ng-icon name="lucideDownload" />
-            Descargar
+            {{ isDownloading() ? 'Descargando…' : 'Descargar' }}
           </button>
         </header>
 
@@ -226,6 +226,11 @@ export class DetailPage implements OnInit {
 
   readonly invoice = this.store.invoice;
   readonly isLoading = this.store.isLoading;
+  readonly isDownloading = this.store.isDownloading;
+
+  downloadOriginal(): void {
+    this.store.downloadOriginalDocument();
+  }
 
   ngOnInit(): void {
     const invoiceId = this.route.snapshot.paramMap.get('invoiceId');
