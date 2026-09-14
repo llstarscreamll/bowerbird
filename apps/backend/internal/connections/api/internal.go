@@ -1,8 +1,13 @@
 package api
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 const SharingPolicyPrivate = "private"
+
+var ErrConnectionNotFound = errors.New("connection not found")
 
 type ConnectionInfo struct {
 	ID                   string
@@ -23,6 +28,7 @@ func (c ConnectionInfo) VisibleTo(userID string) bool {
 // InternalService is the connections Open Host Service for inbox sync.
 type InternalService interface {
 	GetActiveConnections(ctx context.Context) ([]ConnectionInfo, error)
+	GetConnection(ctx context.Context, connectionID string) (ConnectionInfo, error)
 	DecryptCredentials(ctx context.Context, connectionID string) ([]byte, error)
 	MarkRequiresReconnect(ctx context.Context, connectionID, reason string) error
 	GetSharingPolicy(ctx context.Context, connectionID string) (string, error)

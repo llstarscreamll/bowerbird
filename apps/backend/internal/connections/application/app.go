@@ -19,6 +19,7 @@ type Commands struct {
 
 type Queries struct {
 	GetActiveConnections *queries.GetActiveConnectionsQuery
+	GetConnection        *queries.GetConnectionQuery
 	DecryptCredentials   *queries.DecryptCredentialsQuery
 	GetSharingPolicy     *queries.GetSharingPolicyQuery
 }
@@ -37,6 +38,7 @@ func NewApplication(repo domain.Repository, credentials ports.Credentials) *Appl
 		},
 		Queries: Queries{
 			GetActiveConnections: queries.NewGetActiveConnectionsQuery(repo),
+			GetConnection:        queries.NewGetConnectionQuery(repo),
 			DecryptCredentials:   queries.NewDecryptCredentialsQuery(repo, credentials),
 			GetSharingPolicy:     queries.NewGetSharingPolicyQuery(repo),
 		},

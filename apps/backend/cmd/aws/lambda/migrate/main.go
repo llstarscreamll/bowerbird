@@ -47,8 +47,7 @@ func runTenantMigrations(ctx context.Context, controlPlaneURL string) error {
 
 	rows, err := conn.Query(ctx, "SELECT db_name FROM tenants WHERE status = 'active'")
 	if err != nil {
-		log.Printf("could not query tenants: %v", err)
-		return nil
+		return fmt.Errorf("query tenants: %w", err)
 	}
 	defer rows.Close()
 

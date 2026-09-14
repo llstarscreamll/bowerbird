@@ -74,7 +74,7 @@ func (c *ModifyMessageCommand) Execute(ctx context.Context, messageID string, ac
 		return err
 	}
 
-	account, credentialsJSON, err := decryptActiveAccount(ctx, c.connectionsService, message.ConnectionID())
+	account, credentialsJSON, err := decryptAccount(ctx, c.connectionsService, message.ConnectionID())
 	if err != nil {
 		return err
 	}
@@ -85,35 +85,41 @@ func (c *ModifyMessageCommand) Execute(ctx context.Context, messageID string, ac
 	}
 
 	now := time.Now().UTC()
+	providerErr := func(op string, err error) error {
+		if err == nil {
+			return nil
+		}
+		return fmt.Errorf("%s: %w", op, classifySyncError(account, err))
+	}
 	switch action {
 	case MessageActionRead:
-		if err := client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"UNREAD"}}); err != nil {
-			return fmt.Errorf("mark read: %w", err)
+		if err := providerErr("mark read", client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"UNREAD"}})); err != nil {
+			return err
 		}
 		message.MarkAsRead(now)
 	case MessageActionUnread:
-		if err := client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{AddLabelIDs: []string{"UNREAD"}}); err != nil {
-			return fmt.Errorf("mark unread: %w", err)
+		if err := providerErr("mark unread", client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{AddLabelIDs: []string{"UNREAD"}})); err != nil {
+			return err
 		}
 		message.MarkAsUnread(now)
 	case MessageActionStar:
-		if err := client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{AddLabelIDs: []string{"STARRED"}}); err != nil {
-			return fmt.Errorf("star message: %w", err)
+		if err := providerErr("star message", client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{AddLabelIDs: []string{"STARRED"}})); err != nil {
+			return err
 		}
 		message.Star(now)
 	case MessageActionUnstar:
-		if err := client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"STARRED"}}); err != nil {
-			return fmt.Errorf("unstar message: %w", err)
+		if err := providerErr("unstar message", client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"STARRED"}})); err != nil {
+			return err
 		}
 		message.Unstar(now)
 	case MessageActionArchive:
-		if err := client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"INBOX"}}); err != nil {
-			return fmt.Errorf("archive message: %w", err)
+		if err := providerErr("archive message", client.ModifyMessage(ctx, "me", message.ProviderMessageID(), domain.MessageMutation{RemoveLabelIDs: []string{"INBOX"}})); err != nil {
+			return err
 		}
 		message.Archive(now)
 	case MessageActionTrash:
-		if err := client.TrashMessage(ctx, "me", message.ProviderMessageID()); err != nil {
-			return fmt.Errorf("trash message: %w", err)
+		if err := providerErr("trash message", client.TrashMessage(ctx, "me", message.ProviderMessageID())); err != nil {
+			return err
 		}
 		message.MoveToTrash(now)
 	default:

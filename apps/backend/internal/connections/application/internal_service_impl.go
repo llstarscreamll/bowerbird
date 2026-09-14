@@ -10,6 +10,7 @@ import (
 
 type internalService struct {
 	getActiveConnections *queries.GetActiveConnectionsQuery
+	getConnection        *queries.GetConnectionQuery
 	decryptCredentials   *queries.DecryptCredentialsQuery
 	markReconnect        *commands.MarkRequiresReconnectCommand
 	getSharingPolicy     *queries.GetSharingPolicyQuery
@@ -21,6 +22,9 @@ func NewInternalService(app *Application) api.InternalService {
 	}
 	if app.Queries.GetActiveConnections == nil {
 		panic("get active connections query is required")
+	}
+	if app.Queries.GetConnection == nil {
+		panic("get connection query is required")
 	}
 	if app.Queries.DecryptCredentials == nil {
 		panic("decrypt credentials query is required")
@@ -34,6 +38,7 @@ func NewInternalService(app *Application) api.InternalService {
 
 	return &internalService{
 		getActiveConnections: app.Queries.GetActiveConnections,
+		getConnection:        app.Queries.GetConnection,
 		decryptCredentials:   app.Queries.DecryptCredentials,
 		markReconnect:        app.Commands.MarkRequiresReconnect,
 		getSharingPolicy:     app.Queries.GetSharingPolicy,
@@ -56,6 +61,20 @@ func (s *internalService) GetActiveConnections(ctx context.Context) ([]api.Conne
 		})
 	}
 	return out, nil
+}
+
+func (s *internalService) GetConnection(ctx context.Context, connectionID string) (api.ConnectionInfo, error) {
+	item, err := s.getConnection.Execute(ctx, connectionID)
+	if err != nil {
+		return api.ConnectionInfo{}, err
+	}
+	return api.ConnectionInfo{
+		ID:                   item.ID,
+		Provider:             item.Provider,
+		ProviderAccountEmail: item.ProviderAccountEmail,
+		OwnerUserID:          item.OwnerUserID,
+		SharingPolicy:        item.SharingPolicy,
+	}, nil
 }
 
 func (s *internalService) DecryptCredentials(ctx context.Context, connectionID string) ([]byte, error) {

@@ -126,6 +126,19 @@ func (f *failingConnectionsLister) GetActiveConnections(ctx context.Context) ([]
 	return f.activeConnections, nil
 }
 
+func (f *failingConnectionsLister) GetConnection(ctx context.Context, connectionID string) (connectionsapi.ConnectionInfo, error) {
+	slug, _ := tenant.TenantIDFromContext(ctx)
+	if slug == f.failTenant {
+		return connectionsapi.ConnectionInfo{}, errors.New("list accounts failed")
+	}
+	for _, account := range f.activeConnections {
+		if account.ID == connectionID {
+			return account, nil
+		}
+	}
+	return connectionsapi.ConnectionInfo{}, connectionsapi.ErrConnectionNotFound
+}
+
 func (f *failingConnectionsLister) DecryptCredentials(context.Context, string) ([]byte, error) {
 	return nil, nil
 }

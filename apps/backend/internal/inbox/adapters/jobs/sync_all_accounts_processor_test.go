@@ -30,6 +30,9 @@ type stubConnections struct{}
 func (stubConnections) GetActiveConnections(context.Context) ([]connectionsapi.ConnectionInfo, error) {
 	return nil, nil
 }
+func (stubConnections) GetConnection(context.Context, string) (connectionsapi.ConnectionInfo, error) {
+	return connectionsapi.ConnectionInfo{}, connectionsapi.ErrConnectionNotFound
+}
 func (stubConnections) DecryptCredentials(context.Context, string) ([]byte, error) { return nil, nil }
 func (stubConnections) MarkRequiresReconnect(context.Context, string, string) error {
 	return nil

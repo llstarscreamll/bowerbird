@@ -282,6 +282,39 @@ func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 	assert.ErrorContains(t, err, "get provider attachment att-1")
 }
 
+func TestSyncAccountCommand_SkipsForbiddenAttachmentDownload(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		refs: []domain.MessageRef{{ID: "provider-msg-1"}},
+		messages: map[string]*domain.MailMessage{
+			"provider-msg-1": {
+				ID:            "provider-msg-1",
+				ThreadID:      "thread-1",
+				Subject:       "with attachment",
+				Sender:        "Sender <sender@example.com>",
+				PlainTextBody: "normal",
+				Attachments: []domain.MailAttachmentRef{
+					{AttachmentID: "att-1", Filename: "doc.xml", MimeType: "application/xml", Size: 10},
+				},
+			},
+		},
+		downloadAttachmentErr: errors.New("download attachment request failed with status 403"),
+	}
+	publisher := &fakeInboxEventPublisher{}
+	attachmentStore := &fakeFileStore{}
+
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Equal(t, 0, connectionsSvc.markReconnectCalls)
+	assert.Empty(t, repo.upsertedAttachments)
+	require.Len(t, repo.upsertedMessages, 1)
+}
+
 func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
@@ -301,6 +334,29 @@ func TestSyncAccountCommand_ReauthMarksReconnect(t *testing.T) {
 	cursor := repo.cursors["acc-1"]
 	require.NotNil(t, cursor)
 	assert.Equal(t, domain.SyncCursorStatusError, cursor.Status())
+}
+
+func TestSyncAccountCommand_SkipsWhileRateLimited(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		listErr: errors.New("list messages request failed with status 403 (body=\"Quota exceeded for quota metric Total Query Cost reason: rateLimitExceeded\")"),
+	}
+	publisher := &fakeInboxEventPublisher{}
+	attachmentStore := &fakeFileStore{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, attachmentStore, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "ERR_SYNC_RATE_LIMITED")
+	require.Len(t, providerClient.listQueries, 1)
+
+	err = cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
+	require.NoError(t, err)
+	assert.Len(t, providerClient.listQueries, 1)
 }
 
 func toUnixString(v time.Time) string {
@@ -381,11 +437,21 @@ func (f *fakeInboxRepo) UpsertMessageAttachment(ctx context.Context, attachment 
 
 type fakeConnectionsInternalService struct {
 	activeConnections  []connectionsapi.ConnectionInfo
+	connections        []connectionsapi.ConnectionInfo
 	markReconnectCalls int
 }
 
 func (f *fakeConnectionsInternalService) GetActiveConnections(ctx context.Context) ([]connectionsapi.ConnectionInfo, error) {
 	return f.activeConnections, nil
+}
+
+func (f *fakeConnectionsInternalService) GetConnection(ctx context.Context, connectionID string) (connectionsapi.ConnectionInfo, error) {
+	for _, account := range append(append([]connectionsapi.ConnectionInfo{}, f.connections...), f.activeConnections...) {
+		if account.ID == connectionID {
+			return account, nil
+		}
+	}
+	return connectionsapi.ConnectionInfo{}, connectionsapi.ErrConnectionNotFound
 }
 
 func (f *fakeConnectionsInternalService) DecryptCredentials(ctx context.Context, connectionID string) ([]byte, error) {

@@ -63,7 +63,7 @@ func (c *SendMessageCommand) Execute(ctx context.Context, input SendMessageInput
 		return nil, fmt.Errorf("account id is required")
 	}
 
-	account, credentialsJSON, err := decryptActiveAccount(ctx, c.connectionsService, input.AccountID)
+	account, credentialsJSON, err := decryptAccount(ctx, c.connectionsService, input.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *SendMessageCommand) Execute(ctx context.Context, input SendMessageInput
 
 	providerID, err := client.SendMessage(ctx, "me", outgoing)
 	if err != nil {
-		return nil, fmt.Errorf("send provider message: %w", err)
+		return nil, fmt.Errorf("send provider message: %w", classifySyncError(account, err))
 	}
 
 	now := time.Now().UTC()

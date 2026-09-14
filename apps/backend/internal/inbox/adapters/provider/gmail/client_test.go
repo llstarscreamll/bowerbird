@@ -312,6 +312,39 @@ func TestNewOAuthHTTPClientValidatesInputs(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestListHistoryFollowsNextPageToken(t *testing.T) {
+	var pageTokens []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/gmail/v1/users/me/history", r.URL.Path)
+		assert.Equal(t, "hist-1", r.URL.Query().Get("startHistoryId"))
+		pageToken := r.URL.Query().Get("pageToken")
+		pageTokens = append(pageTokens, pageToken)
+		if pageToken == "" {
+			_, _ = w.Write([]byte(`{"history":[{"messagesAdded":[{"message":{"id":"m1"}}]}],"historyId":"hist-2","nextPageToken":"page-2"}`))
+			return
+		}
+		assert.Equal(t, "page-2", pageToken)
+		_, _ = w.Write([]byte(`{"history":[{"messagesAdded":[{"message":{"id":"m2"}}]}],"historyId":"hist-3"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client())
+	client.SetBaseURL(server.URL)
+
+	page, err := client.ListHistory(context.Background(), "me", "hist-1")
+	require.NoError(t, err)
+	assert.Equal(t, "hist-3", page.NewHistoryID)
+	require.Len(t, pageTokens, 2)
+	assert.Equal(t, []string{"", "page-2"}, pageTokens)
+
+	got := map[string]domain.HistoryChangeType{}
+	for _, change := range page.Changes {
+		got[change.MessageID] = change.Type
+	}
+	assert.Equal(t, domain.HistoryChangeAdded, got["m1"])
+	assert.Equal(t, domain.HistoryChangeAdded, got["m2"])
+}
+
 func loadFixture(t *testing.T, fileName string) string {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join("testdata", fileName))

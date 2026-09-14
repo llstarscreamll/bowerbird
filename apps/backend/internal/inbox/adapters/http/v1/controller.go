@@ -185,8 +185,15 @@ func (c *Controller) ModifyMessage(w http.ResponseWriter, r *http.Request) error
 		if errors.Is(err, domain.ErrInboxMessageNotFound) {
 			return appErrors.Wrap(err, appErrors.CodeNotFound, "message not found")
 		}
+		if errors.Is(err, inboxCommands.ErrMailboxConnectionNotFound) {
+			return appErrors.Wrap(err, appErrors.CodeNotFound, "mailbox connection not found")
+		}
 		if errors.Is(err, inboxCommands.ErrInvalidMessageAction) {
 			return appErrors.Wrap(err, appErrors.CodeValidation, "invalid message action")
+		}
+		var syncErr *appErrors.SyncError
+		if errors.As(err, &syncErr) {
+			return syncErr
 		}
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to modify message")
 	}
@@ -234,6 +241,13 @@ func (c *Controller) SendMessage(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		if errors.Is(err, domain.ErrOutgoingMailToRequired) {
 			return appErrors.Wrap(err, appErrors.CodeValidation, "at least one recipient is required")
+		}
+		if errors.Is(err, inboxCommands.ErrMailboxConnectionNotFound) {
+			return appErrors.Wrap(err, appErrors.CodeNotFound, "mailbox connection not found")
+		}
+		var syncErr *appErrors.SyncError
+		if errors.As(err, &syncErr) {
+			return syncErr
 		}
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to send message")
 	}

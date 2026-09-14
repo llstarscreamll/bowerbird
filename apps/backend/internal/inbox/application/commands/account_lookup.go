@@ -2,30 +2,30 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	connectionsapi "github.com/bowerbird/internal/connections/api"
 )
 
-func decryptActiveAccount(
+var ErrMailboxConnectionNotFound = errors.New("mailbox connection not found")
+
+func decryptAccount(
 	ctx context.Context,
 	connectionsService connectionsapi.InternalService,
 	accountID string,
 ) (connectionsapi.ConnectionInfo, []byte, error) {
-	accounts, err := connectionsService.GetActiveConnections(ctx)
+	account, err := connectionsService.GetConnection(ctx, accountID)
 	if err != nil {
-		return connectionsapi.ConnectionInfo{}, nil, fmt.Errorf("list active accounts: %w", err)
-	}
-
-	for _, account := range accounts {
-		if account.ID == accountID {
-			credentialsJSON, err := connectionsService.DecryptCredentials(ctx, account.ID)
-			if err != nil {
-				return connectionsapi.ConnectionInfo{}, nil, fmt.Errorf("decrypt account credentials: %w", err)
-			}
-			return account, credentialsJSON, nil
+		if errors.Is(err, connectionsapi.ErrConnectionNotFound) {
+			return connectionsapi.ConnectionInfo{}, nil, ErrMailboxConnectionNotFound
 		}
+		return connectionsapi.ConnectionInfo{}, nil, fmt.Errorf("get account: %w", err)
 	}
 
-	return connectionsapi.ConnectionInfo{}, nil, fmt.Errorf("active account not found: %s", accountID)
+	credentialsJSON, err := connectionsService.DecryptCredentials(ctx, account.ID)
+	if err != nil {
+		return connectionsapi.ConnectionInfo{}, nil, fmt.Errorf("decrypt account credentials: %w", err)
+	}
+	return account, credentialsJSON, nil
 }

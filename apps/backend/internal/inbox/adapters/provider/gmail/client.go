@@ -12,12 +12,19 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bowerbird/internal/inbox/domain"
 )
 
 const defaultBaseURL = "https://gmail.googleapis.com"
+const gmailMinRequestInterval = 80 * time.Millisecond
+
+var (
+	gmailThrottleMu sync.Mutex
+	gmailNextSlot   time.Time
+)
 
 type Client struct {
 	httpClient *http.Client
@@ -39,6 +46,44 @@ func NewClient(httpClient *http.Client) *Client {
 
 func (c *Client) SetBaseURL(baseURL string) {
 	c.baseURL = strings.TrimRight(baseURL, "/")
+}
+
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	if c.shouldThrottle() {
+		if err := waitGmailSlot(req.Context()); err != nil {
+			return nil, err
+		}
+	}
+	return c.httpClient.Do(req)
+}
+
+func (c *Client) shouldThrottle() bool {
+	return strings.Contains(c.baseURL, "gmail.googleapis.com")
+}
+
+func waitGmailSlot(ctx context.Context) error {
+	gmailThrottleMu.Lock()
+	now := time.Now()
+	waitUntil := gmailNextSlot
+	if waitUntil.Before(now) {
+		waitUntil = now
+	}
+	gmailNextSlot = waitUntil.Add(gmailMinRequestInterval)
+	gmailThrottleMu.Unlock()
+
+	delay := time.Until(waitUntil)
+	if delay <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
@@ -68,7 +113,7 @@ func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptio
 		return nil, "", fmt.Errorf("build list messages request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("list messages request failed: %w", err)
 	}
@@ -141,7 +186,7 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 		return nil, fmt.Errorf("build get message request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("get message request failed: %w", err)
 	}
@@ -207,7 +252,7 @@ func (c *Client) DownloadAttachment(ctx context.Context, userID, messageID, atta
 		return nil, fmt.Errorf("build download attachment request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download attachment request failed: %w", err)
 	}
@@ -276,7 +321,7 @@ func (c *Client) CreateLabel(ctx context.Context, userID, labelName string) (str
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("create label request failed: %w", err)
 	}
@@ -322,7 +367,7 @@ func (c *Client) AddLabelToMessage(ctx context.Context, userID, messageID, label
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("modify message request failed: %w", err)
 	}
@@ -346,7 +391,7 @@ func (c *Client) GetHistoryID(ctx context.Context, userID string) (string, error
 		return "", fmt.Errorf("build get profile request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("get profile request failed: %w", err)
 	}
@@ -374,63 +419,99 @@ func (c *Client) ListHistory(ctx context.Context, userID, startHistoryID string)
 		return domain.HistoryPage{}, fmt.Errorf("start history id is required")
 	}
 
+	seen := map[string]domain.HistoryChangeType{}
+	var newHistoryID string
+	pageToken := ""
+	for {
+		payload, expired, err := c.fetchHistoryPage(ctx, userID, startHistoryID, pageToken)
+		if err != nil {
+			return domain.HistoryPage{}, err
+		}
+		if expired {
+			return domain.HistoryPage{Expired: true}, nil
+		}
+		if payload.HistoryID != "" {
+			newHistoryID = payload.HistoryID
+		}
+		mergeHistoryChanges(seen, payload)
+		if payload.NextPageToken == "" || payload.NextPageToken == pageToken {
+			break
+		}
+		pageToken = payload.NextPageToken
+	}
+
+	page := domain.HistoryPage{NewHistoryID: newHistoryID}
+	for messageID, changeType := range seen {
+		page.Changes = append(page.Changes, domain.HistoryChange{Type: changeType, MessageID: messageID})
+	}
+	return page, nil
+}
+
+type gmailHistoryPage struct {
+	History []struct {
+		MessagesAdded []struct {
+			Message struct {
+				ID string `json:"id"`
+			} `json:"message"`
+		} `json:"messagesAdded"`
+		MessagesDeleted []struct {
+			Message struct {
+				ID string `json:"id"`
+			} `json:"message"`
+		} `json:"messagesDeleted"`
+		LabelsAdded []struct {
+			Message struct {
+				ID string `json:"id"`
+			} `json:"message"`
+		} `json:"labelsAdded"`
+		LabelsRemoved []struct {
+			Message struct {
+				ID string `json:"id"`
+			} `json:"message"`
+		} `json:"labelsRemoved"`
+	} `json:"history"`
+	HistoryID     string `json:"historyId"`
+	NextPageToken string `json:"nextPageToken"`
+}
+
+func (c *Client) fetchHistoryPage(ctx context.Context, userID, startHistoryID, pageToken string) (gmailHistoryPage, bool, error) {
 	values := url.Values{}
 	values.Set("startHistoryId", startHistoryID)
 	values.Add("historyTypes", "messageAdded")
 	values.Add("historyTypes", "messageDeleted")
 	values.Add("historyTypes", "labelAdded")
 	values.Add("historyTypes", "labelRemoved")
+	if pageToken != "" {
+		values.Set("pageToken", pageToken)
+	}
 
 	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/history?%s", c.baseURL, url.PathEscape(userID), values.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return domain.HistoryPage{}, fmt.Errorf("build list history request: %w", err)
+		return gmailHistoryPage{}, false, fmt.Errorf("build list history request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
-		return domain.HistoryPage{}, fmt.Errorf("list history request failed: %w", err)
+		return gmailHistoryPage{}, false, fmt.Errorf("list history request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return domain.HistoryPage{Expired: true}, nil
+		return gmailHistoryPage{}, true, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return domain.HistoryPage{}, c.requestStatusError("list history request failed", resp)
+		return gmailHistoryPage{}, false, c.requestStatusError("list history request failed", resp)
 	}
 
-	var payload struct {
-		History []struct {
-			MessagesAdded []struct {
-				Message struct {
-					ID string `json:"id"`
-				} `json:"message"`
-			} `json:"messagesAdded"`
-			MessagesDeleted []struct {
-				Message struct {
-					ID string `json:"id"`
-				} `json:"message"`
-			} `json:"messagesDeleted"`
-			LabelsAdded []struct {
-				Message struct {
-					ID string `json:"id"`
-				} `json:"message"`
-			} `json:"labelsAdded"`
-			LabelsRemoved []struct {
-				Message struct {
-					ID string `json:"id"`
-				} `json:"message"`
-			} `json:"labelsRemoved"`
-		} `json:"history"`
-		HistoryID string `json:"historyId"`
-	}
+	var payload gmailHistoryPage
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return domain.HistoryPage{}, fmt.Errorf("decode list history response: %w", err)
+		return gmailHistoryPage{}, false, fmt.Errorf("decode list history response: %w", err)
 	}
+	return payload, false, nil
+}
 
-	page := domain.HistoryPage{NewHistoryID: payload.HistoryID}
-	seen := map[string]domain.HistoryChangeType{}
+func mergeHistoryChanges(seen map[string]domain.HistoryChangeType, payload gmailHistoryPage) {
 	appendChange := func(changeType domain.HistoryChangeType, messageID string) {
 		if messageID == "" {
 			return
@@ -454,11 +535,6 @@ func (c *Client) ListHistory(ctx context.Context, userID, startHistoryID string)
 			appendChange(domain.HistoryChangeUpdated, labeled.Message.ID)
 		}
 	}
-	for messageID, changeType := range seen {
-		page.Changes = append(page.Changes, domain.HistoryChange{Type: changeType, MessageID: messageID})
-	}
-
-	return page, nil
 }
 
 func (c *Client) ModifyMessage(ctx context.Context, userID, messageID string, mutation domain.MessageMutation) error {
@@ -486,7 +562,7 @@ func (c *Client) ModifyMessage(ctx context.Context, userID, messageID string, mu
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("modify message request failed: %w", err)
 	}
@@ -510,7 +586,7 @@ func (c *Client) TrashMessage(ctx context.Context, userID, messageID string) err
 		return fmt.Errorf("build trash message request: %w", err)
 	}
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("trash message request failed: %w", err)
 	}
@@ -548,7 +624,7 @@ func (c *Client) SendMessage(ctx context.Context, userID string, message domain.
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
 		return "", fmt.Errorf("send message request failed: %w", err)
 	}

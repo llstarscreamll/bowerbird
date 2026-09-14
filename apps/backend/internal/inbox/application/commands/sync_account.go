@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	connectionsapi "github.com/bowerbird/internal/connections/api"
 	contractEvents "github.com/bowerbird/internal/contracts/events"
 	inboxMappers "github.com/bowerbird/internal/inbox/application/mappers"
 	"github.com/bowerbird/internal/inbox/domain"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 	platformEvents "github.com/bowerbird/internal/platform/events"
 	"github.com/bowerbird/internal/platform/id"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -37,6 +39,9 @@ type SyncAccountCommand struct {
 	fileStore          platformStorage.FileStore
 	unitOfWork         UnitOfWorkRunner
 	idGenerator        func() string
+	syncMu             sync.Mutex
+	syncInFlight       map[string]struct{}
+	syncCooldownUntil  map[string]time.Time
 	// config
 	perMessageTimeout  time.Duration
 	maxRawMessageBytes int
@@ -93,6 +98,8 @@ func NewSyncAccountCommand(
 		fileStore:          fileStore,
 		unitOfWork:         unitOfWork,
 		idGenerator:        id.NewULID,
+		syncInFlight:       map[string]struct{}{},
+		syncCooldownUntil:  map[string]time.Time{},
 		perMessageTimeout:  60 * time.Second,
 		maxRawMessageBytes: 128 * 1024 * 1024, // 128MB
 		maxAttachmentBytes: 128 * 1024 * 1024, // 128MB
@@ -104,6 +111,11 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 	if err != nil {
 		return err
 	}
+
+	if c.skipDuplicateSync(tenantID, input.AccountID) {
+		return nil
+	}
+	defer c.endSync(tenantID, input.AccountID)
 
 	account, err := c.resolveActiveAccount(ctx, input.AccountID)
 	if err != nil {
@@ -117,6 +129,7 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 
 	if err := c.syncAccount(ctx, tenantID, account, cursor); err != nil {
 		err = classifySyncError(account, err)
+		c.noteRateLimitCooldown(tenantID, input.AccountID, err)
 
 		cursor.MarkSyncFailed(err.Error())
 		if persistErr := c.cursorRepo.UpsertSyncCursor(ctx, cursor); persistErr != nil {
@@ -133,6 +146,45 @@ func (c *SyncAccountCommand) Execute(ctx context.Context, input SyncAccountComma
 	}
 
 	return nil
+}
+
+func syncGuardKey(tenantID, accountID string) string {
+	return tenantID + ":" + accountID
+}
+
+func (c *SyncAccountCommand) skipDuplicateSync(tenantID, accountID string) bool {
+	key := syncGuardKey(tenantID, accountID)
+	now := time.Now()
+	c.syncMu.Lock()
+	defer c.syncMu.Unlock()
+	if until, ok := c.syncCooldownUntil[key]; ok && now.Before(until) {
+		return true
+	}
+	if _, busy := c.syncInFlight[key]; busy {
+		return true
+	}
+	c.syncInFlight[key] = struct{}{}
+	return false
+}
+
+func (c *SyncAccountCommand) endSync(tenantID, accountID string) {
+	c.syncMu.Lock()
+	delete(c.syncInFlight, syncGuardKey(tenantID, accountID))
+	c.syncMu.Unlock()
+}
+
+func (c *SyncAccountCommand) noteRateLimitCooldown(tenantID, accountID string, err error) {
+	var syncErr *appErrors.SyncError
+	if !errors.As(err, &syncErr) || syncErr.Code != appErrors.CodeSyncRateLimited {
+		return
+	}
+	retryAfter := syncErr.RetryAfterSeconds
+	if retryAfter <= 0 {
+		retryAfter = 120
+	}
+	c.syncMu.Lock()
+	c.syncCooldownUntil[syncGuardKey(tenantID, accountID)] = time.Now().Add(time.Duration(retryAfter) * time.Second)
+	c.syncMu.Unlock()
 }
 
 func (c *SyncAccountCommand) resolveActiveAccount(ctx context.Context, accountID string) (connectionsapi.ConnectionInfo, error) {
@@ -354,6 +406,9 @@ func (c *SyncAccountCommand) syncMessageAttachments(
 	for _, att := range attachments {
 		data, err := client.DownloadAttachment(providerCtx, "me", providerMessageID, att.AttachmentID)
 		if err != nil {
+			if isSkippableAttachmentError(err) {
+				continue
+			}
 			return refs, fmt.Errorf("get provider attachment %s: %w", att.AttachmentID, err)
 		}
 		if c.maxAttachmentBytes > 0 && int64(len(data)) > c.maxAttachmentBytes {

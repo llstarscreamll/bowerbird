@@ -120,7 +120,7 @@ func parseRetryAfterSeconds(errText string) int {
 }
 
 func isReauthError(statusCode int, errText string) bool {
-	if statusCode == 401 || statusCode == 403 {
+	if statusCode == 401 {
 		return true
 	}
 
@@ -129,7 +129,22 @@ func isReauthError(statusCode int, errText string) bool {
 		strings.Contains(errText, "token has been expired") ||
 		strings.Contains(errText, "token revoked") ||
 		strings.Contains(errText, "invalid credentials") ||
+		strings.Contains(errText, "insufficient authentication scopes") ||
+		strings.Contains(errText, "insufficient_scope") ||
 		strings.Contains(errText, "reauth")
+}
+
+func isSkippableAttachmentError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errText := strings.ToLower(err.Error())
+	statusCode := parseStatusCode(errText)
+	if isRateLimitedError(statusCode, errText) {
+		return false
+	}
+	return statusCode == 403 || statusCode == 404
 }
 
 func isRateLimitedError(statusCode int, errText string) bool {
@@ -138,6 +153,8 @@ func isRateLimitedError(statusCode int, errText string) bool {
 	}
 
 	return strings.Contains(errText, "rate limit") ||
+		strings.Contains(errText, "ratelimitexceeded") ||
+		strings.Contains(errText, "rate_limit_exceeded") ||
 		strings.Contains(errText, "too many requests") ||
 		strings.Contains(errText, "quota exceeded")
 }
