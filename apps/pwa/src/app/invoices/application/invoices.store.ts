@@ -33,7 +33,7 @@ export class InvoicesStore {
         this.isLoading.set(false);
       },
       error: () => {
-        this.toast.showError('No se pudieron cargar las facturas en este momento.');
+        this.toast.showError('No se pudieron cargar las facturas recibidas en este momento.');
         this.isLoading.set(false);
       },
     });
@@ -53,7 +53,7 @@ export class InvoicesStore {
         this.isLoadingMore.set(false);
       },
       error: () => {
-        this.toast.showError('No se pudieron cargar más facturas.');
+        this.toast.showError('No se pudieron cargar más facturas recibidas.');
         this.isLoadingMore.set(false);
       },
     });

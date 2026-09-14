@@ -115,7 +115,15 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                 <ng-icon name="lucidePenLine" class="text-[16px]" />
               </button>
             }
-            <button type="button" hlmBtn variant="outline" size="icon-sm" [class.bg-muted]="filters().onlyInvoices" (click)="setOnlyInvoicesFilter(!filters().onlyInvoices)" title="Solo facturas">
+            <button
+              type="button"
+              hlmBtn
+              variant="outline"
+              size="icon-sm"
+              [class.bg-muted]="filters().onlyInvoices"
+              (click)="setOnlyInvoicesFilter(!filters().onlyInvoices)"
+              title="Solo facturas recibidas"
+            >
               <ng-icon name="lucideReceipt" class="text-[16px]" />
             </button>
             <button type="button" hlmBtn variant="outline" size="icon-sm" [disabled]="isSyncing() || syncRetrySecondsLeft() > 0" (click)="triggerSync()" title="Sincronizar correos">
@@ -364,7 +372,7 @@ import { SecureEmailBodyComponent } from '../../components/secure-email-body/sec
                   <ng-icon name="lucideMailOpen" class="text-[48px] text-primary" />
                 </div>
                 <h3 class="text-lg font-medium">Empieza a recibir tus correos</h3>
-                <p class="mb-6 mt-1.5 text-sm text-muted-foreground">Conecta tu cuenta de correo para centralizar tus facturas y documentos.</p>
+                <p class="mb-6 mt-1.5 text-sm text-muted-foreground">Conecta tu cuenta de correo para centralizar tus facturas recibidas.</p>
                 <button type="button" hlmBtn class="gap-2" (click)="navigateToAddAccount()">
                   <ng-icon name="lucideCirclePlus" class="text-[18px]" />
                   Conectar cuenta

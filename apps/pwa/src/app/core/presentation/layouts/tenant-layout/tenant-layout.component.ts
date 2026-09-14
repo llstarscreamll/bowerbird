@@ -106,9 +106,16 @@ import { InstallPromptHostComponent, PwaInstallCoordinator } from '../../../pwa-
               }
               @if (entitlements.hasInvoicing()) {
                 <li hlmSidebarMenuItem>
-                  <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'invoices']" routerLinkActive #invoicesLink="routerLinkActive" [isActive]="invoicesLink.isActive" [tooltip]="'Facturas'">
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', tenantId(), 'invoices']"
+                    routerLinkActive
+                    #invoicesLink="routerLinkActive"
+                    [isActive]="invoicesLink.isActive"
+                    [tooltip]="'Facturas recibidas'"
+                  >
                     <ng-icon name="lucideReceipt" />
-                    <span>Facturas</span>
+                    <span>Facturas recibidas</span>
                   </a>
                 </li>
                 <li hlmSidebarMenuItem>

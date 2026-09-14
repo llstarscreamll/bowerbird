@@ -83,7 +83,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
             <hlm-empty class="py-16">
               <ng-icon hlm name="lucideUnlink" class="text-muted-foreground" />
               <h3 hlmEmptyTitle>No hay cuentas conectadas</h3>
-              <p hlmEmptyDescription>Añade tu primera cuenta de correo para empezar a sincronizar facturas y comprobantes.</p>
+              <p hlmEmptyDescription>Añade tu primera cuenta de correo para empezar a sincronizar facturas recibidas.</p>
               <button hlmBtn variant="outline" class="mt-4" (click)="openConnectModal()">Añadir primera cuenta</button>
             </hlm-empty>
           } @else {
@@ -146,7 +146,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
               Permisos que solicitaremos
             </h4>
             <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-              <li>Leer correos electrónicos (para encontrar facturas)</li>
+              <li>Leer correos electrónicos (para encontrar facturas recibidas)</li>
               <li>Crear y asignar etiquetas (para organizar tu bandeja)</li>
             </ul>
           </div>

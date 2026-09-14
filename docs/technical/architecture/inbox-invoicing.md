@@ -1,6 +1,9 @@
 # Inbox and invoicing
 
-Two bounded contexts: sync mail (`inbox`), extract Colombian e-invoices (`invoices`). Domain terms **DIAN** and **CUFE** stay as-is.
+Two bounded contexts: sync mail (`inbox`), extract Colombian **received**
+e-invoices (`invoices`, Accounts Payable). Issued invoices (AR) are out of
+scope. Domain terms **DIAN** and **CUFE** stay as-is. UI label: **Facturas
+recibidas**.
 
 ## Product flow
 

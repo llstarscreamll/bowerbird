@@ -46,8 +46,8 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
       <div class="mx-auto w-full space-y-6">
         <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Facturas</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Gestiona tus facturas electrónicas.</p>
+            <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Facturas recibidas</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Facturas electrónicas que te envían tus proveedores.</p>
           </div>
           <div class="flex items-center gap-3">
             <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
@@ -61,10 +61,6 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
               <ng-icon name="lucideFilter" />
               Filtrar
             </button>
-            <button hlmBtn>
-              <ng-icon name="lucidePlus" />
-              Nueva Factura
-            </button>
           </div>
         </div>
 
@@ -77,8 +73,8 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
         @if (!isLoading() && !hasInvoices()) {
           <hlm-empty class="py-20">
             <ng-icon hlm name="lucideReceipt" class="text-4xl text-muted-foreground/40" />
-            <h3 hlmEmptyTitle>Aún no hay facturas</h3>
-            <p hlmEmptyDescription>No se han encontrado facturas en este entorno. Pronto podrás sincronizarlas desde tu bandeja o crearlas manualmente.</p>
+            <h3 hlmEmptyTitle>Aún no hay facturas recibidas</h3>
+            <p hlmEmptyDescription>No se han encontrado facturas de proveedores en este entorno. Impórtalas o espera a que lleguen al buzón conectado.</p>
             <button hlmBtn variant="outline" class="mt-6" [disabled]="isUploading() || isAnalyzing()" (click)="openImportModal()">
               <ng-icon name="lucideCloudDownload" />
               {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
@@ -139,7 +135,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     <hlm-dialog [state]="isImportModalOpen() ? 'open' : 'closed'" (closed)="closeImportModal()">
       <hlm-dialog-content *brnDialogContent class="sm:max-w-lg">
         <hlm-dialog-header>
-          <h2 hlmDialogTitle>Importar historico de facturas</h2>
+          <h2 hlmDialogTitle>Importar histórico de facturas recibidas</h2>
         </hlm-dialog-header>
         <div class="space-y-4">
           <app-file-upload

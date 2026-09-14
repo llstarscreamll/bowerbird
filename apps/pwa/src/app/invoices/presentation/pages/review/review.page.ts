@@ -17,7 +17,7 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
     <div class="mx-auto w-full max-w-5xl space-y-6">
       <a routerLink=".." class="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
         <ng-icon name="lucideArrowLeft" class="mr-1" />
-        Volver a facturas
+        Volver a facturas recibidas
       </a>
       <header>
         <h1 class="text-2xl font-semibold tracking-tight">Cola de revisión</h1>

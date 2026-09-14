@@ -27,7 +27,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
       @if (invoice(); as inv) {
         <a routerLink="../" class="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
           <ng-icon name="lucideArrowLeft" class="size-4" />
-          Volver a facturas
+          Volver a facturas recibidas
         </a>
 
         <header class="flex flex-col gap-4 border-b border-border pb-6 lg:flex-row lg:items-end lg:justify-between">

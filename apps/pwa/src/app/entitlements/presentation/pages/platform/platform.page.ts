@@ -66,8 +66,8 @@ import { ToastService } from '../../../../core/services/toast.service';
                   <div class="rounded-lg border border-border p-4">
                     <div class="flex items-start justify-between gap-4">
                       <div>
-                        <h3 class="font-medium">Facturas</h3>
-                        <p class="mt-1 text-sm text-muted-foreground">Espacio de trabajo e ingesta desde correo.</p>
+                        <h3 class="font-medium">Facturas recibidas</h3>
+                        <p class="mt-1 text-sm text-muted-foreground">Ingesta de facturas de proveedores desde correo.</p>
                       </div>
                       <span class="text-sm font-medium text-muted-foreground">{{ invoicingEnabled() ? 'Activo' : 'Apagado' }}</span>
                     </div>
