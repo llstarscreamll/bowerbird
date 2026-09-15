@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { ToastService } from '../../core/services/toast.service';
 import { CatalogHttpService } from '../infrastructure/catalog.http.service';
-import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, DuplicateCluster, MergeItemsInput, UpdateCatalogItemInput } from '../domain/catalog.model';
 import { isEnrichedHttpError } from '../../core/http/jsonapi-error';
 
 @Injectable({ providedIn: 'root' })
@@ -13,6 +13,7 @@ export class CatalogStore {
 
   readonly items = signal<CatalogItem[]>([]);
   readonly selectedItem = signal<CatalogItem | null>(null);
+  readonly duplicateClusters = signal<DuplicateCluster[]>([]);
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
   readonly submitting = signal(false);
@@ -134,6 +135,49 @@ export class CatalogStore {
       catchError((err: unknown) => {
         this.submitting.set(false);
         this.handleError(err, 'No se pudo eliminar el alias.');
+        return of(false);
+      }),
+    );
+  }
+
+  loadDuplicateClusters(): void {
+    this.http.listDuplicateClusters().subscribe({
+      next: (clusters) => this.duplicateClusters.set(clusters),
+      error: () => this.duplicateClusters.set([]),
+    });
+  }
+
+  mergeItems(input: MergeItemsInput): Observable<CatalogItem | null> {
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    return this.http.mergeItems(input).pipe(
+      tap((item) => {
+        this.submitting.set(false);
+        this.selectedItem.set(item);
+        this.toast.showSuccess('Ítems fusionados.');
+        this.loadDuplicateClusters();
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.handleError(err, 'No se pudieron fusionar los ítems.');
+        return of(null);
+      }),
+    );
+  }
+
+  markNotDuplicates(itemIds: string[]): Observable<boolean> {
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    return this.http.markNotDuplicates(itemIds).pipe(
+      tap(() => {
+        this.submitting.set(false);
+        this.toast.showSuccess('Marcados como productos distintos.');
+        this.loadDuplicateClusters();
+      }),
+      map(() => true),
+      catchError((err: unknown) => {
+        this.submitting.set(false);
+        this.handleError(err, 'No se pudo guardar la decisión.');
         return of(false);
       }),
     );

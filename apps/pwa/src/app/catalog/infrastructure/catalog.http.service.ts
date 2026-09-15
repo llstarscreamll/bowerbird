@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, DuplicateCluster, DuplicateClusterMember, MergeItemsInput, UpdateCatalogItemInput } from '../domain/catalog.model';
 import { CatalogImport, CatalogImportError, CatalogPage } from '../domain/catalog-import.model';
 
 type JsonApiDoc<T> = { id: string; attributes: T };
@@ -75,6 +75,53 @@ export class CatalogHttpService {
 
   removeAlias(itemId: string, aliasId: string): Observable<void> {
     return this.http.delete<void>(`${this.apiDomain}/api/v1/catalog/items/${itemId}/aliases/${aliasId}`);
+  }
+
+  listDuplicateClusters(): Observable<DuplicateCluster[]> {
+    return this.http
+      .get<{
+        data: Array<{
+          id: string;
+          attributes: {
+            reason: string;
+            item_ids: string[];
+            items: Array<{ id: string; attributes: Omit<DuplicateClusterMember, 'id'> }>;
+          };
+        }>;
+      }>(`${this.apiDomain}/api/v1/catalog/items/duplicate-clusters`)
+      .pipe(
+        map((res) =>
+          res.data.map((doc) => ({
+            id: doc.id,
+            reason: doc.attributes.reason,
+            item_ids: doc.attributes.item_ids,
+            items: (doc.attributes.items || []).map((item) => ({ id: item.id, ...item.attributes })),
+          })),
+        ),
+      );
+  }
+
+  mergeItems(input: MergeItemsInput): Observable<CatalogItem> {
+    return this.http
+      .post<{ data: JsonApiDoc<Omit<CatalogItem, 'id'>> }>(`${this.apiDomain}/api/v1/catalog/items/merges`, {
+        data: {
+          type: 'catalog_item_merges',
+          attributes: {
+            survivor_id: input.survivor_id,
+            source_ids: input.source_ids,
+            name: input.name,
+            kind: input.kind,
+            internal_code: input.internal_code,
+          },
+        },
+      })
+      .pipe(map((res) => ({ id: res.data.id, ...res.data.attributes })));
+  }
+
+  markNotDuplicates(itemIds: string[]): Observable<void> {
+    return this.http
+      .post(`${this.apiDomain}/api/v1/catalog/items/not-duplicates`, { data: { type: 'catalog_item_not_duplicates', attributes: { item_ids: itemIds } } }, { responseType: 'text' })
+      .pipe(map(() => undefined));
   }
 
   downloadImportTemplate(): Observable<Blob> {

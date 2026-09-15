@@ -53,6 +53,63 @@ export const CATALOG_KINDS = [
   { value: 'unknown', label: 'Desconocido' },
 ] as const;
 
+export interface MergeItemsInput {
+  survivor_id: string;
+  source_ids: string[];
+  name?: string;
+  kind?: string;
+  internal_code?: string;
+}
+
+export interface DuplicateClusterMember {
+  id: string;
+  name: string;
+  kind: string;
+  status: string;
+  creation_source: string;
+  internal_code: string | null;
+  created_at: string;
+  updated_at: string;
+  line_count: number;
+  aliases?: CatalogAlias[];
+}
+
+export interface DuplicateCluster {
+  id: string;
+  reason: string;
+  item_ids: string[];
+  items: DuplicateClusterMember[];
+}
+
+export function clusterReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'normalized_description':
+      return 'Misma descripción';
+    case 'hard_conflict':
+      return 'Conflicto duro en factura (GTIN vs SKU)';
+    case 'cross_party_sku':
+      return 'Mismo SKU de proveedor en distintos contactos';
+    default:
+      return reason;
+  }
+}
+
+export function pickDefaultSurvivor(items: Array<Pick<CatalogItem, 'id' | 'status' | 'internal_code' | 'creation_source' | 'created_at'> & { line_count?: number }>): string {
+  const ranked = [...items].sort((a, b) => survivorScore(b) - survivorScore(a));
+  return ranked[0]?.id ?? '';
+}
+
+function survivorScore(item: Pick<CatalogItem, 'status' | 'internal_code' | 'creation_source' | 'created_at'> & { line_count?: number }): number {
+  let score = 0;
+  if (item.status === 'confirmed') score += 10_000;
+  if (item.internal_code) score += 1_000;
+  if (item.creation_source === 'manual' || item.creation_source === 'import') score += 100;
+  score += (item.line_count ?? 0) * 10;
+  const created = Date.parse(item.created_at);
+  if (!Number.isNaN(created)) score += Math.max(0, 2_000_000_000_000 - created) / 1_000_000;
+  return score;
+}
+
 export function creationSourceLabel(source: string): string {
   switch (source) {
     case 'manual':

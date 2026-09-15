@@ -37,6 +37,7 @@ import { CatalogAlias, creationSourceLabel } from '../../../domain/catalog.model
               El alias ya existe en
               <a class="font-medium underline" [routerLink]="['/', tenantId(), 'catalog', ownerId]">otro ítem</a>.
             </p>
+            <a class="mt-3 inline-flex" hlmBtn size="sm" [routerLink]="['/', tenantId(), 'catalog', 'merge']" [queryParams]="{ ids: mergeIds(ownerId) }"> Fusionar con este ítem </a>
           }
         </div>
       }
@@ -172,6 +173,11 @@ export class DetailItemPage implements OnInit {
 
   tenantId(): string {
     return this.route.parent?.snapshot.paramMap.get('tenantId') || this.route.snapshot.paramMap.get('tenantId') || location.pathname.split('/').filter(Boolean)[0] || '';
+  }
+
+  mergeIds(ownerId: string): string {
+    const current = this.store.selectedItem()?.id;
+    return [current, ownerId].filter(Boolean).join(',');
   }
 
   partyLabel(alias: CatalogAlias): string {

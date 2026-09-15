@@ -95,6 +95,14 @@ export const routes: Routes = [
         loadComponent: () => import('./catalog/presentation/pages/import-detail/import-detail.page').then((c) => c.ImportDetailPage),
       },
       {
+        path: 'catalog/duplicates',
+        loadComponent: () => import('./catalog/presentation/pages/duplicates/duplicates.page').then((c) => c.DuplicatesPage),
+      },
+      {
+        path: 'catalog/merge',
+        loadComponent: () => import('./catalog/presentation/pages/merge/merge.page').then((c) => c.MergePage),
+      },
+      {
         path: 'catalog/new',
         loadComponent: () => import('./catalog/presentation/pages/new/new.page').then((c) => c.NewItemPage),
       },
