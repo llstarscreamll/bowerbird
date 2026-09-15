@@ -321,6 +321,10 @@ func (cmd *CreateInvoicesFromFilesCommand) tryExtractAndPersistFromDocument(
 	if err != nil {
 		return false, fmt.Errorf("persist invoice: %w", err)
 	}
+	if persisted == nil {
+		cmd.logger.Info("invoice persist skipped by inbound filter", "cufe", invoice.CUFE)
+		return true, nil
+	}
 
 	cmd.logger.Info("invoice extracted and persisted", "source", extractionSource, "cufe", invoice.CUFE, "header_id", persisted.HeaderID)
 	return true, nil

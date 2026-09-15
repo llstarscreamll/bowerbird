@@ -8,32 +8,46 @@ import (
 	"time"
 
 	contractEvents "github.com/bowerbird/internal/contracts/events"
+	"github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
 	"github.com/bowerbird/internal/platform/id"
 	"github.com/bowerbird/internal/platform/jobs"
 )
 
 type CreateInvoicesFromInboxMessageCommand struct {
-	jobQueue jobs.TaskQueue
-	logger   *slog.Logger
-	now      func() time.Time
-	newID    func() string
+	jobQueue  jobs.TaskQueue
+	receivers ports.ReceiverDirectory
+	logger    *slog.Logger
+	now       func() time.Time
+	newID     func() string
 }
 
-func NewCreateInvoicesFromInboxMessageCommand(jobQueue jobs.TaskQueue) *CreateInvoicesFromInboxMessageCommand {
+func NewCreateInvoicesFromInboxMessageCommand(jobQueue jobs.TaskQueue, receivers ports.ReceiverDirectory) *CreateInvoicesFromInboxMessageCommand {
 	if jobQueue == nil {
 		panic("job queue is required")
 	}
+	if receivers == nil {
+		panic("receiver directory is required")
+	}
 
 	return &CreateInvoicesFromInboxMessageCommand{
-		jobQueue: jobQueue,
-		logger:   slog.Default(),
-		now:      time.Now,
-		newID:    id.NewULID,
+		jobQueue:  jobQueue,
+		receivers: receivers,
+		logger:    slog.Default(),
+		now:       time.Now,
+		newID:     id.NewULID,
 	}
 }
 
 func (cmd *CreateInvoicesFromInboxMessageCommand) Execute(ctx context.Context, event contractEvents.InboxMessageReceived) error {
+	hasReceiver, err := cmd.receivers.HasAny(ctx)
+	if err != nil {
+		return err
+	}
+	if !hasReceiver {
+		cmd.logger.Info("invoicing event skipped: no legal entity", "tenant_slug", event.TenantID, "message_id", event.MessageInternalID)
+		return nil
+	}
 	if !hasInvoiceKeyword(event.Subject, event.Body) {
 		cmd.logger.Info("invoicing event skipped: missing invoice keyword", "tenant_slug", event.TenantID, "message_id", event.MessageInternalID)
 		return nil

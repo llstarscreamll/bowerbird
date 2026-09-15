@@ -29,6 +29,7 @@ type CreateInvoiceCommand struct {
 	repo          ports.InvoiceWriteRepository
 	partyResolver ports.IssuerPartyResolver
 	lineResolver  ports.CatalogLineResolver
+	receivers     ports.ReceiverDirectory
 	logger        *slog.Logger
 	now           func() time.Time
 	newID         func() string
@@ -38,6 +39,7 @@ func NewCreateInvoiceCommand(
 	repo ports.InvoiceWriteRepository,
 	partyResolver ports.IssuerPartyResolver,
 	lineResolver ports.CatalogLineResolver,
+	receivers ports.ReceiverDirectory,
 ) *CreateInvoiceCommand {
 	if repo == nil {
 		panic("invoice write repository is required")
@@ -48,11 +50,15 @@ func NewCreateInvoiceCommand(
 	if lineResolver == nil {
 		panic("catalog line resolver is required")
 	}
+	if receivers == nil {
+		panic("receiver directory is required")
+	}
 
 	return &CreateInvoiceCommand{
 		repo:          repo,
 		partyResolver: partyResolver,
 		lineResolver:  lineResolver,
+		receivers:     receivers,
 		logger:        slog.Default(),
 		now:           time.Now,
 		newID:         id.NewULID,
@@ -65,6 +71,23 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 	}
 	if err := input.Invoice.Validate(); err != nil {
 		return nil, err
+	}
+
+	hasReceiver, err := cmd.receivers.HasAny(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check legal entity: %w", err)
+	}
+	if !hasReceiver {
+		cmd.logger.Info("invoice persist skipped: no legal entity")
+		return nil, nil
+	}
+	matches, err := cmd.receivers.ReceiverMatches(ctx, input.Invoice.Receiver.TaxID)
+	if err != nil {
+		return nil, fmt.Errorf("match legal entity: %w", err)
+	}
+	if !matches {
+		cmd.logger.Info("invoice persist skipped: receiver is not a tenant legal entity", "receiver_tax_id", input.Invoice.Receiver.TaxID)
+		return nil, nil
 	}
 
 	now := cmd.now().UTC()

@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/bowerbird/internal/invoices/application/ports"
 	contractJobs "github.com/bowerbird/internal/invoices/contracts/jobs"
+	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/id"
 	"github.com/bowerbird/internal/platform/jobs"
 )
@@ -26,24 +28,36 @@ type QueueInvoiceExtractionFromFilesResult struct {
 }
 
 type QueueInvoiceExtractionFromFilesCommand struct {
-	jobQueue jobs.TaskQueue
-	now      func() time.Time
-	newID    func() string
+	jobQueue  jobs.TaskQueue
+	receivers ports.ReceiverDirectory
+	now       func() time.Time
+	newID     func() string
 }
 
-func NewQueueInvoiceExtractionFromFilesCommand(jobQueue jobs.TaskQueue) *QueueInvoiceExtractionFromFilesCommand {
+func NewQueueInvoiceExtractionFromFilesCommand(jobQueue jobs.TaskQueue, receivers ports.ReceiverDirectory) *QueueInvoiceExtractionFromFilesCommand {
 	if jobQueue == nil {
 		panic("job queue is required")
 	}
+	if receivers == nil {
+		panic("receiver directory is required")
+	}
 
 	return &QueueInvoiceExtractionFromFilesCommand{
-		jobQueue: jobQueue,
-		now:      time.Now,
-		newID:    id.NewULID,
+		jobQueue:  jobQueue,
+		receivers: receivers,
+		now:       time.Now,
+		newID:     id.NewULID,
 	}
 }
 
 func (cmd *QueueInvoiceExtractionFromFilesCommand) Execute(ctx context.Context, input QueueInvoiceExtractionFromFilesInput) (*QueueInvoiceExtractionFromFilesResult, error) {
+	hasReceiver, err := cmd.receivers.HasAny(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !hasReceiver {
+		return nil, appErrors.New(appErrors.CodeConflict, "a legal entity is required before extracting invoices")
+	}
 	files := make([]contractJobs.File, 0, len(input.Files))
 	for _, file := range input.Files {
 		files = append(files, contractJobs.File{

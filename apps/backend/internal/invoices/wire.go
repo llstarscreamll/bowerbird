@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	catalogapi "github.com/bowerbird/internal/catalog/api"
+	inboxapi "github.com/bowerbird/internal/inbox/api"
 	invoicesEvents "github.com/bowerbird/internal/invoices/adapters/events"
 	invoicingLLM "github.com/bowerbird/internal/invoices/adapters/extractors/llm"
 	invoicingXML "github.com/bowerbird/internal/invoices/adapters/extractors/xml"
@@ -35,6 +36,8 @@ func NewApplication(
 	passwords secretsapi.DocumentPasswordResolver,
 	catalog catalogapi.InvoiceSupport,
 	parties partiesapi.IssuerPartyLookup,
+	receivers ports.ReceiverDirectory,
+	inboxBackfill inboxapi.InvoiceBackfillSource,
 ) *application.Application {
 	if eventBus == nil {
 		panic("event bus is required")
@@ -60,6 +63,12 @@ func NewApplication(
 	if parties == nil {
 		panic("issuer party lookup is required")
 	}
+	if receivers == nil {
+		panic("receiver directory is required")
+	}
+	if inboxBackfill == nil {
+		panic("inbox backfill source is required")
+	}
 
 	passwordResolver := newSecretsPasswordAdapter(passwords)
 	partyResolver := invoiceLinking.NewPartyResolverAdapter(parties)
@@ -77,12 +86,14 @@ func NewApplication(
 		panic(fmt.Sprintf("new Gemini invoice extractor failed: %v", err))
 	}
 
-	createInvoice := commands.NewCreateInvoiceCommand(invoiceRepository, partyResolver, catalogACL)
+	createInvoice := commands.NewCreateInvoiceCommand(invoiceRepository, partyResolver, catalogACL, receivers)
+	fromInbox := commands.NewCreateInvoicesFromInboxMessageCommand(jobQueue, receivers)
+	backfill := commands.NewBackfillInboxInvoicesCommand(inboxBackfill, fromInbox, jobQueue, receivers)
 
 	return &application.Application{
 		Commands: application.Commands{
-			CreateInvoicesFromInboxMessage:  commands.NewCreateInvoicesFromInboxMessageCommand(jobQueue),
-			QueueInvoiceExtractionFromFiles: commands.NewQueueInvoiceExtractionFromFilesCommand(jobQueue),
+			CreateInvoicesFromInboxMessage:  fromInbox,
+			QueueInvoiceExtractionFromFiles: commands.NewQueueInvoiceExtractionFromFilesCommand(jobQueue, receivers),
 			ProcessInvoiceExtractionJob: commands.NewCreateInvoicesFromFilesCommand(
 				fileStore,
 				xmlExtractor,
@@ -94,6 +105,7 @@ func NewApplication(
 			CreateInvoice:           createInvoice,
 			ApplyLineDecision:       commands.NewApplyLineDecisionCommand(invoiceRepository, catalogACL),
 			DownloadInvoiceDocument: commands.NewDownloadInvoiceDocumentCommand(invoiceRepository, fileStore),
+			BackfillInboxInvoices:   backfill,
 		},
 		Queries: application.Queries{
 			GetInvoiceByID:  queries.NewGetInvoiceByIDQuery(invoiceRepository, catalogACL),
@@ -125,6 +137,7 @@ func RegisterEvents(app *application.Application) []events.IntegrationEventHandl
 	}
 	return []events.IntegrationEventHandler{
 		invoicesEvents.NewInboxMessageReceivedSubscriber(app.Commands.CreateInvoicesFromInboxMessage),
+		invoicesEvents.NewLegalEntityRegisteredSubscriber(app.Commands.BackfillInboxInvoices),
 	}
 }
 
@@ -134,6 +147,7 @@ func RegisterJobs(app *application.Application) []jobs.JobHandler {
 	}
 	return []jobs.JobHandler{
 		invoicesJobs.NewInvoiceExtractionRequestedProcessor(app.Commands.ProcessInvoiceExtractionJob),
+		invoicesJobs.NewInvoiceInboxBackfillProcessor(app.Commands.BackfillInboxInvoices),
 	}
 }
 

@@ -71,3 +71,8 @@ type CatalogLineResolveResult struct {
 type CatalogLineResolver interface {
 	ResolveLine(ctx context.Context, input CatalogLineResolveInput) (*CatalogLineResolveResult, error)
 }
+
+type ReceiverDirectory interface {
+	HasAny(ctx context.Context) (bool, error)
+	ReceiverMatches(ctx context.Context, taxID string) (bool, error)
+}

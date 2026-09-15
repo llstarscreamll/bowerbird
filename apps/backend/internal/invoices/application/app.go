@@ -17,6 +17,7 @@ type Commands struct {
 	CreateInvoice                   *commands.CreateInvoiceCommand
 	ApplyLineDecision               *commands.ApplyLineDecisionCommand
 	DownloadInvoiceDocument         *commands.DownloadInvoiceDocumentCommand
+	BackfillInboxInvoices           *commands.BackfillInboxInvoicesCommand
 }
 
 type Queries struct {

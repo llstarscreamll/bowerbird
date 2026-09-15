@@ -50,7 +50,7 @@ func (c *Controller) QueueInvoiceExtractionFromUploadedFiles(w http.ResponseWrit
 	input := commands.QueueInvoiceExtractionFromFilesInput{ID: req.Data.ID, Files: files}
 	result, err := c.app.Commands.QueueInvoiceExtractionFromFiles.Execute(r.Context(), input)
 	if err != nil {
-		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to queue invoice extraction")
+		return err
 	}
 
 	resp := newQueueInvoiceExtractionResponse(result)

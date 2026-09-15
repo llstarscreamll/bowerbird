@@ -10,6 +10,14 @@ import (
 	"github.com/bowerbird/internal/platform/jobs"
 )
 
+type alwaysMatchReceivers struct{}
+
+func (alwaysMatchReceivers) HasAny(context.Context) (bool, error) { return true, nil }
+
+func (alwaysMatchReceivers) ReceiverMatches(context.Context, string) (bool, error) {
+	return true, nil
+}
+
 type fakePublisher struct {
 	enqueued int
 }
@@ -21,7 +29,7 @@ func (p *fakePublisher) Enqueue(ctx context.Context, job jobs.Job) error {
 
 func TestOnInboxMessageReceivedRoutesEvent(t *testing.T) {
 	publisher := &fakePublisher{}
-	cmd := invoicingcommands.NewCreateInvoicesFromInboxMessageCommand(publisher)
+	cmd := invoicingcommands.NewCreateInvoicesFromInboxMessageCommand(publisher, alwaysMatchReceivers{})
 	handler := NewOnInboxMessageReceived(cmd)
 
 	detail, err := contractevents.MarshalInboxMessageReceived(contractevents.InboxMessageReceived{

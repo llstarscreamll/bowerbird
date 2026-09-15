@@ -142,7 +142,7 @@ func newTestCreateInvoicesFromFilesCommand(
 		llmExtractor,
 		repo,
 		nopPasswordResolver{},
-		NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{}),
+		NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{}, matchingReceivers()),
 	)
 }
 

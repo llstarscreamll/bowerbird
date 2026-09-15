@@ -15,6 +15,7 @@ import (
 	identityModule "github.com/bowerbird/internal/identity"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
+	legalentitiesModule "github.com/bowerbird/internal/legalentities"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	"github.com/bowerbird/internal/platform/auth"
@@ -113,6 +114,9 @@ func New(deps *platform.Dependencies) (http.Handler, error) {
 	catalogApp := catalogModule.NewApplication(tenantsDbRegistry)
 	catalogModule.NewHTTPHandler(mux, catalogApp, authMiddleware, cfg)
 
+	legalentitiesApp := legalentitiesModule.NewApplication(tenantsDbRegistry, deps.EventBus)
+	legalentitiesModule.NewHTTPHandler(mux, legalentitiesApp, authMiddleware, cfg)
+
 	invoicingApp := invoicesModule.NewApplication(
 		cfg,
 		deps.EventBus,
@@ -122,6 +126,8 @@ func New(deps *platform.Dependencies) (http.Handler, error) {
 		secretsModule.NewDocumentPasswordResolver(secretsApp),
 		catalogModule.NewInvoiceSupport(catalogApp),
 		partiesModule.NewIssuerPartyLookup(partiesApp),
+		legalentitiesModule.NewReceiverDirectory(legalentitiesApp),
+		inboxModule.NewInvoiceBackfillSource(inboxApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
 

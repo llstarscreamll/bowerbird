@@ -8,3 +8,7 @@ import (
 func NewInvoiceExtractionRequestedProcessor(command *commands.CreateInvoicesFromFilesCommand) *handlers.ProcessInvoiceExtractionFromFiles {
 	return handlers.NewProcessInvoiceExtractionFromFiles(command)
 }
+
+func NewInvoiceInboxBackfillProcessor(command *commands.BackfillInboxInvoicesCommand) *handlers.ProcessInvoiceInboxBackfill {
+	return handlers.NewProcessInvoiceInboxBackfill(command)
+}

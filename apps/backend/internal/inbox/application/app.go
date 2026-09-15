@@ -19,7 +19,8 @@ type Commands struct {
 }
 
 type Queries struct {
-	ListAccountHealth *queries.ListAccountHealthQuery
-	ListMessages      *queries.ListMessagesQuery
-	GetMessage        *queries.GetMessageQuery
+	ListAccountHealth        *queries.ListAccountHealthQuery
+	ListMessages             *queries.ListMessagesQuery
+	GetMessage               *queries.GetMessageQuery
+	ListExtractionCandidates *queries.ListExtractionCandidatesQuery
 }

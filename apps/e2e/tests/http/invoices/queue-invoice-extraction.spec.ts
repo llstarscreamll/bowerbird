@@ -136,4 +136,33 @@ test.describe(OPERATION, () => {
     await expectClientError(response, OPERATION);
     expect(response.status(), `${OPERATION}: traversal must not be accepted`).not.toBe(202);
   });
+
+  test('409 si no hay entidad legal', async ({ sharedTenant, platformApi }) => {
+    const { auth } = sharedTenant;
+    const stamp = `${Date.now()}`;
+    const tenant = await platformApi.createTenantOrFail(auth, {
+      name: `E2E Extract LE ${stamp}`,
+      slug: `e2e-extract-le-${stamp}`,
+    });
+
+    const response = await platformApi.call('/api/v1/invoicing/extractions', {
+      method: 'POST',
+      auth,
+      tenant,
+      data: {
+        data: {
+          type: 'queue-invoice-extraction',
+          id: newUlid(),
+          attributes: {
+            files: [{ name: 'invoice.pdf', path: 'uploads/invoicing/u1/invoice.pdf', mime_type: 'application/pdf' }],
+          },
+        },
+      },
+    });
+
+    await expectStatus(response, 409, OPERATION);
+    const payload = await readJson<{ errors: Array<{ code?: string; detail?: string }> }>(response, OPERATION);
+    expect(payload.errors[0].code, `${OPERATION}: errors[0].code`).toBe('ERR_CONFLICT');
+    expect(payload.errors[0].detail, `${OPERATION}: errors[0].detail`).toContain('legal entity');
+  });
 });

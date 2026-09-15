@@ -1,6 +1,7 @@
 package inbox
 
 import (
+	"context"
 	"net/http"
 
 	connectionsapi "github.com/bowerbird/internal/connections/api"
@@ -12,6 +13,7 @@ import (
 	"github.com/bowerbird/internal/inbox/adapters/provider/gmail"
 	"github.com/bowerbird/internal/inbox/adapters/provider/microsoft"
 	inboxRepo "github.com/bowerbird/internal/inbox/adapters/repository/postgres"
+	inboxapi "github.com/bowerbird/internal/inbox/api"
 	"github.com/bowerbird/internal/inbox/application"
 	"github.com/bowerbird/internal/inbox/application/commands"
 	"github.com/bowerbird/internal/inbox/application/ports"
@@ -98,9 +100,10 @@ func NewApplication(
 			DownloadAttachment: downloadAttachmentCommand,
 		},
 		Queries: application.Queries{
-			ListAccountHealth: queries.NewListAccountHealthQuery(inboxRepository, connectionsService),
-			ListMessages:      queries.NewListMessagesQuery(inboxRepository),
-			GetMessage:        queries.NewGetMessageQuery(inboxRepository),
+			ListAccountHealth:        queries.NewListAccountHealthQuery(inboxRepository, connectionsService),
+			ListMessages:             queries.NewListMessagesQuery(inboxRepository),
+			GetMessage:               queries.NewGetMessageQuery(inboxRepository),
+			ListExtractionCandidates: queries.NewListExtractionCandidatesQuery(inboxRepository),
 		},
 	}
 }
@@ -186,6 +189,24 @@ func RegisterSchedules(cfg config.Config) []scheduler.Rule {
 		Schedule: "rate(5 minutes)",
 		JobType:  inboxContracts.InboxSyncAllAccountsType,
 	}}
+}
+
+func NewInvoiceBackfillSource(app *application.Application) inboxapi.InvoiceBackfillSource {
+	if app == nil {
+		panic("inbox application is required")
+	}
+	if app.Queries.ListExtractionCandidates == nil {
+		panic("list extraction candidates query is required")
+	}
+	return extractionBackfillSource{query: app.Queries.ListExtractionCandidates}
+}
+
+type extractionBackfillSource struct {
+	query *queries.ListExtractionCandidatesQuery
+}
+
+func (s extractionBackfillSource) ListExtractionCandidates(ctx context.Context, cursor string, limit int) (inboxapi.ExtractionCandidatePage, error) {
+	return s.query.Execute(ctx, cursor, limit)
 }
 
 func mailSyncEnabled(cfg config.Config) bool {

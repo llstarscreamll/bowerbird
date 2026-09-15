@@ -6,6 +6,7 @@ import (
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
+	legalentitiesModule "github.com/bowerbird/internal/legalentities"
 	partiesModule "github.com/bowerbird/internal/parties"
 	"github.com/bowerbird/internal/platform"
 	awsConfig "github.com/bowerbird/internal/platform/awsconfig"
@@ -40,17 +41,7 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 
 	partiesApp := partiesModule.NewApplication(platformModule.TenantRegistry)
 	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry)
-
-	invoicingApp := invoicesModule.NewApplication(
-		cfg,
-		platformModule.EventBus,
-		platformModule.TaskQueue,
-		platformModule.FileStore,
-		platformModule.TenantRegistry,
-		secretsModule.NewDocumentPasswordResolver(secretsApp),
-		catalogModule.NewInvoiceSupport(catalogApp),
-		partiesModule.NewIssuerPartyLookup(partiesApp),
-	)
+	legalentitiesApp := legalentitiesModule.NewApplication(platformModule.TenantRegistry, platformModule.EventBus)
 
 	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
 	if err != nil {
@@ -66,6 +57,19 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 		platformModule.FileStore,
 		platformModule.TenantRegistry,
 		platformModule.TaskQueue,
+	)
+
+	invoicingApp := invoicesModule.NewApplication(
+		cfg,
+		platformModule.EventBus,
+		platformModule.TaskQueue,
+		platformModule.FileStore,
+		platformModule.TenantRegistry,
+		secretsModule.NewDocumentPasswordResolver(secretsApp),
+		catalogModule.NewInvoiceSupport(catalogApp),
+		partiesModule.NewIssuerPartyLookup(partiesApp),
+		legalentitiesModule.NewReceiverDirectory(legalentitiesApp),
+		inboxModule.NewInvoiceBackfillSource(inboxApp),
 	)
 
 	invoiceEvents := invoicesModule.RegisterEvents(invoicingApp)

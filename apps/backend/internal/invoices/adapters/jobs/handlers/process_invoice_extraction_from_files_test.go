@@ -14,6 +14,14 @@ import (
 	"github.com/bowerbird/internal/platform/tenant"
 )
 
+type alwaysMatchReceivers struct{}
+
+func (alwaysMatchReceivers) HasAny(context.Context) (bool, error) { return true, nil }
+
+func (alwaysMatchReceivers) ReceiverMatches(context.Context, string) (bool, error) {
+	return true, nil
+}
+
 type processorFileStore struct{}
 
 func (s *processorFileStore) WriteFileIfAbsent(ctx context.Context, input platformStorage.WriteFileIfAbsentInput) (*platformStorage.WriteFileIfAbsentResult, error) {
@@ -120,7 +128,7 @@ func newProcessorCommand() *invoicingCommands.CreateInvoicesFromFilesCommand {
 		&processorLLMExtractor{},
 		repo,
 		processorPasswordResolver{},
-		invoicingCommands.NewCreateInvoiceCommand(repo, processorPartyResolver{}, processorLineResolver{}),
+		invoicingCommands.NewCreateInvoiceCommand(repo, processorPartyResolver{}, processorLineResolver{}, alwaysMatchReceivers{}),
 	)
 }
 

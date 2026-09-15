@@ -66,7 +66,7 @@ func (l *failingLineResolver) ResolveLine(ctx context.Context, input ports.Catal
 
 func TestCreateInvoice_LinksPartyAndProvisionalItem(t *testing.T) {
 	repo := &linkingRepoStub{}
-	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &lineResolverStub{})
+	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &lineResolverStub{}, matchingReceivers())
 	n := 0
 	cmd.newID = func() string {
 		n++
@@ -102,7 +102,7 @@ func TestCreateInvoice_LinksPartyAndProvisionalItem(t *testing.T) {
 
 func TestCreateInvoice_LinkFailureKeepsPersistedInvoice(t *testing.T) {
 	repo := &linkingRepoStub{}
-	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &failingLineResolver{})
+	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &failingLineResolver{}, matchingReceivers())
 	n := 0
 	cmd.newID = func() string {
 		n++
@@ -150,7 +150,7 @@ func (l *partialFailLineResolver) ResolveLine(ctx context.Context, input ports.C
 
 func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 	repo := &linkingRepoStub{}
-	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &partialFailLineResolver{})
+	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{id: "PARTY-1"}, &partialFailLineResolver{}, matchingReceivers())
 	n := 0
 	cmd.newID = func() string {
 		n++
@@ -184,7 +184,7 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 
 func TestCreateInvoice_MapsDueDateAndAllowance(t *testing.T) {
 	repo := &linkingRepoStub{}
-	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{})
+	cmd := NewCreateInvoiceCommand(repo, &partyResolverStub{}, &lineResolverStub{}, matchingReceivers())
 	cmd.newID = func() string { return "ID-1" }
 
 	result, err := cmd.Execute(context.Background(), CreateInvoiceInput{

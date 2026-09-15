@@ -8,3 +8,7 @@ import (
 func NewInboxMessageReceivedSubscriber(command *commands.CreateInvoicesFromInboxMessageCommand) *handlers.OnInboxMessageReceived {
 	return handlers.NewOnInboxMessageReceived(command)
 }
+
+func NewLegalEntityRegisteredSubscriber(command *commands.BackfillInboxInvoicesCommand) *handlers.OnLegalEntityRegistered {
+	return handlers.NewOnLegalEntityRegistered(command)
+}
