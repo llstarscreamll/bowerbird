@@ -6,14 +6,15 @@ This glossary defines the ubiquitous language for the Bowerbird project, mapping
 
 ## Core E-Invoicing & Legal Entities
 
-| Term (ES / Business)       | Meaning / Context                                                                | Code (EN)                         |
-| :------------------------- | :------------------------------------------------------------------------------- | :-------------------------------- |
-| **Facturador / Inquilino** | The company that owns the workspace and receives or issues invoices.             | `Tenant` or `Organization`        |
-| **Contacto / Tercero**     | Any external legal entity or person trading with the Tenant. UI label: Contacto. | `Party`                           |
-| **Proveedor**              | A Party that issues invoices to the Tenant (Accounts Payable).                   | `Supplier` (role)                 |
-| **Adquirente / Cliente**   | A Party that receives invoices from the Tenant (Accounts Receivable).            | `Customer` (role)                 |
-| **NIT / Cédula**           | The unique tax identification number of a Party.                                 | `TaxID` (avoid using `CompanyID`) |
-| **DIAN**                   | The Colombian tax authority.                                                     | `DIAN` (kept as-is)               |
+| Term (ES / Business)       | Meaning / Context                                                                     | Code (EN)                         |
+| :------------------------- | :------------------------------------------------------------------------------------ | :-------------------------------- |
+| **Facturador / Inquilino** | The company that owns the workspace and receives or issues invoices.                  | `Tenant` or `Organization`        |
+| **Contacto / Tercero**     | Any external legal entity or person trading with the Tenant. UI label: Contacto.      | `Party`                           |
+| **Proveedor**              | A Party that issues invoices to the Tenant (Accounts Payable).                        | `Supplier` (role)                 |
+| **Adquirente / Cliente**   | A Party that receives invoices from the Tenant (Accounts Receivable).                 | `Customer` (role)                 |
+| **NIT / Cédula**           | The unique tax identification number of a Party.                                      | `TaxID` (avoid using `CompanyID`) |
+| **Razón social propia**    | The Tenant's own legal identity used to match inbound invoice receivers. Not a Party. | `LegalEntity`                     |
+| **DIAN**                   | The Colombian tax authority.                                                          | `DIAN` (kept as-is)               |
 
 ## Documents
 
