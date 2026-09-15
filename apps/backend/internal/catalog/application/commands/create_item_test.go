@@ -59,8 +59,37 @@ func (m *memWrite) GetItemNames(ctx context.Context, ids []string) (map[string]s
 func (m *memWrite) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
 	return nil, nil
 }
-func (m *memWrite) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
-	return nil, nil
+func (m *memWrite) GetItemsByInternalCodes(ctx context.Context, codes []string) ([]domain.Item, error) {
+	out := make([]domain.Item, 0)
+	want := map[string]struct{}{}
+	for _, c := range codes {
+		want[c] = struct{}{}
+	}
+	for _, item := range m.items {
+		if _, ok := want[item.InternalCode]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+func (m *memWrite) CreateItems(ctx context.Context, items []domain.Item) error {
+	for _, item := range items {
+		if err := m.CreateItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (m *memWrite) UpdateItems(ctx context.Context, items []domain.Item) error {
+	for _, item := range items {
+		if err := m.UpdateItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (m *memWrite) ListItems(ctx context.Context, filter ports.ItemListFilter) (ports.ItemListPage, error) {
+	return ports.ItemListPage{}, nil
 }
 func (m *memWrite) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {
 	return nil, nil

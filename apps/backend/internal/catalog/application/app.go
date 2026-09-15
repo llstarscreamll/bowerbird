@@ -18,11 +18,19 @@ type Commands struct {
 	RecordMatchMemory           *commands.RecordMatchMemoryCommand
 	CreateItem                  *commands.CreateItemCommand
 	UpdateItem                  *commands.UpdateItemCommand
+	QueueCatalogImport          *commands.QueueCatalogImportCommand
+	ProcessCatalogImport        *commands.ProcessCatalogImportCommand
+	CancelCatalogImport         *commands.CancelCatalogImportCommand
+	PurgeStaleCatalogImports    *commands.PurgeStaleCatalogImportsCommand
 }
 
 type Queries struct {
-	GetItemByID     *queries.GetItemByIDQuery
-	GetItemNames    *queries.GetItemNamesQuery
-	GetItemDisplays *queries.GetItemDisplaysQuery
-	ListItems       *queries.ListItemsQuery
+	GetItemByID      *queries.GetItemByIDQuery
+	GetItemNames     *queries.GetItemNamesQuery
+	GetItemDisplays  *queries.GetItemDisplaysQuery
+	ListItems        *queries.ListItemsQuery
+	GetImportByID    *queries.GetImportByIDQuery
+	GetActiveImport  *queries.GetActiveImportQuery
+	ListImports      *queries.ListImportsQuery
+	ListImportErrors *queries.ListImportErrorsQuery
 }

@@ -87,6 +87,14 @@ export const routes: Routes = [
         loadComponent: () => import('./catalog/presentation/pages/master/master.page').then((c) => c.MasterPage),
       },
       {
+        path: 'catalog/imports',
+        loadComponent: () => import('./catalog/presentation/pages/imports/imports.page').then((c) => c.ImportsPage),
+      },
+      {
+        path: 'catalog/imports/:importId',
+        loadComponent: () => import('./catalog/presentation/pages/import-detail/import-detail.page').then((c) => c.ImportDetailPage),
+      },
+      {
         path: 'catalog/new',
         loadComponent: () => import('./catalog/presentation/pages/new/new.page').then((c) => c.NewItemPage),
       },

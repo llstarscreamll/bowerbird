@@ -27,6 +27,7 @@ var (
 	_ ports.AliasRepository        = (*CatalogRepository)(nil)
 	_ ports.CatalogWriteRepository = (*CatalogRepository)(nil)
 	_ ports.MatchMemoryRepository  = (*CatalogRepository)(nil)
+	_ ports.ImportRepository       = (*CatalogRepository)(nil)
 )
 
 const itemSelectCols = `id, name, kind, status, creation_source, COALESCE(internal_code, ''), created_at, updated_at`
@@ -134,10 +135,17 @@ func (r *CatalogRepository) GetItemsByIDs(ctx context.Context, ids []string) ([]
 	return out, rows.Err()
 }
 
-func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
+func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemListFilter) (ports.ItemListPage, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get tenant db pool: %w", err)
+		return ports.ItemListPage{}, fmt.Errorf("get tenant db pool: %w", err)
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
 	}
 	query := `SELECT ` + itemSelectCols + ` FROM catalog_items WHERE 1=1`
 	args := []any{}
@@ -162,14 +170,54 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 			SELECT 1 FROM catalog_item_aliases a WHERE a.item_id = catalog_items.id AND a.value ILIKE $%d
 		))`, n, n, n)
 		args = append(args, "%"+search+"%")
+		n++
 	}
-	query += ` ORDER BY name ASC`
+	if filter.AfterName != "" && filter.AfterID != "" {
+		query += fmt.Sprintf(` AND (name, id) > ($%d, $%d)`, n, n+1)
+		args = append(args, filter.AfterName, filter.AfterID)
+		n += 2
+	}
+	query += fmt.Sprintf(` ORDER BY name ASC, id ASC LIMIT $%d`, n)
+	args = append(args, limit+1)
 	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list catalog items: %w", err)
+		return ports.ItemListPage{}, fmt.Errorf("list catalog items: %w", err)
 	}
 	defer rows.Close()
-	out := make([]domain.Item, 0)
+	out := make([]domain.Item, 0, limit)
+	for rows.Next() {
+		item, err := scanItem(rows)
+		if err != nil {
+			return ports.ItemListPage{}, err
+		}
+		out = append(out, item)
+	}
+	if err := rows.Err(); err != nil {
+		return ports.ItemListPage{}, err
+	}
+	page := ports.ItemListPage{Items: out}
+	if len(out) > limit {
+		page.HasMore = true
+		page.Items = out[:limit]
+	}
+	return page, nil
+}
+
+func (r *CatalogRepository) GetItemsByInternalCodes(ctx context.Context, codes []string) ([]domain.Item, error) {
+	unique := uniqueIDs(codes)
+	if len(unique) == 0 {
+		return nil, nil
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get tenant db pool: %w", err)
+	}
+	rows, err := pool.Query(ctx, `SELECT `+itemSelectCols+` FROM catalog_items WHERE internal_code = ANY($1)`, unique)
+	if err != nil {
+		return nil, fmt.Errorf("get catalog items by internal codes: %w", err)
+	}
+	defer rows.Close()
+	out := make([]domain.Item, 0, len(unique))
 	for rows.Next() {
 		item, err := scanItem(rows)
 		if err != nil {
@@ -178,6 +226,28 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 		out = append(out, item)
 	}
 	return out, rows.Err()
+}
+
+func (r *CatalogRepository) CreateItems(ctx context.Context, items []domain.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	return insertItems(ctx, pool, items)
+}
+
+func (r *CatalogRepository) UpdateItems(ctx context.Context, items []domain.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	return updateItems(ctx, pool, items)
 }
 
 func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {

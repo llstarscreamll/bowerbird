@@ -63,6 +63,10 @@ func (s *fakeExtractFileStore) ReadFile(ctx context.Context, input platformStora
 	return payload, nil
 }
 
+func (s *fakeExtractFileStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *fakeExtractFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	payload, ok := s.data[input.Path]
 	if !ok {

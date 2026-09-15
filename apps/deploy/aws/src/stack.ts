@@ -302,6 +302,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 
   scheduleLambda(prefix, 'outbox-relay', 'rate(1 minute)', relayFn.arn, schedulerRole.arn, '{}', awsOpts);
   scheduleLambda(prefix, 'outbox-sweeper', 'rate(1 hour)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'outbox-sweeper' }), awsOpts);
+  scheduleLambda(prefix, 'catalog-import-purge', 'cron(0 5 * * ? *)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'catalog-import-purge' }), awsOpts);
   const mailSyncEnabled = (Boolean(cfg.googleClientId) && Boolean(cfg.googleClientSecret)) || (Boolean(cfg.microsoftClientId) && Boolean(cfg.microsoftClientSecret));
   if (mailSyncEnabled) {
     scheduleLambda(prefix, 'inbox-sync-all', 'rate(5 minutes)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'inbox-sync-all' }), awsOpts);

@@ -65,6 +65,10 @@ func (s *createFilesStoreStub) ReadFile(ctx context.Context, input platformStora
 	return payload, nil
 }
 
+func (s *createFilesStoreStub) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *createFilesStoreStub) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	payload, ok := s.data[input.Path]
 	if !ok {

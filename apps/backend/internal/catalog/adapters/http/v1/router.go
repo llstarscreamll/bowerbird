@@ -43,20 +43,30 @@ type itemResource struct {
 }
 
 func (c *Controller) ListItems(w http.ResponseWriter, r *http.Request) error {
-	items, err := c.app.Queries.ListItems.Execute(r.Context(), ports.ItemListFilter{
+	limit := pageSize(r, 50, 100)
+	afterName, afterID := decodeItemCursor(pageAfter(r))
+	page, err := c.app.Queries.ListItems.Execute(r.Context(), ports.ItemListFilter{
 		Kind:           r.URL.Query().Get("kind"),
 		Status:         r.URL.Query().Get("status"),
 		Search:         r.URL.Query().Get("search"),
 		CreationSource: r.URL.Query().Get("creation_source"),
+		Limit:          limit,
+		AfterName:      afterName,
+		AfterID:        afterID,
 	})
 	if err != nil {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list catalog items")
 	}
-	data := make([]itemResource, 0, len(items))
-	for _, item := range items {
+	data := make([]itemResource, 0, len(page.Items))
+	for _, item := range page.Items {
 		data = append(data, toItemResource(item))
 	}
-	return api.Success(w, http.StatusOK, map[string]any{"data": data})
+	cursor := ""
+	if page.HasMore && len(page.Items) > 0 {
+		last := page.Items[len(page.Items)-1]
+		cursor = encodeCursor(last.Name, last.ID)
+	}
+	return api.Success(w, http.StatusOK, map[string]any{"data": data, "meta": pageMeta(page.HasMore, cursor, nil)})
 }
 
 func (c *Controller) GetItem(w http.ResponseWriter, r *http.Request) error {
@@ -160,6 +170,12 @@ func NewRouter(controller *Controller) *Router {
 }
 
 func (h *Router) Register(mux *http.ServeMux, cfg config.Config, authMiddleware func(http.Handler) http.Handler) {
+	mux.Handle("GET /api/v1/catalog/imports/template", authMiddleware(api.Wrap(h.controller.DownloadImportTemplate, cfg)))
+	mux.Handle("GET /api/v1/catalog/imports", authMiddleware(api.Wrap(h.controller.ListImports, cfg)))
+	mux.Handle("POST /api/v1/catalog/imports", authMiddleware(api.Wrap(h.controller.CreateImport, cfg)))
+	mux.Handle("GET /api/v1/catalog/imports/{id}", authMiddleware(api.Wrap(h.controller.GetImport, cfg)))
+	mux.Handle("POST /api/v1/catalog/imports/{id}/cancel", authMiddleware(api.Wrap(h.controller.CancelImport, cfg)))
+	mux.Handle("GET /api/v1/catalog/imports/{id}/errors", authMiddleware(api.Wrap(h.controller.ListImportErrors, cfg)))
 	mux.Handle("GET /api/v1/catalog/items", authMiddleware(api.Wrap(h.controller.ListItems, cfg)))
 	mux.Handle("POST /api/v1/catalog/items", authMiddleware(api.Wrap(h.controller.CreateItem, cfg)))
 	mux.Handle("GET /api/v1/catalog/items/{id}", authMiddleware(api.Wrap(h.controller.GetItem, cfg)))

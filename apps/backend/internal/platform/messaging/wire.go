@@ -4,6 +4,7 @@ import (
 	catalogModule "github.com/bowerbird/internal/catalog"
 	connectionsModule "github.com/bowerbird/internal/connections"
 	entitlementsModule "github.com/bowerbird/internal/entitlements"
+	filesModule "github.com/bowerbird/internal/files"
 	inboxModule "github.com/bowerbird/internal/inbox"
 	invoicesModule "github.com/bowerbird/internal/invoices"
 	legalentitiesModule "github.com/bowerbird/internal/legalentities"
@@ -40,7 +41,7 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 	secretsApp := secretsModule.NewApplication(platformModule.TenantRegistry, secretsCipher)
 
 	partiesApp := partiesModule.NewApplication(platformModule.TenantRegistry)
-	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry)
+	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry, platformModule.TaskQueue, filesModule.NewTenantObjects(platformModule.FileStore))
 	legalentitiesApp := legalentitiesModule.NewApplication(platformModule.TenantRegistry, platformModule.EventBus)
 
 	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
@@ -77,10 +78,11 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 	inboxEvents := inboxModule.RegisterEvents(entitlementsApp, platformModule.TaskQueue)
 	tenantLister := relay.NewControlPlaneTenantLister(platformModule.ControlDB)
 	inboxJobs := inboxModule.RegisterJobs(inboxApp, entitlementsApp, tenantLister)
+	catalogJobs := catalogModule.RegisterJobs(catalogApp, tenantLister)
 	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, tenantLister, 0)
 
 	eventHandlers := append(append([]platformEvents.IntegrationEventHandler{}, invoiceEvents...), inboxEvents...)
-	jobHandlers := append(append(append([]platformJobs.JobHandler{}, invoiceJobs...), inboxJobs...), sweeper)
+	jobHandlers := append(append(append(append([]platformJobs.JobHandler{}, invoiceJobs...), inboxJobs...), catalogJobs...), sweeper)
 	verifier := attestation.NewVerifier(cfg.MessagingAttestationSecret)
 
 	return Handlers{
@@ -95,6 +97,7 @@ func WireScheduler(deps *platform.Dependencies) (*scheduler.Engine, func(), erro
 		return nil, func() {}, err
 	}
 	rules := append(scheduler.PlatformRules(), inboxModule.RegisterSchedules(deps.Config)...)
+	rules = append(rules, catalogModule.RegisterSchedules()...)
 	engine, err := scheduler.NewEngine(transport, rules)
 	if err != nil {
 		closeTransport()

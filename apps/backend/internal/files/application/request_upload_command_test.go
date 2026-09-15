@@ -24,6 +24,10 @@ func (f *fakeFileStore) ReadFile(ctx context.Context, input platformStorage.Read
 	return nil, nil
 }
 
+func (f *fakeFileStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, nil
+}
+
 func (f *fakeFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	return nil
 }

@@ -32,6 +32,10 @@ func (s *processorFileStore) ReadFile(ctx context.Context, input platformStorage
 	return []byte("<Invoice><ID>INV-1</ID><UUID>CUFE-1</UUID></Invoice>"), nil
 }
 
+func (s *processorFileStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, nil
+}
+
 func (s *processorFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	return os.WriteFile(input.DestPath, []byte("PK\x03\x04"), 0o600)
 }

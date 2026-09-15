@@ -47,6 +47,10 @@ func (s *downloadInvoiceStoreStub) ReadFile(ctx context.Context, input platformS
 	return payload, nil
 }
 
+func (s *downloadInvoiceStoreStub) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (s *downloadInvoiceStoreStub) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	return errors.New("not implemented")
 }

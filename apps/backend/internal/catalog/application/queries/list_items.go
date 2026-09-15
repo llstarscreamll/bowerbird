@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/bowerbird/internal/catalog/application/ports"
-	"github.com/bowerbird/internal/catalog/domain"
 )
 
 type ListItemsQuery struct {
@@ -18,6 +17,12 @@ func NewListItemsQuery(items ports.ItemRepository) *ListItemsQuery {
 	return &ListItemsQuery{items: items}
 }
 
-func (q *ListItemsQuery) Execute(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
+func (q *ListItemsQuery) Execute(ctx context.Context, filter ports.ItemListFilter) (ports.ItemListPage, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 50
+	}
+	if filter.Limit > 100 {
+		filter.Limit = 100
+	}
 	return q.items.ListItems(ctx, filter)
 }

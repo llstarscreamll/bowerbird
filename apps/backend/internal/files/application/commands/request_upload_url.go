@@ -74,5 +74,10 @@ func (cmd *RequestUploadURLCommand) buildPath(tenantID, userID, module, filename
 	}
 
 	name := id.NewULID() + ext
-	return path.Join(defaultUploadScope, "tenants", tenantID, "uploads", module, userID, name)
+	return TenantModulePrefix(tenantID, module) + path.Join(userID, name)
+}
+
+// TenantModulePrefix is the files-owned object-key namespace for a tenant module.
+func TenantModulePrefix(tenantID, module string) string {
+	return path.Join(defaultUploadScope, "tenants", tenantID, "uploads", strings.TrimSpace(module)) + "/"
 }

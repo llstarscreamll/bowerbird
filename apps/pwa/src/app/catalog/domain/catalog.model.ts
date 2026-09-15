@@ -43,6 +43,8 @@ export function creationSourceLabel(source: string): string {
       return 'Manual';
     case 'invoice':
       return 'Desde factura';
+    case 'import':
+      return 'Importación';
     default:
       return source;
   }

@@ -26,6 +26,7 @@ const (
 
 	CreationSourceManual  = "manual"
 	CreationSourceInvoice = "invoice"
+	CreationSourceImport  = "import"
 
 	AliasSchemeSupplierSKU = "supplier_sku"
 

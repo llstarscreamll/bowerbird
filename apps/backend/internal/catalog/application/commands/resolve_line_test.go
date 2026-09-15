@@ -53,12 +53,41 @@ func (m *memItems) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.It
 	}
 	return out, nil
 }
-func (m *memItems) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
+func (m *memItems) GetItemsByInternalCodes(ctx context.Context, codes []string) ([]domain.Item, error) {
+	want := map[string]struct{}{}
+	for _, c := range codes {
+		want[c] = struct{}{}
+	}
+	out := []domain.Item{}
+	for _, item := range m.items {
+		if _, ok := want[item.InternalCode]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+func (m *memItems) CreateItems(ctx context.Context, items []domain.Item) error {
+	for _, item := range items {
+		if err := m.CreateItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (m *memItems) UpdateItems(ctx context.Context, items []domain.Item) error {
+	for _, item := range items {
+		if err := m.UpdateItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (m *memItems) ListItems(ctx context.Context, filter ports.ItemListFilter) (ports.ItemListPage, error) {
 	out := make([]domain.Item, 0, len(m.items))
 	for _, i := range m.items {
 		out = append(out, i)
 	}
-	return out, nil
+	return ports.ItemListPage{Items: out}, nil
 }
 func (m *memItems) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {
 	out := []domain.Item{}
@@ -124,7 +153,16 @@ func (s *catalogStore) GetItemNames(ctx context.Context, ids []string) (map[stri
 func (s *catalogStore) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
 	return s.items.GetItemsByIDs(ctx, ids)
 }
-func (s *catalogStore) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
+func (s *catalogStore) GetItemsByInternalCodes(ctx context.Context, codes []string) ([]domain.Item, error) {
+	return s.items.GetItemsByInternalCodes(ctx, codes)
+}
+func (s *catalogStore) CreateItems(ctx context.Context, items []domain.Item) error {
+	return s.items.CreateItems(ctx, items)
+}
+func (s *catalogStore) UpdateItems(ctx context.Context, items []domain.Item) error {
+	return s.items.UpdateItems(ctx, items)
+}
+func (s *catalogStore) ListItems(ctx context.Context, filter ports.ItemListFilter) (ports.ItemListPage, error) {
 	return s.items.ListItems(ctx, filter)
 }
 func (s *catalogStore) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {

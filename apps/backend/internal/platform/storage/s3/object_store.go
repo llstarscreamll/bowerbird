@@ -123,6 +123,61 @@ func (s *ObjectStore) ReadFile(ctx context.Context, input platformStorage.ReadFi
 	return body, nil
 }
 
+func (s *ObjectStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	params := &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	}
+	if input.Offset > 0 {
+		params.Range = aws.String(fmt.Sprintf("bytes=%d-", input.Offset))
+	}
+	res, err := s.client.GetObject(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("get object: %w", err)
+	}
+	size := int64(0)
+	if res.ContentLength != nil {
+		size = *res.ContentLength
+	}
+	if res.ContentRange != nil {
+		if total := parseContentRangeTotal(*res.ContentRange); total > 0 {
+			size = total
+		}
+	} else if input.Offset > 0 {
+		head, headErr := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+			Bucket: aws.String(s.bucket),
+			Key:    aws.String(input.Path),
+		})
+		if headErr == nil && head.ContentLength != nil {
+			size = *head.ContentLength
+		}
+	}
+	return &platformStorage.OpenFileResult{Body: res.Body, SizeBytes: size}, nil
+}
+
+func parseContentRangeTotal(raw string) int64 {
+	// bytes start-end/total
+	slash := strings.LastIndex(raw, "/")
+	if slash < 0 || slash+1 >= len(raw) {
+		return 0
+	}
+	var total int64
+	if _, err := fmt.Sscanf(raw[slash+1:], "%d", &total); err != nil {
+		return 0
+	}
+	return total
+}
+
 func (s *ObjectStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
 	if s.client == nil {
 		return fmt.Errorf("s3 client is required")

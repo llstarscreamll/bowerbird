@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	httpV1 "github.com/bowerbird/internal/files/adapters/http/v1"
+	"github.com/bowerbird/internal/files/api"
 	"github.com/bowerbird/internal/files/application"
 	"github.com/bowerbird/internal/platform/config"
 	platformStorage "github.com/bowerbird/internal/platform/storage"
@@ -15,6 +16,10 @@ func NewApplication(fileStore platformStorage.FileStore) *application.Applicatio
 	}
 
 	return application.NewApplication(fileStore)
+}
+
+func NewTenantObjects(fileStore platformStorage.FileStore) api.TenantObjects {
+	return application.NewTenantObjects(fileStore)
 }
 
 func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *httpV1.Router {

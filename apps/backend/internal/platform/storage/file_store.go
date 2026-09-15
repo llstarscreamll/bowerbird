@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -28,6 +29,16 @@ type DownloadFileInput struct {
 
 type ExistsFileInput struct {
 	Path string
+}
+
+type OpenFileInput struct {
+	Path   string
+	Offset int64
+}
+
+type OpenFileResult struct {
+	Body      io.ReadCloser
+	SizeBytes int64
 }
 
 type MoveFileInput struct {
@@ -71,6 +82,7 @@ type PresignDownloadResult struct {
 type FileStore interface {
 	WriteFileIfAbsent(ctx context.Context, input WriteFileIfAbsentInput) (*WriteFileIfAbsentResult, error)
 	ReadFile(ctx context.Context, input ReadFileInput) ([]byte, error)
+	OpenFile(ctx context.Context, input OpenFileInput) (*OpenFileResult, error)
 	DownloadFile(ctx context.Context, input DownloadFileInput) error
 	Exists(ctx context.Context, input ExistsFileInput) (bool, error)
 	MoveFile(ctx context.Context, input MoveFileInput) error

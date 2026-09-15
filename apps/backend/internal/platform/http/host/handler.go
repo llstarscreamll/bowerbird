@@ -111,7 +111,7 @@ func New(deps *platform.Dependencies) (http.Handler, error) {
 
 	partiesApp := partiesModule.NewApplication(tenantsDbRegistry)
 	partiesModule.NewHTTPHandler(mux, partiesApp, authMiddleware, cfg)
-	catalogApp := catalogModule.NewApplication(tenantsDbRegistry)
+	catalogApp := catalogModule.NewApplication(tenantsDbRegistry, deps.TaskQueue, filesModule.NewTenantObjects(deps.FileStore))
 	catalogModule.NewHTTPHandler(mux, catalogApp, authMiddleware, cfg)
 
 	legalentitiesApp := legalentitiesModule.NewApplication(tenantsDbRegistry, deps.EventBus)

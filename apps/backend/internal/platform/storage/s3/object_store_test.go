@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -25,7 +26,8 @@ func (f *fakeS3Client) HeadObject(ctx context.Context, params *awsS3.HeadObjectI
 	if _, ok := f.objects[*params.Key]; !ok {
 		return nil, errors.New("status code: 404")
 	}
-	return &awsS3.HeadObjectOutput{}, nil
+	size := int64(len(f.objects[*params.Key]))
+	return &awsS3.HeadObjectOutput{ContentLength: &size}, nil
 }
 
 func (f *fakeS3Client) PutObject(ctx context.Context, params *awsS3.PutObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.PutObjectOutput, error) {
@@ -45,7 +47,25 @@ func (f *fakeS3Client) GetObject(ctx context.Context, params *awsS3.GetObjectInp
 	if !ok {
 		return nil, errors.New("status code: 404")
 	}
-	return &awsS3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(body))}, nil
+	offset := int64(0)
+	if params.Range != nil {
+		var start int64
+		_, _ = fmt.Sscanf(*params.Range, "bytes=%d-", &start)
+		offset = start
+		if offset > int64(len(body)) {
+			offset = int64(len(body))
+		}
+		total := int64(len(body))
+		sliced := body[offset:]
+		cr := fmt.Sprintf("bytes %d-%d/%d", offset, total-1, total)
+		if len(sliced) == 0 {
+			cr = fmt.Sprintf("bytes */%d", total)
+		}
+		size := int64(len(sliced))
+		return &awsS3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(sliced)), ContentLength: &size, ContentRange: &cr}, nil
+	}
+	size := int64(len(body))
+	return &awsS3.GetObjectOutput{Body: io.NopCloser(bytes.NewReader(body)), ContentLength: &size}, nil
 }
 
 func (f *fakeS3Client) CopyObject(ctx context.Context, params *awsS3.CopyObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.CopyObjectOutput, error) {
@@ -154,6 +174,26 @@ func TestMoveFileCopiesAndDeletesSource(t *testing.T) {
 	}
 	if _, ok := client.objects["destination"]; !ok {
 		t.Fatal("expected destination key to exist")
+	}
+}
+
+func TestOpenFileHonorsOffset(t *testing.T) {
+	client := &fakeS3Client{objects: map[string][]byte{"k": []byte("abcdef")}}
+	store := NewObjectStoreWithClient(client, "bucket")
+	res, err := store.OpenFile(context.Background(), platformStorage.OpenFileInput{Path: "k", Offset: 3})
+	if err != nil {
+		t.Fatalf("open file: %v", err)
+	}
+	defer res.Body.Close()
+	got, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != "def" {
+		t.Fatalf("got %q", got)
+	}
+	if res.SizeBytes != 6 {
+		t.Fatalf("size %d", res.SizeBytes)
 	}
 }
 

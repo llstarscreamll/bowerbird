@@ -31,6 +31,23 @@ func ParseItemKind(raw string) (ItemKind, error) {
 	}
 }
 
+// ParseImportKind accepts API codes and Spanish CSV aliases. Empty defaults to unknown.
+func ParseImportKind(raw string) (ItemKind, error) {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	switch v {
+	case "", KindUnknown, "desconocido":
+		return ParseItemKind(KindUnknown)
+	case KindGoods, "bien":
+		return ParseItemKind(KindGoods)
+	case KindService, "servicio":
+		return ParseItemKind(KindService)
+	case KindAsset, "activo":
+		return ParseItemKind(KindAsset)
+	default:
+		return ItemKind{}, ErrInvalidItemKind
+	}
+}
+
 func (k ItemKind) String() string { return k.value }
 
 func (k ItemKind) Equals(other ItemKind) bool { return k.value == other.value }
@@ -73,8 +90,7 @@ func (i Item) ParsedInternalCode() (InternalCode, bool) {
 	return InternalCode{value: i.InternalCode}, true
 }
 
-// NewManualItem creates a user-confirmed catalog item with a required internal code.
-func NewManualItem(id, name string, kind ItemKind, code InternalCode, now time.Time) (Item, error) {
+func newConfirmedItem(id, name string, kind ItemKind, code InternalCode, source string, now time.Time) (Item, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Item{}, ErrMissingItemName
@@ -91,11 +107,21 @@ func NewManualItem(id, name string, kind ItemKind, code InternalCode, now time.T
 		Name:           name,
 		Kind:           kind.String(),
 		Status:         StatusConfirmed,
-		CreationSource: CreationSourceManual,
+		CreationSource: source,
 		InternalCode:   code.String(),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}, nil
+}
+
+// NewManualItem creates a user-confirmed catalog item with a required internal code.
+func NewManualItem(id, name string, kind ItemKind, code InternalCode, now time.Time) (Item, error) {
+	return newConfirmedItem(id, name, kind, code, CreationSourceManual, now)
+}
+
+// NewImportedItem creates a confirmed catalog item born from a CSV import.
+func NewImportedItem(id, name string, kind ItemKind, code InternalCode, now time.Time) (Item, error) {
+	return newConfirmedItem(id, name, kind, code, CreationSourceImport, now)
 }
 
 func (i *Item) Rename(name string, now time.Time) error {
@@ -111,6 +137,33 @@ func (i *Item) Rename(name string, now time.Time) error {
 func (i *Item) ChangeKind(kind ItemKind, now time.Time) {
 	i.Kind = kind.String()
 	i.UpdatedAt = now.UTC()
+}
+
+// ApplyImport syncs name/kind from a catalog file and confirms provisionals.
+// Does not change InternalCode or CreationSource.
+func (i *Item) ApplyImport(name string, kind ItemKind, now time.Time) (bool, error) {
+	changed := false
+	if strings.TrimSpace(name) != i.Name {
+		if err := i.Rename(name, now); err != nil {
+			return false, err
+		}
+		changed = true
+	}
+	if i.Kind != kind.String() {
+		i.ChangeKind(kind, now)
+		changed = true
+	}
+	if i.IsProvisional() {
+		code, ok := i.ParsedInternalCode()
+		if !ok {
+			return false, ErrConfirmRequiresCode
+		}
+		if err := i.Confirm(code, now); err != nil {
+			return false, err
+		}
+		changed = true
+	}
+	return changed, nil
 }
 
 // InterpretMasterStatusChange validates a master-update status intent.

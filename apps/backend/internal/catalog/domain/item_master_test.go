@@ -45,6 +45,68 @@ func TestNewManualItemRequiresInternalCode(t *testing.T) {
 	assert.False(t, item.IsProvisional())
 }
 
+func TestNewImportedItem(t *testing.T) {
+	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	kind, err := domain.ParseImportKind("bien")
+	require.NoError(t, err)
+	code, err := domain.ParseInternalCode("IMP-1")
+	require.NoError(t, err)
+	item, err := domain.NewImportedItem("01IMPITEM00000000000000000", "Tornillo", kind, code, now)
+	require.NoError(t, err)
+	assert.Equal(t, domain.CreationSourceImport, item.CreationSource)
+	assert.Equal(t, domain.KindGoods, item.Kind)
+	assert.True(t, item.IsConfirmed())
+}
+
+func TestApplyImportDoesNotMutateIdentity(t *testing.T) {
+	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	kind, err := domain.ParseItemKind(domain.KindGoods)
+	require.NoError(t, err)
+	code, err := domain.ParseInternalCode("SKU-1")
+	require.NoError(t, err)
+	item, err := domain.NewManualItem("01M", "Old", kind, code, now)
+	require.NoError(t, err)
+
+	next, err := domain.ParseItemKind(domain.KindService)
+	require.NoError(t, err)
+	changed, err := item.ApplyImport("New", next, now)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, "New", item.Name)
+	assert.Equal(t, domain.KindService, item.Kind)
+	assert.Equal(t, domain.CreationSourceManual, item.CreationSource)
+	assert.Equal(t, "SKU-1", item.InternalCode)
+
+	changed, err = item.ApplyImport("New", next, now)
+	require.NoError(t, err)
+	assert.False(t, changed)
+}
+
+func TestApplyImportConfirmsProvisional(t *testing.T) {
+	now := time.Now().UTC()
+	item, err := domain.NewProvisionalItem("01P", "Widget", "W-1", now)
+	require.NoError(t, err)
+	code, err := domain.ParseInternalCode("W-1")
+	require.NoError(t, err)
+	require.NoError(t, item.AssignInternalCode(code, now))
+
+	kind, err := domain.ParseItemKind(domain.KindGoods)
+	require.NoError(t, err)
+	changed, err := item.ApplyImport("Widget", kind, now)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.True(t, item.IsConfirmed())
+	assert.Equal(t, domain.CreationSourceInvoice, item.CreationSource)
+}
+
+func TestParseImportKind(t *testing.T) {
+	kind, err := domain.ParseImportKind("")
+	require.NoError(t, err)
+	assert.Equal(t, domain.KindUnknown, kind.String())
+	_, err = domain.ParseImportKind("widget")
+	assert.ErrorIs(t, err, domain.ErrInvalidItemKind)
+}
+
 func TestItemConfirmAndAssignInternalCode(t *testing.T) {
 	now := time.Now().UTC()
 	item, err := domain.NewProvisionalItem("01P", "Widget", "W-1", now)
