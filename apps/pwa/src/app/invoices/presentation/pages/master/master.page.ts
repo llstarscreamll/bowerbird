@@ -6,6 +6,8 @@ import { NgIcon } from '@ng-icons/core';
 import { BrnDialogClose, BrnDialogContent } from '@spartan-ng/brain/dialog';
 import { InvoiceHistoryImportStore } from '../../../application/invoice-history-import.store';
 import { InvoicesStore } from '../../../application/invoices.store';
+import { LegalEntitiesStore } from '../../../../legal-entities/application/legal-entities.store';
+import { LegalEntityFormComponent, LegalEntityFormValue } from '../../../../legal-entities/presentation/components/legal-entity-form.component';
 import { FileUploadComponent, FileUploadQueueItem } from '../../../../core/presentation/components/file-upload';
 import { generateUlid } from '../../../../core/utils/ulid';
 import { INVOICE_HISTORY_ACCEPT, INVOICE_HISTORY_MAX_FILE_SIZE_BYTES, supportsInvoiceHistoryFile } from '../../../domain/invoice-history-import.model';
@@ -39,6 +41,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
     HlmBadgeImports,
     BrnDialogContent,
     BrnDialogClose,
+    LegalEntityFormComponent,
   ],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full' },
   template: `
@@ -50,84 +53,107 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
             <p class="mt-1 text-sm text-muted-foreground">Facturas electrónicas que te envían tus proveedores.</p>
           </div>
           <div class="flex items-center gap-3">
-            <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
-            @if (hasInvoices()) {
-              <button hlmBtn variant="outline" (click)="openImportModal()">
-                <ng-icon name="lucideCloudDownload" />
-                Importar
+            @if (legalEntities.hasAny()) {
+              <a hlmBtn variant="outline" routerLink="review">Cola de revisión</a>
+              @if (hasInvoices()) {
+                <button hlmBtn variant="outline" (click)="openImportModal()">
+                  <ng-icon name="lucideCloudDownload" />
+                  Importar
+                </button>
+              }
+              <button hlmBtn variant="outline">
+                <ng-icon name="lucideFilter" />
+                Filtrar
               </button>
             }
-            <button hlmBtn variant="outline">
-              <ng-icon name="lucideFilter" />
-              Filtrar
-            </button>
           </div>
         </div>
 
-        @if (isLoading() && !hasInvoices()) {
+        @if (legalEntities.loading() && !legalEntities.hasAny()) {
           <div class="flex items-center justify-center py-20">
             <hlm-spinner class="size-8 text-primary" />
           </div>
-        }
-
-        @if (!isLoading() && !hasInvoices()) {
-          <hlm-empty class="py-20">
-            <ng-icon hlm name="lucideReceipt" class="text-4xl text-muted-foreground/40" />
-            <h3 hlmEmptyTitle>Aún no hay facturas recibidas</h3>
-            <p hlmEmptyDescription>No se han encontrado facturas de proveedores en este entorno. Impórtalas o espera a que lleguen al buzón conectado.</p>
-            <button hlmBtn variant="outline" class="mt-6" [disabled]="isUploading() || isAnalyzing()" (click)="openImportModal()">
-              <ng-icon name="lucideCloudDownload" />
-              {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
-            </button>
-            @if (errorMessage()) {
-              <p class="mt-3 text-sm text-destructive">{{ errorMessage() }}</p>
+        } @else if (!legalEntities.hasAny()) {
+          <hlm-card class="mx-auto max-w-lg p-6">
+            <h3 class="text-lg font-semibold">Registra tu identificación tributaria</h3>
+            <p class="mt-1 mb-4 text-sm text-muted-foreground">
+              Para extraer facturas recibidas necesitamos el NIT o la cédula con el que figuran como receptor. El correo se sigue sincronizando; las facturas se procesan cuando registres estos datos.
+            </p>
+            @if (legalEntities.errorMessage(); as err) {
+              <div hlmAlert variant="destructive" class="mb-4">
+                <ng-icon name="lucideCircleAlert" hlmAlertIcon />
+                <h4 hlmAlertTitle>Error</h4>
+                <p hlmAlertDescription>{{ err }}</p>
+              </div>
             }
-          </hlm-empty>
-        }
-
-        @if (hasInvoices()) {
-          <hlm-card class="overflow-hidden p-0">
-            <div class="overflow-x-auto">
-              <table hlmTable>
-                <thead hlmTHead>
-                  <tr hlmTr>
-                    <th hlmTh>Número</th>
-                    <th hlmTh>Emisor</th>
-                    <th hlmTh>Catálogo</th>
-                    <th hlmTh>Total</th>
-                    <th hlmTh class="text-right">Fecha Emisión</th>
-                  </tr>
-                </thead>
-                <tbody hlmTBody>
-                  @for (invoice of invoices(); track invoice.id) {
-                    <tr hlmTr>
-                      <td hlmTd class="font-medium">
-                        <a [routerLink]="[invoice.id]" class="text-primary hover:underline">{{ invoice.invoice_number || 'N/A' }}</a>
-                      </td>
-                      <td hlmTd>
-                        <div class="max-w-[200px] truncate font-medium" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
-                        <div class="text-xs text-muted-foreground">{{ invoice.issuer_tax_id }}</div>
-                      </td>
-                      <td hlmTd>
-                        <span hlmBadge [variant]="linkingBadgeVariant(invoice.linking_status)">{{ linkingStatusLabel(invoice.linking_status) }}</span>
-                      </td>
-                      <td hlmTd class="font-medium">{{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}</td>
-                      <td hlmTd class="text-right text-muted-foreground">{{ invoice.issue_date | date: 'mediumDate' }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            <div class="flex items-center justify-center border-t px-4 py-3 sm:px-6">
-              @if (hasMore()) {
-                <button hlmBtn variant="outline" (click)="loadMore()" [disabled]="isLoadingMore()">
-                  {{ isLoadingMore() ? 'Cargando...' : 'Cargar más' }}
-                </button>
-              } @else if (hasInvoices()) {
-                <p class="text-sm text-muted-foreground">Has llegado al final de la lista.</p>
-              }
-            </div>
+            <app-legal-entity-form [submitting]="legalEntities.submitting()" submitLabel="Registrar identificación" (submitted)="onLegalEntitySubmit($event)" />
           </hlm-card>
+        } @else {
+          @if (isLoading() && !hasInvoices()) {
+            <div class="flex items-center justify-center py-20">
+              <hlm-spinner class="size-8 text-primary" />
+            </div>
+          }
+
+          @if (!isLoading() && !hasInvoices()) {
+            <hlm-empty class="py-20">
+              <ng-icon hlm name="lucideReceipt" class="text-4xl text-muted-foreground/40" />
+              <h3 hlmEmptyTitle>Aún no hay facturas recibidas</h3>
+              <p hlmEmptyDescription>No se han encontrado facturas de proveedores en este entorno. Impórtalas o espera a que lleguen al buzón conectado.</p>
+              <button hlmBtn variant="outline" class="mt-6" [disabled]="isUploading() || isAnalyzing()" (click)="openImportModal()">
+                <ng-icon name="lucideCloudDownload" />
+                {{ isUploading() ? 'Importando...' : 'Importar histórico' }}
+              </button>
+              @if (errorMessage()) {
+                <p class="mt-3 text-sm text-destructive">{{ errorMessage() }}</p>
+              }
+            </hlm-empty>
+          }
+
+          @if (hasInvoices()) {
+            <hlm-card class="overflow-hidden p-0">
+              <div class="overflow-x-auto">
+                <table hlmTable>
+                  <thead hlmTHead>
+                    <tr hlmTr>
+                      <th hlmTh>Número</th>
+                      <th hlmTh>Emisor</th>
+                      <th hlmTh>Catálogo</th>
+                      <th hlmTh>Total</th>
+                      <th hlmTh class="text-right">Fecha Emisión</th>
+                    </tr>
+                  </thead>
+                  <tbody hlmTBody>
+                    @for (invoice of invoices(); track invoice.id) {
+                      <tr hlmTr>
+                        <td hlmTd class="font-medium">
+                          <a [routerLink]="[invoice.id]" class="text-primary hover:underline">{{ invoice.invoice_number || 'N/A' }}</a>
+                        </td>
+                        <td hlmTd>
+                          <div class="max-w-[200px] truncate font-medium" [title]="invoice.issuer_name">{{ invoice.issuer_name || 'Desconocido' }}</div>
+                          <div class="text-xs text-muted-foreground">{{ invoice.issuer_tax_id }}</div>
+                        </td>
+                        <td hlmTd>
+                          <span hlmBadge [variant]="linkingBadgeVariant(invoice.linking_status)">{{ linkingStatusLabel(invoice.linking_status) }}</span>
+                        </td>
+                        <td hlmTd class="font-medium">{{ invoice.grand_total | currency: invoice.currency_code : 'symbol' : '1.2-2' }}</td>
+                        <td hlmTd class="text-right text-muted-foreground">{{ invoice.issue_date | date: 'mediumDate' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-center border-t px-4 py-3 sm:px-6">
+                @if (hasMore()) {
+                  <button hlmBtn variant="outline" (click)="loadMore()" [disabled]="isLoadingMore()">
+                    {{ isLoadingMore() ? 'Cargando...' : 'Cargar más' }}
+                  </button>
+                } @else if (hasInvoices()) {
+                  <p class="text-sm text-muted-foreground">Has llegado al final de la lista.</p>
+                }
+              </div>
+            </hlm-card>
+          }
         }
       </div>
     </div>
@@ -174,6 +200,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
 export class MasterPage implements OnInit {
   private readonly importStore = inject(InvoiceHistoryImportStore);
   private readonly invoicesStore = inject(InvoicesStore);
+  readonly legalEntities = inject(LegalEntitiesStore);
   private readonly formBuilder = inject(FormBuilder);
 
   readonly historyImportAccept = INVOICE_HISTORY_ACCEPT;
@@ -210,7 +237,14 @@ export class MasterPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.legalEntities.load();
     this.invoicesStore.loadInvoices();
+  }
+
+  onLegalEntitySubmit(value: LegalEntityFormValue): void {
+    this.legalEntities.create(value).subscribe((entity) => {
+      if (entity) this.invoicesStore.loadInvoices();
+    });
   }
 
   loadMore(): void {

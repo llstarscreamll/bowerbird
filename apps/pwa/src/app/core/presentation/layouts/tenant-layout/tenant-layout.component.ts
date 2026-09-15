@@ -163,6 +163,12 @@ import { InstallPromptHostComponent, PwaInstallCoordinator } from '../../../pwa-
                   </a>
                 </li>
               }
+              <li hlmSidebarMenuItem>
+                <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'settings']" routerLinkActive #settingsLink="routerLinkActive" [isActive]="settingsLink.isActive" [tooltip]="'Configuración'">
+                  <ng-icon name="lucideSettings" />
+                  <span>Configuración</span>
+                </a>
+              </li>
             </ul>
           </hlm-sidebar-group>
         </hlm-sidebar-content>

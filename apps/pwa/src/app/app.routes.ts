@@ -98,6 +98,10 @@ export const routes: Routes = [
         path: 'catalog/:itemId',
         loadComponent: () => import('./catalog/presentation/pages/detail/detail.page').then((c) => c.DetailItemPage),
       },
+      {
+        path: 'settings',
+        loadComponent: () => import('./settings/presentation/pages/settings.page').then((c) => c.SettingsPage),
+      },
     ],
   },
 ];
