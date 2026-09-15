@@ -123,6 +123,26 @@ func (m *memAliases) CreateAlias(ctx context.Context, alias domain.Alias) error 
 	return nil
 }
 
+func (m *memAliases) ListAliasesByItemID(ctx context.Context, itemID string) ([]domain.Alias, error) {
+	out := []domain.Alias{}
+	for _, a := range m.byKey {
+		if a.ItemID == itemID {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (m *memAliases) DeleteAlias(ctx context.Context, itemID, aliasID string) error {
+	for key, a := range m.byKey {
+		if a.ID == aliasID && a.ItemID == itemID {
+			delete(m.byKey, key)
+			return nil
+		}
+	}
+	return appErrors.New(appErrors.CodeNotFound, "alias not found")
+}
+
 func (m *memAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	a, ok := m.byKey[aliasKey(scheme, partyID, value)]
 	if !ok {
@@ -174,6 +194,12 @@ func (s *catalogStore) CreateAlias(ctx context.Context, alias domain.Alias) erro
 func (s *catalogStore) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	return s.aliases.FindBySchemePartyValue(ctx, scheme, partyID, value)
 }
+func (s *catalogStore) ListAliasesByItemID(ctx context.Context, itemID string) ([]domain.Alias, error) {
+	return s.aliases.ListAliasesByItemID(ctx, itemID)
+}
+func (s *catalogStore) DeleteAlias(ctx context.Context, itemID, aliasID string) error {
+	return s.aliases.DeleteAlias(ctx, itemID, aliasID)
+}
 
 func (s *catalogStore) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
 	if s.createItemWithAlias != nil {
@@ -192,6 +218,40 @@ func (s *catalogStore) CreateItemWithAlias(ctx context.Context, item domain.Item
 	if err := s.aliases.CreateAlias(ctx, alias); err != nil {
 		delete(s.items.items, item.ID)
 		return err
+	}
+	return nil
+}
+
+func (s *catalogStore) CreateItemWithAliases(ctx context.Context, item domain.Item, aliases []domain.Alias) error {
+	if len(aliases) == 0 {
+		return s.items.CreateItem(ctx, item)
+	}
+	if err := s.CreateItemWithAlias(ctx, item, aliases[0]); err != nil {
+		return err
+	}
+	for _, alias := range aliases[1:] {
+		if err := s.aliases.CreateAlias(ctx, alias); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *catalogStore) RememberDecision(ctx context.Context, aliases []domain.Alias, memory domain.MatchMemory) error {
+	for _, alias := range aliases {
+		party := ""
+		if alias.PartyID != nil {
+			party = *alias.PartyID
+		}
+		if existing, _ := s.FindBySchemePartyValue(ctx, alias.Scheme, party, alias.Value); existing != nil {
+			if !existing.PointsTo(alias.ItemID) {
+				return aliasOwnedBy(existing.ItemID)
+			}
+			continue
+		}
+		if err := s.aliases.CreateAlias(ctx, alias); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -244,7 +304,7 @@ func TestResolve_LockedPreserved(t *testing.T) {
 		ExistingLocked: true,
 		ExistingItemID: "ITEM-1",
 		ExistingMethod: domain.LinkMethodManual,
-		ItemCode:       "X",
+		SellerSKU:      "X",
 		PartyID:        "P",
 	})
 	require.NoError(t, err)
@@ -259,7 +319,7 @@ func TestResolve_MemoryLink(t *testing.T) {
 	memories.byKey[key] = domain.MatchMemory{EvidenceKey: key, Action: domain.MemoryActionLink, ItemID: &itemID}
 	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: &memAliases{}}, memories, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
-		PartyID: "P", ItemCode: "ABC", Description: "Widget",
+		PartyID: "P", SellerSKU: "ABC", Description: "Widget",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, itemID, res.ItemID)
@@ -271,7 +331,7 @@ func TestResolve_HardAlias(t *testing.T) {
 		aliasKey(domain.AliasSchemeSupplierSKU, "P", "SKU-1"): {ItemID: "ITEM-HARD", Scheme: domain.AliasSchemeSupplierSKU, Value: "SKU-1"},
 	}}
 	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: aliases}, &memMemories{}, nil)
-	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{PartyID: "P", ItemCode: "SKU-1", Description: "Thing"})
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{PartyID: "P", SellerSKU: "SKU-1", Description: "Thing"})
 	require.NoError(t, err)
 	assert.Equal(t, "ITEM-HARD", res.ItemID)
 	assert.Equal(t, domain.LinkMethodHard, res.Method)
@@ -303,7 +363,7 @@ func TestResolve_ProvisionalMintOnHardMiss(t *testing.T) {
 		return id
 	}
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
-		PartyID: "P", ItemCode: "NEW-1", Description: "New Product",
+		PartyID: "P", SellerSKU: "NEW-1", Description: "New Product",
 	})
 	require.NoError(t, err)
 	assert.True(t, res.Minted)
@@ -318,7 +378,7 @@ func TestResolve_ProvisionalMintOnHardMiss(t *testing.T) {
 func TestResolve_EmptyCodeNoMint(t *testing.T) {
 	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: &memAliases{}}, &memMemories{}, nil)
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
-		PartyID: "P", ItemCode: "", Description: "Service fee",
+		PartyID: "P", SellerSKU: "", Description: "Service fee",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, domain.LinkStatusUnmatched, res.Status)
@@ -344,6 +404,12 @@ func (r *raceAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyI
 	}
 	cp := r.winner
 	return &cp, nil
+}
+func (r *raceAliases) ListAliasesByItemID(ctx context.Context, itemID string) ([]domain.Alias, error) {
+	return nil, nil
+}
+func (r *raceAliases) DeleteAlias(ctx context.Context, itemID, aliasID string) error {
+	return nil
 }
 
 func TestResolve_ProvisionalMintAliasRaceReturnsWinner(t *testing.T) {
@@ -371,7 +437,7 @@ func TestResolve_ProvisionalMintAliasRaceReturnsWinner(t *testing.T) {
 	}
 
 	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
-		PartyID: "P", ItemCode: "SKU-RACE", Description: "Race Product",
+		PartyID: "P", SellerSKU: "SKU-RACE", Description: "Race Product",
 	})
 	require.NoError(t, err)
 	assert.False(t, res.Minted)
@@ -379,4 +445,70 @@ func TestResolve_ProvisionalMintAliasRaceReturnsWinner(t *testing.T) {
 	assert.Equal(t, domain.LinkMethodHard, res.Method)
 	assert.Contains(t, items.items, "ITEM-WIN")
 	assert.NotContains(t, items.items, "ITEM-ORPHAN")
+}
+
+func TestResolve_BuyerInternalCode(t *testing.T) {
+	items := &memItems{items: map[string]domain.Item{"ITEM-B": {ID: "ITEM-B", InternalCode: "INT-9"}}}
+	cmd := newResolveCmd(&catalogStore{items: items, aliases: &memAliases{}}, &memMemories{}, nil)
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{BuyerCode: "INT-9"})
+	require.NoError(t, err)
+	assert.Equal(t, "ITEM-B", res.ItemID)
+	assert.Equal(t, domain.LinkMethodHard, res.Method)
+}
+
+func TestResolve_GTINHardMatch(t *testing.T) {
+	aliases := &memAliases{byKey: map[string]domain.Alias{
+		aliasKey(domain.AliasSchemeGTIN, "", "7701234567890"): {ItemID: "ITEM-G", Scheme: domain.AliasSchemeGTIN, Value: "7701234567890"},
+	}}
+	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: aliases}, &memMemories{}, nil)
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{GTIN: "7701234567890"})
+	require.NoError(t, err)
+	assert.Equal(t, "ITEM-G", res.ItemID)
+	assert.Equal(t, domain.LinkMethodHard, res.Method)
+}
+
+func TestResolve_HardConflict(t *testing.T) {
+	items := &memItems{items: map[string]domain.Item{"ITEM-A": {ID: "ITEM-A", InternalCode: "INT-9"}}}
+	aliases := &memAliases{byKey: map[string]domain.Alias{
+		aliasKey(domain.AliasSchemeSupplierSKU, "P", "SKU-B"): {ItemID: "ITEM-B", Scheme: domain.AliasSchemeSupplierSKU, Value: "SKU-B"},
+	}}
+	cmd := newResolveCmd(&catalogStore{items: items, aliases: aliases}, &memMemories{}, nil)
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
+		PartyID: "P", BuyerCode: "INT-9", SellerSKU: "SKU-B",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.LinkStatusSuggested, res.Status)
+	assert.Empty(t, res.ItemID)
+	assert.Equal(t, domain.SuggestionReasonHardConflict, res.Suggestions[0].Reason)
+}
+
+func TestResolve_UnusableSellerNoMint(t *testing.T) {
+	cmd := newResolveCmd(&catalogStore{items: &memItems{}, aliases: &memAliases{}}, &memMemories{}, nil)
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
+		PartyID: "P", SellerSKU: "1", Description: "Generic",
+	})
+	require.NoError(t, err)
+	assert.False(t, res.Minted)
+	assert.Empty(t, res.ItemID)
+}
+
+func TestResolve_MintAttachesGTIN(t *testing.T) {
+	store := &catalogStore{items: &memItems{}, aliases: &memAliases{}}
+	cmd := newResolveCmd(store, &memMemories{}, nil)
+	ids := []string{"ITEM-NEW", "ALIAS-SKU", "ALIAS-GTIN"}
+	i := 0
+	cmd.newID = func() string {
+		id := ids[i]
+		i++
+		return id
+	}
+	res, err := cmd.Execute(context.Background(), domain.LineResolutionInput{
+		PartyID: "P", SellerSKU: "ABC-1", GTIN: "7701234567890", Description: "Widget",
+	})
+	require.NoError(t, err)
+	assert.True(t, res.Minted)
+	gtin, err := store.FindBySchemePartyValue(context.Background(), domain.AliasSchemeGTIN, "", "7701234567890")
+	require.NoError(t, err)
+	require.NotNil(t, gtin)
+	assert.Equal(t, "ITEM-NEW", gtin.ItemID)
 }

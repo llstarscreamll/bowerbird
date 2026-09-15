@@ -39,7 +39,7 @@ func (cmd *EnsureSupplierAliasCommand) Execute(ctx context.Context, partyID, cod
 		return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists for another item")
 	}
 
-	alias, err := domain.NewSupplierSKUAlias(cmd.newID(), itemID, partyID, code, cmd.now())
+	alias, err := domain.NewSupplierSKUAlias(cmd.newID(), itemID, partyID, code, domain.AliasSourceInvoice, cmd.now())
 	if err != nil {
 		return err
 	}

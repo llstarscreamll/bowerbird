@@ -8,18 +8,27 @@ import (
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
-type GetItemByIDQuery struct {
-	items ports.ItemRepository
+type ItemDetail struct {
+	Item    domain.Item
+	Aliases []domain.Alias
 }
 
-func NewGetItemByIDQuery(items ports.ItemRepository) *GetItemByIDQuery {
+type GetItemByIDQuery struct {
+	items   ports.ItemRepository
+	aliases ports.AliasRepository
+}
+
+func NewGetItemByIDQuery(items ports.ItemRepository, aliases ports.AliasRepository) *GetItemByIDQuery {
 	if items == nil {
 		panic("item repository is required")
 	}
-	return &GetItemByIDQuery{items: items}
+	if aliases == nil {
+		panic("alias repository is required")
+	}
+	return &GetItemByIDQuery{items: items, aliases: aliases}
 }
 
-func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*domain.Item, error) {
+func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*ItemDetail, error) {
 	item, err := q.items.GetItemByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -27,5 +36,12 @@ func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*domain.Item
 	if item == nil {
 		return nil, appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
-	return item, nil
+	aliases, err := q.aliases.ListAliasesByItemID(ctx, item.ID)
+	if err != nil {
+		return nil, err
+	}
+	if aliases == nil {
+		aliases = []domain.Alias{}
+	}
+	return &ItemDetail{Item: *item, Aliases: aliases}, nil
 }

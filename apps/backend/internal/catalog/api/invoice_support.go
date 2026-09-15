@@ -7,8 +7,7 @@ type InvoiceSupport interface {
 	ResolveLine(ctx context.Context, input LineResolveInput) (*LineResolveResult, error)
 	ValidateItemExists(ctx context.Context, itemID string) error
 	MintProvisionalFromEvidence(ctx context.Context, input MintFromEvidenceInput) (itemID string, err error)
-	EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error
-	RecordMatchMemory(ctx context.Context, input MatchMemoryInput) error
+	RememberDecision(ctx context.Context, input RememberDecisionInput) error
 	GetItemNames(ctx context.Context, ids []string) (map[string]string, error)
 	GetItemDisplays(ctx context.Context, ids []string) (map[string]ItemDisplay, error)
 }
@@ -16,7 +15,9 @@ type InvoiceSupport interface {
 type LineResolveInput struct {
 	LineID         string
 	PartyID        string
-	ItemCode       string
+	BuyerCode      string
+	SellerSKU      string
+	GTIN           string
 	Description    string
 	ExistingItemID string
 	ExistingLocked bool
@@ -39,16 +40,18 @@ type LineResolveResult struct {
 
 type MintFromEvidenceInput struct {
 	PartyID     string
-	ItemCode    string
+	SellerSKU   string
+	GTIN        string
 	Description string
 }
 
-type MatchMemoryInput struct {
+type RememberDecisionInput struct {
 	PartyID     string
-	ItemCode    string
+	SellerSKU   string
+	GTIN        string
 	Description string
 	Action      string
-	ItemID      *string
+	ItemID      string
 }
 
 type ItemDisplay struct {

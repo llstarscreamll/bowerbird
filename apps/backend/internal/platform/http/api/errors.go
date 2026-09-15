@@ -172,6 +172,7 @@ func filterAllowedErrorMeta(meta map[string]any) map[string]any {
 		"retry_after_seconds": {},
 		"account_email":       {},
 		"feature_key":         {},
+		"item_id":             {},
 	}
 
 	out := map[string]any{}

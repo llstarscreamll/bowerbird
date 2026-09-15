@@ -38,12 +38,16 @@ type ItemListPage struct {
 type AliasRepository interface {
 	CreateAlias(ctx context.Context, alias domain.Alias) error
 	FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error)
+	ListAliasesByItemID(ctx context.Context, itemID string) ([]domain.Alias, error)
+	DeleteAlias(ctx context.Context, itemID, aliasID string) error
 }
 
-// CatalogWriteRepository persists an Item together with a supplier alias in one TX
-// (provisional mint on invoice ingest).
+// CatalogWriteRepository persists an Item together with aliases in one TX
+// (provisional mint on invoice ingest) and teaching (aliases + memory).
 type CatalogWriteRepository interface {
 	CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error
+	CreateItemWithAliases(ctx context.Context, item domain.Item, aliases []domain.Alias) error
+	RememberDecision(ctx context.Context, aliases []domain.Alias, memory domain.MatchMemory) error
 }
 
 type MatchMemoryRepository interface {

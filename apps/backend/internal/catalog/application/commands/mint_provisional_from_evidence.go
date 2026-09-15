@@ -41,34 +41,50 @@ func NewMintProvisionalFromEvidenceCommand(items ports.ItemRepository, aliases p
 
 type MintProvisionalFromEvidenceInput struct {
 	PartyID     string
-	ItemCode    string
+	SellerSKU   string
+	GTIN        string
 	Description string
 }
 
 func (cmd *MintProvisionalFromEvidenceCommand) Execute(ctx context.Context, input MintProvisionalFromEvidenceInput) (string, error) {
+	seller := domain.UsableSellerSKU(input.SellerSKU)
+	if !domain.CanMintProvisional(input.PartyID, seller) {
+		return "", appErrors.New(appErrors.CodeValidation, "usable seller sku and party are required to mint a provisional item")
+	}
 	now := cmd.now().UTC()
-	item, err := domain.NewProvisionalItem(cmd.newID(), input.Description, input.ItemCode, now)
+	item, err := domain.NewProvisionalItem(cmd.newID(), input.Description, seller, now)
 	if err != nil {
 		if errors.Is(err, domain.ErrMissingItemName) {
 			return "", appErrors.New(appErrors.CodeValidation, "description or item code is required to create a provisional item")
 		}
 		return "", err
 	}
-	normalized := domain.NormalizeItemCode(input.ItemCode)
-	if normalized != "" && strings.TrimSpace(input.PartyID) != "" {
-		alias, aliasErr := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, input.PartyID, normalized, now)
-		if aliasErr != nil {
-			return "", aliasErr
-		}
-		if err := cmd.write.CreateItemWithAlias(ctx, item, alias); err != nil {
-			if isConflict(err) {
-				return cmd.loadWinnerItemIDBySupplierSKU(ctx, input.PartyID, normalized)
-			}
+	aliases := make([]domain.Alias, 0, 2)
+	sku, err := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, input.PartyID, seller, domain.AliasSourceInvoice, now)
+	if err != nil {
+		return "", err
+	}
+	aliases = append(aliases, sku)
+	if gtin := strings.TrimSpace(input.GTIN); gtin != "" {
+		existing, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeGTIN, "", gtin)
+		if err != nil {
 			return "", err
 		}
-		return item.ID, nil
+		if existing != nil && !existing.PointsTo(item.ID) {
+			return "", aliasOwnedBy(existing.ItemID)
+		}
+		if existing == nil {
+			g, err := domain.NewGTINAlias(cmd.newID(), item.ID, gtin, domain.AliasSourceInvoice, now)
+			if err != nil {
+				return "", appErrors.New(appErrors.CodeValidation, err.Error())
+			}
+			aliases = append(aliases, g)
+		}
 	}
-	if err := cmd.items.CreateItem(ctx, item); err != nil {
+	if err := cmd.write.CreateItemWithAliases(ctx, item, aliases); err != nil {
+		if isConflict(err) {
+			return cmd.loadWinnerItemIDBySupplierSKU(ctx, input.PartyID, seller)
+		}
 		return "", err
 	}
 	return item.ID, nil

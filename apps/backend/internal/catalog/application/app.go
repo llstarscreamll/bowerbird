@@ -18,6 +18,9 @@ type Commands struct {
 	RecordMatchMemory           *commands.RecordMatchMemoryCommand
 	CreateItem                  *commands.CreateItemCommand
 	UpdateItem                  *commands.UpdateItemCommand
+	AddItemAlias                *commands.AddItemAliasCommand
+	RemoveItemAlias             *commands.RemoveItemAliasCommand
+	RememberDecision            *commands.RememberDecisionCommand
 	QueueCatalogImport          *commands.QueueCatalogImportCommand
 	ProcessCatalogImport        *commands.ProcessCatalogImportCommand
 	CancelCatalogImport         *commands.CancelCatalogImportCommand

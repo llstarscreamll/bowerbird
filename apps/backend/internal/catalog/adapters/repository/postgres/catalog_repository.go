@@ -281,12 +281,12 @@ func (r *CatalogRepository) CreateAlias(ctx context.Context, alias domain.Alias)
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	_, err = pool.Exec(ctx, `
-		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt)
+		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, source, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, aliasSource(alias), alias.CreatedAt, alias.UpdatedAt)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+			return r.aliasConflict(ctx, alias)
 		}
 		return fmt.Errorf("create alias: %w", err)
 	}
@@ -300,11 +300,11 @@ func (r *CatalogRepository) FindBySchemePartyValue(ctx context.Context, scheme, 
 	}
 	var alias domain.Alias
 	err = pool.QueryRow(ctx, `
-		SELECT id, item_id, scheme, party_id, value, created_at, updated_at
+		SELECT id, item_id, scheme, party_id, value, COALESCE(source, 'invoice'), created_at, updated_at
 		FROM catalog_item_aliases
 		WHERE scheme = $1 AND COALESCE(party_id, '') = COALESCE(NULLIF($2, ''), '') AND value = $3
 	`, scheme, partyID, value).Scan(
-		&alias.ID, &alias.ItemID, &alias.Scheme, &alias.PartyID, &alias.Value, &alias.CreatedAt, &alias.UpdatedAt,
+		&alias.ID, &alias.ItemID, &alias.Scheme, &alias.PartyID, &alias.Value, &alias.Source, &alias.CreatedAt, &alias.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -316,6 +316,10 @@ func (r *CatalogRepository) FindBySchemePartyValue(ctx context.Context, scheme, 
 }
 
 func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
+	return r.CreateItemWithAliases(ctx, item, []domain.Alias{alias})
+}
+
+func (r *CatalogRepository) CreateItemWithAliases(ctx context.Context, item domain.Item, aliases []domain.Alias) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return fmt.Errorf("get tenant db pool: %w", err)
@@ -338,19 +342,150 @@ func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain
 		}
 		return fmt.Errorf("create catalog item: %w", err)
 	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt); err != nil {
-		if isUniqueViolation(err) {
-			return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+	for _, alias := range aliases {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, source, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, aliasSource(alias), alias.CreatedAt, alias.UpdatedAt); err != nil {
+			if isUniqueViolation(err) {
+				return r.aliasConflict(ctx, alias)
+			}
+			return fmt.Errorf("create alias: %w", err)
 		}
-		return fmt.Errorf("create alias: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit create item+alias: %w", err)
+		return fmt.Errorf("commit create item+aliases: %w", err)
 	}
 	return nil
+}
+
+func (r *CatalogRepository) ListAliasesByItemID(ctx context.Context, itemID string) ([]domain.Alias, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get tenant db pool: %w", err)
+	}
+	rows, err := pool.Query(ctx, `
+		SELECT id, item_id, scheme, party_id, value, COALESCE(source, 'invoice'), created_at, updated_at
+		FROM catalog_item_aliases
+		WHERE item_id = $1
+		ORDER BY scheme, value
+	`, itemID)
+	if err != nil {
+		return nil, fmt.Errorf("list aliases: %w", err)
+	}
+	defer rows.Close()
+	out := make([]domain.Alias, 0)
+	for rows.Next() {
+		var alias domain.Alias
+		if err := rows.Scan(&alias.ID, &alias.ItemID, &alias.Scheme, &alias.PartyID, &alias.Value, &alias.Source, &alias.CreatedAt, &alias.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, alias)
+	}
+	return out, rows.Err()
+}
+
+func (r *CatalogRepository) DeleteAlias(ctx context.Context, itemID, aliasID string) error {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	tag, err := pool.Exec(ctx, `DELETE FROM catalog_item_aliases WHERE id = $1 AND item_id = $2`, aliasID, itemID)
+	if err != nil {
+		return fmt.Errorf("delete alias: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return appErrors.New(appErrors.CodeNotFound, "alias not found")
+	}
+	return nil
+}
+
+func (r *CatalogRepository) RememberDecision(ctx context.Context, aliases []domain.Alias, memory domain.MatchMemory) error {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return fmt.Errorf("get tenant db pool: %w", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	for _, alias := range aliases {
+		party := ""
+		if alias.PartyID != nil {
+			party = *alias.PartyID
+		}
+		var existing domain.Alias
+		err := tx.QueryRow(ctx, `
+			SELECT id, item_id, scheme, party_id, value, COALESCE(source, 'invoice'), created_at, updated_at
+			FROM catalog_item_aliases
+			WHERE scheme = $1 AND COALESCE(party_id, '') = COALESCE(NULLIF($2, ''), '') AND value = $3
+		`, alias.Scheme, party, alias.Value).Scan(
+			&existing.ID, &existing.ItemID, &existing.Scheme, &existing.PartyID, &existing.Value, &existing.Source, &existing.CreatedAt, &existing.UpdatedAt,
+		)
+		if err == nil {
+			if !existing.PointsTo(alias.ItemID) {
+				return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists for another item").
+					WithMeta("item_id", existing.ItemID)
+			}
+			continue
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("find alias: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, source, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, aliasSource(alias), alias.CreatedAt, alias.UpdatedAt); err != nil {
+			if isUniqueViolation(err) {
+				return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
+			}
+			return fmt.Errorf("create alias: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO catalog_match_memories (
+			id, evidence_key, party_id, item_code, description_fingerprint,
+			evidence_kind, item_id, action, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (evidence_key) DO UPDATE SET
+			party_id = EXCLUDED.party_id,
+			item_code = EXCLUDED.item_code,
+			description_fingerprint = EXCLUDED.description_fingerprint,
+			evidence_kind = EXCLUDED.evidence_kind,
+			item_id = EXCLUDED.item_id,
+			action = EXCLUDED.action,
+			updated_at = EXCLUDED.updated_at
+	`, memory.ID, memory.EvidenceKey, memory.PartyID, nullIfEmpty(memory.ItemCode), nullIfEmpty(memory.DescriptionFingerprint),
+		memory.EvidenceKind, memory.ItemID, memory.Action, memory.CreatedAt, memory.UpdatedAt); err != nil {
+		return fmt.Errorf("upsert match memory: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit remember decision: %w", err)
+	}
+	return nil
+}
+
+func aliasSource(alias domain.Alias) string {
+	if strings.TrimSpace(alias.Source) == "" {
+		return domain.AliasSourceInvoice
+	}
+	return alias.Source
+}
+
+func (r *CatalogRepository) aliasConflict(ctx context.Context, alias domain.Alias) error {
+	party := ""
+	if alias.PartyID != nil {
+		party = *alias.PartyID
+	}
+	existing, err := r.FindBySchemePartyValue(ctx, alias.Scheme, party, alias.Value)
+	if err == nil && existing != nil {
+		return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists for another item").
+			WithMeta("item_id", existing.ItemID)
+	}
+	return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
 }
 
 func (r *CatalogRepository) UpsertMemory(ctx context.Context, memory domain.MatchMemory) error {

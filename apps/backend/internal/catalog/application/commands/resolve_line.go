@@ -61,16 +61,16 @@ func (cmd *ResolveInvoiceLineCommand) Execute(ctx context.Context, input domain.
 		return preserved, nil
 	}
 
-	code := domain.NormalizeItemCode(input.ItemCode)
+	seller := domain.UsableSellerSKU(input.SellerSKU)
 	descFP := domain.DescriptionFingerprint(input.Description)
-	evidenceKind := domain.InferEvidenceKind(code, input.Description)
-	evidenceKey := domain.EvidenceKey(input.PartyID, code, descFP, evidenceKind)
+	evidenceKind := domain.InferEvidenceKind(seller, input.Description)
+	evidenceKey := domain.EvidenceKey(input.PartyID, seller, descFP, evidenceKind)
 
 	if mem, err := cmd.memories.FindMemoryByEvidenceKey(ctx, evidenceKey); err != nil {
 		return nil, err
 	} else if mem != nil {
 		if mem.IsNeverMatch() {
-			return cmd.continueAfterNegativeMemory(ctx, input, code, mem.ItemID)
+			return cmd.afterNegativeMemory(ctx, input, mem.ItemID)
 		}
 		if mem.Action == domain.MemoryActionLink {
 			if itemID := mem.LinkedItemID(); itemID != "" {
@@ -80,29 +80,33 @@ func (cmd *ResolveInvoiceLineCommand) Execute(ctx context.Context, input domain.
 		}
 	}
 
-	if domain.CanMintProvisional(input.PartyID, code) {
-		alias, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, input.PartyID, code)
-		if err != nil {
-			return nil, err
-		}
-		if alias != nil {
-			result := domain.LinkedByHardAlias(alias.ItemID)
-			return &result, nil
-		}
+	hits, err := cmd.collectHardHits(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if agreed, conflict, ids := hits.Agree(); conflict {
+		result := domain.LinkedByHardConflict(ids)
+		return &result, nil
+	} else if agreed != "" {
+		result := domain.LinkedByHardAlias(agreed)
+		return &result, nil
 	}
 
-	var suggestions []domain.Suggestion
-	if strings.TrimSpace(input.Description) != "" {
-		soft, err := cmd.matcher.Match(ctx, input.Description)
-		if err != nil {
-			return nil, err
-		}
-		suggestions = soft
+	suggestions, err := cmd.softSuggestions(ctx, input.Description)
+	if err != nil {
+		return nil, err
 	}
 
-	if domain.CanMintProvisional(input.PartyID, code) {
-		item, minted, err := cmd.mintProvisional(ctx, input.PartyID, code, input.Description)
+	if domain.CanMintProvisional(input.PartyID, seller) {
+		item, minted, err := cmd.mintProvisional(ctx, input, seller)
 		if err != nil {
+			if isConflict(err) {
+				if ids := conflictIDsFromErr(err); len(ids) > 0 {
+					result := domain.LinkedByHardConflict(ids)
+					return &result, nil
+				}
+				return cmd.loadWinnerResult(ctx, input.PartyID, seller, suggestions)
+			}
 			return nil, err
 		}
 		result := domain.LinkedByProvisionalMint(item.ID, minted, suggestions)
@@ -115,55 +119,135 @@ func (cmd *ResolveInvoiceLineCommand) Execute(ctx context.Context, input domain.
 	}, nil
 }
 
-func (cmd *ResolveInvoiceLineCommand) continueAfterNegativeMemory(
+func (cmd *ResolveInvoiceLineCommand) afterNegativeMemory(
 	ctx context.Context,
 	input domain.LineResolutionInput,
-	code string,
 	blockedItemID *string,
 ) (*domain.LineResolutionResult, error) {
-	if domain.CanMintProvisional(input.PartyID, code) {
-		alias, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, input.PartyID, code)
-		if err != nil {
-			return nil, err
-		}
-		if alias != nil && (blockedItemID == nil || !alias.PointsTo(*blockedItemID)) {
-			result := domain.LinkedByHardAlias(alias.ItemID)
-			return &result, nil
-		}
-		// Negative memory blocked the hard item: do not remint; soft-suggest only.
+	hits, err := cmd.collectHardHits(ctx, input)
+	if err != nil {
+		return nil, err
 	}
-
-	var suggestions []domain.Suggestion
-	if strings.TrimSpace(input.Description) != "" {
-		soft, err := cmd.matcher.Match(ctx, input.Description)
-		if err != nil {
-			return nil, err
-		}
-		suggestions = domain.FilterBlockedSuggestions(soft, blockedItemID)
+	hits = suppressBlocked(hits, blockedItemID)
+	if agreed, conflict, ids := hits.Agree(); conflict {
+		result := domain.LinkedByHardConflict(ids)
+		return &result, nil
+	} else if agreed != "" {
+		result := domain.LinkedByHardAlias(agreed)
+		return &result, nil
 	}
+	suggestions, err := cmd.softSuggestions(ctx, input.Description)
+	if err != nil {
+		return nil, err
+	}
+	suggestions = domain.FilterBlockedSuggestions(suggestions, blockedItemID)
 	return &domain.LineResolutionResult{
 		Status:      domain.SoftOrUnmatchedStatus(suggestions),
 		Suggestions: suggestions,
 	}, nil
 }
 
-func (cmd *ResolveInvoiceLineCommand) mintProvisional(ctx context.Context, partyID, code, description string) (*domain.Item, bool, error) {
-	now := cmd.now().UTC()
-	item, err := domain.NewProvisionalItem(cmd.newID(), description, code, now)
-	if err != nil {
-		return nil, false, err
+func suppressBlocked(hits domain.HardHits, blocked *string) domain.HardHits {
+	if blocked == nil || strings.TrimSpace(*blocked) == "" {
+		return hits
 	}
-	alias, err := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, partyID, code, now)
-	if err != nil {
-		return nil, false, err
+	id := strings.TrimSpace(*blocked)
+	if hits.BuyerItemID == id {
+		hits.BuyerItemID = ""
 	}
-	if err := cmd.write.CreateItemWithAlias(ctx, item, alias); err != nil {
-		if isConflict(err) {
-			return cmd.loadWinnerBySupplierSKU(ctx, partyID, code)
+	if hits.GTINItemID == id {
+		hits.GTINItemID = ""
+	}
+	if hits.SellerItemID == id {
+		hits.SellerItemID = ""
+	}
+	return hits
+}
+
+func (cmd *ResolveInvoiceLineCommand) collectHardHits(ctx context.Context, input domain.LineResolutionInput) (domain.HardHits, error) {
+	hits := domain.HardHits{}
+	if buyer := strings.TrimSpace(input.BuyerCode); buyer != "" {
+		items, err := cmd.items.GetItemsByInternalCodes(ctx, []string{buyer})
+		if err != nil {
+			return hits, err
 		}
-		return nil, false, fmt.Errorf("create provisional item+alias: %w", err)
+		if len(items) == 1 {
+			hits.BuyerItemID = items[0].ID
+		}
+	}
+	if gtin := strings.TrimSpace(input.GTIN); gtin != "" {
+		alias, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeGTIN, "", gtin)
+		if err != nil {
+			return hits, err
+		}
+		if alias != nil {
+			hits.GTINItemID = alias.ItemID
+		}
+	}
+	seller := domain.UsableSellerSKU(input.SellerSKU)
+	if seller != "" && strings.TrimSpace(input.PartyID) != "" {
+		alias, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeSupplierSKU, input.PartyID, seller)
+		if err != nil {
+			return hits, err
+		}
+		if alias != nil {
+			hits.SellerItemID = alias.ItemID
+		}
+	}
+	return hits, nil
+}
+
+func (cmd *ResolveInvoiceLineCommand) softSuggestions(ctx context.Context, description string) ([]domain.Suggestion, error) {
+	if strings.TrimSpace(description) == "" {
+		return nil, nil
+	}
+	return cmd.matcher.Match(ctx, description)
+}
+
+func (cmd *ResolveInvoiceLineCommand) mintProvisional(ctx context.Context, input domain.LineResolutionInput, seller string) (*domain.Item, bool, error) {
+	now := cmd.now().UTC()
+	item, err := domain.NewProvisionalItem(cmd.newID(), input.Description, seller, now)
+	if err != nil {
+		return nil, false, err
+	}
+	aliases := make([]domain.Alias, 0, 2)
+	sku, err := domain.NewSupplierSKUAlias(cmd.newID(), item.ID, input.PartyID, seller, domain.AliasSourceInvoice, now)
+	if err != nil {
+		return nil, false, err
+	}
+	aliases = append(aliases, sku)
+	if gtin := strings.TrimSpace(input.GTIN); gtin != "" {
+		existing, err := cmd.aliases.FindBySchemePartyValue(ctx, domain.AliasSchemeGTIN, "", gtin)
+		if err != nil {
+			return nil, false, err
+		}
+		if existing != nil && !existing.PointsTo(item.ID) {
+			return nil, false, aliasOwnedBy(existing.ItemID)
+		}
+		if existing == nil {
+			g, err := domain.NewGTINAlias(cmd.newID(), item.ID, gtin, domain.AliasSourceInvoice, now)
+			if err != nil {
+				return nil, false, err
+			}
+			aliases = append(aliases, g)
+		}
+	}
+	if err := cmd.write.CreateItemWithAliases(ctx, item, aliases); err != nil {
+		if isConflict(err) {
+			return cmd.loadWinnerBySupplierSKU(ctx, input.PartyID, seller)
+		}
+		return nil, false, fmt.Errorf("create provisional item+aliases: %w", err)
 	}
 	return &item, true, nil
+}
+
+func (cmd *ResolveInvoiceLineCommand) loadWinnerResult(ctx context.Context, partyID, seller string, suggestions []domain.Suggestion) (*domain.LineResolutionResult, error) {
+	item, minted, err := cmd.loadWinnerBySupplierSKU(ctx, partyID, seller)
+	if err != nil {
+		return nil, err
+	}
+	result := domain.LinkedByProvisionalMint(item.ID, minted, suggestions)
+	return &result, nil
 }
 
 func (cmd *ResolveInvoiceLineCommand) loadWinnerBySupplierSKU(ctx context.Context, partyID, code string) (*domain.Item, bool, error) {
@@ -184,16 +268,22 @@ func (cmd *ResolveInvoiceLineCommand) loadWinnerBySupplierSKU(ctx context.Contex
 	return won, false, nil
 }
 
+func aliasOwnedBy(itemID string) error {
+	return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists for another item").
+		WithMeta("item_id", itemID)
+}
+
+func conflictIDsFromErr(err error) []string {
+	var appErr *appErrors.AppError
+	if errors.As(err, &appErr) && appErr.Meta != nil {
+		if id, ok := appErr.Meta["item_id"].(string); ok && id != "" {
+			return []string{id}
+		}
+	}
+	return nil
+}
+
 func isConflict(err error) bool {
 	var appErr *appErrors.AppError
 	return errors.As(err, &appErr) && appErr.Code == appErrors.CodeConflict
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
 }

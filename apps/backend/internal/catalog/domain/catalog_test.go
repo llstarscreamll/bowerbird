@@ -28,14 +28,82 @@ func TestNewProvisionalItem(t *testing.T) {
 
 func TestNewSupplierSKUAlias(t *testing.T) {
 	now := time.Now().UTC()
-	alias, err := NewSupplierSKUAlias("A1", "ITEM-1", "P1", "  SKU  ", now)
+	alias, err := NewSupplierSKUAlias("A1", "ITEM-1", "P1", "  SKU  ", AliasSourceInvoice, now)
 	require.NoError(t, err)
 	assert.Equal(t, AliasSchemeSupplierSKU, alias.Scheme)
 	assert.Equal(t, "SKU", alias.Value)
+	assert.Equal(t, AliasSourceInvoice, alias.Source)
 	require.NotNil(t, alias.PartyID)
 	assert.Equal(t, "P1", *alias.PartyID)
 	assert.True(t, alias.PointsTo("ITEM-1"))
 	assert.False(t, alias.PointsTo("OTHER"))
+
+	_, err = NewSupplierSKUAlias("A2", "ITEM-1", "", "SKU", AliasSourceManual, now)
+	assert.ErrorIs(t, err, ErrMissingAliasParty)
+}
+
+func TestNewGTINAlias(t *testing.T) {
+	now := time.Now().UTC()
+	alias, err := NewGTINAlias("A1", "ITEM-1", "7701234567890", AliasSourceManual, now)
+	require.NoError(t, err)
+	assert.Equal(t, AliasSchemeGTIN, alias.Scheme)
+	assert.Equal(t, "7701234567890", alias.Value)
+	assert.Nil(t, alias.PartyID)
+
+	_, err = NewGTINAlias("A2", "ITEM-1", "MGND3LA/A", AliasSourceManual, now)
+	assert.ErrorIs(t, err, ErrInvalidGTIN)
+}
+
+func TestParseGTINAndSellerUsable(t *testing.T) {
+	_, ok := ClassifyGTIN("7701234567890")
+	assert.True(t, ok)
+	_, ok = ClassifyGTIN(" 7701 234567890 ")
+	assert.True(t, ok)
+	_, ok = ClassifyGTIN("MGND3LA/A")
+	assert.False(t, ok)
+	_, ok = ClassifyGTIN("123")
+	assert.False(t, ok)
+
+	for _, raw := range []string{"12345678", "123456789012", "7701234567890", "12345678901234"} {
+		_, ok := ClassifyGTIN(raw)
+		assert.True(t, ok, raw)
+	}
+
+	assert.True(t, ParseSellerSKU("ABC-1").Usable())
+	assert.True(t, SellerSKUUsable("ABC-1"))
+	assert.False(t, ParseSellerSKU("1").Usable())
+	assert.False(t, SellerSKUUsable("1"))
+	assert.False(t, SellerSKUUsable("01"))
+	assert.False(t, SellerSKUUsable("001"))
+	assert.False(t, SellerSKUUsable("n/a"))
+	assert.False(t, SellerSKUUsable("na"))
+	assert.False(t, SellerSKUUsable("serv"))
+	assert.False(t, SellerSKUUsable("servicio"))
+	assert.False(t, SellerSKUUsable("item"))
+	assert.False(t, SellerSKUUsable("  "))
+	assert.False(t, SellerSKUUsable("ab"))
+}
+
+func TestHardHitsAgree(t *testing.T) {
+	item, conflict, ids := HardHits{SellerItemID: "A"}.Agree()
+	assert.Equal(t, "A", item)
+	assert.False(t, conflict)
+	assert.Equal(t, []string{"A"}, ids)
+
+	item, conflict, ids = HardHits{BuyerItemID: "A", SellerItemID: "B"}.Agree()
+	assert.Empty(t, item)
+	assert.True(t, conflict)
+	assert.Equal(t, []string{"A", "B"}, ids)
+
+	item, conflict, ids = HardHits{BuyerItemID: "A", GTINItemID: "A", SellerItemID: "A"}.Agree()
+	assert.Equal(t, "A", item)
+	assert.False(t, conflict)
+	assert.Equal(t, []string{"A"}, ids)
+
+	item, conflict, ids = HardHits{}.Agree()
+	assert.Empty(t, item)
+	assert.False(t, conflict)
+	assert.Nil(t, ids)
 }
 
 func TestPreserveLockedLinkAndSoftStatus(t *testing.T) {
@@ -51,6 +119,10 @@ func TestPreserveLockedLinkAndSoftStatus(t *testing.T) {
 	assert.Equal(t, LinkStatusSuggested, SoftOrUnmatchedStatus([]Suggestion{{ItemID: "I"}}))
 	assert.True(t, CanMintProvisional("P", "SKU"))
 	assert.False(t, CanMintProvisional("", "SKU"))
+	assert.False(t, CanMintProvisional("P", "1"))
+	conflict := LinkedByHardConflict([]string{"A", "B"})
+	assert.Equal(t, LinkStatusSuggested, conflict.Status)
+	assert.Equal(t, SuggestionReasonHardConflict, conflict.Suggestions[0].Reason)
 }
 
 func TestNewMatchMemory(t *testing.T) {

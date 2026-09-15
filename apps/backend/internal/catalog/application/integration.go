@@ -13,8 +13,7 @@ type invoiceSupport struct {
 	resolve  *commands.ResolveInvoiceLineCommand
 	validate *commands.ValidateCatalogItemCommand
 	mint     *commands.MintProvisionalFromEvidenceCommand
-	alias    *commands.EnsureSupplierAliasCommand
-	memory   *commands.RecordMatchMemoryCommand
+	remember *commands.RememberDecisionCommand
 	names    *queries.GetItemNamesQuery
 	displays *queries.GetItemDisplaysQuery
 }
@@ -32,11 +31,8 @@ func NewInvoiceSupport(app *Application) api.InvoiceSupport {
 	if app.Commands.MintProvisionalFromEvidence == nil {
 		panic("mint provisional command is required")
 	}
-	if app.Commands.EnsureSupplierAlias == nil {
-		panic("ensure supplier alias command is required")
-	}
-	if app.Commands.RecordMatchMemory == nil {
-		panic("record match memory command is required")
+	if app.Commands.RememberDecision == nil {
+		panic("remember decision command is required")
 	}
 	if app.Queries.GetItemNames == nil {
 		panic("get item names query is required")
@@ -48,8 +44,7 @@ func NewInvoiceSupport(app *Application) api.InvoiceSupport {
 		resolve:  app.Commands.ResolveInvoiceLine,
 		validate: app.Commands.ValidateCatalogItem,
 		mint:     app.Commands.MintProvisionalFromEvidence,
-		alias:    app.Commands.EnsureSupplierAlias,
-		memory:   app.Commands.RecordMatchMemory,
+		remember: app.Commands.RememberDecision,
 		names:    app.Queries.GetItemNames,
 		displays: app.Queries.GetItemDisplays,
 	}
@@ -59,7 +54,9 @@ func (s *invoiceSupport) ResolveLine(ctx context.Context, input api.LineResolveI
 	result, err := s.resolve.Execute(ctx, domain.LineResolutionInput{
 		LineID:         input.LineID,
 		PartyID:        input.PartyID,
-		ItemCode:       input.ItemCode,
+		BuyerCode:      input.BuyerCode,
+		SellerSKU:      input.SellerSKU,
+		GTIN:           input.GTIN,
 		Description:    input.Description,
 		ExistingItemID: input.ExistingItemID,
 		ExistingLocked: input.ExistingLocked,
@@ -95,19 +92,17 @@ func (s *invoiceSupport) ValidateItemExists(ctx context.Context, itemID string) 
 func (s *invoiceSupport) MintProvisionalFromEvidence(ctx context.Context, input api.MintFromEvidenceInput) (string, error) {
 	return s.mint.Execute(ctx, commands.MintProvisionalFromEvidenceInput{
 		PartyID:     input.PartyID,
-		ItemCode:    input.ItemCode,
+		SellerSKU:   input.SellerSKU,
+		GTIN:        input.GTIN,
 		Description: input.Description,
 	})
 }
 
-func (s *invoiceSupport) EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error {
-	return s.alias.Execute(ctx, partyID, itemCode, itemID)
-}
-
-func (s *invoiceSupport) RecordMatchMemory(ctx context.Context, input api.MatchMemoryInput) error {
-	return s.memory.Execute(ctx, commands.RecordMatchMemoryInput{
+func (s *invoiceSupport) RememberDecision(ctx context.Context, input api.RememberDecisionInput) error {
+	return s.remember.Execute(ctx, commands.RememberDecisionInput{
 		PartyID:     input.PartyID,
-		ItemCode:    input.ItemCode,
+		SellerSKU:   input.SellerSKU,
+		GTIN:        input.GTIN,
 		Description: input.Description,
 		Action:      input.Action,
 		ItemID:      input.ItemID,

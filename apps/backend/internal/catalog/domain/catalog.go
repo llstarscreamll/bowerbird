@@ -13,6 +13,11 @@ var (
 	ErrItemIDRequired      = errors.New("item id is required for link")
 	ErrMissingItemName     = errors.New("missing catalog item name")
 	ErrMissingAliasValue   = errors.New("missing alias value")
+	ErrMissingAliasParty   = errors.New("supplier sku alias requires a party")
+	ErrInvalidAliasSource  = errors.New("invalid alias source")
+	ErrInvalidAliasScheme  = errors.New("invalid alias scheme")
+	ErrInvalidGTIN         = errors.New("invalid gtin")
+	ErrGTINMustBeUnscoped  = errors.New("gtin alias must not have a party")
 )
 
 const (
@@ -29,6 +34,12 @@ const (
 	CreationSourceImport  = "import"
 
 	AliasSchemeSupplierSKU = "supplier_sku"
+	AliasSchemeGTIN        = "gtin"
+
+	AliasSourceInvoice = "invoice"
+	AliasSourceManual  = "manual"
+
+	SuggestionReasonHardConflict = "hard_conflict"
 
 	LinkStatusUnmatched = "unmatched"
 	LinkStatusSuggested = "suggested"
@@ -92,19 +103,30 @@ func (i Item) IsProvisional() bool {
 	return i.Status == StatusProvisional
 }
 
-// Alias maps an external code (e.g. supplier SKU) onto an Item.
+// Alias maps an external code (e.g. supplier SKU or GTIN) onto an Item.
 type Alias struct {
 	ID        string
 	ItemID    string
 	Scheme    string
 	PartyID   *string
 	Value     string
+	Source    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
+func ParseAliasSource(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	switch v {
+	case AliasSourceInvoice, AliasSourceManual:
+		return v, nil
+	default:
+		return "", ErrInvalidAliasSource
+	}
+}
+
 // NewSupplierSKUAlias creates a hard supplier_sku alias scoped to a party.
-func NewSupplierSKUAlias(id, itemID, partyID, code string, now time.Time) (Alias, error) {
+func NewSupplierSKUAlias(id, itemID, partyID, code, source string, now time.Time) (Alias, error) {
 	value := NormalizeItemCode(code)
 	if value == "" {
 		return Alias{}, ErrMissingAliasValue
@@ -112,18 +134,48 @@ func NewSupplierSKUAlias(id, itemID, partyID, code string, now time.Time) (Alias
 	if strings.TrimSpace(itemID) == "" {
 		return Alias{}, ErrItemIDRequired
 	}
-	now = now.UTC()
 	party := strings.TrimSpace(partyID)
-	var partyPtr *string
-	if party != "" {
-		partyPtr = &party
+	if party == "" {
+		return Alias{}, ErrMissingAliasParty
 	}
+	src, err := ParseAliasSource(source)
+	if err != nil {
+		return Alias{}, err
+	}
+	now = now.UTC()
 	return Alias{
 		ID:        id,
 		ItemID:    itemID,
 		Scheme:    AliasSchemeSupplierSKU,
-		PartyID:   partyPtr,
+		PartyID:   &party,
 		Value:     value,
+		Source:    src,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
+}
+
+// NewGTINAlias creates an unscoped gtin alias.
+func NewGTINAlias(id, itemID, raw, source string, now time.Time) (Alias, error) {
+	gtin, err := ParseGTIN(raw)
+	if err != nil {
+		return Alias{}, err
+	}
+	if strings.TrimSpace(itemID) == "" {
+		return Alias{}, ErrItemIDRequired
+	}
+	src, err := ParseAliasSource(source)
+	if err != nil {
+		return Alias{}, err
+	}
+	now = now.UTC()
+	return Alias{
+		ID:        id,
+		ItemID:    itemID,
+		Scheme:    AliasSchemeGTIN,
+		PartyID:   nil,
+		Value:     gtin.String(),
+		Source:    src,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -215,7 +267,9 @@ type Suggestion struct {
 type LineResolutionInput struct {
 	LineID      string
 	PartyID     string
-	ItemCode    string
+	BuyerCode   string
+	SellerSKU   string
+	GTIN        string
 	Description string
 	// Existing link state (from DB) for lock / reprocess.
 	ExistingItemID string
@@ -300,9 +354,25 @@ func FilterBlockedSuggestions(suggestions []Suggestion, blockedItemID *string) [
 	return out
 }
 
-// CanMintProvisional encodes the analytics-first mint gate: party + non-empty code.
-func CanMintProvisional(partyID, itemCode string) bool {
-	return strings.TrimSpace(partyID) != "" && NormalizeItemCode(itemCode) != ""
+// CanMintProvisional encodes the mint gate: party + usable seller SKU.
+func CanMintProvisional(partyID, sellerSKU string) bool {
+	return strings.TrimSpace(partyID) != "" && SellerSKUUsable(sellerSKU)
+}
+
+// LinkedByHardConflict is the outcome when hard identity hits disagree.
+func LinkedByHardConflict(itemIDs []string) LineResolutionResult {
+	suggestions := make([]Suggestion, 0, len(itemIDs))
+	for _, id := range itemIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		suggestions = append(suggestions, Suggestion{ItemID: id, Score: 1, Reason: SuggestionReasonHardConflict})
+	}
+	return LineResolutionResult{
+		Status:      LinkStatusSuggested,
+		Suggestions: suggestions,
+	}
 }
 
 func NormalizeItemCode(code string) string {
