@@ -2,5 +2,6 @@
 node = "24"
 go = "1.25"
 pnpm = "11.5"
+turbo = "2.9"
 air = "latest"
 pulumi = "latest"
