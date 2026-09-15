@@ -18,6 +18,10 @@ func (c fakeClient) GetMessage(ctx context.Context, userID, messageID string) (*
 	return nil, nil
 }
 
+func (c fakeClient) GetMessageMetadata(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+	return nil, nil
+}
+
 func (c fakeClient) DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error) {
 	return nil, nil
 }

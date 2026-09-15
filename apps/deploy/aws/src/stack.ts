@@ -111,7 +111,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     {
       name: `${prefix}-jobs`,
       sqsManagedSseEnabled: true,
-      visibilityTimeoutSeconds: 360,
+      visibilityTimeoutSeconds: 1080,
       redrivePolicy: jobsDlq.arn.apply((arn) => JSON.stringify({ deadLetterTargetArn: arn, maxReceiveCount: 5 })),
     },
     awsOpts,
@@ -223,7 +223,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     includeMigrations: true,
   });
   const jobsFn = goLambda(cfg, prefix, 'sqs', 'jobs', key, secretsParam, lambdaDlq, lambdaEnv, afterSchema, {
-    timeout: 60,
+    timeout: 900,
     memory: 1024,
     ephemeralMb: 1024,
     extraStatements: [s3ObjectsPolicy(objectsBucket.arn), sqsConsume(jobsQueue.arn), kmsDecrypt(key.arn)],
@@ -249,7 +249,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     {
       eventSourceArn: jobsQueue.arn,
       functionName: jobsFn.name,
-      batchSize: 10,
+      batchSize: 1,
     },
     awsOpts,
   );

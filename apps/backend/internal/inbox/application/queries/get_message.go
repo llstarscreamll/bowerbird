@@ -3,6 +3,7 @@ package queries
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/bowerbird/internal/inbox/application/ports"
 	"github.com/bowerbird/internal/inbox/domain"
@@ -39,6 +40,10 @@ type MessageDetail struct {
 	HasPDF           bool                       `json:"has_pdf"`
 	Attachments      []MessageAttachmentSummary `json:"attachments,omitempty"`
 	ProviderMessage  *domain.MailMessage        `json:"provider_message,omitempty"`
+}
+
+func (d *MessageDetail) HasBody() bool {
+	return d != nil && (strings.TrimSpace(d.BodyText) != "" || strings.TrimSpace(d.BodyHTML) != "")
 }
 
 type GetMessageQuery struct {

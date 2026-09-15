@@ -8,6 +8,7 @@ var (
 	ErrInboxMessageIDRequired             = errors.New("inbox message ID is required")
 	ErrInboxMessageConnectionIDRequired   = errors.New("inbox message connection ID is required")
 	ErrInboxMessageProviderIDRequired     = errors.New("inbox message provider ID is required")
+	ErrInboxMessageProviderMismatch       = errors.New("inbox message provider ID mismatch")
 	ErrMessageAttachmentIDRequired        = errors.New("message attachment ID is required")
 	ErrMessageAttachmentMessageIDRequired = errors.New("message attachment message ID is required")
 	ErrMessageAttachmentFilenameRequired  = errors.New("message attachment filename is required")

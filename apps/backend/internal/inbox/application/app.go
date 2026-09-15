@@ -16,6 +16,7 @@ type Commands struct {
 	ModifyMessage      *commands.ModifyMessageCommand
 	SendMessage        *commands.SendMessageCommand
 	DownloadAttachment *commands.DownloadAttachmentCommand
+	HydrateMessage     *commands.HydrateMessageCommand
 }
 
 type Queries struct {

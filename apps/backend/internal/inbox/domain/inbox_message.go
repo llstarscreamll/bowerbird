@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"encoding/json"
+	"strings"
+	"time"
+)
 
 type MessageSyncStatus string
 
@@ -96,6 +100,7 @@ func (m *InboxMessage) CreatedAt() time.Time          { return m.createdAt }
 func (m *InboxMessage) UpdatedAt() time.Time          { return m.updatedAt }
 func (m *InboxMessage) SyncStatus() MessageSyncStatus { return m.syncStatus }
 func (m *InboxMessage) ReceivedAt() *time.Time        { return m.receivedAt }
+func (m *InboxMessage) RawData() []byte               { return append([]byte(nil), m.rawData...) }
 
 func (m *InboxMessage) Snapshot() InboxMessageSnapshot {
 	return InboxMessageSnapshot{
@@ -183,6 +188,57 @@ func (m *InboxMessage) MoveToTrash(now time.Time) {
 	m.updatedAt = now.UTC()
 }
 
+func (m *InboxMessage) ApplyProviderFlags(labelIDs []string, now time.Time) {
+	flags := FlagsFromProviderLabels(labelIDs)
+	m.folder = flags.Folder
+	m.isRead = flags.IsRead
+	m.isStarred = flags.IsStarred
+	m.isDraft = flags.IsDraft
+	m.updatedAt = now.UTC()
+}
+
+func (m *InboxMessage) HasFullContent() bool {
+	if len(m.rawData) == 0 {
+		return false
+	}
+	var parsed MailMessage
+	if err := json.Unmarshal(m.rawData, &parsed); err != nil {
+		return false
+	}
+	return parsed.HasFullContent()
+}
+
+func (m *InboxMessage) ApplyProviderMessage(provider *MailMessage, rawData []byte, now time.Time) error {
+	if m == nil {
+		return ErrInboxMessageIDRequired
+	}
+	if provider == nil || strings.TrimSpace(provider.ID) == "" {
+		return ErrInboxMessageProviderIDRequired
+	}
+	if m.providerMessageID != "" && m.providerMessageID != provider.ID {
+		return ErrInboxMessageProviderMismatch
+	}
+
+	flags := FlagsFromProviderLabels(provider.LabelIDs)
+	m.providerMessageID = provider.ID
+	m.providerThreadID = optionalStringPointer(provider.ThreadID)
+	m.subject = optionalStringPointer(provider.Subject)
+	m.senderEmail = optionalStringPointer(provider.Sender)
+	m.toEmails = firstNonEmptyStrings(provider.To, ParseAddressList(headerValueFromMail(provider, "to")))
+	m.ccEmails = firstNonEmptyStrings(provider.Cc, ParseAddressList(headerValueFromMail(provider, "cc")))
+	m.bccEmails = firstNonEmptyStrings(provider.Bcc, ParseAddressList(headerValueFromMail(provider, "bcc")))
+	m.snippet = optionalStringPointer(provider.Snippet)
+	m.folder = flags.Folder
+	m.isRead = flags.IsRead
+	m.isStarred = flags.IsStarred
+	m.isDraft = flags.IsDraft
+	m.receivedAt = provider.ReceivedAt
+	m.syncStatus = MessageSyncStatusSynced
+	m.rawData = append([]byte(nil), rawData...)
+	m.updatedAt = now.UTC()
+	return nil
+}
+
 func NewInboxMessageAsSynced(input NewInboxMessageInput) (*InboxMessage, error) {
 	if input.ID == "" {
 		return nil, ErrInboxMessageIDRequired
@@ -227,28 +283,20 @@ func NewInboxMessageFromProvider(input NewInboxMessageFromProviderInput) (*Inbox
 		return nil, ErrInboxMessageProviderIDRequired
 	}
 
-	flags := FlagsFromProviderLabels(input.ProviderMessage.LabelIDs)
-
-	return NewInboxMessageAsSynced(NewInboxMessageInput{
+	message, err := NewInboxMessageAsSynced(NewInboxMessageInput{
 		ID:                input.ID,
 		ConnectionID:      input.ConnectionID,
 		ProviderMessageID: input.ProviderMessage.ID,
-		ProviderThreadID:  optionalStringPointer(input.ProviderMessage.ThreadID),
-		Subject:           optionalStringPointer(input.ProviderMessage.Subject),
-		SenderEmail:       optionalStringPointer(input.ProviderMessage.Sender),
-		ToEmails:          firstNonEmptyStrings(input.ProviderMessage.To, ParseAddressList(headerValueFromMail(input.ProviderMessage, "to"))),
-		CcEmails:          firstNonEmptyStrings(input.ProviderMessage.Cc, ParseAddressList(headerValueFromMail(input.ProviderMessage, "cc"))),
-		BccEmails:         firstNonEmptyStrings(input.ProviderMessage.Bcc, ParseAddressList(headerValueFromMail(input.ProviderMessage, "bcc"))),
-		Snippet:           optionalStringPointer(input.ProviderMessage.Snippet),
-		Folder:            flags.Folder,
-		IsRead:            flags.IsRead,
-		IsStarred:         flags.IsStarred,
-		IsDraft:           flags.IsDraft,
-		ReceivedAt:        input.ProviderMessage.ReceivedAt,
-		RawData:           input.RawData,
 		CreatedAt:         input.CreatedAt,
 		UpdatedAt:         input.UpdatedAt,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if err := message.ApplyProviderMessage(input.ProviderMessage, input.RawData, input.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return message, nil
 }
 
 func optionalStringPointer(value string) *string {

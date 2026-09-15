@@ -2,7 +2,8 @@ package domain
 
 import "time"
 
-// MessageSynced is a domain event raised when a new inbox message is first persisted.
+// MessageSynced is a domain event raised when a message first has full content
+// for invoice capture (new full persist or hydrate of a metadata stub).
 type MessageSynced struct {
 	EventID           string
 	OccurredAt        time.Time
@@ -40,6 +41,18 @@ func (m *InboxMessage) NotificationAfterPersist(inserted bool, ctx SyncNotificat
 	if !inserted {
 		return nil, nil
 	}
+	return m.messageSyncedEvent(ctx)
+}
+
+// NotificationAfterCapture returns a domain event when this message first has full content.
+func (m *InboxMessage) NotificationAfterCapture(priorHadFullContent bool, ctx SyncNotificationContext) (*MessageSynced, error) {
+	if !m.HasFullContent() || priorHadFullContent {
+		return nil, nil
+	}
+	return m.messageSyncedEvent(ctx)
+}
+
+func (m *InboxMessage) messageSyncedEvent(ctx SyncNotificationContext) (*MessageSynced, error) {
 	if ctx.ProviderMessage == nil {
 		return nil, ErrInboxMessageProviderIDRequired
 	}

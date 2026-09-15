@@ -65,6 +65,7 @@ func TestSendMessageRequiresRecipient(t *testing.T) {
 func TestGetMessageExtractsHeadersAndAttachments(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.True(t, strings.HasPrefix(r.URL.Path, "/gmail/v1/users/me/messages/"))
+		assert.Equal(t, "full", r.URL.Query().Get("format"))
 
 		_, _ = w.Write([]byte(`{
 			"id":"m1",
@@ -343,6 +344,55 @@ func TestListHistoryFollowsNextPageToken(t *testing.T) {
 	}
 	assert.Equal(t, domain.HistoryChangeAdded, got["m1"])
 	assert.Equal(t, domain.HistoryChangeAdded, got["m2"])
+}
+
+func TestGetMessageMetadataUsesMetadataFormat(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "metadata", r.URL.Query().Get("format"))
+		assert.Contains(t, r.URL.Query()["metadataHeaders"], "Subject")
+		_, _ = w.Write([]byte(`{"id":"m1","snippet":"hi","payload":{"headers":[{"name":"Subject","value":"Hello"}]}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client())
+	client.SetBaseURL(server.URL)
+	msg, err := client.GetMessageMetadata(context.Background(), "me", "m1")
+	require.NoError(t, err)
+	assert.Equal(t, "Hello", msg.Subject)
+	assert.Empty(t, msg.PlainTextBody)
+}
+
+func TestDoRetriesRateLimitedList(t *testing.T) {
+	gmailBackoffBase = time.Millisecond
+	gmailBackoffMax = 8 * time.Millisecond
+	gmailBackoffJitterMax = 0
+	t.Cleanup(func() {
+		gmailBackoffBase = time.Second
+		gmailBackoffMax = 32 * time.Second
+		gmailBackoffJitterMax = time.Second
+	})
+
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":{"code":403,"errors":[{"reason":"rateLimitExceeded"}],"message":"Quota exceeded"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"messages":[]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client())
+	client.SetBaseURL(server.URL)
+	_, _, err := client.ListMessages(context.Background(), domain.ListMessagesOptions{UserID: "me"})
+	require.NoError(t, err)
+	assert.Equal(t, 3, attempts)
+}
+
+func TestGmailPaceMatchesPerUserBudget(t *testing.T) {
+	assert.Equal(t, 250*time.Millisecond, gmailPace(gmailGetCost))
 }
 
 func loadFixture(t *testing.T, fileName string) string {

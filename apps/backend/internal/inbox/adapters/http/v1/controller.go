@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,38 +20,41 @@ import (
 )
 
 type Controller struct {
-	listAccountSyncStatusQuery *inboxQueries.ListAccountHealthQuery
-	listMessagesUseCase        *inboxQueries.ListMessagesQuery
-	getMessageQuery            *inboxQueries.GetMessageQuery
-	syncAllAccountsCommand     *inboxCommands.SyncAllAccountsCommand
-	modifyMessageCommand       *inboxCommands.ModifyMessageCommand
-	sendMessageCommand         *inboxCommands.SendMessageCommand
-	downloadAttachmentCommand  *inboxCommands.DownloadAttachmentCommand
-	features                   entitlementsapi.Features
+	listAccountHealthQuery    *inboxQueries.ListAccountHealthQuery
+	listMessagesQuery         *inboxQueries.ListMessagesQuery
+	getMessageQuery           *inboxQueries.GetMessageQuery
+	syncAllAccountsCommand    *inboxCommands.SyncAllAccountsCommand
+	modifyMessageCommand      *inboxCommands.ModifyMessageCommand
+	sendMessageCommand        *inboxCommands.SendMessageCommand
+	downloadAttachmentCommand *inboxCommands.DownloadAttachmentCommand
+	hydrateMessageCommand     *inboxCommands.HydrateMessageCommand
+	features                  entitlementsapi.Features
 }
 
 func NewController(
-	listAccountHealthUseCase *inboxQueries.ListAccountHealthQuery,
-	listMessagesUseCase *inboxQueries.ListMessagesQuery,
-	getMessageUseCase *inboxQueries.GetMessageQuery,
+	listAccountHealthQuery *inboxQueries.ListAccountHealthQuery,
+	listMessagesQuery *inboxQueries.ListMessagesQuery,
+	getMessageQuery *inboxQueries.GetMessageQuery,
 	syncAllAccountsCommand *inboxCommands.SyncAllAccountsCommand,
 	modifyMessageCommand *inboxCommands.ModifyMessageCommand,
 	sendMessageCommand *inboxCommands.SendMessageCommand,
 	downloadAttachmentCommand *inboxCommands.DownloadAttachmentCommand,
+	hydrateMessageCommand *inboxCommands.HydrateMessageCommand,
 	features entitlementsapi.Features,
 ) *Controller {
 	if features == nil {
 		panic("feature checker is required")
 	}
 	return &Controller{
-		listAccountSyncStatusQuery: listAccountHealthUseCase,
-		listMessagesUseCase:        listMessagesUseCase,
-		getMessageQuery:            getMessageUseCase,
-		syncAllAccountsCommand:     syncAllAccountsCommand,
-		modifyMessageCommand:       modifyMessageCommand,
-		sendMessageCommand:         sendMessageCommand,
-		downloadAttachmentCommand:  downloadAttachmentCommand,
-		features:                   features,
+		listAccountHealthQuery:    listAccountHealthQuery,
+		listMessagesQuery:         listMessagesQuery,
+		getMessageQuery:           getMessageQuery,
+		syncAllAccountsCommand:    syncAllAccountsCommand,
+		modifyMessageCommand:      modifyMessageCommand,
+		sendMessageCommand:        sendMessageCommand,
+		downloadAttachmentCommand: downloadAttachmentCommand,
+		hydrateMessageCommand:     hydrateMessageCommand,
+		features:                  features,
 	}
 }
 
@@ -92,7 +96,7 @@ func (c *Controller) ListAccountSyncStatus(w http.ResponseWriter, r *http.Reques
 		return err
 	}
 
-	statuses, err := c.listAccountSyncStatusQuery.Execute(r.Context())
+	statuses, err := c.listAccountHealthQuery.Execute(r.Context())
 	if err != nil {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to list account sync statuses")
 	}
@@ -119,7 +123,7 @@ func (c *Controller) ListMessages(w http.ResponseWriter, r *http.Request) error 
 	offset, _ := strconv.Atoi(query.Get("offset"))
 	onlyInvoices := query.Get("only_invoices") == "true" || query.Get("only_invoices") == "1"
 
-	result, err := c.listMessagesUseCase.Execute(r.Context(), ports.ListMessagesFilter{
+	result, err := c.listMessagesQuery.Execute(r.Context(), ports.ListMessagesFilter{
 		ViewerUserID: claims.UserID,
 		AccountID:    query.Get("account_id"),
 		Folder:       query.Get("folder"),
@@ -157,6 +161,19 @@ func (c *Controller) GetMessage(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to get message")
+	}
+
+	if c.hydrateMessageCommand != nil && !message.HasBody() {
+		if hydrateErr := c.hydrateMessageCommand.Execute(r.Context(), messageID); hydrateErr != nil {
+			slog.Warn("inbox.hydrate failed", "message_id", messageID, "error", hydrateErr)
+		} else {
+			hydrated, queryErr := c.getMessageQuery.Execute(r.Context(), messageID, claims.UserID)
+			if queryErr != nil {
+				slog.Warn("inbox.hydrate reload failed", "message_id", messageID, "error", queryErr)
+			} else {
+				message = hydrated
+			}
+		}
 	}
 
 	return api.Success(w, http.StatusOK, message)

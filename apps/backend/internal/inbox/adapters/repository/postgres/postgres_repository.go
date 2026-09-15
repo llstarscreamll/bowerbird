@@ -27,7 +27,7 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 	}
 
 	query := `
-			SELECT connection_id, last_synced_at, last_error, status, history_id
+			SELECT connection_id, last_synced_at, last_error, status, history_id, list_page_token
 			FROM inbox_sync_cursors
 			WHERE connection_id = $1
 		`
@@ -39,6 +39,7 @@ func (r *PostgresRepository) GetSyncCursor(ctx context.Context, connectionID str
 		&snapshot.LastError,
 		&status,
 		&snapshot.HistoryID,
+		&snapshot.ListPageToken,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -63,15 +64,25 @@ func (r *PostgresRepository) UpsertSyncCursor(ctx context.Context, cursor *domai
 
 	snapshot := cursor.Snapshot()
 	query := `
-			INSERT INTO inbox_sync_cursors (connection_id, last_synced_at, last_error, status, history_id)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO inbox_sync_cursors (connection_id, last_synced_at, last_error, status, history_id, list_page_token)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (connection_id) DO UPDATE SET
 				last_synced_at = EXCLUDED.last_synced_at,
 				last_error = EXCLUDED.last_error,
 				status = EXCLUDED.status,
-				history_id = EXCLUDED.history_id
+				history_id = EXCLUDED.history_id,
+				list_page_token = EXCLUDED.list_page_token
 		`
-	_, err = pool.Exec(ctx, query, snapshot.ConnectionID, snapshot.LastSyncedAt, snapshot.LastError, snapshot.Status.String(), snapshot.HistoryID)
+	_, err = pool.Exec(
+		ctx,
+		query,
+		snapshot.ConnectionID,
+		snapshot.LastSyncedAt,
+		snapshot.LastError,
+		snapshot.Status.String(),
+		snapshot.HistoryID,
+		snapshot.ListPageToken,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to upsert sync cursor: %w", err)
 	}
@@ -487,6 +498,54 @@ func (r *PostgresRepository) GetInboxMessageByID(ctx context.Context, messageID 
 			return nil, domain.ErrInboxMessageNotFound
 		}
 		return nil, fmt.Errorf("failed to get inbox message: %w", err)
+	}
+	snapshot.Folder = domain.MailFolder(folder)
+	snapshot.SyncStatus = domain.MessageSyncStatus(status)
+	return domain.RehydrateInboxMessage(snapshot), nil
+}
+
+func (r *PostgresRepository) GetInboxMessageByProviderID(ctx context.Context, accountID, providerMessageID string) (*domain.InboxMessage, error) {
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	query := `
+		SELECT id, account_id, provider_message_id, provider_thread_id, subject, sender_email,
+			snippet, to_emails, cc_emails, bcc_emails, folder, is_read, is_starred, is_draft,
+			received_at, sync_status, raw_data, created_at, updated_at
+		FROM email_messages
+		WHERE account_id = $1 AND provider_message_id = $2
+	`
+	var snapshot domain.InboxMessageSnapshot
+	var status string
+	var folder string
+	err = pool.QueryRow(ctx, query, accountID, providerMessageID).Scan(
+		&snapshot.ID,
+		&snapshot.ConnectionID,
+		&snapshot.ProviderMessageID,
+		&snapshot.ProviderThreadID,
+		&snapshot.Subject,
+		&snapshot.SenderEmail,
+		&snapshot.Snippet,
+		&snapshot.ToEmails,
+		&snapshot.CcEmails,
+		&snapshot.BccEmails,
+		&folder,
+		&snapshot.IsRead,
+		&snapshot.IsStarred,
+		&snapshot.IsDraft,
+		&snapshot.ReceivedAt,
+		&status,
+		&snapshot.RawData,
+		&snapshot.CreatedAt,
+		&snapshot.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInboxMessageNotFound
+		}
+		return nil, fmt.Errorf("failed to get inbox message by provider id: %w", err)
 	}
 	snapshot.Folder = domain.MailFolder(folder)
 	snapshot.SyncStatus = domain.MessageSyncStatus(status)

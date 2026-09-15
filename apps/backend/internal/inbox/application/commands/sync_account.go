@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -39,14 +40,23 @@ type SyncAccountCommand struct {
 	fileStore          platformStorage.FileStore
 	unitOfWork         UnitOfWorkRunner
 	idGenerator        func() string
+	logger             *slog.Logger
 	syncMu             sync.Mutex
 	syncInFlight       map[string]struct{}
 	syncCooldownUntil  map[string]time.Time
 	// config
 	perMessageTimeout  time.Duration
+	runBudget          time.Duration
+	maxMessagesPerRun  int
 	maxRawMessageBytes int
 	maxAttachmentBytes int64
 }
+
+const (
+	defaultSyncRunBudget = 12 * time.Minute
+	syncYieldReserve     = 20 * time.Second
+	minWorkRemaining     = 5 * time.Second
+)
 
 type SyncAccountCommandInput struct {
 	AccountID string
@@ -98,9 +108,11 @@ func NewSyncAccountCommand(
 		fileStore:          fileStore,
 		unitOfWork:         unitOfWork,
 		idGenerator:        id.NewULID,
+		logger:             slog.Default(),
 		syncInFlight:       map[string]struct{}{},
 		syncCooldownUntil:  map[string]time.Time{},
-		perMessageTimeout:  60 * time.Second,
+		perMessageTimeout:  20 * time.Second,
+		runBudget:          defaultSyncRunBudget,
 		maxRawMessageBytes: 128 * 1024 * 1024, // 128MB
 		maxAttachmentBytes: 128 * 1024 * 1024, // 128MB
 	}
@@ -239,14 +251,25 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 		return fmt.Errorf("build provider client: %w", err)
 	}
 
+	deadline := c.syncDeadline(ctx, time.Now())
+	complete := false
 	if cursor.HistoryID() != "" {
-		if err := c.syncAccountFromHistory(ctx, tenantID, account, cursor, mailClient); err != nil {
-			return err
-		}
+		complete, err = c.syncAccountFromHistory(ctx, tenantID, account, cursor, mailClient, deadline)
 	} else {
-		if err := c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient); err != nil {
-			return err
-		}
+		complete, err = c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient, deadline)
+	}
+	if err != nil {
+		return err
+	}
+	if !complete {
+		c.logger.Info("inbox.sync yielded",
+			"tenant_id", tenantID,
+			"account_id", account.ID,
+			"list_page_token", cursor.ListPageToken(),
+			"history_id", cursor.HistoryID(),
+		)
+		cursor.MarkSyncYielded()
+		return c.cursorRepo.UpsertSyncCursor(ctx, cursor)
 	}
 
 	historyID, histErr := mailClient.GetHistoryID(ctx, "me")
@@ -259,12 +282,32 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 	return c.cursorRepo.UpsertSyncCursor(ctx, cursor)
 }
 
+func (c *SyncAccountCommand) syncDeadline(ctx context.Context, started time.Time) time.Time {
+	budget := c.runBudget
+	if budget <= 0 {
+		budget = defaultSyncRunBudget
+	}
+	deadline := started.Add(budget)
+	if dl, ok := ctx.Deadline(); ok {
+		reserved := dl.Add(-syncYieldReserve)
+		if reserved.Before(deadline) {
+			deadline = reserved
+		}
+	}
+	return deadline
+}
+
+func shouldYieldSync(deadline time.Time) bool {
+	return time.Until(deadline) < minWorkRemaining
+}
+
 func (c *SyncAccountCommand) processSingleMessage(
 	ctx context.Context,
 	tenantID string,
 	account connectionsapi.ConnectionInfo,
 	ref domain.MessageRef,
 	client domain.MailProviderClient,
+	forceFull bool,
 ) (retErr error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -272,10 +315,34 @@ func (c *SyncAccountCommand) processSingleMessage(
 		}
 	}()
 
+	existing, err := c.messageRepo.GetInboxMessageByProviderID(ctx, account.ID, ref.ID)
+	if err != nil && !errors.Is(err, domain.ErrInboxMessageNotFound) {
+		return fmt.Errorf("lookup existing message %s: %w", ref.ID, err)
+	}
+	if errors.Is(err, domain.ErrInboxMessageNotFound) {
+		existing = nil
+	}
+	if existing != nil && !forceFull {
+		return nil
+	}
+
 	messageCtx, cancel := context.WithTimeout(ctx, c.perMessageTimeout)
 	defer cancel()
 
-	message, err := client.GetMessage(messageCtx, "me", ref.ID)
+	fetchedFull := forceFull
+	var message *domain.MailMessage
+	if forceFull {
+		message, err = client.GetMessage(messageCtx, "me", ref.ID)
+	} else {
+		message, err = client.GetMessageMetadata(messageCtx, "me", ref.ID)
+		if err != nil {
+			return fmt.Errorf("get provider message metadata %s: %w", ref.ID, err)
+		}
+		if message.NeedsFullContent() {
+			message, err = client.GetMessage(messageCtx, "me", ref.ID)
+			fetchedFull = true
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("get provider message %s: %w", ref.ID, err)
 	}
@@ -293,28 +360,35 @@ func (c *SyncAccountCommand) processSingleMessage(
 	}
 
 	now := time.Now().UTC()
-
-	inboxMessage, err := domain.NewInboxMessageFromProvider(domain.NewInboxMessageFromProviderInput{
-		ID:              c.idGenerator(),
-		ConnectionID:    account.ID,
-		ProviderMessage: message,
-		RawData:         rawData,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-	})
-	if err != nil {
-		return fmt.Errorf("build internal message: %w", err)
+	priorHadFullContent := existing != nil && existing.HasFullContent()
+	var inboxMessage *domain.InboxMessage
+	if existing != nil {
+		inboxMessage = existing
+		if err := inboxMessage.ApplyProviderMessage(message, rawData, now); err != nil {
+			return fmt.Errorf("apply provider message: %w", err)
+		}
+	} else {
+		inboxMessage, err = domain.NewInboxMessageFromProvider(domain.NewInboxMessageFromProviderInput{
+			ID:              c.idGenerator(),
+			ConnectionID:    account.ID,
+			ProviderMessage: message,
+			RawData:         rawData,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		})
+		if err != nil {
+			return fmt.Errorf("build internal message: %w", err)
+		}
 	}
 
 	var attachmentRefs []domain.SyncedAttachmentRef
 	persist := func(ctx context.Context) error {
-		var err error
-		inserted, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage)
+		_, err := c.messageRepo.UpsertInboxMessage(ctx, inboxMessage)
 		if err != nil {
 			return fmt.Errorf("save internal message: %w", err)
 		}
 
-		if len(message.Attachments) > 0 {
+		if fetchedFull && len(message.Attachments) > 0 {
 			attachmentRefs, err = c.syncMessageAttachments(
 				ctx,
 				messageCtx,
@@ -330,10 +404,10 @@ func (c *SyncAccountCommand) processSingleMessage(
 			}
 		}
 
-		if !inserted {
+		if !fetchedFull {
 			return nil
 		}
-		domainEvent, err := inboxMessage.NotificationAfterPersist(inserted, domain.SyncNotificationContext{
+		domainEvent, err := inboxMessage.NotificationAfterCapture(priorHadFullContent, domain.SyncNotificationContext{
 			EventID:         c.idGenerator(),
 			TenantSlug:      tenantID,
 			AccountID:       account.ID,
@@ -515,10 +589,20 @@ func (c *SyncAccountCommand) syncAccountFromList(
 	account connectionsapi.ConnectionInfo,
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
-) error {
+	deadline time.Time,
+) (bool, error) {
 	query := incrementalQuery(cursor.LastSyncedAt())
-	pageToken := ""
+	pageToken := cursor.ListPageToken()
+	processed := 0
 	for {
+		if shouldYieldSync(deadline) || c.hitMessageCap(processed) {
+			cursor.CheckpointListPage(pageToken)
+			if err := c.cursorRepo.UpsertSyncCursor(ctx, cursor); err != nil {
+				return false, fmt.Errorf("checkpoint list page token: %w", err)
+			}
+			return false, nil
+		}
+
 		refs, nextPageToken, err := mailClient.ListMessages(ctx, domain.ListMessagesOptions{
 			UserID:     "me",
 			Query:      query,
@@ -526,26 +610,38 @@ func (c *SyncAccountCommand) syncAccountFromList(
 			MaxResults: 100,
 		})
 		if err != nil {
-			return fmt.Errorf("list provider messages: %w", err)
+			return false, fmt.Errorf("list provider messages: %w", err)
 		}
 
 		for _, ref := range refs {
-			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient); err != nil {
+			if shouldYieldSync(deadline) || c.hitMessageCap(processed) {
+				cursor.CheckpointListPage(pageToken)
+				if err := c.cursorRepo.UpsertSyncCursor(ctx, cursor); err != nil {
+					return false, fmt.Errorf("checkpoint list page token: %w", err)
+				}
+				return false, nil
+			}
+			if err := c.processSingleMessage(ctx, tenantID, account, ref, mailClient, false); err != nil {
 				if errors.Is(err, errPayloadRejected) {
+					processed++
 					continue
 				}
 
-				return err
+				return false, err
 			}
+			processed++
+		}
+
+		cursor.CheckpointListPage(nextPageToken)
+		if err := c.cursorRepo.UpsertSyncCursor(ctx, cursor); err != nil {
+			return false, fmt.Errorf("checkpoint list page token: %w", err)
 		}
 
 		pageToken = nextPageToken
 		if pageToken == "" {
-			break
+			return true, nil
 		}
 	}
-
-	return nil
 }
 
 func (c *SyncAccountCommand) syncAccountFromHistory(
@@ -554,30 +650,119 @@ func (c *SyncAccountCommand) syncAccountFromHistory(
 	account connectionsapi.ConnectionInfo,
 	cursor *domain.SyncCursor,
 	mailClient domain.MailProviderClient,
-) error {
+	deadline time.Time,
+) (bool, error) {
 	page, err := mailClient.ListHistory(ctx, "me", cursor.HistoryID())
 	if err != nil {
-		return fmt.Errorf("list provider history: %w", err)
+		return false, fmt.Errorf("list provider history: %w", err)
 	}
 	if page.Expired {
-		return c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient)
+		return c.syncAccountFromList(ctx, tenantID, account, cursor, mailClient, deadline)
 	}
 
+	processed := 0
 	for _, change := range page.Changes {
+		if shouldYieldSync(deadline) || c.hitMessageCap(processed) {
+			return false, nil
+		}
 		if change.Type == domain.HistoryChangeDeleted {
 			continue
 		}
-		if err := c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: change.MessageID}, mailClient); err != nil {
+		if change.Type == domain.HistoryChangeUpdated {
+			if err := c.refreshExistingMessage(ctx, tenantID, account, change.MessageID, mailClient); err != nil {
+				if errors.Is(err, errPayloadRejected) {
+					processed++
+					continue
+				}
+				return false, err
+			}
+			processed++
+			continue
+		}
+		if err := c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: change.MessageID}, mailClient, false); err != nil {
 			if errors.Is(err, errPayloadRejected) {
+				processed++
 				continue
 			}
-			return err
+			return false, err
 		}
+		processed++
 	}
 
 	if page.NewHistoryID != "" {
 		_ = cursor.AdvanceHistory(page.NewHistoryID)
 	}
 
-	return nil
+	return true, nil
+}
+
+func (c *SyncAccountCommand) hitMessageCap(processed int) bool {
+	return c.maxMessagesPerRun > 0 && processed >= c.maxMessagesPerRun
+}
+
+func (c *SyncAccountCommand) refreshExistingMessage(
+	ctx context.Context,
+	tenantID string,
+	account connectionsapi.ConnectionInfo,
+	providerMessageID string,
+	client domain.MailProviderClient,
+) error {
+	existing, err := c.messageRepo.GetInboxMessageByProviderID(ctx, account.ID, providerMessageID)
+	if err != nil {
+		if errors.Is(err, domain.ErrInboxMessageNotFound) {
+			return c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: providerMessageID}, client, false)
+		}
+		return err
+	}
+
+	meta, err := client.GetMessageMetadata(ctx, "me", providerMessageID)
+	if err != nil {
+		return fmt.Errorf("get provider message metadata %s: %w", providerMessageID, err)
+	}
+	existing.ApplyProviderFlags(meta.LabelIDs, time.Now().UTC())
+	if err := c.messageRepo.UpdateInboxMessageFlags(ctx, existing); err != nil {
+		return err
+	}
+	if existing.HasFullContent() || !meta.NeedsFullContent() {
+		return nil
+	}
+	return c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: providerMessageID}, client, true)
+}
+
+func (c *SyncAccountCommand) hydrateMessage(ctx context.Context, messageID string) error {
+	tenantID, err := tenant.TenantIDFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	existing, err := c.messageRepo.GetInboxMessageByID(ctx, messageID)
+	if err != nil {
+		return err
+	}
+	if existing.HasFullContent() {
+		return nil
+	}
+
+	account, err := c.connectionsService.GetConnection(ctx, existing.ConnectionID())
+	if err != nil {
+		return fmt.Errorf("get connection: %w", err)
+	}
+	credentialsJSON, err := c.connectionsService.DecryptCredentials(ctx, account.ID)
+	if err != nil {
+		return fmt.Errorf("decrypt account credentials: %w", err)
+	}
+	mailClient, err := c.providerFactory.Build(ctx, account.Provider, credentialsJSON)
+	if err != nil {
+		return fmt.Errorf("build provider client: %w", err)
+	}
+	return c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: existing.ProviderMessageID()}, mailClient, true)
+}
+
+func LimitMessagesPerRun(c *SyncAccountCommand, n int) {
+	if c == nil {
+		return
+	}
+	if n < 0 {
+		n = 0
+	}
+	c.maxMessagesPerRun = n
 }

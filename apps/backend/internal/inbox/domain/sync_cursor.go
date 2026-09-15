@@ -14,19 +14,21 @@ const (
 )
 
 type SyncCursor struct {
-	connectionID string
-	lastSyncedAt *time.Time
-	historyID    *string
-	lastError    *string
-	status       SyncCursorStatus
+	connectionID  string
+	lastSyncedAt  *time.Time
+	historyID     *string
+	listPageToken *string
+	lastError     *string
+	status        SyncCursorStatus
 }
 
 type SyncCursorSnapshot struct {
-	ConnectionID string
-	LastSyncedAt *time.Time
-	HistoryID    *string
-	LastError    *string
-	Status       SyncCursorStatus
+	ConnectionID  string
+	LastSyncedAt  *time.Time
+	HistoryID     *string
+	ListPageToken *string
+	LastError     *string
+	Status        SyncCursorStatus
 }
 
 func NewSyncCursor(connectionID string, initialSyncedAt *time.Time) (*SyncCursor, error) {
@@ -49,27 +51,30 @@ func NewSyncCursor(connectionID string, initialSyncedAt *time.Time) (*SyncCursor
 
 func RehydrateSyncCursor(snapshot SyncCursorSnapshot) *SyncCursor {
 	return &SyncCursor{
-		connectionID: snapshot.ConnectionID,
-		lastSyncedAt: snapshot.LastSyncedAt,
-		historyID:    snapshot.HistoryID,
-		lastError:    snapshot.LastError,
-		status:       snapshot.Status,
+		connectionID:  snapshot.ConnectionID,
+		lastSyncedAt:  snapshot.LastSyncedAt,
+		historyID:     snapshot.HistoryID,
+		listPageToken: snapshot.ListPageToken,
+		lastError:     snapshot.LastError,
+		status:        snapshot.Status,
 	}
 }
 
 func (c *SyncCursor) ConnectionID() string     { return c.connectionID }
 func (c *SyncCursor) LastSyncedAt() *time.Time { return c.lastSyncedAt }
 func (c *SyncCursor) HistoryID() string        { return derefString(c.historyID) }
+func (c *SyncCursor) ListPageToken() string    { return derefString(c.listPageToken) }
 func (c *SyncCursor) LastError() *string       { return c.lastError }
 func (c *SyncCursor) Status() SyncCursorStatus { return c.status }
 
 func (c *SyncCursor) Snapshot() SyncCursorSnapshot {
 	return SyncCursorSnapshot{
-		ConnectionID: c.connectionID,
-		LastSyncedAt: c.lastSyncedAt,
-		HistoryID:    c.historyID,
-		LastError:    c.lastError,
-		Status:       c.status,
+		ConnectionID:  c.connectionID,
+		LastSyncedAt:  c.lastSyncedAt,
+		HistoryID:     c.historyID,
+		ListPageToken: c.listPageToken,
+		LastError:     c.lastError,
+		Status:        c.status,
 	}
 }
 
@@ -96,8 +101,17 @@ func (c *SyncCursor) MarkSyncFailed(failure string) {
 func (c *SyncCursor) MarkSyncSucceeded(at time.Time) {
 	c.status = SyncCursorStatusIdle
 	c.lastError = nil
+	c.listPageToken = nil
 	syncedAt := at.UTC()
 	c.lastSyncedAt = &syncedAt
+}
+
+func (c *SyncCursor) MarkSyncYielded() {
+	if c.status != SyncCursorStatusSyncing {
+		return
+	}
+	c.status = SyncCursorStatusIdle
+	c.lastError = nil
 }
 
 func (c *SyncCursor) AdvanceHistory(historyID string) error {
@@ -107,6 +121,15 @@ func (c *SyncCursor) AdvanceHistory(historyID string) error {
 	id := historyID
 	c.historyID = &id
 	return nil
+}
+
+func (c *SyncCursor) CheckpointListPage(token string) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		c.listPageToken = nil
+		return
+	}
+	c.listPageToken = &token
 }
 
 func derefString(value *string) string {

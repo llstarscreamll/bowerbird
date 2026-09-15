@@ -2,6 +2,8 @@ package gmail
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -40,6 +42,19 @@ func NewOAuthHTTPClient(ctx context.Context, cfg OAuthConfig, credentialsJSON []
 	}
 
 	httpClient := oauthCfg.Client(ctx, &token)
+	client := NewClient(httpClient)
+	client.SetQuotaKey(quotaKeyFromToken(token))
+	return client, nil
+}
 
-	return NewClient(httpClient), nil
+func quotaKeyFromToken(token oauth2.Token) string {
+	raw := token.RefreshToken
+	if raw == "" {
+		raw = token.AccessToken
+	}
+	if raw == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
 }

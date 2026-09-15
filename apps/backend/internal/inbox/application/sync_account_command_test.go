@@ -81,9 +81,9 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	expected := time.Now().UTC().AddDate(0, -2, 0)
 	assert.WithinDuration(t, expected, time.Unix(queryTs, 0).UTC(), 5*time.Second)
 
-	require.Len(t, repo.upsertedCursors, 2)
+	require.Len(t, repo.upsertedCursors, 3)
 	assert.Equal(t, domain.SyncCursorStatusSyncing, repo.upsertedCursors[0].Status())
-	assert.Equal(t, domain.SyncCursorStatusIdle, repo.upsertedCursors[1].Status())
+	assert.Equal(t, domain.SyncCursorStatusIdle, repo.upsertedCursors[len(repo.upsertedCursors)-1].Status())
 }
 
 func TestSyncAccountCommand_UsesExistingCursorWithoutResettingRange(t *testing.T) {
@@ -143,7 +143,8 @@ func TestSyncAccountCommand_ContinuesAfterPayloadRejected(t *testing.T) {
 	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
 	require.NoError(t, err)
 	require.Len(t, repo.upsertedMessages, 1)
-	assert.Equal(t, []string{"m-invalid", "m-valid"}, providerClient.getMessageCalls)
+	assert.Equal(t, []string{"m-invalid", "m-valid"}, providerClient.getMetadataCalls)
+	assert.Empty(t, providerClient.getMessageCalls)
 
 	persisted := repo.upsertedMessages[0]
 	require.NotNil(t, persisted.SenderEmail())
@@ -171,10 +172,13 @@ func TestSyncAccountCommand_DoesNotRepublishExistingMessage(t *testing.T) {
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 
 	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
-	require.Len(t, publisher.published, 1)
+	assert.Empty(t, publisher.published)
+	assert.Equal(t, []string{"m-1"}, providerClient.getMetadataCalls)
 
 	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
-	assert.Len(t, publisher.published, 1)
+	assert.Empty(t, publisher.published)
+	assert.Equal(t, []string{"m-1"}, providerClient.getMetadataCalls)
+	assert.Empty(t, providerClient.getMessageCalls)
 }
 
 func TestSyncAccountCommand_UsesHistoryWhenCursorHasHistoryID(t *testing.T) {
@@ -192,7 +196,7 @@ func TestSyncAccountCommand_UsesHistoryWhenCursorHasHistoryID(t *testing.T) {
 	mail := &domain.MailMessage{
 		ID:            "m-hist",
 		ThreadID:      "t-1",
-		Subject:       "from history",
+		Subject:       "Factura electrónica",
 		Sender:        "sender@example.com",
 		PlainTextBody: "hello",
 	}
@@ -226,7 +230,7 @@ func TestSyncAccountCommand_UsesProviderMessageIDForAttachmentDownload(t *testin
 			"provider-msg-1": {
 				ID:            "provider-msg-1",
 				ThreadID:      "thread-1",
-				Subject:       "with attachment",
+				Subject:       "Factura con XML",
 				Sender:        "Sender <sender@example.com>",
 				PlainTextBody: "normal",
 				Attachments: []domain.MailAttachmentRef{
@@ -261,7 +265,7 @@ func TestSyncAccountCommand_FailsWhenAttachmentDownloadFails(t *testing.T) {
 			"provider-msg-1": {
 				ID:            "provider-msg-1",
 				ThreadID:      "thread-1",
-				Subject:       "with attachment",
+				Subject:       "Factura con XML",
 				Sender:        "Sender <sender@example.com>",
 				PlainTextBody: "normal",
 				Attachments: []domain.MailAttachmentRef{
@@ -293,7 +297,7 @@ func TestSyncAccountCommand_SkipsForbiddenAttachmentDownload(t *testing.T) {
 			"provider-msg-1": {
 				ID:            "provider-msg-1",
 				ThreadID:      "thread-1",
-				Subject:       "with attachment",
+				Subject:       "Factura con XML",
 				Sender:        "Sender <sender@example.com>",
 				PlainTextBody: "normal",
 				Attachments: []domain.MailAttachmentRef{
@@ -359,6 +363,109 @@ func TestSyncAccountCommand_SkipsWhileRateLimited(t *testing.T) {
 	assert.Len(t, providerClient.listQueries, 1)
 }
 
+func TestSyncAccountCommand_MetadataOnlyForNormalMail(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		refs: []domain.MessageRef{{ID: "m-news"}},
+		messages: map[string]*domain.MailMessage{
+			"m-news": {ID: "m-news", Subject: "Newsletter", Sender: "news@example.com", PlainTextBody: "hello"},
+		},
+	}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, &fakeInboxEventPublisher{}, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Equal(t, []string{"m-news"}, providerClient.getMetadataCalls)
+	assert.Empty(t, providerClient.getMessageCalls)
+	assert.Empty(t, providerClient.downloadAttachmentCalls)
+}
+
+func TestSyncAccountCommand_CheckpointsListPageTokenOnRateLimit(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		refs:            []domain.MessageRef{{ID: "m-1"}},
+		nextPageToken:   "page-2",
+		failOnPageToken: "page-2",
+		listErr:         errors.New("list messages request failed with status 403 (body=\"Quota exceeded reason: rateLimitExceeded\")"),
+		messages: map[string]*domain.MailMessage{
+			"m-1": {ID: "m-1", Subject: "hi", Sender: "a@example.com"},
+		},
+	}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, &fakeInboxEventPublisher{}, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	err := cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"})
+	require.Error(t, err)
+	require.NotNil(t, repo.cursors["acc-1"])
+	assert.Equal(t, "page-2", repo.cursors["acc-1"].ListPageToken())
+	assert.Equal(t, []string{"", "page-2"}, providerClient.listPageTokens)
+}
+
+func TestSyncAccountCommand_YieldsBeforeFinishingBackfill(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		historyID: "hist-9",
+		pages: map[string]fakeListPage{
+			"":       {refs: []domain.MessageRef{{ID: "m-1"}}, next: "page-2"},
+			"page-2": {refs: []domain.MessageRef{{ID: "m-2"}}, next: ""},
+		},
+		messages: map[string]*domain.MailMessage{
+			"m-1": {ID: "m-1", Subject: "one", Sender: "a@example.com"},
+			"m-2": {ID: "m-2", Subject: "two", Sender: "a@example.com"},
+		},
+	}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, &fakeInboxEventPublisher{}, &fakeFileStore{}, fakeUnitOfWork{})
+	inboxCommands.LimitMessagesPerRun(cmd, 1)
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	require.NotNil(t, repo.cursors["acc-1"])
+	assert.Equal(t, "page-2", repo.cursors["acc-1"].ListPageToken())
+	assert.Equal(t, domain.SyncCursorStatusIdle, repo.cursors["acc-1"].Status())
+	assert.Empty(t, repo.cursors["acc-1"].HistoryID())
+	require.Len(t, repo.upsertedMessages, 1)
+	assert.Equal(t, "m-1", repo.upsertedMessages[0].ProviderMessageID())
+
+	inboxCommands.LimitMessagesPerRun(cmd, 0)
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Empty(t, repo.cursors["acc-1"].ListPageToken())
+	assert.Equal(t, "hist-9", repo.cursors["acc-1"].HistoryID())
+	require.Len(t, repo.upsertedMessages, 2)
+	assert.Equal(t, "m-2", repo.upsertedMessages[1].ProviderMessageID())
+}
+
+func TestSyncAccountCommand_HydrateFetchesFullBody(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		refs: []domain.MessageRef{{ID: "m-1"}},
+		messages: map[string]*domain.MailMessage{
+			"m-1": {ID: "m-1", Subject: "hello", Sender: "a@example.com", PlainTextBody: "full body"},
+		},
+	}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, &fakeInboxEventPublisher{}, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	require.Len(t, repo.upsertedMessages, 1)
+	assert.False(t, repo.upsertedMessages[0].HasFullContent())
+
+	require.NoError(t, inboxCommands.NewHydrateMessageCommand(cmd).Execute(ctx, repo.upsertedMessages[0].ID()))
+	assert.Equal(t, []string{"m-1"}, providerClient.getMessageCalls)
+	assert.True(t, repo.messagesByID[repo.upsertedMessages[0].ID()].HasFullContent())
+}
+
 func toUnixString(v time.Time) string {
 	return strconv.FormatInt(v.Unix(), 10)
 }
@@ -402,6 +509,15 @@ func (f *fakeInboxRepo) UpsertInboxMessage(ctx context.Context, msg *domain.Inbo
 
 func (f *fakeInboxRepo) GetInboxMessageByID(ctx context.Context, messageID string) (*domain.InboxMessage, error) {
 	msg, ok := f.messagesByID[messageID]
+	if !ok {
+		return nil, domain.ErrInboxMessageNotFound
+	}
+	return msg, nil
+}
+
+func (f *fakeInboxRepo) GetInboxMessageByProviderID(ctx context.Context, accountID, providerMessageID string) (*domain.InboxMessage, error) {
+	key := accountID + ":" + providerMessageID
+	msg, ok := f.messagesByKey[key]
 	if !ok {
 		return nil, domain.ErrInboxMessageNotFound
 	}
@@ -483,8 +599,13 @@ type fakeProviderClient struct {
 	refs                    []domain.MessageRef
 	messages                map[string]*domain.MailMessage
 	listErr                 error
+	failOnPageToken         string
 	listQueries             []string
 	getMessageCalls         []string
+	getMetadataCalls        []string
+	listPageTokens          []string
+	nextPageToken           string
+	pages                   map[string]fakeListPage
 	downloadAttachmentCalls []attachmentDownloadCall
 	downloadAttachmentErr   error
 	historyID               string
@@ -502,10 +623,15 @@ type fakeProviderClient struct {
 
 func (f *fakeProviderClient) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
 	f.listQueries = append(f.listQueries, opts.Query)
-	if f.listErr != nil {
+	f.listPageTokens = append(f.listPageTokens, opts.PageToken)
+	if f.listErr != nil && (f.failOnPageToken == "" || opts.PageToken == f.failOnPageToken) {
 		return nil, "", f.listErr
 	}
-	return f.refs, "", nil
+	if len(f.pages) > 0 {
+		page := f.pages[opts.PageToken]
+		return page.refs, page.next, nil
+	}
+	return f.refs, f.nextPageToken, nil
 }
 
 func (f *fakeProviderClient) GetMessage(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
@@ -515,6 +641,22 @@ func (f *fakeProviderClient) GetMessage(ctx context.Context, userID, messageID s
 		return nil, errors.New("message not found")
 	}
 	return message, nil
+}
+
+func (f *fakeProviderClient) GetMessageMetadata(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+	f.getMetadataCalls = append(f.getMetadataCalls, messageID)
+	message, ok := f.messages[messageID]
+	if !ok {
+		return nil, errors.New("message not found")
+	}
+	cloned := *message
+	cloned.PlainTextBody = ""
+	cloned.HTMLBody = ""
+	cloned.Attachments = nil
+	if len(message.Attachments) > 0 {
+		cloned.Attachments = append([]domain.MailAttachmentRef(nil), message.Attachments...)
+	}
+	return &cloned, nil
 }
 
 func (f *fakeProviderClient) DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error) {
@@ -616,6 +758,11 @@ func (f *fakeFileStore) PresignUpload(ctx context.Context, input platformStorage
 
 func (f *fakeFileStore) PresignDownload(ctx context.Context, input platformStorage.PresignDownloadInput) (*platformStorage.PresignDownloadResult, error) {
 	return nil, nil
+}
+
+type fakeListPage struct {
+	refs []domain.MessageRef
+	next string
 }
 
 type attachmentDownloadCall struct {

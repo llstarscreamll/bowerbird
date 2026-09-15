@@ -23,6 +23,7 @@ type MessageRepository interface {
 	UpsertInboxMessage(ctx context.Context, msg *InboxMessage) (bool, error)
 	UpsertMessageAttachment(ctx context.Context, attachment *MessageAttachment) (bool, error)
 	GetInboxMessageByID(ctx context.Context, messageID string) (*InboxMessage, error)
+	GetInboxMessageByProviderID(ctx context.Context, accountID, providerMessageID string) (*InboxMessage, error)
 	UpdateInboxMessageFlags(ctx context.Context, message *InboxMessage) error
 	GetMessageAttachment(ctx context.Context, messageID, attachmentID string) (*MessageAttachment, error)
 	GetMessageAttachmentByMessageAndSHA(ctx context.Context, messageID, sha256 string) (*MessageAttachment, error)

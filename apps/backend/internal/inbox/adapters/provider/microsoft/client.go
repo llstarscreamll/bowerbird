@@ -112,6 +112,10 @@ func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*dom
 	return payload.toMailMessage(), nil
 }
 
+func (c *Client) GetMessageMetadata(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+	return c.GetMessage(ctx, userID, messageID)
+}
+
 func (c *Client) DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error) {
 	endpoint := fmt.Sprintf("%s/v1.0/me/messages/%s/attachments/%s/$value", c.baseURL, url.PathEscape(messageID), url.PathEscape(attachmentID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)

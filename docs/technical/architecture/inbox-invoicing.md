@@ -10,8 +10,18 @@ recibidas**.
 ### Inbox
 
 - Connect mail accounts (Gmail / Microsoft); track connection status.
-- Incremental sync from the last cursor.
-- Download attachments to S3 for downstream processing.
+- Incremental sync from the last cursor. Gmail uses History after the first
+  successful sync and stores the list page token so a rate-limited or
+  time-boxed backfill resumes instead of restarting.
+- Sync fetches message metadata first. Full bodies and attachments download
+  only for e-invoice candidates (subject keywords such as "factura", or
+  XML/PDF/ZIP attachments) or when a user opens the message.
+- Gmail API calls are paced per mailbox against the 6,000 units/minute
+  per-user quota. Rate-limit responses retry with exponential backoff.
+  Each `InboxSyncAccount` job stops under the Lambda cap (15 minutes; the
+  command yields after 12 minutes or when the context deadline is close)
+  and checkpoints the list page token. The 5-minute poll continues the
+  remainder.
 
 ### Invoicing
 
@@ -26,8 +36,9 @@ recibidas**.
 
 ## Technical flow
 
-1. Inbox persists message + attachments → publishes `InboxMessageReceived`
-   (EventBridge).
+1. Inbox persists metadata for every message. Full body + attachments (and
+   `InboxMessageReceived`) only for e-invoice candidates or when the user
+   opens the message.
 2. Invoices subscriber may enqueue `InvoiceExtractionRequested` (SQS job) when
    a `LegalEntity` exists.
 3. Job classifies documents, extracts, dedups, persists header/lines if the

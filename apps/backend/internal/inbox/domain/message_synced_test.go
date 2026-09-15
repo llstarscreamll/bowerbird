@@ -48,3 +48,40 @@ func TestMessageSyncedOnlyOnFirstPersist(t *testing.T) {
 	require.Equal(t, "provider-msg-1", synced.ProviderMessageID)
 	require.Equal(t, "Invoice", synced.Subject)
 }
+
+func TestNotificationAfterCaptureOnlyWhenFirstFullContent(t *testing.T) {
+	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	stub, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
+		ID:                "msg-1",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "provider-msg-1",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	require.NoError(t, err)
+
+	ctx := domain.SyncNotificationContext{
+		EventID:    "evt-1",
+		TenantSlug: "tenant-a",
+		AccountID:  "acc-1",
+		Provider:   "gmail",
+		ProviderMessage: &domain.MailMessage{
+			ID:            "provider-msg-1",
+			Subject:       "Invoice",
+			PlainTextBody: "body",
+		},
+	}
+
+	none, err := stub.NotificationAfterCapture(false, ctx)
+	require.NoError(t, err)
+	require.Nil(t, none)
+
+	require.NoError(t, stub.ApplyProviderMessage(ctx.ProviderMessage, []byte(`{"plain_text_body":"body"}`), now))
+	first, err := stub.NotificationAfterCapture(false, ctx)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	again, err := stub.NotificationAfterCapture(true, ctx)
+	require.NoError(t, err)
+	require.Nil(t, again)
+}

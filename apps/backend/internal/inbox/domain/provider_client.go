@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -114,10 +115,18 @@ type MessageMutation struct {
 	RemoveLabelIDs []string
 }
 
+func (m *MailMessage) HasFullContent() bool {
+	if m == nil {
+		return false
+	}
+	return strings.TrimSpace(m.PlainTextBody) != "" || strings.TrimSpace(m.HTMLBody) != ""
+}
+
 // MailProviderClient is the provider-agnostic inbox port implemented by each provider adapter.
 type MailProviderClient interface {
 	ListMessages(ctx context.Context, opts ListMessagesOptions) ([]MessageRef, string, error)
 	GetMessage(ctx context.Context, userID, messageID string) (*MailMessage, error)
+	GetMessageMetadata(ctx context.Context, userID, messageID string) (*MailMessage, error)
 	DownloadAttachment(ctx context.Context, userID, messageID, attachmentID string) ([]byte, error)
 	DownloadMessageAttachments(ctx context.Context, userID, messageID string, refs []MailAttachmentRef) ([]DownloadedMailAttachment, error)
 	CreateLabel(ctx context.Context, userID, labelName string) (string, error)

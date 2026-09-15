@@ -6,29 +6,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/mail"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bowerbird/internal/inbox/domain"
 )
 
 const defaultBaseURL = "https://gmail.googleapis.com"
-const gmailMinRequestInterval = 80 * time.Millisecond
-
-var (
-	gmailThrottleMu sync.Mutex
-	gmailNextSlot   time.Time
-)
 
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
+	quotaKey   string
 }
 
 var _ domain.MailProviderClient = (*Client)(nil)
@@ -48,42 +43,72 @@ func (c *Client) SetBaseURL(baseURL string) {
 	c.baseURL = strings.TrimRight(baseURL, "/")
 }
 
-func (c *Client) do(req *http.Request) (*http.Response, error) {
-	if c.shouldThrottle() {
-		if err := waitGmailSlot(req.Context()); err != nil {
+func (c *Client) SetQuotaKey(key string) {
+	c.quotaKey = strings.TrimSpace(key)
+}
+
+func (c *Client) do(req *http.Request, units int) (*http.Response, error) {
+	retryAfter := ""
+	for attempt := 0; attempt <= gmailMaxRetries; attempt++ {
+		if attempt > 0 {
+			delay := gmailBackoffDelay(attempt-1, retryAfter)
+			slog.Warn("inbox.gmail.quota rate_limited",
+				"attempt", attempt,
+				"retry_after", retryAfter,
+				"backoff_ms", delay.Milliseconds(),
+			)
+			timer := time.NewTimer(delay)
+			select {
+			case <-req.Context().Done():
+				timer.Stop()
+				return nil, req.Context().Err()
+			case <-timer.C:
+				timer.Stop()
+			}
+			if req.GetBody != nil {
+				body, err := req.GetBody()
+				if err != nil {
+					return nil, err
+				}
+				req.Body = body
+			}
+		}
+
+		if c.shouldThrottle() {
+			if err := waitGmailUnits(req.Context(), c.quotaKey, units); err != nil {
+				return nil, err
+			}
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
 			return nil, err
 		}
+
+		if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+
+		body, restored, peekErr := peekRateLimitBody(resp)
+		if peekErr != nil {
+			return nil, peekErr
+		}
+		resp.Body = restored
+		if !isGmailRateLimitResponse(resp, body) {
+			return resp, nil
+		}
+
+		retryAfter = strings.TrimSpace(resp.Header.Get("Retry-After"))
+		if attempt == gmailMaxRetries {
+			return resp, nil
+		}
+		_ = resp.Body.Close()
 	}
-	return c.httpClient.Do(req)
+	return nil, fmt.Errorf("gmail request exhausted retries")
 }
 
 func (c *Client) shouldThrottle() bool {
 	return strings.Contains(c.baseURL, "gmail.googleapis.com")
-}
-
-func waitGmailSlot(ctx context.Context) error {
-	gmailThrottleMu.Lock()
-	now := time.Now()
-	waitUntil := gmailNextSlot
-	if waitUntil.Before(now) {
-		waitUntil = now
-	}
-	gmailNextSlot = waitUntil.Add(gmailMinRequestInterval)
-	gmailThrottleMu.Unlock()
-
-	delay := time.Until(waitUntil)
-	if delay <= 0 {
-		return nil
-	}
-
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptions) ([]domain.MessageRef, string, error) {
@@ -113,7 +138,7 @@ func (c *Client) ListMessages(ctx context.Context, opts domain.ListMessagesOptio
 		return nil, "", fmt.Errorf("build list messages request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailListCost)
 	if err != nil {
 		return nil, "", fmt.Errorf("list messages request failed: %w", err)
 	}
@@ -176,17 +201,36 @@ func (c *Client) requestStatusError(prefix string, resp *http.Response) error {
 }
 
 func (c *Client) GetMessage(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+	return c.getMessage(ctx, userID, messageID, "full")
+}
+
+func (c *Client) GetMessageMetadata(ctx context.Context, userID, messageID string) (*domain.MailMessage, error) {
+	return c.getMessage(ctx, userID, messageID, "metadata")
+}
+
+func (c *Client) getMessage(ctx context.Context, userID, messageID, format string) (*domain.MailMessage, error) {
 	if userID == "" {
 		userID = "me"
 	}
+	if format == "" {
+		format = "full"
+	}
 
-	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/%s?format=full", c.baseURL, url.PathEscape(userID), url.PathEscape(messageID))
+	values := url.Values{}
+	values.Set("format", format)
+	if format == "metadata" {
+		for _, header := range []string{"From", "To", "Cc", "Bcc", "Subject", "Date"} {
+			values.Add("metadataHeaders", header)
+		}
+	}
+
+	endpoint := fmt.Sprintf("%s/gmail/v1/users/%s/messages/%s?%s", c.baseURL, url.PathEscape(userID), url.PathEscape(messageID), values.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build get message request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailGetCost)
 	if err != nil {
 		return nil, fmt.Errorf("get message request failed: %w", err)
 	}
@@ -252,7 +296,7 @@ func (c *Client) DownloadAttachment(ctx context.Context, userID, messageID, atta
 		return nil, fmt.Errorf("build download attachment request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailAttachmentCost)
 	if err != nil {
 		return nil, fmt.Errorf("download attachment request failed: %w", err)
 	}
@@ -321,7 +365,7 @@ func (c *Client) CreateLabel(ctx context.Context, userID, labelName string) (str
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailLabelCost)
 	if err != nil {
 		return "", fmt.Errorf("create label request failed: %w", err)
 	}
@@ -367,7 +411,7 @@ func (c *Client) AddLabelToMessage(ctx context.Context, userID, messageID, label
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailModifyCost)
 	if err != nil {
 		return fmt.Errorf("modify message request failed: %w", err)
 	}
@@ -391,7 +435,7 @@ func (c *Client) GetHistoryID(ctx context.Context, userID string) (string, error
 		return "", fmt.Errorf("build get profile request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailProfileCost)
 	if err != nil {
 		return "", fmt.Errorf("get profile request failed: %w", err)
 	}
@@ -423,6 +467,9 @@ func (c *Client) ListHistory(ctx context.Context, userID, startHistoryID string)
 	var newHistoryID string
 	pageToken := ""
 	for {
+		if err := ctx.Err(); err != nil {
+			return domain.HistoryPage{}, err
+		}
 		payload, expired, err := c.fetchHistoryPage(ctx, userID, startHistoryID, pageToken)
 		if err != nil {
 			return domain.HistoryPage{}, err
@@ -491,7 +538,7 @@ func (c *Client) fetchHistoryPage(ctx context.Context, userID, startHistoryID, p
 		return gmailHistoryPage{}, false, fmt.Errorf("build list history request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailHistoryCost)
 	if err != nil {
 		return gmailHistoryPage{}, false, fmt.Errorf("list history request failed: %w", err)
 	}
@@ -562,7 +609,7 @@ func (c *Client) ModifyMessage(ctx context.Context, userID, messageID string, mu
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailModifyCost)
 	if err != nil {
 		return fmt.Errorf("modify message request failed: %w", err)
 	}
@@ -586,7 +633,7 @@ func (c *Client) TrashMessage(ctx context.Context, userID, messageID string) err
 		return fmt.Errorf("build trash message request: %w", err)
 	}
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailTrashCost)
 	if err != nil {
 		return fmt.Errorf("trash message request failed: %w", err)
 	}
@@ -624,7 +671,7 @@ func (c *Client) SendMessage(ctx context.Context, userID string, message domain.
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.do(req)
+	resp, err := c.do(req, gmailSendCost)
 	if err != nil {
 		return "", fmt.Errorf("send message request failed: %w", err)
 	}

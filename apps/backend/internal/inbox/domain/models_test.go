@@ -24,10 +24,12 @@ func TestInboxSyncCursorMarkSyncFailed(t *testing.T) {
 func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
 	prevError := "failed"
+	pageToken := "page-2"
 	cursor := RehydrateSyncCursor(SyncCursorSnapshot{
-		ConnectionID: "conn-1",
-		Status:       SyncCursorStatusError,
-		LastError:    &prevError,
+		ConnectionID:  "conn-1",
+		Status:        SyncCursorStatusError,
+		LastError:     &prevError,
+		ListPageToken: &pageToken,
 	})
 
 	cursor.MarkSyncSucceeded(now)
@@ -38,8 +40,60 @@ func TestInboxSyncCursorMarkSyncSucceeded(t *testing.T) {
 	if cursor.LastError() != nil {
 		t.Fatalf("expected last error to be cleared")
 	}
+	if cursor.ListPageToken() != "" {
+		t.Fatalf("expected list page token cleared on success, got %q", cursor.ListPageToken())
+	}
 	if cursor.LastSyncedAt() == nil || !cursor.LastSyncedAt().Equal(now) {
 		t.Fatalf("expected last synced at %v, got %#v", now, cursor.LastSyncedAt())
+	}
+}
+
+func TestInboxSyncCursorMarkSyncYieldedRequiresSyncing(t *testing.T) {
+	cursor, err := NewSyncCursor("conn-1", nil)
+	if err != nil {
+		t.Fatalf("new sync cursor: %v", err)
+	}
+	cursor.MarkSyncYielded()
+	if cursor.Status() != SyncCursorStatusIdle {
+		t.Fatalf("expected idle yield no-op, got %s", cursor.Status())
+	}
+}
+
+func TestInboxSyncCursorMarkSyncYieldedKeepsCheckpoint(t *testing.T) {
+	pageToken := "page-2"
+	syncedAt := time.Date(2026, 5, 2, 8, 30, 0, 0, time.UTC)
+	cursor := RehydrateSyncCursor(SyncCursorSnapshot{
+		ConnectionID:  "conn-1",
+		Status:        SyncCursorStatusSyncing,
+		LastSyncedAt:  &syncedAt,
+		ListPageToken: &pageToken,
+	})
+
+	cursor.MarkSyncYielded()
+
+	if cursor.Status() != SyncCursorStatusIdle {
+		t.Fatalf("expected status idle, got %s", cursor.Status())
+	}
+	if cursor.ListPageToken() != "page-2" {
+		t.Fatalf("expected list page token kept, got %q", cursor.ListPageToken())
+	}
+	if cursor.LastSyncedAt() == nil || !cursor.LastSyncedAt().Equal(syncedAt) {
+		t.Fatalf("expected last synced at unchanged, got %#v", cursor.LastSyncedAt())
+	}
+}
+
+func TestSyncCursorListPageToken(t *testing.T) {
+	cursor, err := NewSyncCursor("conn-1", nil)
+	if err != nil {
+		t.Fatalf("new sync cursor: %v", err)
+	}
+	cursor.CheckpointListPage(" nxt ")
+	if cursor.ListPageToken() != "nxt" {
+		t.Fatalf("expected trimmed page token nxt, got %q", cursor.ListPageToken())
+	}
+	cursor.CheckpointListPage("")
+	if cursor.ListPageToken() != "" {
+		t.Fatalf("expected empty page token")
 	}
 }
 
@@ -135,5 +189,46 @@ func TestNewInboxMessageFromProvider(t *testing.T) {
 	}
 	if message.ReceivedAt() == nil || !message.ReceivedAt().Equal(receivedAt) {
 		t.Fatalf("expected received at %v, got %#v", receivedAt, message.ReceivedAt())
+	}
+}
+
+func TestApplyProviderMessageHydratesStub(t *testing.T) {
+	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	message, err := NewInboxMessageAsSynced(NewInboxMessageInput{
+		ID:                "msg-1",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "provider-msg-1",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	if err != nil {
+		t.Fatalf("new stub: %v", err)
+	}
+	if message.HasFullContent() {
+		t.Fatal("stub should not have full content")
+	}
+
+	later := now.Add(time.Minute)
+	err = message.ApplyProviderMessage(&MailMessage{
+		ID:            "provider-msg-1",
+		Subject:       "Factura 1",
+		PlainTextBody: "cuerpo",
+	}, []byte(`{"id":"provider-msg-1","plain_text_body":"cuerpo"}`), later)
+	if err != nil {
+		t.Fatalf("apply provider message: %v", err)
+	}
+	if !message.HasFullContent() {
+		t.Fatal("expected full content after apply")
+	}
+	if message.Subject() == nil || *message.Subject() != "Factura 1" {
+		t.Fatalf("expected subject Factura 1, got %#v", message.Subject())
+	}
+	if !message.UpdatedAt().Equal(later) {
+		t.Fatalf("expected updated at %v, got %v", later, message.UpdatedAt())
+	}
+
+	err = message.ApplyProviderMessage(&MailMessage{ID: "other"}, nil, later)
+	if err != ErrInboxMessageProviderMismatch {
+		t.Fatalf("expected provider mismatch, got %v", err)
 	}
 }

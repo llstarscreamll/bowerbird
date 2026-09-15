@@ -98,6 +98,7 @@ func NewApplication(
 			ModifyMessage:      modifyMessageCommand,
 			SendMessage:        sendMessageCommand,
 			DownloadAttachment: downloadAttachmentCommand,
+			HydrateMessage:     commands.NewHydrateMessageCommand(syncAccountCommand),
 		},
 		Queries: application.Queries{
 			ListAccountHealth:        queries.NewListAccountHealthQuery(inboxRepository, connectionsService),
@@ -127,6 +128,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 		app.Commands.ModifyMessage,
 		app.Commands.SendMessage,
 		app.Commands.DownloadAttachment,
+		app.Commands.HydrateMessage,
 		features,
 	)
 	handler := httpV1.NewRouter(controller)
