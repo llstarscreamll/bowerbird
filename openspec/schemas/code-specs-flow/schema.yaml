@@ -1,0 +1,44 @@
+name: code-specs-flow
+version: 1
+description: Lean OpenSpec workflow - design (Problem + Architecture) → tasks (E2E Tests + Implementation)
+artifacts:
+  - id: design
+    generates: design.md
+    description: Technical design document and problem statement
+    template: design.md
+    instruction: |
+      Create the design document.
+
+      Sections:
+      - **Problem Statement**: Extremely concise summary of the problem being solved. No preambles.
+      - **Technical Design**: Technical solution strictly following the evolutionary-modular-architecture guidelines. Specify bounded contexts, aggregates, and patterns.
+
+      Focus on the architecture and approach. Go straight to the point.
+    requires: []
+
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist focusing on E2E tests as specs
+    template: tasks.md
+    instruction: |
+      Create the task list for implementation.
+
+      **CRITICAL**: The very first task MUST be writing the BDD specification as executable E2E Playwright tests (or HTTP tests) in the `tests/e2e/` folder.
+      Do not write specs in Markdown. Code is the source of truth.
+
+      **IMPORTANT: Follow the template below exactly.** The apply phase parses
+      checkbox format to track progress. Tasks not using `- [ ]` won't be tracked.
+
+      Guidelines:
+      - Group related tasks under ## numbered headings
+      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
+      - Tasks should be atomic and verifiable.
+    requires:
+      - design
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Read context files, work through pending tasks, mark complete as you go.
+    Ensure the E2E tests are written first and that the final code passes them.
