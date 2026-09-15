@@ -28,9 +28,12 @@ var (
 	_ ports.CatalogWriteRepository = (*CatalogRepository)(nil)
 	_ ports.MatchMemoryRepository  = (*CatalogRepository)(nil)
 	_ ports.ImportRepository       = (*CatalogRepository)(nil)
+	_ ports.ItemMergeRepository    = (*CatalogRepository)(nil)
+	_ ports.DuplicateIndex         = (*CatalogRepository)(nil)
+	_ ports.NotDuplicateRepository = (*CatalogRepository)(nil)
 )
 
-const itemSelectCols = `id, name, kind, status, creation_source, COALESCE(internal_code, ''), created_at, updated_at`
+const itemSelectCols = `id, name, kind, status, creation_source, COALESCE(internal_code, ''), COALESCE(merged_into_id, ''), created_at, updated_at`
 
 type itemScanner interface {
 	Scan(dest ...any) error
@@ -38,7 +41,7 @@ type itemScanner interface {
 
 func scanItem(s itemScanner) (domain.Item, error) {
 	var item domain.Item
-	err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.InternalCode, &item.CreatedAt, &item.UpdatedAt)
+	err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.InternalCode, &item.MergedIntoID, &item.CreatedAt, &item.UpdatedAt)
 	return item, err
 }
 
@@ -69,8 +72,8 @@ func (r *CatalogRepository) UpdateItem(ctx context.Context, item domain.Item) er
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	tag, err := pool.Exec(ctx, `
-		UPDATE catalog_items SET name=$2, kind=$3, status=$4, internal_code=$5, updated_at=$6 WHERE id=$1
-	`, item.ID, item.Name, item.Kind, item.Status, nullIfEmpty(item.InternalCode), item.UpdatedAt)
+		UPDATE catalog_items SET name=$2, kind=$3, status=$4, internal_code=$5, merged_into_id=$6, updated_at=$7 WHERE id=$1
+	`, item.ID, item.Name, item.Kind, item.Status, nullIfEmpty(item.InternalCode), nullIfEmpty(item.MergedIntoID), item.UpdatedAt)
 	if err != nil {
 		if isInternalCodeConflict(err) {
 			return appErrors.New(appErrors.CodeConflict, "an item with this internal code already exists")
@@ -159,6 +162,8 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 		query += fmt.Sprintf(` AND status=$%d`, n)
 		args = append(args, filter.Status)
 		n++
+	} else {
+		query += ` AND status <> 'merged'`
 	}
 	if source := strings.TrimSpace(filter.CreationSource); source != "" {
 		query += fmt.Sprintf(` AND creation_source=$%d`, n)
@@ -259,6 +264,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 		SELECT `+itemSelectCols+`
 		FROM catalog_items
 		WHERE lower(regexp_replace(btrim(name), '\s+', ' ', 'g')) = $1
+		  AND status <> 'merged'
 	`, normalizedDesc)
 	if err != nil {
 		return nil, fmt.Errorf("find by description: %w", err)

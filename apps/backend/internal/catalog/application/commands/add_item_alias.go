@@ -46,6 +46,9 @@ func (cmd *AddItemAliasCommand) Execute(ctx context.Context, input AddItemAliasI
 	if item == nil {
 		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
+	if item.IsMerged() {
+		return appErrors.New(appErrors.CodeGone, "catalog item was merged").WithMeta("merged_into_id", item.MergedIntoID)
+	}
 	now := cmd.now().UTC()
 	var alias domain.Alias
 	switch strings.TrimSpace(input.Scheme) {

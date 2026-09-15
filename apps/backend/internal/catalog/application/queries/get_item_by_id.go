@@ -36,6 +36,9 @@ func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*ItemDetail,
 	if item == nil {
 		return nil, appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
+	if item.IsMerged() {
+		return nil, appErrors.New(appErrors.CodeGone, "catalog item was merged").WithMeta("merged_into_id", item.MergedIntoID)
+	}
 	aliases, err := q.aliases.ListAliasesByItemID(ctx, item.ID)
 	if err != nil {
 		return nil, err

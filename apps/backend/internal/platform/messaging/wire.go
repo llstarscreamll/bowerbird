@@ -72,6 +72,7 @@ func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
 		legalentitiesModule.NewReceiverDirectory(legalentitiesApp),
 		inboxModule.NewInvoiceBackfillSource(inboxApp),
 	)
+	catalogModule.BindItemLinks(catalogApp, invoicesModule.NewItemLinkSupport(invoicingApp))
 
 	invoiceEvents := invoicesModule.RegisterEvents(invoicingApp)
 	invoiceJobs := invoicesModule.RegisterJobs(invoicingApp)

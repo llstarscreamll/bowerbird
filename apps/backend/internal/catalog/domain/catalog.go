@@ -18,6 +18,9 @@ var (
 	ErrInvalidAliasScheme  = errors.New("invalid alias scheme")
 	ErrInvalidGTIN         = errors.New("invalid gtin")
 	ErrGTINMustBeUnscoped  = errors.New("gtin alias must not have a party")
+	ErrCannotMergeIntoSelf = errors.New("cannot merge an item into itself")
+	ErrItemAlreadyMerged   = errors.New("catalog item was already merged")
+	ErrMergedItemFrozen    = errors.New("merged catalog item cannot be modified")
 )
 
 const (
@@ -28,6 +31,7 @@ const (
 
 	StatusProvisional = "provisional"
 	StatusConfirmed   = "confirmed"
+	StatusMerged      = "merged"
 
 	CreationSourceManual  = "manual"
 	CreationSourceInvoice = "invoice"
@@ -74,6 +78,7 @@ type Item struct {
 	Status         string
 	CreationSource string
 	InternalCode   string
+	MergedIntoID   string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -101,6 +106,10 @@ func NewProvisionalItem(id, description, fallbackCode string, now time.Time) (It
 
 func (i Item) IsProvisional() bool {
 	return i.Status == StatusProvisional
+}
+
+func (i Item) IsMerged() bool {
+	return i.Status == StatusMerged
 }
 
 // Alias maps an external code (e.g. supplier SKU or GTIN) onto an Item.
@@ -183,6 +192,17 @@ func NewGTINAlias(id, itemID, raw, source string, now time.Time) (Alias, error) 
 
 func (a Alias) PointsTo(itemID string) bool {
 	return a.ItemID == itemID
+}
+
+// ReassignTo points this alias at another item. Merge uses this instead of AddItemAlias
+// so the unique (scheme, party, value) tuple can move without a user-facing 409.
+func (a *Alias) ReassignTo(itemID string) error {
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return ErrItemIDRequired
+	}
+	a.ItemID = itemID
+	return nil
 }
 
 // MatchMemory records a durable human/system matching decision for evidence.

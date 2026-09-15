@@ -76,6 +76,29 @@ func (i Item) IsConfirmed() bool {
 	return i.Status == StatusConfirmed
 }
 
+// MergeInto retires this item into survivorID. Internal code is cleared so the
+// unique index can stay on the surviving master.
+func (i *Item) MergeInto(survivorID string, now time.Time) error {
+	survivorID = strings.TrimSpace(survivorID)
+	if survivorID == "" {
+		return ErrItemIDRequired
+	}
+	if i.ID == survivorID {
+		return ErrCannotMergeIntoSelf
+	}
+	if i.Status == StatusMerged {
+		if i.MergedIntoID == survivorID {
+			return nil
+		}
+		return ErrItemAlreadyMerged
+	}
+	i.Status = StatusMerged
+	i.MergedIntoID = survivorID
+	i.InternalCode = ""
+	i.UpdatedAt = now.UTC()
+	return nil
+}
+
 // ItemKind returns the Kind field as a validated value object.
 // Kind is stored as string for persistence; mutate only via New* / ChangeKind.
 func (i Item) ItemKind() (ItemKind, error) {
@@ -125,6 +148,9 @@ func NewImportedItem(id, name string, kind ItemKind, code InternalCode, now time
 }
 
 func (i *Item) Rename(name string, now time.Time) error {
+	if i.IsMerged() {
+		return ErrMergedItemFrozen
+	}
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return ErrMissingItemName
@@ -134,9 +160,13 @@ func (i *Item) Rename(name string, now time.Time) error {
 	return nil
 }
 
-func (i *Item) ChangeKind(kind ItemKind, now time.Time) {
+func (i *Item) ChangeKind(kind ItemKind, now time.Time) error {
+	if i.IsMerged() {
+		return ErrMergedItemFrozen
+	}
 	i.Kind = kind.String()
 	i.UpdatedAt = now.UTC()
+	return nil
 }
 
 // ApplyImport syncs name/kind from a catalog file and confirms provisionals.
@@ -150,7 +180,9 @@ func (i *Item) ApplyImport(name string, kind ItemKind, now time.Time) (bool, err
 		changed = true
 	}
 	if i.Kind != kind.String() {
-		i.ChangeKind(kind, now)
+		if err := i.ChangeKind(kind, now); err != nil {
+			return false, err
+		}
 		changed = true
 	}
 	if i.IsProvisional() {
@@ -190,6 +222,9 @@ func (i Item) InterpretMasterStatusChange(requested string) (confirm bool, err e
 // Confirm transitions provisional → confirmed. An internal code must already
 // exist or be supplied (zero InternalCode = not provided in this operation).
 func (i *Item) Confirm(provided InternalCode, now time.Time) error {
+	if i.IsMerged() {
+		return ErrMergedItemFrozen
+	}
 	if i.IsConfirmed() {
 		return ErrItemAlreadyConfirmed
 	}
@@ -216,6 +251,9 @@ func (i *Item) Confirm(provided InternalCode, now time.Time) error {
 
 // AssignInternalCode allows first assignment only; rejects changes when already set.
 func (i *Item) AssignInternalCode(next InternalCode, now time.Time) error {
+	if i.IsMerged() {
+		return ErrMergedItemFrozen
+	}
 	if !next.Assigned() {
 		return ErrMissingInternalCode
 	}

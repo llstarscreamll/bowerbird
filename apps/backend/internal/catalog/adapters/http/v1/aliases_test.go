@@ -44,7 +44,13 @@ func (m *httpMemItems) GetItemNames(ctx context.Context, ids []string) (map[stri
 	return map[string]string{}, nil
 }
 func (m *httpMemItems) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
-	return nil, nil
+	out := make([]domain.Item, 0, len(ids))
+	for _, id := range ids {
+		if item, ok := m.items[id]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
 }
 func (m *httpMemItems) GetItemsByInternalCodes(ctx context.Context, codes []string) ([]domain.Item, error) {
 	return nil, nil

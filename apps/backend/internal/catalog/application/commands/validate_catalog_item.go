@@ -26,5 +26,8 @@ func (cmd *ValidateCatalogItemCommand) Execute(ctx context.Context, itemID strin
 	if item == nil {
 		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
+	if item.IsMerged() {
+		return appErrors.New(appErrors.CodeGone, "catalog item was merged").WithMeta("merged_into_id", item.MergedIntoID)
+	}
 	return nil
 }

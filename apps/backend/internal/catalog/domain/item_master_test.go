@@ -144,7 +144,7 @@ func TestItemConfirmAndAssignInternalCode(t *testing.T) {
 	assert.Equal(t, "Gadget Pro", prov.Name)
 	kind, err := domain.ParseItemKind(domain.KindAsset)
 	require.NoError(t, err)
-	prov.ChangeKind(kind, now)
+	require.NoError(t, prov.ChangeKind(kind, now))
 	assert.Equal(t, domain.KindAsset, prov.Kind)
 
 	parsedKind, err := prov.ItemKind()
@@ -178,4 +178,22 @@ func TestInterpretMasterStatusChange(t *testing.T) {
 
 	_, err = prov.InterpretMasterStatusChange(domain.StatusProvisional)
 	assert.ErrorIs(t, err, domain.ErrCannotRevertToProvisional)
+}
+
+func TestMergeInto(t *testing.T) {
+	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	kind, err := domain.ParseItemKind(domain.KindGoods)
+	require.NoError(t, err)
+	code, err := domain.ParseInternalCode("SKU-M")
+	require.NoError(t, err)
+	item, err := domain.NewManualItem("01SRC", "Widget", kind, code, now)
+	require.NoError(t, err)
+
+	require.NoError(t, item.MergeInto("01DST", now))
+	assert.True(t, item.IsMerged())
+	assert.Equal(t, "01DST", item.MergedIntoID)
+	assert.Empty(t, item.InternalCode)
+	require.NoError(t, item.MergeInto("01DST", now))
+	assert.ErrorIs(t, item.MergeInto("01OTHER", now), domain.ErrItemAlreadyMerged)
+	assert.ErrorIs(t, item.MergeInto("01SRC", now), domain.ErrCannotMergeIntoSelf)
 }

@@ -55,6 +55,38 @@ type MatchMemoryRepository interface {
 	FindMemoryByEvidenceKey(ctx context.Context, evidenceKey string) (*domain.MatchMemory, error)
 }
 
+type ItemIDPair struct {
+	Left  string
+	Right string
+}
+
+type ItemLinkSupport interface {
+	RelinkItems(ctx context.Context, fromIDs []string, toID string) error
+	HardConflictPairs(ctx context.Context) ([]ItemIDPair, error)
+	CountLinks(ctx context.Context, itemIDs []string) (map[string]int, error)
+}
+
+type MergePersistence struct {
+	Survivor        domain.Item
+	Merged          []domain.Item
+	ReassignAliases []domain.Alias
+	DeleteAliasIDs  []string
+}
+
+type ItemMergeRepository interface {
+	ApplyMerge(ctx context.Context, in MergePersistence) error
+}
+
+type DuplicateIndex interface {
+	DescriptionDuplicateGroups(ctx context.Context) ([][]domain.Item, error)
+	CrossPartySKUGroups(ctx context.Context) ([][]domain.Item, error)
+}
+
+type NotDuplicateRepository interface {
+	UpsertNotDuplicatePairs(ctx context.Context, pairs []domain.NotDuplicatePair) error
+	ListNotDuplicatePairs(ctx context.Context) ([]domain.NotDuplicatePair, error)
+}
+
 type SoftMatcher interface {
 	Match(ctx context.Context, description string) ([]domain.Suggestion, error)
 }

@@ -154,6 +154,8 @@ func statusFromCode(code string) (int, string) {
 		return http.StatusTooManyRequests, "Too Many Requests"
 	case appErrors.CodeNotImplemented:
 		return http.StatusNotImplemented, "Not Implemented"
+	case appErrors.CodeGone:
+		return http.StatusGone, "Gone"
 	case appErrors.CodeInternal:
 		fallthrough
 	default:
@@ -173,6 +175,7 @@ func filterAllowedErrorMeta(meta map[string]any) map[string]any {
 		"account_email":       {},
 		"feature_key":         {},
 		"item_id":             {},
+		"merged_into_id":      {},
 	}
 
 	out := map[string]any{}

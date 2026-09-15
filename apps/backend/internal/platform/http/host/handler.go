@@ -130,6 +130,7 @@ func New(deps *platform.Dependencies) (http.Handler, error) {
 		inboxModule.NewInvoiceBackfillSource(inboxApp),
 	)
 	invoicesModule.NewHTTPHandler(mux, invoicingApp, authMiddleware, cfg)
+	catalogModule.BindItemLinks(catalogApp, invoicesModule.NewItemLinkSupport(invoicingApp))
 
 	return withSecurityHeaders(withCORS(tenant.Middleware(mux), cfg.AllowedOrigins)), nil
 }

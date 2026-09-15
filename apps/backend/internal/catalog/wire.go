@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	httpV1 "github.com/bowerbird/internal/catalog/adapters/http/v1"
+	"github.com/bowerbird/internal/catalog/adapters/invoicelinks"
 	catalogJobs "github.com/bowerbird/internal/catalog/adapters/jobs"
 	"github.com/bowerbird/internal/catalog/adapters/matchers"
 	catalogRepo "github.com/bowerbird/internal/catalog/adapters/repository/postgres"
@@ -14,6 +15,7 @@ import (
 	"github.com/bowerbird/internal/catalog/application/queries"
 	contractJobs "github.com/bowerbird/internal/catalog/contracts/jobs"
 	filesapi "github.com/bowerbird/internal/files/api"
+	invoicesapi "github.com/bowerbird/internal/invoices/api"
 	"github.com/bowerbird/internal/platform/config"
 	"github.com/bowerbird/internal/platform/database"
 	"github.com/bowerbird/internal/platform/jobs"
@@ -44,20 +46,23 @@ func NewApplication(registry *database.Registry, jobQueue jobs.TaskQueue, object
 			AddItemAlias:                commands.NewAddItemAliasCommand(repo, repo),
 			RemoveItemAlias:             commands.NewRemoveItemAliasCommand(repo, repo),
 			RememberDecision:            commands.NewRememberDecisionCommand(repo, repo, repo),
+			MergeItems:                  commands.NewMergeItemsCommand(repo, repo, repo, nil),
+			MarkNotDuplicates:           commands.NewMarkNotDuplicatesCommand(repo, repo),
 			QueueCatalogImport:          commands.NewQueueCatalogImportCommand(repo, objects, jobQueue),
 			ProcessCatalogImport:        commands.NewProcessCatalogImportCommand(repo, repo, objects, jobQueue),
 			CancelCatalogImport:         commands.NewCancelCatalogImportCommand(repo),
 			PurgeStaleCatalogImports:    commands.NewPurgeStaleCatalogImportsCommand(repo),
 		},
 		Queries: application.Queries{
-			GetItemByID:      queries.NewGetItemByIDQuery(repo, repo),
-			GetItemNames:     queries.NewGetItemNamesQuery(repo),
-			GetItemDisplays:  queries.NewGetItemDisplaysQuery(repo),
-			ListItems:        queries.NewListItemsQuery(repo),
-			GetImportByID:    queries.NewGetImportByIDQuery(repo),
-			GetActiveImport:  queries.NewGetActiveImportQuery(repo),
-			ListImports:      queries.NewListImportsQuery(repo),
-			ListImportErrors: queries.NewListImportErrorsQuery(repo),
+			GetItemByID:           queries.NewGetItemByIDQuery(repo, repo),
+			GetItemNames:          queries.NewGetItemNamesQuery(repo),
+			GetItemDisplays:       queries.NewGetItemDisplaysQuery(repo),
+			ListItems:             queries.NewListItemsQuery(repo),
+			ListDuplicateClusters: queries.NewListDuplicateClustersQuery(repo, repo, repo, repo, nil),
+			GetImportByID:         queries.NewGetImportByIDQuery(repo),
+			GetActiveImport:       queries.NewGetActiveImportQuery(repo),
+			ListImports:           queries.NewListImportsQuery(repo),
+			ListImportErrors:      queries.NewListImportErrorsQuery(repo),
 		},
 	}
 }
@@ -97,4 +102,11 @@ func RegisterSchedules() []scheduler.Rule {
 
 func NewInvoiceSupport(app *application.Application) api.InvoiceSupport {
 	return application.NewInvoiceSupport(app)
+}
+
+func BindItemLinks(app *application.Application, links invoicesapi.ItemLinkSupport) {
+	if app == nil {
+		panic("catalog application is required")
+	}
+	app.BindItemLinks(invoicelinks.New(links))
 }

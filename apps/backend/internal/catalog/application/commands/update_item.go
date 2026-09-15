@@ -37,6 +37,9 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 	if item == nil {
 		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
+	if item.IsMerged() {
+		return appErrors.New(appErrors.CodeGone, "catalog item was merged").WithMeta("merged_into_id", item.MergedIntoID)
+	}
 
 	now := cmd.now().UTC()
 
@@ -50,7 +53,9 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 		if err != nil {
 			return appErrors.New(appErrors.CodeValidation, "invalid item kind")
 		}
-		item.ChangeKind(kind, now)
+		if err := item.ChangeKind(kind, now); err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
 	}
 
 	var provided domain.InternalCode

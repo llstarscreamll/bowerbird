@@ -139,3 +139,28 @@ func TestNewMatchMemory(t *testing.T) {
 	assert.True(t, never.IsNeverMatch())
 	assert.Equal(t, "ITEM-BAD", never.LinkedItemID())
 }
+
+func TestUnionAliasesReassignsAndDropsCollidingTuple(t *testing.T) {
+	party := "P1"
+	held := []Alias{{ID: "H1", ItemID: "A", Scheme: AliasSchemeSupplierSKU, Value: "SKU-1", PartyID: &party, Source: AliasSourceManual}}
+	incoming := []Alias{
+		{ID: "I1", ItemID: "B", Scheme: AliasSchemeSupplierSKU, Value: "SKU-1", PartyID: &party, Source: AliasSourceInvoice},
+		{ID: "I2", ItemID: "B", Scheme: AliasSchemeGTIN, Value: "7701234567890", Source: AliasSourceInvoice},
+	}
+	reassign, deleteIDs, err := UnionAliases("A", held, incoming)
+	require.NoError(t, err)
+	require.Equal(t, []string{"I1"}, deleteIDs)
+	require.Len(t, reassign, 1)
+	assert.Equal(t, "A", reassign[0].ItemID)
+	assert.Equal(t, "I2", reassign[0].ID)
+	assert.Equal(t, AliasSourceInvoice, reassign[0].Source)
+}
+
+func TestPickMergeNameAndKind(t *testing.T) {
+	mint := Item{Name: "SKU", Kind: KindUnknown, CreationSource: CreationSourceInvoice}
+	master := Item{Name: "Widget largo", Kind: KindGoods, CreationSource: CreationSourceManual}
+	assert.Equal(t, "Widget largo", PickMergeName(mint, []Item{master}))
+	assert.Equal(t, "Kept", PickMergeName(Item{Name: "Kept", CreationSource: CreationSourceManual}, []Item{master}))
+	assert.Equal(t, KindGoods, PickMergeKind(mint, []Item{master}))
+	assert.Equal(t, KindService, PickMergeKind(Item{Kind: KindService}, []Item{master}))
+}
