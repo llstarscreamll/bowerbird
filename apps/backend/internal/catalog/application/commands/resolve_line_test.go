@@ -44,6 +44,15 @@ func (m *memItems) GetItemNames(ctx context.Context, ids []string) (map[string]s
 	}
 	return out, nil
 }
+func (m *memItems) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
+	out := make([]domain.Item, 0, len(ids))
+	for _, id := range ids {
+		if item, ok := m.items[id]; ok {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
 func (m *memItems) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	out := make([]domain.Item, 0, len(m.items))
 	for _, i := range m.items {
@@ -84,9 +93,6 @@ func (m *memAliases) CreateAlias(ctx context.Context, alias domain.Alias) error 
 	m.byKey[key] = alias
 	return nil
 }
-func (m *memAliases) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
-	return map[string]string{}, nil
-}
 
 func (m *memAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	a, ok := m.byKey[aliasKey(scheme, partyID, value)]
@@ -115,6 +121,9 @@ func (s *catalogStore) GetItemByID(ctx context.Context, id string) (*domain.Item
 func (s *catalogStore) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
 	return s.items.GetItemNames(ctx, ids)
 }
+func (s *catalogStore) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
+	return s.items.GetItemsByIDs(ctx, ids)
+}
 func (s *catalogStore) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	return s.items.ListItems(ctx, filter)
 }
@@ -126,9 +135,6 @@ func (s *catalogStore) CreateAlias(ctx context.Context, alias domain.Alias) erro
 }
 func (s *catalogStore) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
 	return s.aliases.FindBySchemePartyValue(ctx, scheme, partyID, value)
-}
-func (s *catalogStore) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
-	return s.aliases.ListInternalSKUsByItemIDs(ctx, itemIDs)
 }
 
 func (s *catalogStore) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
@@ -148,16 +154,6 @@ func (s *catalogStore) CreateItemWithAlias(ctx context.Context, item domain.Item
 	if err := s.aliases.CreateAlias(ctx, alias); err != nil {
 		delete(s.items.items, item.ID)
 		return err
-	}
-	return nil
-}
-
-func (s *catalogStore) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
-	if err := s.items.UpdateItem(ctx, item); err != nil {
-		return err
-	}
-	if alias != nil {
-		return s.aliases.CreateAlias(ctx, *alias)
 	}
 	return nil
 }
@@ -301,9 +297,6 @@ type raceAliases struct {
 
 func (r *raceAliases) CreateAlias(ctx context.Context, alias domain.Alias) error {
 	return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
-}
-func (r *raceAliases) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
-	return map[string]string{}, nil
 }
 
 func (r *raceAliases) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {

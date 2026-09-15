@@ -8,28 +8,18 @@ import (
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
-// ItemView is the HTTP/read-model projection of a catalog item plus canonical SKU.
-type ItemView struct {
-	Item        domain.Item
-	InternalSKU *string
-}
-
 type GetItemByIDQuery struct {
-	items   ports.ItemRepository
-	aliases ports.AliasRepository
+	items ports.ItemRepository
 }
 
-func NewGetItemByIDQuery(items ports.ItemRepository, aliases ports.AliasRepository) *GetItemByIDQuery {
+func NewGetItemByIDQuery(items ports.ItemRepository) *GetItemByIDQuery {
 	if items == nil {
 		panic("item repository is required")
 	}
-	if aliases == nil {
-		panic("alias repository is required")
-	}
-	return &GetItemByIDQuery{items: items, aliases: aliases}
+	return &GetItemByIDQuery{items: items}
 }
 
-func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*ItemView, error) {
+func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*domain.Item, error) {
 	item, err := q.items.GetItemByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -37,14 +27,5 @@ func (q *GetItemByIDQuery) Execute(ctx context.Context, id string) (*ItemView, e
 	if item == nil {
 		return nil, appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
-	skus, err := q.aliases.ListInternalSKUsByItemIDs(ctx, []string{item.ID})
-	if err != nil {
-		return nil, err
-	}
-	view := &ItemView{Item: *item}
-	if sku, ok := skus[item.ID]; ok && sku != "" {
-		s := sku
-		view.InternalSKU = &s
-	}
-	return view, nil
+	return item, nil
 }

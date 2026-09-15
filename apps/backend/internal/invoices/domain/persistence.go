@@ -110,6 +110,6 @@ type InvoiceLineRecord struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	// Display-only enrichment from catalog (not persisted).
-	ItemName string
-	ItemSKU  string
+	ItemName         string
+	ItemInternalCode string
 }

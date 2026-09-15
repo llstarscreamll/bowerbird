@@ -11,6 +11,7 @@ type ItemRepository interface {
 	UpdateItem(ctx context.Context, item domain.Item) error
 	GetItemByID(ctx context.Context, id string) (*domain.Item, error)
 	GetItemNames(ctx context.Context, ids []string) (map[string]string, error)
+	GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error)
 	ListItems(ctx context.Context, filter ItemListFilter) ([]domain.Item, error)
 	FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error)
 }
@@ -25,16 +26,12 @@ type ItemListFilter struct {
 type AliasRepository interface {
 	CreateAlias(ctx context.Context, alias domain.Alias) error
 	FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error)
-	ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error)
 }
 
-// CatalogWriteRepository is the persistence ACL for Item + canonical InternalSKU.
-// Internal SKU is an Alias (scheme=internal_sku), not a column on catalog_items;
-// create/update must keep Item and that alias in one transaction so domain
-// invariants (required SKU on manual create / confirm, SKU immutability) hold.
+// CatalogWriteRepository persists an Item together with a supplier alias in one TX
+// (provisional mint on invoice ingest).
 type CatalogWriteRepository interface {
 	CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error
-	UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error
 }
 
 type MatchMemoryRepository interface {

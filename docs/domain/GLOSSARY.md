@@ -35,14 +35,15 @@ This glossary defines the ubiquitous language for the Bowerbird project, mapping
 
 ## Catalog & Inventory
 
-| Term (ES / Business)            | Meaning / Context                                                                                                                                                             | Code (EN)                                    |
-| :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
-| **Catálogo**                    | The master list of products, services, or assets.                                                                                                                             | `Catalog`                                    |
-| **Producto / Servicio**         | A single entry in the catalog.                                                                                                                                                | `Item`                                       |
-| **Tipo de Ítem**                | Whether the item is a physical good, service, or asset.                                                                                                                       | `Kind` (`Goods`, `Service`, `Asset`)         |
-| **SKU / Código Externo**        | A code used by a supplier or internally to identify an item.                                                                                                                  | `Alias` (e.g., `SupplierSKU`, `InternalSKU`) |
-| **Emparejamiento / Enlace**     | The act of linking an invoice line item to a catalog item.                                                                                                                    | `Match`, `Link` (e.g., `MatchMemory`)        |
-| **Acuñar / Mint (provisional)** | Auto-create a provisional catalog item from invoice line evidence (supplier party + item code), attach a `supplier_sku` alias, and link the line. Not a manual master create. | `Mint`, `mintProvisional`, `Provisional`     |
+| Term (ES / Business)            | Meaning / Context                                                                                                                                                             | Code (EN)                                |
+| :------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------- |
+| **Catálogo**                    | The master list of products, services, or assets.                                                                                                                             | `Catalog`                                |
+| **Producto / Servicio**         | A single entry in the catalog.                                                                                                                                                | `Item`                                   |
+| **Tipo de Ítem**                | Whether the item is a physical good, service, or asset.                                                                                                                       | `Kind` (`Goods`, `Service`, `Asset`)     |
+| **Código interno**              | Tenant-canonical item code on the catalog item. Required on manual create and when confirming a provisional; immutable once set. Not a supplier identifier.                   | `InternalCode` (column on `Item`)        |
+| **SKU / Código de proveedor**   | A supplier-scoped code that maps an invoice line onto a catalog item.                                                                                                         | `Alias` (`SupplierSKU`)                  |
+| **Emparejamiento / Enlace**     | The act of linking an invoice line item to a catalog item.                                                                                                                    | `Match`, `Link` (e.g., `MatchMemory`)    |
+| **Acuñar / Mint (provisional)** | Auto-create a provisional catalog item from invoice line evidence (supplier party + item code), attach a `supplier_sku` alias, and link the line. Not a manual master create. | `Mint`, `mintProvisional`, `Provisional` |
 
 ## Platform & Integrations
 

@@ -47,7 +47,7 @@ import { creationSourceLabel } from '../../../domain/catalog.model';
             <thead hlmTHead>
               <tr hlmTr>
                 <th hlmTh>Nombre</th>
-                <th hlmTh>SKU</th>
+                <th hlmTh>Código interno</th>
                 <th hlmTh>Tipo</th>
                 <th hlmTh>Origen</th>
                 <th hlmTh>Estado</th>
@@ -57,7 +57,7 @@ import { creationSourceLabel } from '../../../domain/catalog.model';
               @for (item of store.items(); track item.id) {
                 <tr hlmTr class="cursor-pointer hover:bg-muted/40" (click)="openDetail(item.id)">
                   <td hlmTd class="font-medium">{{ item.name }}</td>
-                  <td hlmTd class="text-muted-foreground">{{ item.internal_sku || '—' }}</td>
+                  <td hlmTd class="text-muted-foreground">{{ item.internal_code || '—' }}</td>
                   <td hlmTd>
                     <span hlmBadge variant="secondary">{{ item.kind }}</span>
                   </td>

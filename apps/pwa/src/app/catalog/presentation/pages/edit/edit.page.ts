@@ -22,7 +22,7 @@ import { CatalogItemFormComponent, CatalogItemFormMode, CatalogItemFormValue } f
       <header>
         <h1 class="text-2xl font-semibold tracking-tight">{{ formMode() === 'confirm' ? 'Confirmar ítem' : 'Editar ítem' }}</h1>
         <p class="mt-1 text-sm text-muted-foreground">
-          {{ formMode() === 'confirm' ? 'Asigna SKU interno y confirma el ítem provisional.' : 'Actualiza nombre, tipo o SKU (si aún no existe).' }}
+          {{ formMode() === 'confirm' ? 'Asigna código interno y confirma el ítem provisional.' : 'Actualiza nombre, tipo o código interno (si aún no existe).' }}
         </p>
       </header>
 
@@ -69,8 +69,8 @@ export class EditItemPage implements OnInit {
       name: value.name,
       kind: value.kind,
     };
-    if (!item.internal_sku && value.internal_sku) {
-      input.internal_sku = value.internal_sku;
+    if (!item.internal_code && value.internal_code) {
+      input.internal_code = value.internal_code;
     }
     if (this.formMode() === 'confirm') {
       input.status = 'confirmed';

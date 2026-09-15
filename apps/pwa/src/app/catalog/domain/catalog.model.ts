@@ -11,7 +11,7 @@ export interface CatalogItem {
   kind: string;
   status: string;
   creation_source: string;
-  internal_sku: string | null;
+  internal_code: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -20,14 +20,14 @@ export interface CreateCatalogItemInput {
   id: string;
   name: string;
   kind: string;
-  internal_sku: string;
+  internal_code: string;
 }
 
 export interface UpdateCatalogItemInput {
   name?: string;
   kind?: string;
   status?: string;
-  internal_sku?: string;
+  internal_code?: string;
 }
 
 export const CATALOG_KINDS = [

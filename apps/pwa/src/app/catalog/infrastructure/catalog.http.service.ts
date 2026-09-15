@@ -34,7 +34,7 @@ export class CatalogHttpService {
           attributes: {
             name: input.name,
             kind: input.kind,
-            internal_sku: input.internal_sku,
+            internal_code: input.internal_code,
           },
         },
       })

@@ -16,7 +16,7 @@ test.describe('cross-tenant X-Tenant-ID', () => {
         data: {
           type: 'catalog_items',
           id: itemId,
-          attributes: { name: 'Victim item', kind: 'goods', internal_sku: `SKU-VICTIM-${Date.now()}` },
+          attributes: { name: 'Victim item', kind: 'goods', internal_code: `SKU-VICTIM-${Date.now()}` },
         },
       },
     });

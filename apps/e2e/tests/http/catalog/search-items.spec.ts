@@ -6,7 +6,7 @@ import { newUlid } from '../../support/ulid';
 const OPERATION = 'GET /api/v1/catalog/items';
 
 test.describe(OPERATION, () => {
-  test('encuentra el ítem por SKU', async ({ sharedTenant, platformApi }) => {
+  test('encuentra el ítem por código interno', async ({ sharedTenant, platformApi }) => {
     // given
     const { auth, tenant } = sharedTenant;
     const id = newUlid();
@@ -21,7 +21,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name: `Search Item ${stamp}`, kind: 'service', internal_sku: sku },
+            attributes: { name: `Search Item ${stamp}`, kind: 'service', internal_code: sku },
           },
         },
       }),
@@ -34,12 +34,12 @@ test.describe(OPERATION, () => {
 
     // then
     await expectStatus(response, 200, OPERATION);
-    const payload = await readJson<{ data: Array<{ id: string; attributes: { internal_sku: string | null } }> }>(response, OPERATION);
+    const payload = await readJson<{ data: Array<{ id: string; attributes: { internal_code: string | null } }> }>(response, OPERATION);
     expect(
       payload.data.map((item) => item.id),
       `${OPERATION}: ids`,
     ).toContain(id);
-    expect(payload.data.find((item) => item.id === id)?.attributes.internal_sku, `${OPERATION}: internal_sku`).toBe(sku);
+    expect(payload.data.find((item) => item.id === id)?.attributes.internal_code, `${OPERATION}: internal_code`).toBe(sku);
   });
 
   test('no 500 ante inyección en search', async ({ sharedTenant, platformApi }) => {

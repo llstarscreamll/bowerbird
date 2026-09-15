@@ -8,10 +8,10 @@ import (
 
 var (
 	ErrInvalidItemKind           = errors.New("invalid catalog item kind")
-	ErrMissingInternalSKU        = errors.New("missing internal sku")
-	ErrInternalSKUImmutable      = errors.New("internal sku cannot be changed once set")
+	ErrMissingInternalCode       = errors.New("missing internal code")
+	ErrInternalCodeImmutable     = errors.New("internal code cannot be changed once set")
 	ErrItemAlreadyConfirmed      = errors.New("item is already confirmed")
-	ErrConfirmRequiresSKU        = errors.New("confirming a provisional item requires an internal sku")
+	ErrConfirmRequiresCode       = errors.New("confirming a provisional item requires an internal code")
 	ErrCannotRevertToProvisional = errors.New("cannot revert a confirmed item to provisional")
 	ErrInvalidItemStatus         = errors.New("invalid item status")
 )
@@ -35,28 +35,22 @@ func (k ItemKind) String() string { return k.value }
 
 func (k ItemKind) Equals(other ItemKind) bool { return k.value == other.value }
 
-// InternalSKU is the tenant-canonical item code (immutable once assigned).
-//
-// Persistence ACL: InternalSKU is not a column on catalog_items. It is stored as
-// an Alias with Scheme=internal_sku (party unset). The Item aggregate enforces
-// assignment/immutability rules; the application loads current SKU via
-// AliasRepository and persists new aliases via CatalogWriteRepository in the
-// same transaction as the Item.
-type InternalSKU struct {
+// InternalCode is the tenant-canonical item code (immutable once assigned).
+type InternalCode struct {
 	value string
 }
 
-func ParseInternalSKU(raw string) (InternalSKU, error) {
+func ParseInternalCode(raw string) (InternalCode, error) {
 	v := NormalizeItemCode(raw)
 	if v == "" {
-		return InternalSKU{}, ErrMissingInternalSKU
+		return InternalCode{}, ErrMissingInternalCode
 	}
-	return InternalSKU{value: v}, nil
+	return InternalCode{value: v}, nil
 }
 
-func (s InternalSKU) String() string { return s.value }
+func (c InternalCode) String() string { return c.value }
 
-func (s InternalSKU) Equals(other InternalSKU) bool { return s.value == other.value }
+func (c InternalCode) Equals(other InternalCode) bool { return c.value == other.value }
 
 func (i Item) IsConfirmed() bool {
 	return i.Status == StatusConfirmed
@@ -68,10 +62,8 @@ func (i Item) ItemKind() (ItemKind, error) {
 	return ParseItemKind(i.Kind)
 }
 
-// NewManualItem creates a user-confirmed catalog item.
-// The required InternalSKU must be persisted separately as an internal_sku Alias
-// in the same unit of work (see CatalogWriteRepository).
-func NewManualItem(id, name string, kind ItemKind, sku InternalSKU, now time.Time) (Item, error) {
+// NewManualItem creates a user-confirmed catalog item with a required internal code.
+func NewManualItem(id, name string, kind ItemKind, code InternalCode, now time.Time) (Item, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Item{}, ErrMissingItemName
@@ -79,8 +71,8 @@ func NewManualItem(id, name string, kind ItemKind, sku InternalSKU, now time.Tim
 	if strings.TrimSpace(id) == "" {
 		return Item{}, ErrItemIDRequired
 	}
-	if sku.value == "" {
-		return Item{}, ErrMissingInternalSKU
+	if code.value == "" {
+		return Item{}, ErrMissingInternalCode
 	}
 	now = now.UTC()
 	return Item{
@@ -89,31 +81,9 @@ func NewManualItem(id, name string, kind ItemKind, sku InternalSKU, now time.Tim
 		Kind:           kind.String(),
 		Status:         StatusConfirmed,
 		CreationSource: CreationSourceManual,
+		InternalCode:   code.String(),
 		CreatedAt:      now,
 		UpdatedAt:      now,
-	}, nil
-}
-
-// NewInternalSKUAlias creates an unscoped internal_sku alias for an item.
-func NewInternalSKUAlias(id, itemID string, sku InternalSKU, now time.Time) (Alias, error) {
-	if sku.value == "" {
-		return Alias{}, ErrMissingAliasValue
-	}
-	if strings.TrimSpace(itemID) == "" {
-		return Alias{}, ErrItemIDRequired
-	}
-	if strings.TrimSpace(id) == "" {
-		return Alias{}, ErrItemIDRequired
-	}
-	now = now.UTC()
-	return Alias{
-		ID:        id,
-		ItemID:    itemID,
-		Scheme:    AliasSchemeInternalSKU,
-		PartyID:   nil,
-		Value:     sku.String(),
-		CreatedAt: now,
-		UpdatedAt: now,
 	}, nil
 }
 
@@ -133,7 +103,7 @@ func (i *Item) ChangeKind(kind ItemKind, now time.Time) {
 }
 
 // InterpretMasterStatusChange validates a master-update status intent.
-// confirm=true means the caller must invoke Confirm (with SKU rules).
+// confirm=true means the caller must invoke Confirm (with internal-code rules).
 // Requesting provisional is a no-op when already provisional; it errors only
 // when attempting to revert a confirmed item.
 func (i Item) InterpretMasterStatusChange(requested string) (confirm bool, err error) {
@@ -153,43 +123,42 @@ func (i Item) InterpretMasterStatusChange(requested string) (confirm bool, err e
 	}
 }
 
-// Confirm transitions provisional → confirmed.
-// currentSKU / newSKU come from the Alias ACL (not Item fields): pass the
-// currently persisted internal_sku (if any) and an optional first assignment.
-func (i *Item) Confirm(currentSKU *InternalSKU, newSKU *InternalSKU, now time.Time) (sku InternalSKU, assignNew bool, err error) {
+// Confirm transitions provisional → confirmed. An internal code must already
+// exist or be supplied in the same operation.
+func (i *Item) Confirm(newCode *InternalCode, now time.Time) error {
 	if i.IsConfirmed() {
-		return InternalSKU{}, false, ErrItemAlreadyConfirmed
+		return ErrItemAlreadyConfirmed
 	}
 	if !i.IsProvisional() {
-		return InternalSKU{}, false, ErrConfirmRequiresSKU
+		return ErrConfirmRequiresCode
 	}
-	switch {
-	case currentSKU != nil && currentSKU.value != "":
-		sku = *currentSKU
-		assignNew = false
-	case newSKU != nil && newSKU.value != "":
-		sku = *newSKU
-		assignNew = true
-	default:
-		return InternalSKU{}, false, ErrConfirmRequiresSKU
+	if i.InternalCode == "" {
+		if newCode == nil {
+			return ErrConfirmRequiresCode
+		}
+		if err := i.AssignInternalCode(*newCode, now); err != nil {
+			return err
+		}
+	} else if newCode != nil && newCode.value != "" && newCode.value != i.InternalCode {
+		return ErrInternalCodeImmutable
 	}
 	i.Status = StatusConfirmed
 	i.UpdatedAt = now.UTC()
-	return sku, assignNew, nil
+	return nil
 }
 
-// AssignInternalSKU allows first assignment only; rejects changes when already set.
-// current must be the SKU loaded from the Alias ACL (nil/empty = not yet assigned).
-func (i *Item) AssignInternalSKU(current *InternalSKU, next InternalSKU, now time.Time) (assignNew bool, err error) {
+// AssignInternalCode allows first assignment only; rejects changes when already set.
+func (i *Item) AssignInternalCode(next InternalCode, now time.Time) error {
 	if next.value == "" {
-		return false, ErrMissingInternalSKU
+		return ErrMissingInternalCode
 	}
-	if current != nil && current.value != "" {
-		if !current.Equals(next) {
-			return false, ErrInternalSKUImmutable
+	if i.InternalCode != "" {
+		if i.InternalCode != next.value {
+			return ErrInternalCodeImmutable
 		}
-		return false, nil
+		return nil
 	}
+	i.InternalCode = next.String()
 	i.UpdatedAt = now.UTC()
-	return true, nil
+	return nil
 }

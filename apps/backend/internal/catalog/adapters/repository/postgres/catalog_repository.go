@@ -29,16 +29,34 @@ var (
 	_ ports.MatchMemoryRepository  = (*CatalogRepository)(nil)
 )
 
+const itemSelectCols = `id, name, kind, status, creation_source, COALESCE(internal_code, ''), created_at, updated_at`
+
+type itemScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanItem(s itemScanner) (domain.Item, error) {
+	var item domain.Item
+	err := s.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.InternalCode, &item.CreatedAt, &item.UpdatedAt)
+	return item, err
+}
+
 func (r *CatalogRepository) CreateItem(ctx context.Context, item domain.Item) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	_, err = pool.Exec(ctx, `
-		INSERT INTO catalog_items (id, name, kind, status, creation_source, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, item.CreatedAt, item.UpdatedAt)
+		INSERT INTO catalog_items (id, name, kind, status, creation_source, internal_code, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, nullIfEmpty(item.InternalCode), item.CreatedAt, item.UpdatedAt)
 	if err != nil {
+		if isInternalCodeConflict(err) {
+			return appErrors.New(appErrors.CodeConflict, "an item with this internal code already exists")
+		}
+		if isUniqueViolation(err) {
+			return appErrors.New(appErrors.CodeConflict, "a catalog item with this id already exists")
+		}
 		return fmt.Errorf("create catalog item: %w", err)
 	}
 	return nil
@@ -50,9 +68,12 @@ func (r *CatalogRepository) UpdateItem(ctx context.Context, item domain.Item) er
 		return fmt.Errorf("get tenant db pool: %w", err)
 	}
 	tag, err := pool.Exec(ctx, `
-		UPDATE catalog_items SET name=$2, kind=$3, status=$4, updated_at=$5 WHERE id=$1
-	`, item.ID, item.Name, item.Kind, item.Status, item.UpdatedAt)
+		UPDATE catalog_items SET name=$2, kind=$3, status=$4, internal_code=$5, updated_at=$6 WHERE id=$1
+	`, item.ID, item.Name, item.Kind, item.Status, nullIfEmpty(item.InternalCode), item.UpdatedAt)
 	if err != nil {
+		if isInternalCodeConflict(err) {
+			return appErrors.New(appErrors.CodeConflict, "an item with this internal code already exists")
+		}
 		return fmt.Errorf("update catalog item: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
@@ -66,10 +87,7 @@ func (r *CatalogRepository) GetItemByID(ctx context.Context, id string) (*domain
 	if err != nil {
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
-	var item domain.Item
-	err = pool.QueryRow(ctx, `
-		SELECT id, name, kind, status, creation_source, created_at, updated_at FROM catalog_items WHERE id=$1
-	`, id).Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt)
+	item, err := scanItem(pool.QueryRow(ctx, `SELECT `+itemSelectCols+` FROM catalog_items WHERE id=$1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -81,40 +99,37 @@ func (r *CatalogRepository) GetItemByID(ctx context.Context, id string) (*domain
 
 func (r *CatalogRepository) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
 	out := make(map[string]string, len(ids))
-	if len(ids) == 0 {
-		return out, nil
+	items, err := r.GetItemsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		out[item.ID] = item.Name
+	}
+	return out, nil
+}
+
+func (r *CatalogRepository) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
+	unique := uniqueIDs(ids)
+	if len(unique) == 0 {
+		return nil, nil
 	}
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
-	unique := make([]string, 0, len(ids))
-	seen := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		unique = append(unique, id)
-	}
-	if len(unique) == 0 {
-		return out, nil
-	}
-	rows, err := pool.Query(ctx, `SELECT id, name FROM catalog_items WHERE id = ANY($1)`, unique)
+	rows, err := pool.Query(ctx, `SELECT `+itemSelectCols+` FROM catalog_items WHERE id = ANY($1)`, unique)
 	if err != nil {
-		return nil, fmt.Errorf("get catalog item names: %w", err)
+		return nil, fmt.Errorf("get catalog items by ids: %w", err)
 	}
 	defer rows.Close()
+	out := make([]domain.Item, 0, len(unique))
 	for rows.Next() {
-		var id, name string
-		if err := rows.Scan(&id, &name); err != nil {
+		item, err := scanItem(rows)
+		if err != nil {
 			return nil, err
 		}
-		out[id] = name
+		out = append(out, item)
 	}
 	return out, rows.Err()
 }
@@ -124,7 +139,7 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	if err != nil {
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
-	query := `SELECT id, name, kind, status, creation_source, created_at, updated_at FROM catalog_items WHERE 1=1`
+	query := `SELECT ` + itemSelectCols + ` FROM catalog_items WHERE 1=1`
 	args := []any{}
 	n := 1
 	if filter.Kind != "" {
@@ -143,9 +158,9 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 		n++
 	}
 	if search := strings.TrimSpace(filter.Search); search != "" {
-		query += fmt.Sprintf(` AND (name ILIKE $%d OR EXISTS (
+		query += fmt.Sprintf(` AND (name ILIKE $%d OR internal_code ILIKE $%d OR EXISTS (
 			SELECT 1 FROM catalog_item_aliases a WHERE a.item_id = catalog_items.id AND a.value ILIKE $%d
-		))`, n, n)
+		))`, n, n, n)
 		args = append(args, "%"+search+"%")
 	}
 	query += ` ORDER BY name ASC`
@@ -156,8 +171,8 @@ func (r *CatalogRepository) ListItems(ctx context.Context, filter ports.ItemList
 	defer rows.Close()
 	out := make([]domain.Item, 0)
 	for rows.Next() {
-		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		item, err := scanItem(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -171,7 +186,7 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 		return nil, fmt.Errorf("get tenant db pool: %w", err)
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT id, name, kind, status, creation_source, created_at, updated_at
+		SELECT `+itemSelectCols+`
 		FROM catalog_items
 		WHERE lower(regexp_replace(btrim(name), '\s+', ' ', 'g')) = $1
 	`, normalizedDesc)
@@ -181,8 +196,8 @@ func (r *CatalogRepository) FindByNormalizedDescription(ctx context.Context, nor
 	defer rows.Close()
 	out := make([]domain.Item, 0)
 	for rows.Next() {
-		var item domain.Item
-		if err := rows.Scan(&item.ID, &item.Name, &item.Kind, &item.Status, &item.CreationSource, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		item, err := scanItem(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -230,50 +245,6 @@ func (r *CatalogRepository) FindBySchemePartyValue(ctx context.Context, scheme, 
 	return &alias, nil
 }
 
-func (r *CatalogRepository) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
-	out := make(map[string]string, len(itemIDs))
-	if len(itemIDs) == 0 {
-		return out, nil
-	}
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get tenant db pool: %w", err)
-	}
-	unique := make([]string, 0, len(itemIDs))
-	seen := make(map[string]struct{}, len(itemIDs))
-	for _, id := range itemIDs {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		unique = append(unique, id)
-	}
-	if len(unique) == 0 {
-		return out, nil
-	}
-	rows, err := pool.Query(ctx, `
-		SELECT item_id, value
-		FROM catalog_item_aliases
-		WHERE scheme = $1 AND item_id = ANY($2)
-	`, domain.AliasSchemeInternalSKU, unique)
-	if err != nil {
-		return nil, fmt.Errorf("list internal skus: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var itemID, value string
-		if err := rows.Scan(&itemID, &value); err != nil {
-			return nil, err
-		}
-		out[itemID] = value
-	}
-	return out, rows.Err()
-}
-
 func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {
@@ -286,9 +257,12 @@ func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO catalog_items (id, name, kind, status, creation_source, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, item.CreatedAt, item.UpdatedAt); err != nil {
+		INSERT INTO catalog_items (id, name, kind, status, creation_source, internal_code, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, item.ID, item.Name, item.Kind, item.Status, item.CreationSource, nullIfEmpty(item.InternalCode), item.CreatedAt, item.UpdatedAt); err != nil {
+		if isInternalCodeConflict(err) {
+			return appErrors.New(appErrors.CodeConflict, "an item with this internal code already exists")
+		}
 		if isUniqueViolation(err) {
 			return appErrors.New(appErrors.CodeConflict, "a catalog item with this id already exists")
 		}
@@ -305,43 +279,6 @@ func (r *CatalogRepository) CreateItemWithAlias(ctx context.Context, item domain
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit create item+alias: %w", err)
-	}
-	return nil
-}
-
-func (r *CatalogRepository) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
-	pool, err := r.registry.GetPool(ctx)
-	if err != nil {
-		return fmt.Errorf("get tenant db pool: %w", err)
-	}
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	tag, err := tx.Exec(ctx, `
-		UPDATE catalog_items SET name=$2, kind=$3, status=$4, updated_at=$5 WHERE id=$1
-	`, item.ID, item.Name, item.Kind, item.Status, item.UpdatedAt)
-	if err != nil {
-		return fmt.Errorf("update catalog item: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
-	}
-	if alias != nil {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO catalog_item_aliases (id, item_id, scheme, party_id, value, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-		`, alias.ID, alias.ItemID, alias.Scheme, alias.PartyID, alias.Value, alias.CreatedAt, alias.UpdatedAt); err != nil {
-			if isUniqueViolation(err) {
-				return appErrors.New(appErrors.CodeConflict, "an alias with this scheme, party, and value already exists")
-			}
-			return fmt.Errorf("create alias: %w", err)
-		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit update item: %w", err)
 	}
 	return nil
 }
@@ -395,9 +332,31 @@ func (r *CatalogRepository) FindMemoryByEvidenceKey(ctx context.Context, evidenc
 	return &mem, nil
 }
 
+func uniqueIDs(ids []string) []string {
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	return unique
+}
+
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func isInternalCodeConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "ux_catalog_items_internal_code"
 }
 
 func nullIfEmpty(s string) *string {

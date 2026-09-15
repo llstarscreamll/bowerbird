@@ -58,8 +58,8 @@ import { creationSourceLabel } from '../../../domain/catalog.model';
               <p class="font-medium">{{ item.status }}</p>
             </div>
             <div>
-              <p class="text-muted-foreground">SKU interno</p>
-              <p class="font-medium">{{ item.internal_sku || '—' }}</p>
+              <p class="text-muted-foreground">Código interno</p>
+              <p class="font-medium">{{ item.internal_code || '—' }}</p>
             </div>
             <div>
               <p class="text-muted-foreground">Creado</p>

@@ -9,7 +9,7 @@ export type CatalogItemFormMode = 'create' | 'edit' | 'confirm';
 export interface CatalogItemFormValue {
   name: string;
   kind: string;
-  internal_sku: string;
+  internal_code: string;
 }
 
 @Component({
@@ -47,17 +47,17 @@ export interface CatalogItemFormValue {
       </div>
 
       <div class="space-y-1.5">
-        <label class="text-sm font-medium" for="catalog-item-sku">SKU interno</label>
+        <label class="text-sm font-medium" for="catalog-item-internal-code">Código interno</label>
         <input
-          id="catalog-item-sku"
-          name="internal_sku"
-          formControlName="internal_sku"
+          id="catalog-item-internal-code"
+          name="internal_code"
+          formControlName="internal_code"
           autocomplete="off"
-          [required]="skuRequired"
+          [required]="codeRequired"
           class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
         />
-        @if (skuReadonly) {
-          <p class="text-xs text-muted-foreground">El SKU interno no se puede cambiar una vez asignado.</p>
+        @if (codeReadonly) {
+          <p class="text-xs text-muted-foreground">El código interno no se puede cambiar una vez asignado.</p>
         } @else if (mode() === 'confirm') {
           <p class="text-xs text-muted-foreground">Obligatorio para confirmar un ítem provisional.</p>
         }
@@ -88,7 +88,7 @@ export class CatalogItemFormComponent {
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
     kind: ['goods', Validators.required],
-    internal_sku: [''],
+    internal_code: [''],
   });
 
   constructor() {
@@ -98,19 +98,19 @@ export class CatalogItemFormComponent {
         this.form.patchValue({
           name: item.name,
           kind: item.kind || 'unknown',
-          internal_sku: item.internal_sku ?? '',
+          internal_code: item.internal_code ?? '',
         });
       }
-      this.applySkuRules();
+      this.applyCodeRules();
     });
   }
 
-  get skuReadonly(): boolean {
-    return this.mode() !== 'create' && !!this.initial()?.internal_sku;
+  get codeReadonly(): boolean {
+    return this.mode() !== 'create' && !!this.initial()?.internal_code;
   }
 
-  get skuRequired(): boolean {
-    return this.mode() === 'create' || this.mode() === 'confirm' || !this.initial()?.internal_sku;
+  get codeRequired(): boolean {
+    return this.mode() === 'create' || this.mode() === 'confirm' || !this.initial()?.internal_code;
   }
 
   get submitLabel(): string {
@@ -119,14 +119,14 @@ export class CatalogItemFormComponent {
     return 'Guardar cambios';
   }
 
-  private applySkuRules(): void {
-    const ctrl = this.form.controls.internal_sku;
-    if (this.skuReadonly) {
+  private applyCodeRules(): void {
+    const ctrl = this.form.controls.internal_code;
+    if (this.codeReadonly) {
       ctrl.disable({ emitEvent: false });
       ctrl.clearValidators();
     } else {
       ctrl.enable({ emitEvent: false });
-      ctrl.setValidators(this.skuRequired ? [Validators.required] : []);
+      ctrl.setValidators(this.codeRequired ? [Validators.required] : []);
     }
     ctrl.updateValueAndValidity({ emitEvent: false });
   }
@@ -137,7 +137,7 @@ export class CatalogItemFormComponent {
     this.submitted.emit({
       name: raw.name.trim(),
       kind: raw.kind,
-      internal_sku: raw.internal_sku.trim(),
+      internal_code: raw.internal_code.trim(),
     });
   }
 }

@@ -28,7 +28,6 @@ const (
 	CreationSourceInvoice = "invoice"
 
 	AliasSchemeSupplierSKU = "supplier_sku"
-	AliasSchemeInternalSKU = "internal_sku"
 
 	LinkStatusUnmatched = "unmatched"
 	LinkStatusSuggested = "suggested"
@@ -54,14 +53,15 @@ const (
 //   - Kind/Status are strings for storage; mutate only via domain factories/methods
 //     (NewManualItem, NewProvisionalItem, ChangeKind, Confirm, …). Use ItemKind() to
 //     read Kind as a value object.
-//   - Canonical InternalSKU is NOT a field here — it lives in Alias (scheme=internal_sku).
-//     Application loads/saves that alias in the same TX as Item (CatalogWriteRepository).
+//   - InternalCode is the tenant-canonical item code (empty until assigned). It is
+//     not an Alias; supplier identifiers live on Alias (scheme=supplier_sku).
 type Item struct {
 	ID             string
 	Name           string
 	Kind           string // persistence; prefer ItemKind() / ChangeKind in domain logic
 	Status         string
 	CreationSource string
+	InternalCode   string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

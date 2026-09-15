@@ -27,7 +27,7 @@ The system SHALL store each catalog item with a kind of `goods`, `service`, `ass
 
 ### Requirement: Item aliases
 
-The system SHALL support multiple external identifiers (aliases) per item. An alias MUST include a scheme (at least `supplier_sku` and `internal_sku`), a value, and optional scope (party id for supplier-scoped codes). Within a tenant, the tuple (scheme, scope party id or none, value) MUST be unique.
+The system SHALL support multiple external identifiers (aliases) per item. An alias MUST include a scheme (at least `supplier_sku`), a value, and optional scope (party id for supplier-scoped codes). The tenant-canonical internal code is an attribute of the item, not an alias. Within a tenant, the tuple (scheme, scope party id or none, value) MUST be unique.
 
 #### Scenario: Supplier-scoped SKU
 
@@ -121,7 +121,7 @@ The system SHALL persist an immutable `creation_source` on each catalog item wit
 
 #### Scenario: Update does not change creation source
 
-- **WHEN** a catalog item is updated (rename, kind, SKU assignment)
+- **WHEN** a catalog item is updated (rename, kind, internal code assignment)
 - **THEN** its stored `creation_source` remains unchanged
 
 ### Requirement: Stock side effects forbidden
@@ -158,21 +158,21 @@ Authorized tenant users MUST be able to list catalog items filtered by `creation
 
 ### Requirement: Manual create of catalog item
 
-Authorized tenant users MUST be able to create a catalog item without an invoice line. The client MUST supply the item id as a valid ULID. Manual create MUST require a non-empty internal SKU and MUST persist the item with status `confirmed` and `creation_source` `manual`. The system MUST reject create when the internal SKU conflicts with an existing internal SKU in the tenant. The public create contract MUST express the internal SKU as an item attribute and MUST NOT require clients to manage alias resources. Create MUST be atomic with respect to the item and its internal SKU (no persisted item without the required SKU, and no orphan SKU without the item). The create contract MUST NOT include a stockable attribute.
+Authorized tenant users MUST be able to create a catalog item without an invoice line. The client MUST supply the item id as a valid ULID. Manual create MUST require a non-empty internal code and MUST persist the item with status `confirmed` and `creation_source` `manual`. The system MUST reject create when the internal code conflicts with an existing internal code in the tenant. The public create contract MUST express the internal code as an item attribute (`internal_code`) persisted on the catalog item (not as an alias resource). Create MUST be atomic with respect to the item and its internal code. The create contract MUST NOT include a stockable attribute.
 
 #### Scenario: Successful manual create
 
-- **WHEN** a user creates an item with a client-generated ULID, name, kind, and internal SKU
-- **THEN** the item is persisted with status `confirmed`, `creation_source` `manual`, and that internal SKU is available on subsequent reads of the item
+- **WHEN** a user creates an item with a client-generated ULID, name, kind, and internal code
+- **THEN** the item is persisted with status `confirmed`, `creation_source` `manual`, and that internal code is available on subsequent reads of the item
 
-#### Scenario: Reject create without internal SKU
+#### Scenario: Reject create without internal code
 
-- **WHEN** a user attempts to create an item without an internal SKU
+- **WHEN** a user attempts to create an item without an internal code
 - **THEN** the system rejects the request with a validation error
 
-#### Scenario: Reject duplicate internal SKU on create
+#### Scenario: Reject duplicate internal code on create
 
-- **WHEN** a user creates an item whose internal SKU already exists for another item in the tenant
+- **WHEN** a user creates an item whose internal code already exists for another item in the tenant
 - **THEN** the system rejects the request with a conflict error
 
 #### Scenario: Reject invalid client id
@@ -187,45 +187,45 @@ Authorized tenant users MUST be able to create a catalog item without an invoice
 
 ### Requirement: Update catalog item
 
-Authorized tenant users MUST be able to rename an item and change its kind. Confirming a provisional item (transition to `confirmed`) MUST require an internal SKU (already assigned or provided in the same update). The system MUST NOT allow reassigning an internal SKU once it is set. The system MUST NOT expose supplier-alias management on the item update surface of this capability. First assignment of an internal SKU (including as part of confirmation) MUST be atomic with the item update. Domain invariants for confirmation and SKU immutability MUST be enforced in the catalog item model (not only at the transport layer). The update contract MUST NOT include a stockable attribute.
+Authorized tenant users MUST be able to rename an item and change its kind. Confirming a provisional item (transition to `confirmed`) MUST require an internal code (already assigned or provided in the same update). The system MUST NOT allow reassigning an internal code once it is set. The system MUST NOT expose supplier-alias management on the item update surface of this capability. First assignment of an internal code (including as part of confirmation) MUST be persisted on the catalog item in the same update. Domain invariants for confirmation and internal-code immutability MUST be enforced in the catalog item model (not only at the transport layer). The update contract MUST NOT include a stockable attribute.
 
 #### Scenario: Rename and change kind
 
 - **WHEN** a user renames an item and changes its kind
-- **THEN** the changes are persisted and the internal SKU (if any) remains unchanged
+- **THEN** the changes are persisted and the internal code (if any) remains unchanged
 
-#### Scenario: Confirm provisional with internal SKU
+#### Scenario: Confirm provisional with internal code
 
-- **WHEN** a user confirms a provisional item and supplies a new internal SKU (or one already exists)
-- **THEN** the item becomes `confirmed` and the internal SKU is stored if it was missing
+- **WHEN** a user confirms a provisional item and supplies a new internal code (or one already exists)
+- **THEN** the item becomes `confirmed` and the internal code is stored if it was missing
 
-#### Scenario: Reject confirm without internal SKU
+#### Scenario: Reject confirm without internal code
 
-- **WHEN** a user attempts to confirm a provisional item that has no internal SKU and does not provide one
+- **WHEN** a user attempts to confirm a provisional item that has no internal code and does not provide one
 - **THEN** the system rejects the request with a validation error
 
-#### Scenario: Reject reassignment of internal SKU
+#### Scenario: Reject reassignment of internal code
 
-- **WHEN** a user attempts to assign a different internal SKU after one was already set
+- **WHEN** a user attempts to assign a different internal code after one was already set
 - **THEN** the system rejects the request with a validation or conflict error
 
 ### Requirement: View catalog item detail
 
-Authorized tenant users MUST be able to open a single catalog item and see its id, name, kind, status, `creation_source`, timestamps, and internal SKU when present. The detail view of this capability MUST NOT require displaying supplier aliases and MUST NOT expose a stockable attribute.
+Authorized tenant users MUST be able to open a single catalog item and see its id, name, kind, status, `creation_source`, timestamps, and internal code when present. The detail view of this capability MUST NOT require displaying supplier aliases and MUST NOT expose a stockable attribute.
 
 #### Scenario: Open item detail
 
 - **WHEN** a user opens an item by id
-- **THEN** the system returns the item fields including `creation_source` and internal SKU when set
+- **THEN** the system returns the item fields including `creation_source` and internal code when set
 
-#### Scenario: Item without internal SKU
+#### Scenario: Item without internal code
 
-- **WHEN** a user opens a provisional item that has no internal SKU yet
-- **THEN** the system returns the item with an empty/absent internal SKU and its `creation_source`
+- **WHEN** a user opens a provisional item that has no internal code yet
+- **THEN** the system returns the item with an empty/absent internal code and its `creation_source`
 
 ### Requirement: Catalog master navigation for manual CRUD
 
-The catalog master MUST allow authorized users to start creating an item and to open an item's detail (and from detail, edit). Create and edit MUST share the same form component within the catalog feature. List responses used by the master SHOULD include the internal SKU when present so users can recognize items by code.
+The catalog master MUST allow authorized users to start creating an item and to open an item's detail (and from detail, edit). Create and edit MUST share the same form component within the catalog feature. List responses used by the master SHOULD include the internal code when present so users can recognize items by code.
 
 #### Scenario: Create from master
 

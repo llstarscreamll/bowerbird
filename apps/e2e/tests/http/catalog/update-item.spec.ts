@@ -19,7 +19,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name: `Before ${Date.now()}`, kind: 'goods', internal_sku: `SKU-PATCH-${Date.now()}` },
+            attributes: { name: `Before ${Date.now()}`, kind: 'goods', internal_code: `SKU-PATCH-${Date.now()}` },
           },
         },
       }),
@@ -54,7 +54,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name: 'Do not patch', kind: 'goods', internal_sku: `SKU-X-${Date.now()}` },
+            attributes: { name: 'Do not patch', kind: 'goods', internal_code: `SKU-X-${Date.now()}` },
           },
         },
       }),

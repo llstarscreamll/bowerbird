@@ -40,7 +40,7 @@ export interface InvoiceLine {
   line_total: number;
   item_id?: string | null;
   item_name?: string | null;
-  item_sku?: string | null;
+  item_internal_code?: string | null;
   link_status?: string;
   link_method?: string | null;
   link_locked?: boolean;

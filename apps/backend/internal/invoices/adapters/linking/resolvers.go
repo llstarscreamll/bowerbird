@@ -81,7 +81,7 @@ func (a *CatalogACL) GetItemDisplays(ctx context.Context, ids []string) (map[str
 	}
 	out := make(map[string]ports.ItemDisplay, len(raw))
 	for id, d := range raw {
-		out[id] = ports.ItemDisplay{Name: d.Name, InternalSKU: d.InternalSKU}
+		out[id] = ports.ItemDisplay{Name: d.Name, InternalCode: d.InternalCode}
 	}
 	return out, nil
 }

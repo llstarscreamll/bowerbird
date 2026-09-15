@@ -129,7 +129,7 @@ func (q *GetInvoiceByIDQuery) enrichLinkedItemDisplays(ctx context.Context, line
 		}
 		if d, ok := displays[lines[i].ItemID]; ok {
 			lines[i].ItemName = d.Name
-			lines[i].ItemSKU = d.InternalSKU
+			lines[i].ItemInternalCode = d.InternalCode
 		}
 	}
 	return nil

@@ -125,7 +125,7 @@ func (s *invoiceSupport) GetItemDisplays(ctx context.Context, ids []string) (map
 	}
 	out := make(map[string]api.ItemDisplay, len(raw))
 	for id, display := range raw {
-		out[id] = api.ItemDisplay{Name: display.Name, InternalSKU: display.InternalSKU}
+		out[id] = api.ItemDisplay{Name: display.Name, InternalCode: display.InternalCode}
 	}
 	return out, nil
 }

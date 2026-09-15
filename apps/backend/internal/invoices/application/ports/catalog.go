@@ -4,8 +4,8 @@ import "context"
 
 // ItemDisplay is the catalog projection needed to render a linked invoice line.
 type ItemDisplay struct {
-	Name        string
-	InternalSKU string
+	Name         string
+	InternalCode string
 }
 
 // CatalogService is an anti-corruption port for resolving catalog item display data

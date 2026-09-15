@@ -20,7 +20,7 @@ import { CatalogItemFormComponent, CatalogItemFormValue } from '../../components
       </a>
       <header>
         <h1 class="text-2xl font-semibold tracking-tight">Nuevo ítem</h1>
-        <p class="mt-1 text-sm text-muted-foreground">Crea un ítem confirmado con SKU interno obligatorio.</p>
+        <p class="mt-1 text-sm text-muted-foreground">Crea un ítem confirmado con código interno obligatorio.</p>
       </header>
 
       @if (store.errorMessage(); as err) {
@@ -48,7 +48,7 @@ export class NewItemPage {
         id: generateUlid(),
         name: value.name,
         kind: value.kind,
-        internal_sku: value.internal_sku,
+        internal_code: value.internal_code,
       })
       .subscribe((item) => {
         if (item) void this.router.navigate(['..', item.id], { relativeTo: this.route });

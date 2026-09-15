@@ -23,7 +23,7 @@ test.describe(OPERATION, () => {
         data: {
           type: 'catalog_items',
           id,
-          attributes: { name, kind: 'goods', internal_sku: sku },
+          attributes: { name, kind: 'goods', internal_code: sku },
         },
       },
     });
@@ -31,13 +31,13 @@ test.describe(OPERATION, () => {
     // then
     await expectStatus(response, 201, OPERATION);
     const payload = await readJson<{
-      data: { type: string; id: string; attributes: { name: string; kind: string; internal_sku: string | null; status: string } };
+      data: { type: string; id: string; attributes: { name: string; kind: string; internal_code: string | null; status: string } };
     }>(response, OPERATION);
     expect(payload.data.type, `${OPERATION}: data.type`).toBe('catalog_items');
     expect(payload.data.id, `${OPERATION}: data.id`).toBe(id);
     expect(payload.data.attributes.name, `${OPERATION}: name`).toBe(name);
     expect(payload.data.attributes.kind, `${OPERATION}: kind`).toBe('goods');
-    expect(payload.data.attributes.internal_sku, `${OPERATION}: internal_sku`).toBe(sku);
+    expect(payload.data.attributes.internal_code, `${OPERATION}: internal_code`).toBe(sku);
     expect(payload.data.attributes.status, `${OPERATION}: status`).toBe('confirmed');
   });
 
@@ -54,7 +54,7 @@ test.describe(OPERATION, () => {
         data: {
           type: 'catalog_items',
           id: newUlid(),
-          attributes: { name: 'Bad kind', kind: 'widget', internal_sku: `SKU-BAD-${Date.now()}` },
+          attributes: { name: 'Bad kind', kind: 'widget', internal_code: `SKU-BAD-${Date.now()}` },
         },
       },
     });
@@ -79,7 +79,7 @@ test.describe(OPERATION, () => {
         data: {
           type: 'catalog_items',
           id: newUlid(),
-          attributes: { name: '   ', kind: 'goods', internal_sku: `SKU-EMPTY-${Date.now()}` },
+          attributes: { name: '   ', kind: 'goods', internal_code: `SKU-EMPTY-${Date.now()}` },
         },
       },
     });
@@ -113,7 +113,7 @@ test.describe(OPERATION, () => {
       data: {
         type: 'catalog_items',
         id,
-        attributes: { name: 'Dup', kind: 'goods', internal_sku: `SKU-DUP-${Date.now()}` },
+        attributes: { name: 'Dup', kind: 'goods', internal_code: `SKU-DUP-${Date.now()}` },
       },
     };
     await expectStatus(await platformApi.call('/api/v1/catalog/items', { method: 'POST', auth, tenant, data: payload }), 201, OPERATION);
@@ -127,7 +127,7 @@ test.describe(OPERATION, () => {
         data: {
           type: 'catalog_items',
           id,
-          attributes: { name: 'Dup 2', kind: 'goods', internal_sku: `SKU-DUP2-${Date.now()}` },
+          attributes: { name: 'Dup 2', kind: 'goods', internal_code: `SKU-DUP2-${Date.now()}` },
         },
       },
     });
@@ -148,7 +148,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name: 'Tenant A', kind: 'goods', internal_sku: `SKU-A-${Date.now()}` },
+            attributes: { name: 'Tenant A', kind: 'goods', internal_code: `SKU-A-${Date.now()}` },
           },
         },
       }),
@@ -165,7 +165,7 @@ test.describe(OPERATION, () => {
         data: {
           type: 'catalog_items',
           id,
-          attributes: { name: 'Tenant B', kind: 'goods', internal_sku: `SKU-B-${Date.now()}` },
+          attributes: { name: 'Tenant B', kind: 'goods', internal_code: `SKU-B-${Date.now()}` },
         },
       },
     });

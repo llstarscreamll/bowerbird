@@ -12,26 +12,21 @@ import (
 
 type CreateItemCommand struct {
 	items ports.ItemRepository
-	write ports.CatalogWriteRepository
 	now   func() time.Time
-	newID func() string
 }
 
-func NewCreateItemCommand(items ports.ItemRepository, write ports.CatalogWriteRepository) *CreateItemCommand {
+func NewCreateItemCommand(items ports.ItemRepository) *CreateItemCommand {
 	if items == nil {
 		panic("item repository is required")
 	}
-	if write == nil {
-		panic("catalog write repository is required")
-	}
-	return &CreateItemCommand{items: items, write: write, now: time.Now, newID: id.NewULID}
+	return &CreateItemCommand{items: items, now: time.Now}
 }
 
 type CreateItemInput struct {
-	ID          string
-	Name        string
-	Kind        string
-	InternalSKU string
+	ID           string
+	Name         string
+	Kind         string
+	InternalCode string
 }
 
 func (cmd *CreateItemCommand) Execute(ctx context.Context, input CreateItemInput) error {
@@ -42,9 +37,9 @@ func (cmd *CreateItemCommand) Execute(ctx context.Context, input CreateItemInput
 	if err != nil {
 		return appErrors.New(appErrors.CodeValidation, "invalid item kind")
 	}
-	sku, err := domain.ParseInternalSKU(input.InternalSKU)
+	code, err := domain.ParseInternalCode(input.InternalCode)
 	if err != nil {
-		return appErrors.New(appErrors.CodeValidation, "internal_sku is required")
+		return appErrors.New(appErrors.CodeValidation, "internal_code is required")
 	}
 	existing, err := cmd.items.GetItemByID(ctx, input.ID)
 	if err != nil {
@@ -55,16 +50,9 @@ func (cmd *CreateItemCommand) Execute(ctx context.Context, input CreateItemInput
 	}
 
 	now := cmd.now().UTC()
-	item, err := domain.NewManualItem(input.ID, input.Name, kind, sku, now)
+	item, err := domain.NewManualItem(input.ID, input.Name, kind, code, now)
 	if err != nil {
 		return appErrors.New(appErrors.CodeValidation, err.Error())
 	}
-	alias, err := domain.NewInternalSKUAlias(cmd.newID(), item.ID, sku, now)
-	if err != nil {
-		return appErrors.New(appErrors.CodeValidation, err.Error())
-	}
-	if err := cmd.write.CreateItemWithAlias(ctx, item, alias); err != nil {
-		return err
-	}
-	return nil
+	return cmd.items.CreateItem(ctx, item)
 }

@@ -38,7 +38,7 @@ import { LineDecisionPayload } from '../../../domain/invoice.model';
     <div class="space-y-2">
       <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Buscar en catálogo</p>
       <hlm-command class="min-h-40 rounded-lg border border-border" [filter]="passthroughFilter" (searchChange)="onSearch($event)">
-        <hlm-command-input placeholder="Nombre o SKU…" />
+        <hlm-command-input placeholder="Nombre o código…" />
         <hlm-command-list>
           <div *hlmCommandEmptyState hlmCommandEmpty>
             @if (searching()) {

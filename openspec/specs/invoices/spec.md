@@ -104,7 +104,7 @@ Authorized tenant users MUST be able to list invoice lines that are unmatched or
 
 Authorized users MUST be able to apply a link decision on an invoice line from the invoice detail view or the review queue: link to an existing item, reject (`never_match`), or create a provisional catalog item from the line evidence.
 
-- The system MUST allow the user to search the catalog by name or SKU when linking to an existing item.
+- The system MUST allow the user to search the catalog by name, internal code, or supplier SKU when linking to an existing item.
 - On link: the line MUST become `linked` with method `manual`, MUST be locked when requested, and when remember is requested the system MUST persist catalog match memory (and supplier alias when hard identity evidence exists) so future identical evidence auto-links.
 - On reject: the line status MUST become `rejected` and, when remember is requested, the system MUST record `never_match` memory for the evidence.
 - On create provisional: the system MUST create a provisional catalog item from the line's description/code, link the line to it, remember the decision, and lock the link.

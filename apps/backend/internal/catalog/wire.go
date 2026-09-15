@@ -27,14 +27,14 @@ func NewApplication(registry *database.Registry) *application.Application {
 			MintProvisionalFromEvidence: commands.NewMintProvisionalFromEvidenceCommand(repo, repo, repo),
 			EnsureSupplierAlias:         commands.NewEnsureSupplierAliasCommand(repo),
 			RecordMatchMemory:           commands.NewRecordMatchMemoryCommand(repo),
-			CreateItem:                  commands.NewCreateItemCommand(repo, repo),
-			UpdateItem:                  commands.NewUpdateItemCommand(repo, repo, repo),
+			CreateItem:                  commands.NewCreateItemCommand(repo),
+			UpdateItem:                  commands.NewUpdateItemCommand(repo),
 		},
 		Queries: application.Queries{
-			GetItemByID:     queries.NewGetItemByIDQuery(repo, repo),
+			GetItemByID:     queries.NewGetItemByIDQuery(repo),
 			GetItemNames:    queries.NewGetItemNamesQuery(repo),
-			GetItemDisplays: queries.NewGetItemDisplaysQuery(repo, repo),
-			ListItems:       queries.NewListItemsQuery(repo, repo),
+			GetItemDisplays: queries.NewGetItemDisplaysQuery(repo),
+			ListItems:       queries.NewListItemsQuery(repo),
 		},
 	}
 }

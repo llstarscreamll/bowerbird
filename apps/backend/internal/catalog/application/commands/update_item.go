@@ -2,42 +2,31 @@ package commands
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/bowerbird/internal/catalog/application/ports"
 	"github.com/bowerbird/internal/catalog/domain"
 	appErrors "github.com/bowerbird/internal/platform/errors"
-	"github.com/bowerbird/internal/platform/id"
 )
 
 type UpdateItemCommand struct {
-	items   ports.ItemRepository
-	aliases ports.AliasRepository
-	write   ports.CatalogWriteRepository
-	now     func() time.Time
-	newID   func() string
+	items ports.ItemRepository
+	now   func() time.Time
 }
 
-func NewUpdateItemCommand(items ports.ItemRepository, aliases ports.AliasRepository, write ports.CatalogWriteRepository) *UpdateItemCommand {
+func NewUpdateItemCommand(items ports.ItemRepository) *UpdateItemCommand {
 	if items == nil {
 		panic("item repository is required")
 	}
-	if aliases == nil {
-		panic("alias repository is required")
-	}
-	if write == nil {
-		panic("catalog write repository is required")
-	}
-	return &UpdateItemCommand{items: items, aliases: aliases, write: write, now: time.Now, newID: id.NewULID}
+	return &UpdateItemCommand{items: items, now: time.Now}
 }
 
 type UpdateItemInput struct {
-	ID          string
-	Name        *string
-	Kind        *string
-	Status      *string
-	InternalSKU *string
+	ID           string
+	Name         *string
+	Kind         *string
+	Status       *string
+	InternalCode *string
 }
 
 func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput) error {
@@ -49,21 +38,7 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
 	}
 
-	skus, err := cmd.aliases.ListInternalSKUsByItemIDs(ctx, []string{item.ID})
-	if err != nil {
-		return err
-	}
-	var currentSKU *domain.InternalSKU
-	if raw, ok := skus[item.ID]; ok && strings.TrimSpace(raw) != "" {
-		parsed, parseErr := domain.ParseInternalSKU(raw)
-		if parseErr != nil {
-			return parseErr
-		}
-		currentSKU = &parsed
-	}
-
 	now := cmd.now().UTC()
-	var newAlias *domain.Alias
 
 	if input.Name != nil {
 		if err := item.Rename(*input.Name, now); err != nil {
@@ -78,13 +53,13 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 		item.ChangeKind(kind, now)
 	}
 
-	var newSKU *domain.InternalSKU
-	if input.InternalSKU != nil {
-		parsed, err := domain.ParseInternalSKU(*input.InternalSKU)
+	var newCode *domain.InternalCode
+	if input.InternalCode != nil {
+		parsed, err := domain.ParseInternalCode(*input.InternalCode)
 		if err != nil {
-			return appErrors.New(appErrors.CodeValidation, "internal_sku is required")
+			return appErrors.New(appErrors.CodeValidation, "internal_code is required")
 		}
-		newSKU = &parsed
+		newCode = &parsed
 	}
 
 	confirmRequested := false
@@ -97,30 +72,14 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 	}
 
 	if confirmRequested {
-		sku, assignNew, err := item.Confirm(currentSKU, newSKU, now)
-		if err != nil {
+		if err := item.Confirm(newCode, now); err != nil {
 			return appErrors.New(appErrors.CodeValidation, err.Error())
 		}
-		if assignNew {
-			alias, err := domain.NewInternalSKUAlias(cmd.newID(), item.ID, sku, now)
-			if err != nil {
-				return appErrors.New(appErrors.CodeValidation, err.Error())
-			}
-			newAlias = &alias
-		}
-	} else if newSKU != nil {
-		assignNew, err := item.AssignInternalSKU(currentSKU, *newSKU, now)
-		if err != nil {
+	} else if newCode != nil {
+		if err := item.AssignInternalCode(*newCode, now); err != nil {
 			return appErrors.New(appErrors.CodeValidation, err.Error())
-		}
-		if assignNew {
-			alias, err := domain.NewInternalSKUAlias(cmd.newID(), item.ID, *newSKU, now)
-			if err != nil {
-				return appErrors.New(appErrors.CodeValidation, err.Error())
-			}
-			newAlias = &alias
 		}
 	}
 
-	return cmd.write.UpdateItemWithOptionalAlias(ctx, *item, newAlias)
+	return cmd.items.UpdateItem(ctx, *item)
 }

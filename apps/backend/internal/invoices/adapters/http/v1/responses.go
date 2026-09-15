@@ -76,21 +76,21 @@ type invoiceSummaryAttributes struct {
 }
 
 type invoiceLineAttributes struct {
-	ID           string  `json:"id"`
-	LineNumber   int     `json:"line_number"`
-	ItemCode     string  `json:"item_code"`
-	Description  string  `json:"description"`
-	Quantity     float64 `json:"quantity"`
-	UnitPrice    float64 `json:"unit_price"`
-	LineTaxTotal float64 `json:"line_tax_total"`
-	LineTotal    float64 `json:"line_total"`
-	ItemID       *string `json:"item_id"`
-	ItemName     *string `json:"item_name,omitempty"`
-	ItemSKU      *string `json:"item_sku,omitempty"`
-	LinkStatus   string  `json:"link_status"`
-	LinkMethod   *string `json:"link_method"`
-	LinkLocked   bool    `json:"link_locked"`
-	Suggestions  any     `json:"suggestions"`
+	ID               string  `json:"id"`
+	LineNumber       int     `json:"line_number"`
+	ItemCode         string  `json:"item_code"`
+	Description      string  `json:"description"`
+	Quantity         float64 `json:"quantity"`
+	UnitPrice        float64 `json:"unit_price"`
+	LineTaxTotal     float64 `json:"line_tax_total"`
+	LineTotal        float64 `json:"line_total"`
+	ItemID           *string `json:"item_id"`
+	ItemName         *string `json:"item_name,omitempty"`
+	ItemInternalCode *string `json:"item_internal_code,omitempty"`
+	LinkStatus       string  `json:"link_status"`
+	LinkMethod       *string `json:"link_method"`
+	LinkLocked       bool    `json:"link_locked"`
+	Suggestions      any     `json:"suggestions"`
 }
 
 type invoiceDetailsAttributes struct {
@@ -171,21 +171,21 @@ func newInvoiceDetailsResponse(result *queries.InvoiceDetails) jsonApiResponse[i
 			_ = json.Unmarshal(line.Suggestions, &suggestions)
 		}
 		lines = append(lines, invoiceLineAttributes{
-			ID:           line.ID,
-			LineNumber:   line.LineNumber,
-			ItemCode:     line.ItemCode,
-			Description:  line.Description,
-			Quantity:     line.Quantity,
-			UnitPrice:    line.UnitPrice,
-			LineTaxTotal: line.LineTaxTotal,
-			LineTotal:    line.LineTotal,
-			ItemID:       optionalString(line.ItemID),
-			ItemName:     optionalString(line.ItemName),
-			ItemSKU:      optionalString(line.ItemSKU),
-			LinkStatus:   line.LinkStatus,
-			LinkMethod:   optionalString(line.LinkMethod),
-			LinkLocked:   line.LinkLocked,
-			Suggestions:  suggestions,
+			ID:               line.ID,
+			LineNumber:       line.LineNumber,
+			ItemCode:         line.ItemCode,
+			Description:      line.Description,
+			Quantity:         line.Quantity,
+			UnitPrice:        line.UnitPrice,
+			LineTaxTotal:     line.LineTaxTotal,
+			LineTotal:        line.LineTotal,
+			ItemID:           optionalString(line.ItemID),
+			ItemName:         optionalString(line.ItemName),
+			ItemInternalCode: optionalString(line.ItemInternalCode),
+			LinkStatus:       line.LinkStatus,
+			LinkMethod:       optionalString(line.LinkMethod),
+			LinkLocked:       line.LinkLocked,
+			Suggestions:      suggestions,
 		})
 	}
 

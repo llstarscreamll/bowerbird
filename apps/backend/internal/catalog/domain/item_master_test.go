@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseInternalSKUAndItemKind(t *testing.T) {
-	sku, err := domain.ParseInternalSKU("  ABC-1  ")
+func TestParseInternalCodeAndItemKind(t *testing.T) {
+	code, err := domain.ParseInternalCode("  ABC-1  ")
 	require.NoError(t, err)
-	assert.Equal(t, "ABC-1", sku.String())
-	assert.True(t, sku.Equals(sku))
+	assert.Equal(t, "ABC-1", code.String())
+	assert.True(t, code.Equals(code))
 
-	_, err = domain.ParseInternalSKU("   ")
-	assert.ErrorIs(t, err, domain.ErrMissingInternalSKU)
+	_, err = domain.ParseInternalCode("   ")
+	assert.ErrorIs(t, err, domain.ErrMissingInternalCode)
 
 	kind, err := domain.ParseItemKind("goods")
 	require.NoError(t, err)
@@ -26,56 +26,48 @@ func TestParseInternalSKUAndItemKind(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidItemKind)
 }
 
-func TestNewManualItemAndInternalSKUAlias(t *testing.T) {
+func TestNewManualItemRequiresInternalCode(t *testing.T) {
 	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
 	kind, err := domain.ParseItemKind(domain.KindService)
 	require.NoError(t, err)
-	sku, err := domain.ParseInternalSKU("SRV-01")
+	code, err := domain.ParseInternalCode("SRV-01")
 	require.NoError(t, err)
 
-	item, err := domain.NewManualItem("01ITEM", "Consulting", kind, sku, now)
+	item, err := domain.NewManualItem("01ITEM", "Consulting", kind, code, now)
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusConfirmed, item.Status)
 	assert.Equal(t, domain.CreationSourceManual, item.CreationSource)
+	assert.Equal(t, "SRV-01", item.InternalCode)
 	assert.True(t, item.IsConfirmed())
 	assert.False(t, item.IsProvisional())
-
-	alias, err := domain.NewInternalSKUAlias("01ALIAS", item.ID, sku, now)
-	require.NoError(t, err)
-	assert.Equal(t, domain.AliasSchemeInternalSKU, alias.Scheme)
-	assert.Nil(t, alias.PartyID)
-	assert.Equal(t, "SRV-01", alias.Value)
 }
 
-func TestItemConfirmAndAssignInternalSKU(t *testing.T) {
+func TestItemConfirmAndAssignInternalCode(t *testing.T) {
 	now := time.Now().UTC()
 	item, err := domain.NewProvisionalItem("01P", "Widget", "W-1", now)
 	require.NoError(t, err)
 
-	_, _, err = item.Confirm(nil, nil, now)
-	assert.ErrorIs(t, err, domain.ErrConfirmRequiresSKU)
+	err = item.Confirm(nil, now)
+	assert.ErrorIs(t, err, domain.ErrConfirmRequiresCode)
 
-	sku, err := domain.ParseInternalSKU("W-1")
+	code, err := domain.ParseInternalCode("W-1")
 	require.NoError(t, err)
-	got, assignNew, err := item.Confirm(nil, &sku, now)
-	require.NoError(t, err)
-	assert.True(t, assignNew)
-	assert.Equal(t, "W-1", got.String())
+	require.NoError(t, item.Confirm(&code, now))
+	assert.Equal(t, "W-1", item.InternalCode)
 	assert.True(t, item.IsConfirmed())
 
-	_, _, err = item.Confirm(nil, &sku, now)
+	err = item.Confirm(&code, now)
 	assert.ErrorIs(t, err, domain.ErrItemAlreadyConfirmed)
 
-	other, err := domain.ParseInternalSKU("OTHER")
+	other, err := domain.ParseInternalCode("OTHER")
 	require.NoError(t, err)
-	_, err = item.AssignInternalSKU(&sku, other, now)
-	assert.ErrorIs(t, err, domain.ErrInternalSKUImmutable)
+	err = item.AssignInternalCode(other, now)
+	assert.ErrorIs(t, err, domain.ErrInternalCodeImmutable)
 
 	prov, err := domain.NewProvisionalItem("01P2", "Gadget", "", now)
 	require.NoError(t, err)
-	assign, err := prov.AssignInternalSKU(nil, sku, now)
-	require.NoError(t, err)
-	assert.True(t, assign)
+	require.NoError(t, prov.AssignInternalCode(code, now))
+	assert.Equal(t, "W-1", prov.InternalCode)
 
 	require.NoError(t, prov.Rename("Gadget Pro", now))
 	assert.Equal(t, "Gadget Pro", prov.Name)
@@ -109,10 +101,9 @@ func TestInterpretMasterStatusChange(t *testing.T) {
 	_, err = prov.InterpretMasterStatusChange("archived")
 	assert.ErrorIs(t, err, domain.ErrInvalidItemStatus)
 
-	sku, err := domain.ParseInternalSKU("W-1")
+	code, err := domain.ParseInternalCode("W-1")
 	require.NoError(t, err)
-	_, _, err = prov.Confirm(nil, &sku, now)
-	require.NoError(t, err)
+	require.NoError(t, prov.Confirm(&code, now))
 
 	_, err = prov.InterpretMasterStatusChange(domain.StatusProvisional)
 	assert.ErrorIs(t, err, domain.ErrCannotRevertToProvisional)

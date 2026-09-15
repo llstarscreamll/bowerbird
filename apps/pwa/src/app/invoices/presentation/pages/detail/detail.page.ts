@@ -167,7 +167,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                         <a class="ml-1.5 font-medium text-primary hover:underline break-words" [routerLink]="['/', tenantId(), 'catalog', line.item_id]">{{
                           line.item_name || shortId(line.item_id)
                         }}</a>
-                        <span class="ml-1.5 font-mono text-xs text-muted-foreground tabular-nums">SKU {{ line.item_sku || '—' }}</span>
+                        <span class="ml-1.5 font-mono text-xs text-muted-foreground tabular-nums">{{ line.item_internal_code || '—' }}</span>
                       </p>
                       @if (line.link_method || line.link_locked) {
                         <p class="text-sm">

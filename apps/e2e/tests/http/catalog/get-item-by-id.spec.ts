@@ -20,7 +20,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name, kind: 'asset', internal_sku: `SKU-GET-${Date.now()}` },
+            attributes: { name, kind: 'asset', internal_code: `SKU-GET-${Date.now()}` },
           },
         },
       }),
@@ -64,7 +64,7 @@ test.describe(OPERATION, () => {
           data: {
             type: 'catalog_items',
             id,
-            attributes: { name: 'Secret item', kind: 'goods', internal_sku: `SKU-ISO-${Date.now()}` },
+            attributes: { name: 'Secret item', kind: 'goods', internal_code: `SKU-ISO-${Date.now()}` },
           },
         },
       }),

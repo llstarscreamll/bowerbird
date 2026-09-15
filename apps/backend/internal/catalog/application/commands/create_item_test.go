@@ -12,59 +12,37 @@ import (
 )
 
 type memWrite struct {
-	items   map[string]domain.Item
-	aliases map[string]domain.Alias
-	fail    bool
-}
-
-func (m *memWrite) CreateItemWithAlias(ctx context.Context, item domain.Item, alias domain.Alias) error {
-	if m.fail {
-		return appErrors.New(appErrors.CodeInternal, "write failed")
-	}
-	if m.items == nil {
-		m.items = map[string]domain.Item{}
-	}
-	if m.aliases == nil {
-		m.aliases = map[string]domain.Alias{}
-	}
-	if _, ok := m.items[item.ID]; ok {
-		return appErrors.New(appErrors.CodeConflict, "duplicate item")
-	}
-	for _, a := range m.aliases {
-		if a.Scheme == domain.AliasSchemeInternalSKU && a.Value == alias.Value {
-			return appErrors.New(appErrors.CodeConflict, "duplicate sku")
-		}
-	}
-	m.items[item.ID] = item
-	m.aliases[alias.ID] = alias
-	return nil
-}
-
-func (m *memWrite) UpdateItemWithOptionalAlias(ctx context.Context, item domain.Item, alias *domain.Alias) error {
-	if m.fail {
-		return appErrors.New(appErrors.CodeInternal, "write failed")
-	}
-	if m.items == nil {
-		m.items = map[string]domain.Item{}
-	}
-	m.items[item.ID] = item
-	if alias != nil {
-		if m.aliases == nil {
-			m.aliases = map[string]domain.Alias{}
-		}
-		m.aliases[alias.ID] = *alias
-	}
-	return nil
+	items map[string]domain.Item
+	fail  bool
 }
 
 func (m *memWrite) CreateItem(ctx context.Context, item domain.Item) error {
+	if m.fail {
+		return appErrors.New(appErrors.CodeInternal, "write failed")
+	}
 	if m.items == nil {
 		m.items = map[string]domain.Item{}
+	}
+	if _, ok := m.items[item.ID]; ok {
+		return appErrors.New(appErrors.CodeConflict, "a catalog item with this id already exists")
+	}
+	if item.InternalCode != "" {
+		for _, existing := range m.items {
+			if existing.InternalCode == item.InternalCode {
+				return appErrors.New(appErrors.CodeConflict, "an item with this internal code already exists")
+			}
+		}
 	}
 	m.items[item.ID] = item
 	return nil
 }
 func (m *memWrite) UpdateItem(ctx context.Context, item domain.Item) error {
+	if m.fail {
+		return appErrors.New(appErrors.CodeInternal, "write failed")
+	}
+	if m.items == nil {
+		m.items = map[string]domain.Item{}
+	}
 	m.items[item.ID] = item
 	return nil
 }
@@ -78,47 +56,25 @@ func (m *memWrite) GetItemByID(ctx context.Context, id string) (*domain.Item, er
 func (m *memWrite) GetItemNames(ctx context.Context, ids []string) (map[string]string, error) {
 	return map[string]string{}, nil
 }
+func (m *memWrite) GetItemsByIDs(ctx context.Context, ids []string) ([]domain.Item, error) {
+	return nil, nil
+}
 func (m *memWrite) ListItems(ctx context.Context, filter ports.ItemListFilter) ([]domain.Item, error) {
 	return nil, nil
 }
 func (m *memWrite) FindByNormalizedDescription(ctx context.Context, normalizedDesc string) ([]domain.Item, error) {
 	return nil, nil
 }
-func (m *memWrite) CreateAlias(ctx context.Context, alias domain.Alias) error {
-	if m.aliases == nil {
-		m.aliases = map[string]domain.Alias{}
-	}
-	m.aliases[alias.ID] = alias
-	return nil
-}
-func (m *memWrite) FindBySchemePartyValue(ctx context.Context, scheme, partyID, value string) (*domain.Alias, error) {
-	return nil, nil
-}
-func (m *memWrite) ListInternalSKUsByItemIDs(ctx context.Context, itemIDs []string) (map[string]string, error) {
-	out := map[string]string{}
-	for _, a := range m.aliases {
-		if a.Scheme != domain.AliasSchemeInternalSKU {
-			continue
-		}
-		for _, id := range itemIDs {
-			if a.ItemID == id {
-				out[id] = a.Value
-			}
-		}
-	}
-	return out, nil
-}
 
 func TestCreateItemCommand(t *testing.T) {
 	t.Parallel()
 	store := &memWrite{}
-	cmd := NewCreateItemCommand(store, store)
+	cmd := NewCreateItemCommand(store)
 	cmd.now = func() time.Time { return time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC) }
-	cmd.newID = func() string { return "01ARZ3NDEKTSV4RRFFQ69G5FB0" }
 
 	id := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	err := cmd.Execute(context.Background(), CreateItemInput{
-		ID: id, Name: "Widget", Kind: domain.KindGoods, InternalSKU: "SKU-1",
+		ID: id, Name: "Widget", Kind: domain.KindGoods, InternalCode: "CODE-1",
 	})
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -127,12 +83,12 @@ func TestCreateItemCommand(t *testing.T) {
 	if item.Status != domain.StatusConfirmed {
 		t.Fatalf("status=%s", item.Status)
 	}
-	if len(store.aliases) != 1 {
-		t.Fatalf("expected alias")
+	if item.InternalCode != "CODE-1" {
+		t.Fatalf("internal_code=%s", item.InternalCode)
 	}
 
 	err = cmd.Execute(context.Background(), CreateItemInput{
-		ID: id, Name: "Dup", Kind: domain.KindGoods, InternalSKU: "SKU-2",
+		ID: id, Name: "Dup", Kind: domain.KindGoods, InternalCode: "CODE-2",
 	})
 	var appErr *appErrors.AppError
 	if err == nil || !errors.As(err, &appErr) || appErr.Code != appErrors.CodeConflict {

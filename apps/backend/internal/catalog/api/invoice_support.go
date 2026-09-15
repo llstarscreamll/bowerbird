@@ -52,6 +52,6 @@ type MatchMemoryInput struct {
 }
 
 type ItemDisplay struct {
-	Name        string
-	InternalSKU string
+	Name         string
+	InternalCode string
 }
