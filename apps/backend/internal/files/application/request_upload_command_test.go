@@ -45,7 +45,7 @@ func (f *fakeFileStore) PresignDownload(ctx context.Context, input platformStora
 	return nil, nil
 }
 
-func TestRequestUploadURLUseCaseBuildsTenantUserModuleScopedPrefix(t *testing.T) {
+func TestRequestUploadURLCommandBuildsTenantUserModuleScopedPrefix(t *testing.T) {
 	store := &fakeFileStore{}
 	uc := NewRequestUploadURLCommand(store)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")

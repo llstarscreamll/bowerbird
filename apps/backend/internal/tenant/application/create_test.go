@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bowerbird/internal/tenant/application/commands"
 	"github.com/bowerbird/internal/tenant/domain"
 )
 
@@ -89,9 +90,9 @@ func (nopDefaultPack) ApplyDefaultPack(ctx context.Context, tenantID, actorUserI
 func TestCreateTenantStartsProvisioningAndEndsActive(t *testing.T) {
 	repo := &fakeTenantRepo{}
 	provisioner := &fakeProvisioner{}
-	uc := NewCreateTenantUseCase(repo, provisioner, nopDefaultPack{})
+	cmd := commands.NewCreateTenantCommand(repo, provisioner, nopDefaultPack{})
 
-	org, err := uc.Execute(context.Background(), CreateTenantCommand{
+	org, err := cmd.Execute(context.Background(), commands.CreateTenantInput{
 		Name:           "Acme",
 		Slug:           "acme",
 		OwnerID:        "user-1",
@@ -120,9 +121,9 @@ func TestCreateTenantStartsProvisioningAndEndsActive(t *testing.T) {
 func TestCreateTenantMarksFailedWhenProvisioningFails(t *testing.T) {
 	repo := &fakeTenantRepo{}
 	provisioner := &fakeProvisioner{createDatabaseErr: errors.New("db down")}
-	uc := NewCreateTenantUseCase(repo, provisioner, nopDefaultPack{})
+	cmd := commands.NewCreateTenantCommand(repo, provisioner, nopDefaultPack{})
 
-	_, err := uc.Execute(context.Background(), CreateTenantCommand{
+	_, err := cmd.Execute(context.Background(), commands.CreateTenantInput{
 		Name:           "Acme",
 		Slug:           "acme",
 		OwnerID:        "user-1",

@@ -9,26 +9,27 @@ import (
 	appErrors "github.com/bowerbird/internal/platform/errors"
 	"github.com/bowerbird/internal/platform/http/api"
 	"github.com/bowerbird/internal/tenant/application"
+	"github.com/bowerbird/internal/tenant/application/commands"
+	"github.com/bowerbird/internal/tenant/application/queries"
 	"github.com/bowerbird/internal/tenant/domain"
 )
 
 type Controller struct {
-	createUseCase *application.CreateTenantUseCase
-	getUseCase    *application.GetTenantUseCase
+	createTenantCommand *commands.CreateTenantCommand
+	getTenantQuery      *queries.GetTenantQuery
 }
 
-func NewController(createUseCase *application.CreateTenantUseCase, getUseCase *application.GetTenantUseCase) *Controller {
-	if createUseCase == nil {
-		panic("tenant create use case is required")
+func NewController(createTenantCommand *commands.CreateTenantCommand, getTenantQuery *queries.GetTenantQuery) *Controller {
+	if createTenantCommand == nil {
+		panic("create tenant command is required")
 	}
-
-	if getUseCase == nil {
-		panic("tenant get use case is required")
+	if getTenantQuery == nil {
+		panic("get tenant query is required")
 	}
 
 	return &Controller{
-		createUseCase: createUseCase,
-		getUseCase:    getUseCase,
+		createTenantCommand: createTenantCommand,
+		getTenantQuery:      getTenantQuery,
 	}
 }
 
@@ -49,7 +50,7 @@ func (c *Controller) CreateTenant(w http.ResponseWriter, r *http.Request) error 
 		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
-	cmd := application.CreateTenantCommand{
+	org, err := c.createTenantCommand.Execute(r.Context(), commands.CreateTenantInput{
 		Name:           req.Name,
 		Slug:           req.Slug,
 		OwnerID:        claims.UserID,
@@ -57,9 +58,7 @@ func (c *Controller) CreateTenant(w http.ResponseWriter, r *http.Request) error 
 		OwnerFirstName: claims.FirstName,
 		OwnerLastName:  claims.LastName,
 		OwnerAvatarURL: claims.PictureURL,
-	}
-
-	org, err := c.createUseCase.Execute(r.Context(), cmd)
+	})
 	if err != nil {
 		if errors.Is(err, application.ErrSlugAlreadyExists) {
 			return appErrors.Wrap(err, appErrors.CodeConflict, "slug already exists")
@@ -86,7 +85,7 @@ func (c *Controller) GetTenant(w http.ResponseWriter, r *http.Request) error {
 		return appErrors.New(appErrors.CodeUnauthorized, "unauthorized")
 	}
 
-	org, err := c.getUseCase.Execute(r.Context(), tenantID, claims.UserID)
+	org, err := c.getTenantQuery.Execute(r.Context(), tenantID, claims.UserID)
 	if err != nil {
 		return appErrors.Wrap(err, appErrors.CodeNotFound, "tenant not found")
 	}

@@ -51,7 +51,7 @@ func (f *fakeDownloadFileStore) PresignDownload(ctx context.Context, input platf
 	return &platformStorage.PresignDownloadResult{URL: f.presignResultURL, Method: "GET"}, nil
 }
 
-func TestRequestDownloadURLUseCasePresignsOnlyTenantScopedKey(t *testing.T) {
+func TestRequestDownloadURLCommandPresignsOnlyTenantScopedKey(t *testing.T) {
 	store := &fakeDownloadFileStore{exists: true}
 	uc := NewRequestDownloadURLCommand(store)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
@@ -66,7 +66,7 @@ func TestRequestDownloadURLUseCasePresignsOnlyTenantScopedKey(t *testing.T) {
 	assert.Equal(t, "1-day/tenant-a/uploads/user-x/invoice.pdf", store.existsInput.Path)
 }
 
-func TestRequestDownloadURLUseCaseRejectsOutOfTenantKey(t *testing.T) {
+func TestRequestDownloadURLCommandRejectsOutOfTenantKey(t *testing.T) {
 	store := &fakeDownloadFileStore{exists: true}
 	uc := NewRequestDownloadURLCommand(store)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
@@ -78,7 +78,7 @@ func TestRequestDownloadURLUseCaseRejectsOutOfTenantKey(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestRequestDownloadURLUseCaseReturnsNotFoundWhenFileMissing(t *testing.T) {
+func TestRequestDownloadURLCommandReturnsNotFoundWhenFileMissing(t *testing.T) {
 	store := &fakeDownloadFileStore{exists: false}
 	uc := NewRequestDownloadURLCommand(store)
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")

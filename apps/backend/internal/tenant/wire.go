@@ -39,8 +39,8 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddle
 	}
 
 	controller := httpV1.NewController(
-		application.NewCreateTenantUseCaseFromCommand(app.Commands.CreateTenant),
-		application.NewGetTenantUseCaseFromQuery(app.Queries.GetTenant),
+		app.Commands.CreateTenant,
+		app.Queries.GetTenant,
 	)
 	router := httpV1.NewRouter(controller)
 	router.Register(mux, cfg, authMiddleware)

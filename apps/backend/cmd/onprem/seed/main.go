@@ -12,6 +12,7 @@ import (
 	"github.com/bowerbird/internal/platform/database"
 	tenantModule "github.com/bowerbird/internal/tenant"
 	"github.com/bowerbird/internal/tenant/application"
+	"github.com/bowerbird/internal/tenant/application/commands"
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 	}
 
 	organizationApp := tenantModule.NewApplication(pool, cfg.DatabaseURL, migrationsDir, entitlementsModule.NewApplication(pool))
-	orgUseCase := application.NewCreateTenantUseCaseFromCommand(organizationApp.Commands.CreateTenant)
+	createTenantCommand := organizationApp.Commands.CreateTenant
 
 	// We also need the user to exist in the Control Plane identity tables before we create the tenant.
 	// Because the AddMembership requires a foreign key to users.id
@@ -60,7 +61,7 @@ func main() {
 		user, _ = idRepo.FindUserByEmail(ctx, email)
 	}
 
-	cmd := application.CreateTenantCommand{
+	org, err := createTenantCommand.Execute(ctx, commands.CreateTenantInput{
 		Name:           "Acme Corp",
 		Slug:           "acme",
 		OwnerID:        user.ID,
@@ -68,9 +69,7 @@ func main() {
 		OwnerFirstName: "Admin",
 		OwnerLastName:  "Acme",
 		OwnerAvatarURL: "https://i.pravatar.cc/150?u=admin@acme.com",
-	}
-
-	org, err := orgUseCase.Execute(ctx, cmd)
+	})
 	if err != nil {
 		if err == application.ErrSlugAlreadyExists {
 			log.Println("Tenant 'acme' already exists, skipping.")
