@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CatalogItem, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
 import { CatalogImport, CatalogImportError, CatalogPage } from '../domain/catalog-import.model';
 
 type JsonApiDoc<T> = { id: string; attributes: T };
@@ -55,6 +55,26 @@ export class CatalogHttpService {
         data: { attributes: input },
       })
       .pipe(map((res) => ({ id: res.data.id, ...res.data.attributes })));
+  }
+
+  addAlias(itemId: string, input: CreateCatalogAliasInput): Observable<CatalogAlias> {
+    return this.http
+      .post<{ data: JsonApiDoc<Omit<CatalogAlias, 'id'>> }>(`${this.apiDomain}/api/v1/catalog/items/${itemId}/aliases`, {
+        data: {
+          type: 'catalog_item_aliases',
+          id: input.id,
+          attributes: {
+            scheme: input.scheme,
+            value: input.value,
+            party_id: input.party_id,
+          },
+        },
+      })
+      .pipe(map((res) => ({ id: res.data.id, ...res.data.attributes })));
+  }
+
+  removeAlias(itemId: string, aliasId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiDomain}/api/v1/catalog/items/${itemId}/aliases/${aliasId}`);
   }
 
   downloadImportTemplate(): Observable<Blob> {

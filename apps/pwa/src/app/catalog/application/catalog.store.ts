@@ -3,7 +3,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { ToastService } from '../../core/services/toast.service';
 import { CatalogHttpService } from '../infrastructure/catalog.http.service';
-import { CatalogItem, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { CatalogAlias, CatalogItem, CreateCatalogAliasInput, CreateCatalogItemInput, UpdateCatalogItemInput } from '../domain/catalog.model';
+import { isEnrichedHttpError } from '../../core/http/jsonapi-error';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogStore {
@@ -16,6 +17,7 @@ export class CatalogStore {
   readonly loadingMore = signal(false);
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly conflictOwnerItemId = signal<string | null>(null);
   readonly hasMore = signal(false);
   readonly search = signal('');
   private cursor = signal<string | undefined>(undefined);
@@ -55,6 +57,7 @@ export class CatalogStore {
   loadItem(id: string): void {
     this.loading.set(true);
     this.errorMessage.set(null);
+    this.conflictOwnerItemId.set(null);
     this.selectedItem.set(null);
     this.http.getItem(id).subscribe({
       next: (item) => {
@@ -63,16 +66,6 @@ export class CatalogStore {
       },
       error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo cargar el ítem.'),
     });
-  }
-
-  searchItems(query: string): Observable<CatalogItem[]> {
-    return this.http.listItems({ search: query, pageSize: 20 }).pipe(
-      map((page) => page.items),
-      catchError((err: HttpErrorResponse) => {
-        this.handleError(err, 'No se pudo buscar en el catálogo.');
-        return of([]);
-      }),
-    );
   }
 
   createItem(input: CreateCatalogItemInput): Observable<CatalogItem | null> {
@@ -95,6 +88,7 @@ export class CatalogStore {
   updateItem(id: string, input: UpdateCatalogItemInput): Observable<CatalogItem | null> {
     this.submitting.set(true);
     this.errorMessage.set(null);
+    this.conflictOwnerItemId.set(null);
     return this.http.updateItem(id, input).pipe(
       tap((item) => {
         this.submitting.set(false);
@@ -109,13 +103,54 @@ export class CatalogStore {
     );
   }
 
+  addAlias(itemId: string, input: CreateCatalogAliasInput): Observable<CatalogAlias | null> {
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    this.conflictOwnerItemId.set(null);
+    return this.http.addAlias(itemId, input).pipe(
+      tap(() => {
+        this.submitting.set(false);
+        this.toast.showSuccess('Alias añadido.');
+        this.loadItem(itemId);
+      }),
+      catchError((err: unknown) => {
+        this.submitting.set(false);
+        this.handleError(err, 'No se pudo añadir el alias.');
+        return of(null);
+      }),
+    );
+  }
+
+  removeAlias(itemId: string, aliasId: string): Observable<boolean> {
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    return this.http.removeAlias(itemId, aliasId).pipe(
+      tap(() => {
+        this.submitting.set(false);
+        this.toast.showSuccess('Alias eliminado.');
+        this.loadItem(itemId);
+      }),
+      map(() => true),
+      catchError((err: unknown) => {
+        this.submitting.set(false);
+        this.handleError(err, 'No se pudo eliminar el alias.');
+        return of(false);
+      }),
+    );
+  }
+
   readonly hasItems = computed(() => this.items().length > 0);
 
-  private handleError(err: HttpErrorResponse, fallback: string): void {
+  private handleError(err: unknown, fallback: string): void {
     this.loading.set(false);
     this.submitting.set(false);
-    if (err.status >= 400 && err.status < 500) {
-      this.errorMessage.set(err.error?.errors?.[0]?.detail || fallback);
+    const enriched = isEnrichedHttpError(err) ? err : null;
+    const http = enriched?.original ?? (err instanceof HttpErrorResponse ? err : null);
+    const first = enriched?.jsonApiErrors?.[0];
+    const owner = typeof first?.meta?.['item_id'] === 'string' ? String(first.meta['item_id']) : null;
+    this.conflictOwnerItemId.set(owner);
+    if (http && http.status >= 400 && http.status < 500) {
+      this.errorMessage.set(first?.detail || http.error?.errors?.[0]?.detail || fallback);
     } else {
       this.toast.showError(fallback);
     }

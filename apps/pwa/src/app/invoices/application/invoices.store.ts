@@ -2,8 +2,9 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { ToastService } from '../../core/services/toast.service';
+import { isEnrichedHttpError } from '../../core/http/jsonapi-error';
 import { InvoicesHttpService } from '../infrastructure/invoices.http.service';
-import { InvoiceSummary, InvoiceReviewLine, LineDecisionPayload } from '../domain/invoice.model';
+import { InvoiceSummary, InvoiceReviewLine, LineDecisionPayload, CatalogSearchHit } from '../domain/invoice.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvoicesStore {
@@ -71,22 +72,35 @@ export class InvoicesStore {
     });
   }
 
+  searchCatalogItems(query: string): Observable<CatalogSearchHit[]> {
+    return this.invoicesHttp.searchCatalogItems(query).pipe(
+      catchError((err: unknown) => {
+        this.handleReviewError(err, 'No se pudo buscar en el catálogo.');
+        return of([]);
+      }),
+    );
+  }
+
   resolveLineDecision(invoiceId: string, lineId: string, payload: LineDecisionPayload): Observable<boolean> {
     this.reviewErrorMessage.set(null);
     return this.invoicesHttp.applyLineDecision(invoiceId, lineId, payload).pipe(
       tap(() => this.toast.showSuccess('Decisión de coincidencia guardada.')),
       map(() => true),
-      catchError((err: HttpErrorResponse) => {
+      catchError((err: unknown) => {
         this.handleReviewError(err, 'No se pudo guardar la decisión.');
         return of(false);
       }),
     );
   }
 
-  private handleReviewError(err: HttpErrorResponse, fallback: string): void {
+  private handleReviewError(err: unknown, fallback: string): void {
     this.reviewLoading.set(false);
-    if (err.status >= 400 && err.status < 500) {
-      this.reviewErrorMessage.set(err.error?.errors?.[0]?.detail || fallback);
+    const enriched = isEnrichedHttpError(err) ? err : null;
+    const http = enriched?.original ?? (err instanceof HttpErrorResponse ? err : null);
+    const first = enriched?.jsonApiErrors?.[0];
+    const owner = typeof first?.meta?.['item_id'] === 'string' ? ` Ítem dueño: ${first.meta['item_id']}` : '';
+    if (http && http.status >= 400 && http.status < 500) {
+      this.reviewErrorMessage.set((first?.detail || http.error?.errors?.[0]?.detail || fallback) + owner);
     } else {
       this.toast.showError(fallback);
     }

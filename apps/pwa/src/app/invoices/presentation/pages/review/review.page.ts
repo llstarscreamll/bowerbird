@@ -41,7 +41,9 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
               <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p class="font-medium">{{ line.description || 'Sin descripción' }}</p>
-                  <p class="text-xs text-muted-foreground">Código: {{ line.item_code || '—' }} · Estado: {{ line.link_status }}</p>
+                  <p class="text-xs text-muted-foreground">
+                    Adquirente: {{ line.buyer_code || '—' }} · SKU: {{ line.seller_sku || '—' }} · GTIN: {{ line.gtin || '—' }} · Estado: {{ line.link_status }}
+                  </p>
                 </div>
                 <a class="text-xs text-primary underline" [routerLink]="['/', tenantPrefix(), 'invoices', line.invoice_header_id]">Ver factura</a>
               </div>
@@ -49,7 +51,10 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
                 [invoiceId]="line.invoice_header_id"
                 [lineId]="line.id"
                 [description]="line.description"
-                [itemCode]="line.item_code"
+                [buyerCode]="line.buyer_code"
+                [sellerSku]="line.seller_sku"
+                [gtin]="line.gtin"
+                [locked]="!!line.link_locked"
                 [suggestions]="line.suggestions || []"
                 (resolved)="onResolved()"
               />

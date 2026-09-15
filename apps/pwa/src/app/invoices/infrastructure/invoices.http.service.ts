@@ -2,7 +2,7 @@ import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { InvoiceListResponse, JsonApiCollectionResponse, JsonApiDocument, InvoiceSummary, InvoiceDetails, InvoiceReviewLine, LineDecisionPayload } from '../domain/invoice.model';
+import { InvoiceListResponse, JsonApiCollectionResponse, JsonApiDocument, InvoiceSummary, InvoiceDetails, InvoiceReviewLine, LineDecisionPayload, CatalogSearchHit } from '../domain/invoice.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvoicesHttpService {
@@ -48,6 +48,15 @@ export class InvoicesHttpService {
           })),
         ),
       );
+  }
+
+  searchCatalogItems(query: string): Observable<CatalogSearchHit[]> {
+    let params = new HttpParams().set('page[size]', '20');
+    const search = query.trim();
+    if (search) params = params.set('search', search);
+    return this.http
+      .get<{ data: { id: string; attributes: { name: string; status: string } }[] }>(`${this.apiDomain}/api/v1/catalog/items`, { params })
+      .pipe(map((res) => (res.data ?? []).map((doc) => ({ id: doc.id, name: doc.attributes.name, status: doc.attributes.status }))));
   }
 
   applyLineDecision(invoiceId: string, lineId: string, payload: LineDecisionPayload): Observable<void> {

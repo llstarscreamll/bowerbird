@@ -14,6 +14,22 @@ export interface CatalogItem {
   internal_code: string | null;
   created_at: string;
   updated_at: string;
+  aliases?: CatalogAlias[];
+}
+
+export interface CatalogAlias {
+  id: string;
+  scheme: 'supplier_sku' | 'gtin' | string;
+  value: string;
+  party_id?: string | null;
+  source: 'invoice' | 'manual' | string;
+}
+
+export interface CreateCatalogAliasInput {
+  id: string;
+  scheme: string;
+  value: string;
+  party_id?: string;
 }
 
 export interface CreateCatalogItemInput {
