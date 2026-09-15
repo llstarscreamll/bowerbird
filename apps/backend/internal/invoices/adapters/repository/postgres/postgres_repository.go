@@ -20,6 +20,8 @@ func NewRepository(registry *database.Registry) *PostgresRepository {
 	return &PostgresRepository{registry: registry}
 }
 
+var _ ports.CatalogItemLinkRepository = (*PostgresRepository)(nil)
+
 func (r *PostgresRepository) ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error) {
 	pool, err := r.registry.GetPool(ctx)
 	if err != nil {

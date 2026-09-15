@@ -14,6 +14,7 @@ import (
 	invoicesJobs "github.com/bowerbird/internal/invoices/adapters/jobs"
 	invoiceLinking "github.com/bowerbird/internal/invoices/adapters/linking"
 	invoicingRepo "github.com/bowerbird/internal/invoices/adapters/repository/postgres"
+	invoicesapi "github.com/bowerbird/internal/invoices/api"
 	"github.com/bowerbird/internal/invoices/application"
 	"github.com/bowerbird/internal/invoices/application/commands"
 	"github.com/bowerbird/internal/invoices/application/ports"
@@ -112,7 +113,18 @@ func NewApplication(
 			ListInvoices:    queries.NewListInvoicesQuery(invoiceRepository),
 			ListReviewQueue: queries.NewListReviewQueueQuery(invoiceRepository, catalogACL),
 		},
+		ItemLinks: application.NewItemLinkSupport(invoiceRepository),
 	}
+}
+
+func NewItemLinkSupport(app *application.Application) invoicesapi.ItemLinkSupport {
+	if app == nil {
+		panic("invoicing application is required")
+	}
+	if app.ItemLinks == nil {
+		panic("item link support is required")
+	}
+	return app.ItemLinks
 }
 
 func NewHTTPHandler(mux *http.ServeMux, app *application.Application, authMiddleware func(http.Handler) http.Handler, cfg config.Config) *httpV1.Router {

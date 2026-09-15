@@ -1,13 +1,15 @@
 package application
 
 import (
+	invoicesapi "github.com/bowerbird/internal/invoices/api"
 	"github.com/bowerbird/internal/invoices/application/commands"
 	"github.com/bowerbird/internal/invoices/application/queries"
 )
 
 type Application struct {
-	Commands Commands
-	Queries  Queries
+	Commands  Commands
+	Queries   Queries
+	ItemLinks invoicesapi.ItemLinkSupport
 }
 
 type Commands struct {

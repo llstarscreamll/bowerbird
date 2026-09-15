@@ -28,6 +28,8 @@ const (
 	ActionCreateProvisional = "create_provisional"
 	ActionUnlock            = "unlock"
 
+	SuggestionReasonHardConflict = "hard_conflict"
+
 	LinkingStatusPending = "pending"
 	LinkingStatusLinked  = "linked"
 	LinkingStatusFailed  = "failed"

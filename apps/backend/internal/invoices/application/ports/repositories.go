@@ -78,3 +78,14 @@ type ReceiverDirectory interface {
 	HasAny(ctx context.Context) (bool, error)
 	ReceiverMatches(ctx context.Context, taxID string) (bool, error)
 }
+
+type ItemIDPair struct {
+	Left  string
+	Right string
+}
+
+type CatalogItemLinkRepository interface {
+	RelinkCatalogItems(ctx context.Context, fromIDs []string, toID string) error
+	HardConflictItemPairs(ctx context.Context) ([]ItemIDPair, error)
+	CountLinesByItemIDs(ctx context.Context, itemIDs []string) (map[string]int, error)
+}
