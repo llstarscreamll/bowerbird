@@ -57,7 +57,7 @@ func TestSyncAccountCommand_FailsWhenAccountIsNotActive(t *testing.T) {
 	assert.Empty(t, providerClient.listQueries)
 }
 
-func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T) {
+func TestSyncAccountCommand_CreatesCursorForLastSixMonthsWhenMissing(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
 		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
@@ -78,7 +78,7 @@ func TestSyncAccountCommand_CreatesCursorForLastTenDaysWhenMissing(t *testing.T)
 	queryTs, convErr := strconv.ParseInt(strings.TrimPrefix(query, "after:"), 10, 64)
 	require.NoError(t, convErr)
 
-	expected := time.Now().UTC().AddDate(0, -2, 0)
+	expected := time.Now().UTC().AddDate(0, -6, 0)
 	assert.WithinDuration(t, expected, time.Unix(queryTs, 0).UTC(), 5*time.Second)
 
 	require.Len(t, repo.upsertedCursors, 3)

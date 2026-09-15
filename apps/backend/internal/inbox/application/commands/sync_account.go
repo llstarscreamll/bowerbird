@@ -225,7 +225,7 @@ func (c *SyncAccountCommand) ensureCursor(ctx context.Context, accountID string)
 	}
 
 	if cursor == nil {
-		initialSyncStart := time.Now().UTC().AddDate(0, -2, 0)
+		initialSyncStart := time.Now().UTC().AddDate(0, -6, 0)
 		cursor, err = domain.NewSyncCursor(accountID, &initialSyncStart)
 		if err != nil {
 			return nil, fmt.Errorf("new sync cursor: %w", err)
