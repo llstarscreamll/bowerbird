@@ -34,7 +34,11 @@ func (q *GetItemDisplaysQuery) Execute(ctx context.Context, ids []string) (map[s
 	}
 	byID := make(map[string]ItemDisplay, len(items))
 	for _, item := range items {
-		byID[item.ID] = ItemDisplay{Name: item.Name, InternalCode: item.InternalCode}
+		code := ""
+		if parsed, ok := item.ParsedInternalCode(); ok {
+			code = parsed.String()
+		}
+		byID[item.ID] = ItemDisplay{Name: item.Name, InternalCode: code}
 	}
 	for _, id := range ids {
 		if id == "" {

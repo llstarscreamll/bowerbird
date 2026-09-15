@@ -17,6 +17,7 @@ func TestParseInternalCodeAndItemKind(t *testing.T) {
 
 	_, err = domain.ParseInternalCode("   ")
 	assert.ErrorIs(t, err, domain.ErrMissingInternalCode)
+	assert.False(t, domain.InternalCode{}.Assigned())
 
 	kind, err := domain.ParseItemKind("goods")
 	require.NoError(t, err)
@@ -37,7 +38,9 @@ func TestNewManualItemRequiresInternalCode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.StatusConfirmed, item.Status)
 	assert.Equal(t, domain.CreationSourceManual, item.CreationSource)
-	assert.Equal(t, "SRV-01", item.InternalCode)
+	got, ok := item.ParsedInternalCode()
+	require.True(t, ok)
+	assert.Equal(t, "SRV-01", got.String())
 	assert.True(t, item.IsConfirmed())
 	assert.False(t, item.IsProvisional())
 }
@@ -47,16 +50,18 @@ func TestItemConfirmAndAssignInternalCode(t *testing.T) {
 	item, err := domain.NewProvisionalItem("01P", "Widget", "W-1", now)
 	require.NoError(t, err)
 
-	err = item.Confirm(nil, now)
+	err = item.Confirm(domain.InternalCode{}, now)
 	assert.ErrorIs(t, err, domain.ErrConfirmRequiresCode)
 
 	code, err := domain.ParseInternalCode("W-1")
 	require.NoError(t, err)
-	require.NoError(t, item.Confirm(&code, now))
-	assert.Equal(t, "W-1", item.InternalCode)
+	require.NoError(t, item.Confirm(code, now))
+	got, ok := item.ParsedInternalCode()
+	require.True(t, ok)
+	assert.Equal(t, "W-1", got.String())
 	assert.True(t, item.IsConfirmed())
 
-	err = item.Confirm(&code, now)
+	err = item.Confirm(code, now)
 	assert.ErrorIs(t, err, domain.ErrItemAlreadyConfirmed)
 
 	other, err := domain.ParseInternalCode("OTHER")
@@ -67,7 +72,11 @@ func TestItemConfirmAndAssignInternalCode(t *testing.T) {
 	prov, err := domain.NewProvisionalItem("01P2", "Gadget", "", now)
 	require.NoError(t, err)
 	require.NoError(t, prov.AssignInternalCode(code, now))
-	assert.Equal(t, "W-1", prov.InternalCode)
+	assigned, ok := prov.ParsedInternalCode()
+	require.True(t, ok)
+	assert.Equal(t, "W-1", assigned.String())
+	require.NoError(t, prov.Confirm(domain.InternalCode{}, now))
+	assert.True(t, prov.IsConfirmed())
 
 	require.NoError(t, prov.Rename("Gadget Pro", now))
 	assert.Equal(t, "Gadget Pro", prov.Name)
@@ -103,7 +112,7 @@ func TestInterpretMasterStatusChange(t *testing.T) {
 
 	code, err := domain.ParseInternalCode("W-1")
 	require.NoError(t, err)
-	require.NoError(t, prov.Confirm(&code, now))
+	require.NoError(t, prov.Confirm(code, now))
 
 	_, err = prov.InterpretMasterStatusChange(domain.StatusProvisional)
 	assert.ErrorIs(t, err, domain.ErrCannotRevertToProvisional)

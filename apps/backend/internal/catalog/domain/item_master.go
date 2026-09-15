@@ -52,6 +52,9 @@ func (c InternalCode) String() string { return c.value }
 
 func (c InternalCode) Equals(other InternalCode) bool { return c.value == other.value }
 
+// Assigned reports a present code. The zero value means “not provided”.
+func (c InternalCode) Assigned() bool { return c.value != "" }
+
 func (i Item) IsConfirmed() bool {
 	return i.Status == StatusConfirmed
 }
@@ -60,6 +63,14 @@ func (i Item) IsConfirmed() bool {
 // Kind is stored as string for persistence; mutate only via New* / ChangeKind.
 func (i Item) ItemKind() (ItemKind, error) {
 	return ParseItemKind(i.Kind)
+}
+
+// ParsedInternalCode returns the assigned internal code, if any.
+func (i Item) ParsedInternalCode() (InternalCode, bool) {
+	if strings.TrimSpace(i.InternalCode) == "" {
+		return InternalCode{}, false
+	}
+	return InternalCode{value: i.InternalCode}, true
 }
 
 // NewManualItem creates a user-confirmed catalog item with a required internal code.
@@ -71,7 +82,7 @@ func NewManualItem(id, name string, kind ItemKind, code InternalCode, now time.T
 	if strings.TrimSpace(id) == "" {
 		return Item{}, ErrItemIDRequired
 	}
-	if code.value == "" {
+	if !code.Assigned() {
 		return Item{}, ErrMissingInternalCode
 	}
 	now = now.UTC()
@@ -124,23 +135,26 @@ func (i Item) InterpretMasterStatusChange(requested string) (confirm bool, err e
 }
 
 // Confirm transitions provisional → confirmed. An internal code must already
-// exist or be supplied in the same operation.
-func (i *Item) Confirm(newCode *InternalCode, now time.Time) error {
+// exist or be supplied (zero InternalCode = not provided in this operation).
+func (i *Item) Confirm(provided InternalCode, now time.Time) error {
 	if i.IsConfirmed() {
 		return ErrItemAlreadyConfirmed
 	}
 	if !i.IsProvisional() {
 		return ErrConfirmRequiresCode
 	}
-	if i.InternalCode == "" {
-		if newCode == nil {
-			return ErrConfirmRequiresCode
+	current, ok := i.ParsedInternalCode()
+	switch {
+	case ok:
+		if provided.Assigned() && !provided.Equals(current) {
+			return ErrInternalCodeImmutable
 		}
-		if err := i.AssignInternalCode(*newCode, now); err != nil {
+	case provided.Assigned():
+		if err := i.AssignInternalCode(provided, now); err != nil {
 			return err
 		}
-	} else if newCode != nil && newCode.value != "" && newCode.value != i.InternalCode {
-		return ErrInternalCodeImmutable
+	default:
+		return ErrConfirmRequiresCode
 	}
 	i.Status = StatusConfirmed
 	i.UpdatedAt = now.UTC()
@@ -149,11 +163,11 @@ func (i *Item) Confirm(newCode *InternalCode, now time.Time) error {
 
 // AssignInternalCode allows first assignment only; rejects changes when already set.
 func (i *Item) AssignInternalCode(next InternalCode, now time.Time) error {
-	if next.value == "" {
+	if !next.Assigned() {
 		return ErrMissingInternalCode
 	}
-	if i.InternalCode != "" {
-		if i.InternalCode != next.value {
+	if current, ok := i.ParsedInternalCode(); ok {
+		if !current.Equals(next) {
 			return ErrInternalCodeImmutable
 		}
 		return nil

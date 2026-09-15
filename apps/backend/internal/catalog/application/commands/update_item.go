@@ -53,13 +53,13 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 		item.ChangeKind(kind, now)
 	}
 
-	var newCode *domain.InternalCode
+	var provided domain.InternalCode
 	if input.InternalCode != nil {
 		parsed, err := domain.ParseInternalCode(*input.InternalCode)
 		if err != nil {
 			return appErrors.New(appErrors.CodeValidation, "internal_code is required")
 		}
-		newCode = &parsed
+		provided = parsed
 	}
 
 	confirmRequested := false
@@ -72,11 +72,11 @@ func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput
 	}
 
 	if confirmRequested {
-		if err := item.Confirm(newCode, now); err != nil {
+		if err := item.Confirm(provided, now); err != nil {
 			return appErrors.New(appErrors.CodeValidation, err.Error())
 		}
-	} else if newCode != nil {
-		if err := item.AssignInternalCode(*newCode, now); err != nil {
+	} else if input.InternalCode != nil {
+		if err := item.AssignInternalCode(provided, now); err != nil {
 			return appErrors.New(appErrors.CodeValidation, err.Error())
 		}
 	}

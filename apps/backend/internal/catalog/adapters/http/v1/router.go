@@ -132,9 +132,9 @@ func (c *Controller) UpdateItem(w http.ResponseWriter, r *http.Request) error {
 
 func toItemResource(item domain.Item) itemResource {
 	var code *string
-	if item.InternalCode != "" {
-		c := item.InternalCode
-		code = &c
+	if parsed, ok := item.ParsedInternalCode(); ok {
+		s := parsed.String()
+		code = &s
 	}
 	return itemResource{
 		Type: "catalog_items",
