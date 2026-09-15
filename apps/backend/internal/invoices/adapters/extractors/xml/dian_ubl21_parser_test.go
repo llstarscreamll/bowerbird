@@ -280,6 +280,168 @@ func TestDecodeInvoiceDocumentFindsInvoiceInParentDocumentAttachment(t *testing.
 	}
 }
 
+func TestDIANUBL21ParserStructuredItemIdentifiers(t *testing.T) {
+	parser := NewDianUBL21Parser()
+	xmlData := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>FE-IDS</cbc:ID>
+  <cbc:IssueDate>2026-05-25</cbc:IssueDate>
+  <cbc:DocumentCurrencyCode>COP</cbc:DocumentCurrencyCode>
+  <cbc:UUID>cufe-ids</cbc:UUID>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Proveedor SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Proveedor SAS</cbc:RegistrationName>
+        <cbc:CompanyID>900123456</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Cliente SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Cliente SAS</cbc:RegistrationName>
+        <cbc:CompanyID>901999888</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cbc:PayableAmount>100</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="EA">1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>MacBook</cbc:Description>
+      <cac:BuyersItemIdentification><cbc:ID>INT-9</cbc:ID></cac:BuyersItemIdentification>
+      <cac:SellersItemIdentification><cbc:ID>MGND3LA/A</cbc:ID></cac:SellersItemIdentification>
+      <cac:StandardItemIdentification><cbc:ID>7701234567890</cbc:ID></cac:StandardItemIdentification>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount>100</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</Invoice>`)
+	doc, err := parser.ParseInvoiceXML(xmlData)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	line := doc.Lines[0]
+	if line.BuyerCode != "INT-9" || line.SellerSKU != "MGND3LA/A" || line.GTIN != "7701234567890" {
+		t.Fatalf("unexpected ids: buyer=%q seller=%q gtin=%q", line.BuyerCode, line.SellerSKU, line.GTIN)
+	}
+}
+
+func TestDIANUBL21ParserStandardNotGTINEqualsSeller(t *testing.T) {
+	parser := NewDianUBL21Parser()
+	xmlData := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>FE-IDS2</cbc:ID>
+  <cbc:IssueDate>2026-05-25</cbc:IssueDate>
+  <cbc:DocumentCurrencyCode>COP</cbc:DocumentCurrencyCode>
+  <cbc:UUID>cufe-ids2</cbc:UUID>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Proveedor SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Proveedor SAS</cbc:RegistrationName>
+        <cbc:CompanyID>900123456</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Cliente SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Cliente SAS</cbc:RegistrationName>
+        <cbc:CompanyID>901999888</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cbc:PayableAmount>100</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="EA">1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>MacBook</cbc:Description>
+      <cac:SellersItemIdentification><cbc:ID>MGND3LA/A</cbc:ID></cac:SellersItemIdentification>
+      <cac:StandardItemIdentification><cbc:ID>MGND3LA/A</cbc:ID></cac:StandardItemIdentification>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount>100</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</Invoice>`)
+	doc, err := parser.ParseInvoiceXML(xmlData)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	line := doc.Lines[0]
+	if line.SellerSKU != "MGND3LA/A" || line.GTIN != "" {
+		t.Fatalf("unexpected ids: seller=%q gtin=%q", line.SellerSKU, line.GTIN)
+	}
+}
+
+func TestDIANUBL21ParserStandardFallbackToSeller(t *testing.T) {
+	parser := NewDianUBL21Parser()
+	xmlData := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>FE-IDS3</cbc:ID>
+  <cbc:IssueDate>2026-05-25</cbc:IssueDate>
+  <cbc:DocumentCurrencyCode>COP</cbc:DocumentCurrencyCode>
+  <cbc:UUID>cufe-ids3</cbc:UUID>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Proveedor SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Proveedor SAS</cbc:RegistrationName>
+        <cbc:CompanyID>900123456</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>Cliente SAS</cbc:Name></cac:PartyName>
+      <cac:PartyTaxScheme>
+        <cbc:RegistrationName>Cliente SAS</cbc:RegistrationName>
+        <cbc:CompanyID>901999888</cbc:CompanyID>
+      </cac:PartyTaxScheme>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cbc:PayableAmount>100</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="EA">1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Widget</cbc:Description>
+      <cac:StandardItemIdentification><cbc:ID>ABC-1</cbc:ID></cac:StandardItemIdentification>
+    </cac:Item>
+    <cac:Price><cbc:PriceAmount>100</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>
+</Invoice>`)
+	doc, err := parser.ParseInvoiceXML(xmlData)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	line := doc.Lines[0]
+	if line.SellerSKU != "ABC-1" || line.GTIN != "" {
+		t.Fatalf("unexpected ids: seller=%q gtin=%q", line.SellerSKU, line.GTIN)
+	}
+}
+
 func TestDIANUBL21ParserParseInvoiceXMLErrorsOnMissingCUFE(t *testing.T) {
 	parser := NewDianUBL21Parser()
 

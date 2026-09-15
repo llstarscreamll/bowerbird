@@ -42,7 +42,9 @@ func (a *CatalogACL) ResolveLine(ctx context.Context, input ports.CatalogLineRes
 	result, err := a.catalog.ResolveLine(ctx, catalogapi.LineResolveInput{
 		LineID:         input.LineID,
 		PartyID:        input.PartyID,
-		ItemCode:       input.ItemCode,
+		BuyerCode:      input.BuyerCode,
+		SellerSKU:      input.SellerSKU,
+		GTIN:           input.GTIN,
 		Description:    input.Description,
 		ExistingItemID: input.ExistingItemID,
 		ExistingLocked: input.ExistingLocked,
@@ -93,19 +95,17 @@ func (a *CatalogACL) ValidateItemExists(ctx context.Context, itemID string) erro
 func (a *CatalogACL) MintProvisionalFromEvidence(ctx context.Context, input ports.MintProvisionalInput) (string, error) {
 	return a.catalog.MintProvisionalFromEvidence(ctx, catalogapi.MintFromEvidenceInput{
 		PartyID:     input.PartyID,
-		ItemCode:    input.ItemCode,
+		SellerSKU:   input.SellerSKU,
+		GTIN:        input.GTIN,
 		Description: input.Description,
 	})
 }
 
-func (a *CatalogACL) EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error {
-	return a.catalog.EnsureSupplierAlias(ctx, partyID, itemCode, itemID)
-}
-
-func (a *CatalogACL) RecordMatchMemory(ctx context.Context, input ports.MatchMemoryInput) error {
-	return a.catalog.RecordMatchMemory(ctx, catalogapi.MatchMemoryInput{
+func (a *CatalogACL) RememberDecision(ctx context.Context, input ports.RememberDecisionInput) error {
+	return a.catalog.RememberDecision(ctx, catalogapi.RememberDecisionInput{
 		PartyID:     input.PartyID,
-		ItemCode:    input.ItemCode,
+		SellerSKU:   input.SellerSKU,
+		GTIN:        input.GTIN,
 		Description: input.Description,
 		Action:      input.Action,
 		ItemID:      input.ItemID,

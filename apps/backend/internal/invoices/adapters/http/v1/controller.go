@@ -149,7 +149,9 @@ func (c *Controller) ListReviewQueue(w http.ResponseWriter, r *http.Request) err
 			"id":   line.LineID,
 			"attributes": map[string]any{
 				"line_number": line.LineNumber,
-				"item_code":   line.ItemCode,
+				"buyer_code":  line.BuyerCode,
+				"seller_sku":  line.SellerSKU,
+				"gtin":        line.GTIN,
 				"description": line.Description,
 				"item_id":     nullIfEmptyStr(line.ItemID),
 				"link_status": line.LinkStatus,

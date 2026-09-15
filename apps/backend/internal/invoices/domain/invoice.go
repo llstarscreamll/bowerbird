@@ -33,7 +33,9 @@ type TaxTotal struct {
 
 type InvoiceLine struct {
 	LineID          string
-	ItemCode        string
+	BuyerCode       string
+	SellerSKU       string
+	GTIN            string
 	ItemDescription string
 	Quantity        float64
 	UnitCode        string

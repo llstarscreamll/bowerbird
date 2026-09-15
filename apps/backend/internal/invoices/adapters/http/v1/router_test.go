@@ -66,10 +66,7 @@ func (s *stubMatching) ValidateItemExists(ctx context.Context, itemID string) er
 func (s *stubMatching) MintProvisionalFromEvidence(ctx context.Context, input ports.MintProvisionalInput) (string, error) {
 	return "ITEM-NEW", nil
 }
-func (s *stubMatching) EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error {
-	return nil
-}
-func (s *stubMatching) RecordMatchMemory(ctx context.Context, input ports.MatchMemoryInput) error {
+func (s *stubMatching) RememberDecision(ctx context.Context, input ports.RememberDecisionInput) error {
 	return nil
 }
 

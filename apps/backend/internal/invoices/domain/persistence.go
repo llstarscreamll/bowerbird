@@ -51,7 +51,9 @@ func (l InvoiceLine) ToLineRecord(id, headerID string, fallbackNumber int, raw [
 		ID:              id,
 		InvoiceHeaderID: headerID,
 		LineNumber:      l.NumberOrDefault(fallbackNumber),
-		ItemCode:        l.ItemCode,
+		BuyerCode:       l.BuyerCode,
+		SellerSKU:       l.SellerSKU,
+		GTIN:            l.GTIN,
 		Description:     l.ItemDescription,
 		Quantity:        l.Quantity,
 		UnitPrice:       l.UnitPrice,
@@ -95,7 +97,9 @@ type InvoiceLineRecord struct {
 	ID              string
 	InvoiceHeaderID string
 	LineNumber      int
-	ItemCode        string
+	BuyerCode       string
+	SellerSKU       string
+	GTIN            string
 	Description     string
 	Quantity        float64
 	UnitPrice       float64

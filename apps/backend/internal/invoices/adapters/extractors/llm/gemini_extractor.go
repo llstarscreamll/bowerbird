@@ -359,9 +359,12 @@ func decodeStrictInvoice(raw string) (*domain.InvoiceDocument, error) {
 
 	lines := make([]domain.InvoiceLine, 0, len(out.Lines))
 	for _, l := range out.Lines {
+		ids := domain.FromCollapsedCode(l.ItemCode)
 		lines = append(lines, domain.InvoiceLine{
 			LineID:          l.LineID,
-			ItemCode:        l.ItemCode,
+			BuyerCode:       ids.BuyerCode,
+			SellerSKU:       ids.SellerSKU,
+			GTIN:            ids.GTIN,
 			ItemDescription: l.ItemDescription,
 			Quantity:        l.Quantity,
 			UnitCode:        l.UnitCode,

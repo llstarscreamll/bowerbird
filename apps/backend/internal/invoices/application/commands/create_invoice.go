@@ -149,7 +149,9 @@ func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain
 			result, err := cmd.lineResolver.ResolveLine(ctx, ports.CatalogLineResolveInput{
 				LineID:      line.ID,
 				PartyID:     partyID,
-				ItemCode:    line.ItemCode,
+				BuyerCode:   line.BuyerCode,
+				SellerSKU:   line.SellerSKU,
+				GTIN:        line.GTIN,
 				Description: line.Description,
 			})
 			if err != nil {

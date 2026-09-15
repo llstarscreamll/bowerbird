@@ -46,7 +46,7 @@ func (p *partyResolverStub) ResolveIssuerPartyID(ctx context.Context, taxID, nam
 type lineResolverStub struct{}
 
 func (l *lineResolverStub) ResolveLine(ctx context.Context, input ports.CatalogLineResolveInput) (*ports.CatalogLineResolveResult, error) {
-	if input.ItemCode == "" {
+	if input.SellerSKU == "" {
 		return &ports.CatalogLineResolveResult{Status: "unmatched"}, nil
 	}
 	suggestions, _ := json.Marshal([]any{})
@@ -80,8 +80,8 @@ func TestCreateInvoice_LinksPartyAndProvisionalItem(t *testing.T) {
 			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
 			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
 			Lines: []domain.InvoiceLine{
-				{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
-				{LineID: "2", ItemCode: "", ItemDescription: "Service", Quantity: 1, UnitPrice: 5, LineExtension: 5},
+				{LineID: "1", SellerSKU: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
+				{LineID: "2", SellerSKU: "", ItemDescription: "Service", Quantity: 1, UnitPrice: 5, LineExtension: 5},
 			},
 		},
 		SourceName:       "test",
@@ -115,7 +115,7 @@ func TestCreateInvoice_LinkFailureKeepsPersistedInvoice(t *testing.T) {
 			InvoiceID: "FV-2",
 			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
 			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
-			Lines:     []domain.InvoiceLine{{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
+			Lines:     []domain.InvoiceLine{{LineID: "1", SellerSKU: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
 		},
 		SourceName:       "test",
 		SourceID:         "src-2",
@@ -164,8 +164,8 @@ func TestCreateInvoice_PartialLineLinkingPersistsSuccessfulLines(t *testing.T) {
 			Issuer:    domain.Party{Name: "Proveedor", TaxID: "900123"},
 			Receiver:  domain.Party{Name: "Cliente", TaxID: "901456"},
 			Lines: []domain.InvoiceLine{
-				{LineID: "1", ItemCode: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
-				{LineID: "2", ItemCode: "SKU-2", ItemDescription: "Gadget", Quantity: 1, UnitPrice: 5, LineExtension: 5},
+				{LineID: "1", SellerSKU: "SKU-1", ItemDescription: "Widget", Quantity: 1, UnitPrice: 10, LineExtension: 10},
+				{LineID: "2", SellerSKU: "SKU-2", ItemDescription: "Gadget", Quantity: 1, UnitPrice: 5, LineExtension: 5},
 			},
 		},
 		SourceName:       "test",

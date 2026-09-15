@@ -78,7 +78,9 @@ type invoiceSummaryAttributes struct {
 type invoiceLineAttributes struct {
 	ID               string  `json:"id"`
 	LineNumber       int     `json:"line_number"`
-	ItemCode         string  `json:"item_code"`
+	BuyerCode        string  `json:"buyer_code"`
+	SellerSKU        string  `json:"seller_sku"`
+	GTIN             string  `json:"gtin"`
 	Description      string  `json:"description"`
 	Quantity         float64 `json:"quantity"`
 	UnitPrice        float64 `json:"unit_price"`
@@ -173,7 +175,9 @@ func newInvoiceDetailsResponse(result *queries.InvoiceDetails) jsonApiResponse[i
 		lines = append(lines, invoiceLineAttributes{
 			ID:               line.ID,
 			LineNumber:       line.LineNumber,
-			ItemCode:         line.ItemCode,
+			BuyerCode:        line.BuyerCode,
+			SellerSKU:        line.SellerSKU,
+			GTIN:             line.GTIN,
 			Description:      line.Description,
 			Quantity:         line.Quantity,
 			UnitPrice:        line.UnitPrice,

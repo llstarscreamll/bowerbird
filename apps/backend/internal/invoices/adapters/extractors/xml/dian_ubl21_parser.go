@@ -40,9 +40,16 @@ func (p *DianUBL21Parser) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument,
 
 	lines := make([]domain.InvoiceLine, 0, len(invoice.InvoiceLines))
 	for _, line := range invoice.InvoiceLines {
+		ids := domain.NewLineIdentifiers(
+			line.Item.BuyersItemIdentification.ID.Value,
+			line.Item.SellersItemIdentification.ID.Value,
+			line.Item.StandardItemIdentification.ID.Value,
+		)
 		mapped := domain.InvoiceLine{
 			LineID:          strings.TrimSpace(line.ID.Value),
-			ItemCode:        firstNonEmpty(line.Item.StandardItemIdentification.ID.Value, line.Item.SellersItemIdentification.ID.Value),
+			BuyerCode:       ids.BuyerCode,
+			SellerSKU:       ids.SellerSKU,
+			GTIN:            ids.GTIN,
 			ItemDescription: firstNonEmpty(firstNonEmpty(line.Item.Descriptions...), strings.TrimSpace(line.Item.Name)),
 			Quantity:        parseFloat(line.InvoicedQuantity.Value),
 			UnitCode:        strings.TrimSpace(line.InvoicedQuantity.UnitCode),
@@ -349,6 +356,7 @@ type item struct {
 	Descriptions               []string           `xml:"Description"`
 	Name                       string             `xml:"Name"`
 	PackSizeNumeric            string             `xml:"PackSizeNumeric"`
+	BuyersItemIdentification   itemIdentification `xml:"BuyersItemIdentification"`
 	SellersItemIdentification  itemIdentification `xml:"SellersItemIdentification"`
 	StandardItemIdentification itemIdentification `xml:"StandardItemIdentification"`
 }

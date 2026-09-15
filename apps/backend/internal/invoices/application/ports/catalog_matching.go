@@ -4,22 +4,23 @@ import "context"
 
 type MintProvisionalInput struct {
 	PartyID     string
-	ItemCode    string
+	SellerSKU   string
+	GTIN        string
 	Description string
 }
 
-type MatchMemoryInput struct {
+type RememberDecisionInput struct {
 	PartyID     string
-	ItemCode    string
+	SellerSKU   string
+	GTIN        string
 	Description string
-	Action      string // link | never_match
-	ItemID      *string
+	Action      string
+	ItemID      string
 }
 
-// CatalogMatchingPort is the anti-corruption boundary for catalog identity and match memory effects.
+// CatalogMatchingPort is the anti-corruption boundary for catalog identity and match memory.
 type CatalogMatchingPort interface {
 	ValidateItemExists(ctx context.Context, itemID string) error
 	MintProvisionalFromEvidence(ctx context.Context, input MintProvisionalInput) (itemID string, err error)
-	EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error
-	RecordMatchMemory(ctx context.Context, input MatchMemoryInput) error
+	RememberDecision(ctx context.Context, input RememberDecisionInput) error
 }

@@ -62,11 +62,7 @@ func (s *stubCatalogMatching) MintProvisionalFromEvidence(ctx context.Context, i
 	return "ITEM-NEW", nil
 }
 
-func (s *stubCatalogMatching) EnsureSupplierAlias(ctx context.Context, partyID, itemCode, itemID string) error {
-	return nil
-}
-
-func (s *stubCatalogMatching) RecordMatchMemory(ctx context.Context, input ports.MatchMemoryInput) error {
+func (s *stubCatalogMatching) RememberDecision(ctx context.Context, input ports.RememberDecisionInput) error {
 	s.memoryCalls++
 	return s.memoryErr
 }
@@ -78,7 +74,7 @@ func TestApplyLineDecision_LinkRemember(t *testing.T) {
 				LineID:          "LINE-1",
 				InvoiceHeaderID: "INV-1",
 				PartyID:         "P1",
-				ItemCode:        "SKU-1",
+				SellerSKU:       "SKU-1",
 				Description:     "Widget",
 				Link:            invoicesDomain.LineLink{Status: invoicesDomain.LinkStatusUnmatched},
 			},
@@ -130,7 +126,7 @@ func TestApplyLineDecision_CreateProvisional(t *testing.T) {
 				LineID:          "LINE-1",
 				InvoiceHeaderID: "INV-1",
 				PartyID:         "P1",
-				ItemCode:        "SKU-1",
+				SellerSKU:       "SKU-1",
 				Description:     "Widget",
 				Link:            invoicesDomain.LineLink{Status: invoicesDomain.LinkStatusUnmatched},
 			},
@@ -179,7 +175,7 @@ func TestApplyLineDecision_MemoryFailsWithoutMutatingLine(t *testing.T) {
 				LineID:          "LINE-1",
 				InvoiceHeaderID: "INV-1",
 				PartyID:         "P1",
-				ItemCode:        "SKU-1",
+				SellerSKU:       "SKU-1",
 				Description:     "Widget",
 				Link:            invoicesDomain.LineLink{Status: invoicesDomain.LinkStatusUnmatched},
 			},
@@ -223,4 +219,52 @@ func TestApplyLineDecision_InvoiceMismatch(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, invoicesDomain.LinkStatusUnmatched, links.lines["LINE-1"].Link.Status)
+}
+
+func TestApplyLineDecision_Unlock(t *testing.T) {
+	itemID := "ITEM-1"
+	links := &stubLineLinks{
+		lines: map[string]*invoicesDomain.LineForDecision{
+			"LINE-1": {
+				LineID:          "LINE-1",
+				InvoiceHeaderID: "INV-1",
+				SellerSKU:       "SKU-1",
+				Link: invoicesDomain.LineLink{
+					ItemID: &itemID, Status: invoicesDomain.LinkStatusLinked, Method: invoicesDomain.LinkMethodManual, Locked: true,
+				},
+			},
+		},
+	}
+	catalog := &stubCatalogMatching{items: map[string]bool{"ITEM-1": true}}
+	cmd := NewApplyLineDecisionCommand(links, catalog)
+	err := cmd.Execute(context.Background(), ApplyLineDecisionInput{
+		InvoiceID: "INV-1", LineID: "LINE-1", Action: invoicesDomain.ActionUnlock,
+	})
+	require.NoError(t, err)
+	assert.False(t, links.lines["LINE-1"].Link.Locked)
+	assert.Equal(t, "ITEM-1", *links.lines["LINE-1"].Link.ItemID)
+	assert.Equal(t, 0, catalog.memoryCalls)
+}
+
+func TestApplyLineDecision_RememberFalseDoesNotTeach(t *testing.T) {
+	links := &stubLineLinks{
+		lines: map[string]*invoicesDomain.LineForDecision{
+			"LINE-1": {
+				LineID:          "LINE-1",
+				InvoiceHeaderID: "INV-1",
+				PartyID:         "P1",
+				SellerSKU:       "SKU-1",
+				Link:            invoicesDomain.LineLink{Status: invoicesDomain.LinkStatusUnmatched},
+			},
+		},
+	}
+	catalog := &stubCatalogMatching{items: map[string]bool{"ITEM-1": true}}
+	cmd := NewApplyLineDecisionCommand(links, catalog)
+	err := cmd.Execute(context.Background(), ApplyLineDecisionInput{
+		InvoiceID: "INV-1", LineID: "LINE-1", ItemID: "ITEM-1",
+		Action: invoicesDomain.MemoryActionLink, Remember: false, Lock: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, catalog.memoryCalls)
+	assert.Equal(t, invoicesDomain.LinkStatusLinked, links.lines["LINE-1"].Link.Status)
 }

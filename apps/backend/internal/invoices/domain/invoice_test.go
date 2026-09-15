@@ -92,7 +92,7 @@ func TestInvoiceDocumentToHeaderRecordStartsPending(t *testing.T) {
 		LineExtension:  100,
 		AllowanceTotal: 10,
 		PayableAmount:  90,
-		Lines:          []InvoiceLine{{LineID: "1", ItemCode: "SKU", ItemDescription: "Widget", Quantity: 1, UnitPrice: 100, LineExtension: 100}},
+		Lines:          []InvoiceLine{{LineID: "1", SellerSKU: "SKU", ItemDescription: "Widget", Quantity: 1, UnitPrice: 100, LineExtension: 100}},
 	}
 	now := time.Date(2026, 9, 5, 12, 0, 0, 0, time.UTC)
 
@@ -116,7 +116,7 @@ func TestInvoiceDocumentToHeaderRecordStartsPending(t *testing.T) {
 	if line.LinkStatus != LinkStatusUnmatched {
 		t.Fatalf("expected unmatched line, got %q", line.LinkStatus)
 	}
-	if line.LineNumber != 1 || line.ItemCode != "SKU" {
+	if line.LineNumber != 1 || line.SellerSKU != "SKU" {
 		t.Fatalf("unexpected line mapping: %#v", line)
 	}
 }

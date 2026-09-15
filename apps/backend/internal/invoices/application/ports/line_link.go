@@ -17,7 +17,9 @@ type ReviewLine struct {
 	LineID          string
 	InvoiceHeaderID string
 	LineNumber      int
-	ItemCode        string
+	BuyerCode       string
+	SellerSKU       string
+	GTIN            string
 	Description     string
 	ItemID          string
 	LinkStatus      string

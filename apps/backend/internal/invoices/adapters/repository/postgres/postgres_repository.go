@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/bowerbird/internal/invoices/application/ports"
 	"github.com/bowerbird/internal/invoices/domain"
@@ -121,21 +122,23 @@ func (r *PostgresRepository) PersistInvoiceAtomic(ctx context.Context, header do
 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO invoice_lines (
-				id, invoice_header_id, line_number, item_code, description,
+				id, invoice_header_id, line_number, buyer_code, seller_sku, gtin, description,
 				quantity, unit_price, line_tax_total, line_total,
 				raw_data, created_at, updated_at,
 				item_id, link_status, link_method, link_locked, suggestions
 			) VALUES (
-				$1, $2, $3, $4, $5,
-				$6, $7, $8, $9,
-				$10, $11, $12,
-				NULLIF($13, ''), COALESCE(NULLIF($14, ''), 'unmatched'), NULLIF($15, ''), $16, $17::jsonb
+				$1, $2, $3, $4, $5, $6, $7,
+				$8, $9, $10, $11,
+				$12, $13, $14,
+				NULLIF($15, ''), COALESCE(NULLIF($16, ''), 'unmatched'), NULLIF($17, ''), $18, $19::jsonb
 			)
 		`,
 			line.ID,
 			line.InvoiceHeaderID,
 			line.LineNumber,
-			line.ItemCode,
+			nullIfEmpty(line.BuyerCode),
+			nullIfEmpty(line.SellerSKU),
+			nullIfEmpty(line.GTIN),
 			line.Description,
 			line.Quantity,
 			line.UnitPrice,
@@ -240,7 +243,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 	}
 
 	rows, err := pool.Query(ctx, `
-		SELECT id, invoice_header_id, line_number, item_code, description,
+		SELECT id, invoice_header_id, line_number, COALESCE(buyer_code, ''), COALESCE(seller_sku, ''), COALESCE(gtin, ''), description,
 			quantity, unit_price, line_tax_total, line_total, raw_data, created_at, updated_at,
 			COALESCE(item_id, ''), COALESCE(link_status, 'unmatched'), COALESCE(link_method, ''),
 			COALESCE(link_locked, false), COALESCE(suggestions, '[]'::jsonb)
@@ -257,7 +260,7 @@ func (r *PostgresRepository) GetInvoiceByID(ctx context.Context, id string) (*do
 	for rows.Next() {
 		var line domain.InvoiceLineRecord
 		if err := rows.Scan(
-			&line.ID, &line.InvoiceHeaderID, &line.LineNumber, &line.ItemCode,
+			&line.ID, &line.InvoiceHeaderID, &line.LineNumber, &line.BuyerCode, &line.SellerSKU, &line.GTIN,
 			&line.Description, &line.Quantity, &line.UnitPrice, &line.LineTaxTotal,
 			&line.LineTotal, &line.RawData, &line.CreatedAt, &line.UpdatedAt,
 			&line.ItemID, &line.LinkStatus, &line.LinkMethod, &line.LinkLocked, &line.Suggestions,
@@ -329,4 +332,11 @@ func (r *PostgresRepository) ListInvoices(ctx context.Context, limit int, cursor
 	}
 
 	return headers, hasMore, nil
+}
+
+func nullIfEmpty(s string) *string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return &s
 }

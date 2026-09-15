@@ -33,15 +33,12 @@ func NewApplyLineDecisionCommand(links ports.InvoiceLineLinkRepository, catalog 
 }
 
 type ApplyLineDecisionInput struct {
-	InvoiceID   string
-	LineID      string
-	ItemID      string
-	Action      string // link | never_match | create_provisional
-	Remember    bool
-	Lock        bool
-	PartyID     string
-	ItemCode    string
-	Description string
+	InvoiceID string
+	LineID    string
+	ItemID    string
+	Action    string
+	Remember  bool
+	Lock      bool
 }
 
 func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLineDecisionInput) error {
@@ -56,19 +53,38 @@ func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLin
 		return appErrors.New(appErrors.CodeNotFound, "invoice line not found")
 	}
 
-	partyID := firstNonEmpty(input.PartyID, line.PartyID)
-	itemCode := firstNonEmpty(input.ItemCode, line.ItemCode)
-	description := firstNonEmpty(input.Description, line.Description)
-
 	action := strings.TrimSpace(input.Action)
 	if action == "" {
 		action = domain.MemoryActionLink
 	}
+
+	if action == domain.ActionUnlock {
+		next, err := line.Link.Unlock()
+		if err != nil {
+			if errors.Is(err, domain.ErrLineLinkNotLocked) {
+				return appErrors.New(appErrors.CodeConflict, "line link is not locked")
+			}
+			return err
+		}
+		if err := cmd.links.SaveLineLink(ctx, input.LineID, next); err != nil {
+			cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "save_failed")
+			return err
+		}
+		if line.InvoiceHeaderID != "" {
+			if err := cmd.links.SyncHeaderLinkingStatus(ctx, line.InvoiceHeaderID); err != nil {
+				return err
+			}
+		}
+		cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "ok")
+		return nil
+	}
+
 	if action == domain.ActionCreateProvisional {
 		itemID, err := cmd.catalog.MintProvisionalFromEvidence(ctx, ports.MintProvisionalInput{
-			PartyID:     partyID,
-			ItemCode:    itemCode,
-			Description: description,
+			PartyID:     line.PartyID,
+			SellerSKU:   line.SellerSKU,
+			GTIN:        line.GTIN,
+			Description: line.Description,
 		})
 		if err != nil {
 			cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "catalog_mint_failed")
@@ -99,26 +115,18 @@ func (cmd *ApplyLineDecisionCommand) Execute(ctx context.Context, input ApplyLin
 			cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "validate_item_failed")
 			return err
 		}
-		code := strings.TrimSpace(itemCode)
-		if input.Remember && code != "" && partyID != "" {
-			if err := cmd.catalog.EnsureSupplierAlias(ctx, partyID, code, input.ItemID); err != nil {
-				cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "ensure_alias_failed")
-				return err
-			}
-		}
 	}
 
-	// ACL before persist: catalog failure must not mutate the invoice line.
 	if input.Remember {
-		memItemID := domain.RememberedItemID(action, next.ItemID, input.ItemID)
-		if err := cmd.catalog.RecordMatchMemory(ctx, ports.MatchMemoryInput{
-			PartyID:     partyID,
-			ItemCode:    itemCode,
-			Description: description,
+		if err := cmd.catalog.RememberDecision(ctx, ports.RememberDecisionInput{
+			PartyID:     line.PartyID,
+			SellerSKU:   line.SellerSKU,
+			GTIN:        line.GTIN,
+			Description: line.Description,
 			Action:      action,
-			ItemID:      memItemID,
+			ItemID:      firstNonEmpty(input.ItemID, ptrValue(next.ItemID)),
 		}); err != nil {
-			cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "record_memory_failed")
+			cmd.logDecision(input.LineID, line.InvoiceHeaderID, action, "remember_failed")
 			return err
 		}
 	}
@@ -154,4 +162,11 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func ptrValue(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }

@@ -44,7 +44,8 @@ func (r *PostgresRepository) ListReviewLines(ctx context.Context, statuses []str
 		statuses = []string{domain.LinkStatusUnmatched, domain.LinkStatusSuggested}
 	}
 	rows, err := pool.Query(ctx, `
-		SELECT l.id, l.invoice_header_id, l.line_number, COALESCE(l.item_code, ''), COALESCE(l.description, ''),
+		SELECT l.id, l.invoice_header_id, l.line_number,
+			COALESCE(l.buyer_code, ''), COALESCE(l.seller_sku, ''), COALESCE(l.gtin, ''), COALESCE(l.description, ''),
 			COALESCE(l.item_id, ''), l.link_status, COALESCE(l.link_method, ''), l.link_locked, l.suggestions
 		FROM invoice_lines l
 		WHERE l.link_status = ANY($1)
@@ -61,7 +62,8 @@ func (r *PostgresRepository) ListReviewLines(ctx context.Context, statuses []str
 		var line ports.ReviewLine
 		var suggestionsRaw []byte
 		if err := rows.Scan(
-			&line.LineID, &line.InvoiceHeaderID, &line.LineNumber, &line.ItemCode, &line.Description,
+			&line.LineID, &line.InvoiceHeaderID, &line.LineNumber,
+			&line.BuyerCode, &line.SellerSKU, &line.GTIN, &line.Description,
 			&line.ItemID, &line.LinkStatus, &line.LinkMethod, &line.LinkLocked, &suggestionsRaw,
 		); err != nil {
 			return nil, err
@@ -98,13 +100,13 @@ func (r *PostgresRepository) GetLineForDecision(ctx context.Context, lineID stri
 	var locked bool
 	err = pool.QueryRow(ctx, `
 		SELECT l.id, l.invoice_header_id, COALESCE(l.item_id, ''), l.link_status, COALESCE(l.link_method, ''), l.link_locked,
-			COALESCE(l.item_code, ''), COALESCE(l.description, ''), COALESCE(h.issuer_party_id, '')
+			COALESCE(l.buyer_code, ''), COALESCE(l.seller_sku, ''), COALESCE(l.gtin, ''), COALESCE(l.description, ''), COALESCE(h.issuer_party_id, '')
 		FROM invoice_lines l
 		JOIN invoice_headers h ON h.id = l.invoice_header_id
 		WHERE l.id = $1
 	`, lineID).Scan(
 		&state.LineID, &state.InvoiceHeaderID, &itemID, &status, &method, &locked,
-		&state.ItemCode, &state.Description, &state.PartyID,
+		&state.BuyerCode, &state.SellerSKU, &state.GTIN, &state.Description, &state.PartyID,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

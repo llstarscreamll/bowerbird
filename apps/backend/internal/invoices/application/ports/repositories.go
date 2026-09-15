@@ -53,7 +53,9 @@ type IssuerPartyResolver interface {
 type CatalogLineResolveInput struct {
 	LineID         string
 	PartyID        string
-	ItemCode       string
+	BuyerCode      string
+	SellerSKU      string
+	GTIN           string
 	Description    string
 	ExistingItemID string
 	ExistingLocked bool

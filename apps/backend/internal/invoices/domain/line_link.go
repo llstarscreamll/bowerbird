@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrItemIDRequired = errors.New("item id is required for link")
-	ErrLineLinkLocked = errors.New("line link is locked")
-	ErrInvalidAction  = errors.New("invalid link decision action")
+	ErrItemIDRequired    = errors.New("item id is required for link")
+	ErrLineLinkLocked    = errors.New("line link is locked")
+	ErrLineLinkNotLocked = errors.New("line link is not locked")
+	ErrInvalidAction     = errors.New("invalid link decision action")
 )
 
 const (
@@ -25,6 +26,7 @@ const (
 	MemoryActionLink        = "link"
 	MemoryActionNeverMatch  = "never_match"
 	ActionCreateProvisional = "create_provisional"
+	ActionUnlock            = "unlock"
 
 	LinkingStatusPending = "pending"
 	LinkingStatusLinked  = "linked"
@@ -50,7 +52,9 @@ func (l LineLink) IsLinked() bool {
 type LineForDecision struct {
 	LineID          string
 	InvoiceHeaderID string
-	ItemCode        string
+	BuyerCode       string
+	SellerSKU       string
+	GTIN            string
 	Description     string
 	PartyID         string
 	Link            LineLink
@@ -72,6 +76,8 @@ func (l LineLink) ApplyManualDecision(action, itemID string, lock bool) (LineLin
 		return l.ApplyManualLink(itemID, lock)
 	case MemoryActionNeverMatch:
 		return l.Reject(lock)
+	case ActionUnlock:
+		return l.Unlock()
 	default:
 		return LineLink{}, ErrInvalidAction
 	}
@@ -105,6 +111,15 @@ func (l LineLink) Reject(lock bool) (LineLink, error) {
 		Locked:      lock,
 		Suggestions: emptySuggestions,
 	}, nil
+}
+
+func (l LineLink) Unlock() (LineLink, error) {
+	if !l.Locked {
+		return LineLink{}, ErrLineLinkNotLocked
+	}
+	next := l
+	next.Locked = false
+	return next, nil
 }
 
 // RememberedItemID chooses the catalog item id to store in match memory for a decision.

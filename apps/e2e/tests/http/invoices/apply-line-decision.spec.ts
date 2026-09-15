@@ -31,4 +31,20 @@ test.describe(OPERATION, () => {
     expect(payload.errors[0].code, `${OPERATION}: errors[0].code`).toBe('ERR_NOT_FOUND');
     expect(payload.errors[0].detail, `${OPERATION}: errors[0].detail`).toContain('invoice line not found');
   });
+
+  test('404 al desbloquear una línea inexistente', async ({ sharedTenant, platformApi }) => {
+    const { auth, tenant } = sharedTenant;
+    const response = await platformApi.call(`/api/v1/invoicing/invoices/${newUlid()}/lines/${newUlid()}/decisions`, {
+      method: 'POST',
+      auth,
+      tenant,
+      data: {
+        data: {
+          type: 'invoice_line_decisions',
+          attributes: { action: 'unlock', remember: false, lock: false },
+        },
+      },
+    });
+    await expectStatus(response, 404, OPERATION);
+  });
 });
