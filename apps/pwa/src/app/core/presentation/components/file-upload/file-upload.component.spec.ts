@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FileUploadComponent } from './file-upload.component';
+import { appIcons } from '../../../../shared/icons/app-icons';
 
 describe('FileUploadComponent', () => {
   let fixture: ComponentFixture<FileUploadComponent>;
@@ -8,6 +9,7 @@ describe('FileUploadComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [FileUploadComponent],
+      providers: [appIcons],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FileUploadComponent);
