@@ -42,6 +42,10 @@ func (r *Relay) RunOnce(ctx context.Context) error {
 		return err
 	}
 
+	if eventsDelivered+eventsFailed+jobsDelivered+jobsFailed == 0 {
+		return nil
+	}
+
 	pendingEvents, pendingJobs, err := r.store.CountPending(ctx)
 	if err != nil {
 		return err
