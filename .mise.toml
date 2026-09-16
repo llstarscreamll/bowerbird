@@ -5,3 +5,13 @@ pnpm = "11.5"
 turbo = "2.9"
 air = "latest"
 pulumi = "latest"
+
+[tasks.dev]
+description = "Start local infra, API, PWA, and workers using .env"
+run = "pnpm run dev"
+env = { ENV_FILE = ".env" }
+
+[tasks."test:full"]
+description = "Full local suite: wipe Postgres, Go + PWA unit tests, e2e (chromium + http) via .env.test"
+run = "scripts/test-full.sh"
+env = { ENV_FILE = ".env.test" }

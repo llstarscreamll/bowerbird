@@ -14,6 +14,7 @@
   "scripts": {
     "setup:local": "./scripts/setup-local.sh",
     "dev": "pnpm run infra:up && turbo run dev dev:relay dev:events-consumer dev:jobs-consumer dev:scheduler --filter=@bowerbird/backend --filter=@bowerbird/pwa",
+    "test:full": "./scripts/test-full.sh",
     "seed": "pnpm --filter @bowerbird/backend run seed",
     "build": "turbo run build",
     "migrate:controlplane": "pnpm --filter @bowerbird/backend run migrate:controlplane",
@@ -21,7 +22,9 @@
     "migrate:all": "pnpm --filter @bowerbird/backend run migrate:all",
     "test": "turbo run test",
     "test:e2e:install": "pnpm --filter @bowerbird/e2e run test:e2e:install",
+    "test:e2e:install:all": "pnpm --filter @bowerbird/e2e run test:e2e:install:all",
     "test:e2e": "turbo run test:e2e --filter=@bowerbird/e2e",
+    "test:e2e:local": "pnpm --filter @bowerbird/e2e run test:e2e:local",
     "test:e2e:browser": "pnpm --filter @bowerbird/e2e run test:e2e:browser",
     "test:e2e:http": "pnpm --filter @bowerbird/e2e run test:e2e:http",
     "test:e2e:headed": "pnpm --filter @bowerbird/e2e run test:e2e:headed",

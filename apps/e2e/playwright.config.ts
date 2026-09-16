@@ -1,12 +1,21 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { defineConfig, devices } from '@playwright/test';
 import { resolveE2EOrigins } from './tests/support/origins';
 
-loadEnv({ path: path.resolve(__dirname, '../../.env') });
+const repoRoot = path.resolve(__dirname, '../..');
+const envFileRaw = process.env.ENV_FILE?.trim();
+const envPath = envFileRaw ? (path.isAbsolute(envFileRaw) ? envFileRaw : path.resolve(repoRoot, envFileRaw)) : path.join(repoRoot, '.env');
+if (envFileRaw && !fs.existsSync(envPath)) {
+  throw new Error(`ENV_FILE not found: ${envPath}`);
+}
+if (fs.existsSync(envPath)) {
+  loadEnv({ path: envPath, override: true });
+}
 
 const origins = resolveE2EOrigins();
-console.log(`[e2e] app=${origins.app} api=${origins.api} media=${origins.media}`);
+console.log(`[e2e] env=${envPath} app=${origins.app} api=${origins.api} media=${origins.media}`);
 
 export default defineConfig({
   testDir: './tests',
@@ -17,7 +26,7 @@ export default defineConfig({
   },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 5,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     baseURL: origins.app,
