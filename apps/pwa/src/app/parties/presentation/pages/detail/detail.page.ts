@@ -8,7 +8,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { PartiesStore } from '../../../application/parties.store';
-import { roleLabel, creationSourceLabel } from '../../../domain/party.model';
+import { creationSourceLabel, emailKindLabel, roleLabel, schemeLabel, taxpayerKindLabel } from '../../../domain/party.model';
 
 @Component({
   selector: 'app-parties-detail',
@@ -46,8 +46,16 @@ import { roleLabel, creationSourceLabel } from '../../../domain/party.model';
         <hlm-card class="space-y-4 p-6">
           <div class="grid gap-3 text-sm">
             <div>
-              <p class="text-muted-foreground">NIT</p>
-              <p class="font-medium">{{ party.tax_id || '—' }}</p>
+              <p class="text-muted-foreground">Documento</p>
+              <p class="font-medium">{{ schemeLabel(party.scheme_id) }} {{ party.tax_id || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-muted-foreground">Tipo de contribuyente</p>
+              <p class="font-medium">{{ taxpayerKindLabel(party.taxpayer_kind) }}</p>
+            </div>
+            <div>
+              <p class="text-muted-foreground">Responsabilidades fiscales</p>
+              <p class="font-medium">{{ party.tax_level_codes.length ? party.tax_level_codes.join(', ') : '—' }}</p>
             </div>
             <div>
               <p class="text-muted-foreground">Roles</p>
@@ -75,6 +83,45 @@ import { roleLabel, creationSourceLabel } from '../../../domain/party.model';
             </div>
           </div>
         </hlm-card>
+
+        <hlm-card class="space-y-4 p-6">
+          <h2 class="text-sm font-medium">Correos</h2>
+          @for (email of party.emails; track email.id) {
+            <div class="flex items-center justify-between gap-2 text-sm">
+              <span>{{ email.value }}</span>
+              <span class="flex gap-1">
+                <span hlmBadge variant="secondary">{{ emailKindLabel(email.kind) }}</span>
+                <span hlmBadge variant="outline">{{ creationSourceLabel(email.source) }}</span>
+              </span>
+            </div>
+          } @empty {
+            <p class="text-sm text-muted-foreground">Sin correos.</p>
+          }
+        </hlm-card>
+
+        <hlm-card class="space-y-4 p-6">
+          <h2 class="text-sm font-medium">Teléfonos</h2>
+          @for (phone of party.phones; track phone.id) {
+            <div class="flex items-center justify-between gap-2 text-sm">
+              <span>{{ phone.value }}</span>
+              <span hlmBadge variant="outline">{{ creationSourceLabel(phone.source) }}</span>
+            </div>
+          } @empty {
+            <p class="text-sm text-muted-foreground">Sin teléfonos.</p>
+          }
+        </hlm-card>
+
+        <hlm-card class="space-y-4 p-6">
+          <h2 class="text-sm font-medium">Direcciones</h2>
+          @for (addr of party.addresses; track addr.id) {
+            <div class="flex items-start justify-between gap-2 text-sm">
+              <span>{{ addr.line }}{{ addr.city ? ', ' + addr.city : '' }}{{ addr.department ? ', ' + addr.department : '' }}</span>
+              <span hlmBadge variant="outline">{{ creationSourceLabel(addr.source) }}</span>
+            </div>
+          } @empty {
+            <p class="text-sm text-muted-foreground">Sin direcciones.</p>
+          }
+        </hlm-card>
       }
     </div>
   `,
@@ -83,6 +130,9 @@ export class DetailPartyPage implements OnInit {
   readonly store = inject(PartiesStore);
   readonly roleLabel = roleLabel;
   readonly creationSourceLabel = creationSourceLabel;
+  readonly schemeLabel = schemeLabel;
+  readonly taxpayerKindLabel = taxpayerKindLabel;
+  readonly emailKindLabel = emailKindLabel;
   private readonly route = inject(ActivatedRoute);
 
   ngOnInit(): void {

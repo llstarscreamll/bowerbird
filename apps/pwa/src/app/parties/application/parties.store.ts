@@ -75,6 +75,46 @@ export class PartiesStore {
     );
   }
 
+  addEmail(id: string, value: string): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.addEmail(id, value), 'No se pudo añadir el correo.');
+  }
+
+  addPhone(id: string, value: string): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.addPhone(id, value), 'No se pudo añadir el teléfono.');
+  }
+
+  addAddress(id: string, input: { line: string; city: string; department: string; postal_zone: string; country_code: string; kind: string }): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.addAddress(id, input), 'No se pudo añadir la dirección.');
+  }
+
+  deleteEmail(id: string, emailId: string): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.deleteEmail(id, emailId), 'No se pudo eliminar el correo.');
+  }
+
+  deletePhone(id: string, phoneId: string): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.deletePhone(id, phoneId), 'No se pudo eliminar el teléfono.');
+  }
+
+  deleteAddress(id: string, addressId: string): Observable<Party | null> {
+    return this.mutateChannel(() => this.http.deleteAddress(id, addressId), 'No se pudo eliminar la dirección.');
+  }
+
+  private mutateChannel(op: () => Observable<Party>, fallback: string): Observable<Party | null> {
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    return op().pipe(
+      tap((party) => {
+        this.submitting.set(false);
+        this.selectedParty.set(party);
+      }),
+      catchError((err: HttpErrorResponse) => {
+        this.submitting.set(false);
+        this.handleError(err, fallback);
+        return of(null);
+      }),
+    );
+  }
+
   private handleError(err: HttpErrorResponse, fallback: string): void {
     this.loading.set(false);
     this.submitting.set(false);

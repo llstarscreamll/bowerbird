@@ -19,7 +19,7 @@ import { PartyFormComponent, PartyFormValue } from '../../components/party-form/
       </a>
       <header>
         <h1 class="text-2xl font-semibold tracking-tight">Nuevo contacto</h1>
-        <p class="mt-1 text-sm text-muted-foreground">Registra un proveedor o cliente con NIT.</p>
+        <p class="mt-1 text-sm text-muted-foreground">Registra un proveedor o cliente con su documento.</p>
       </header>
 
       @if (store.errorMessage(); as err) {
@@ -42,7 +42,7 @@ export class NewPartyPage {
   private readonly route = inject(ActivatedRoute);
 
   onSubmit(value: PartyFormValue): void {
-    this.store.createParty({ name: value.name, tax_id: value.tax_id, roles: value.roles }).subscribe((party) => {
+    this.store.createParty({ name: value.name, tax_id: value.tax_id, scheme_id: value.scheme_id || undefined, roles: value.roles }).subscribe((party) => {
       if (party) void this.router.navigate(['..', party.id], { relativeTo: this.route });
     });
   }
