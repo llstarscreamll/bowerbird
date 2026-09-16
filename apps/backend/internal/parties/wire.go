@@ -23,6 +23,7 @@ func NewApplication(registry *database.Registry) *application.Application {
 			ResolveOrCreateFromIssuer: commands.NewResolveOrCreateFromIssuerCommand(repo),
 			CreateParty:               commands.NewCreatePartyCommand(repo),
 			UpdateParty:               commands.NewUpdatePartyCommand(repo),
+			PartyChannels:             commands.NewPartyChannelsCommand(repo),
 		},
 		Queries: application.Queries{
 			GetPartyByID: queries.NewGetPartyByIDQuery(repo),

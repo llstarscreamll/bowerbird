@@ -64,12 +64,55 @@ func (s *stubPartyRepo) List(ctx context.Context, filter ports.ListFilter) ([]do
 	return out, nil
 }
 
+func (s *stubPartyRepo) InsertEmail(ctx context.Context, partyID string, email domain.PartyEmail) error {
+	p, ok := s.parties[partyID]
+	if !ok {
+		return nil
+	}
+	p.Emails = append(p.Emails, email)
+	s.parties[partyID] = p
+	return nil
+}
+
+func (s *stubPartyRepo) InsertPhone(ctx context.Context, partyID string, phone domain.PartyPhone) error {
+	p, ok := s.parties[partyID]
+	if !ok {
+		return nil
+	}
+	p.Phones = append(p.Phones, phone)
+	s.parties[partyID] = p
+	return nil
+}
+
+func (s *stubPartyRepo) InsertAddress(ctx context.Context, partyID string, address domain.PartyAddress) error {
+	p, ok := s.parties[partyID]
+	if !ok {
+		return nil
+	}
+	p.Addresses = append(p.Addresses, address)
+	s.parties[partyID] = p
+	return nil
+}
+
+func (s *stubPartyRepo) DeleteEmail(ctx context.Context, partyID, emailID string) error {
+	return nil
+}
+
+func (s *stubPartyRepo) DeletePhone(ctx context.Context, partyID, phoneID string) error {
+	return nil
+}
+
+func (s *stubPartyRepo) DeleteAddress(ctx context.Context, partyID, addressID string) error {
+	return nil
+}
+
 func testApp(repo ports.PartyRepository) *application.Application {
 	return &application.Application{
 		Commands: application.Commands{
 			ResolveOrCreateFromIssuer: commands.NewResolveOrCreateFromIssuerCommand(repo),
 			CreateParty:               commands.NewCreatePartyCommand(repo),
 			UpdateParty:               commands.NewUpdatePartyCommand(repo),
+			PartyChannels:             commands.NewPartyChannelsCommand(repo),
 		},
 		Queries: application.Queries{
 			GetPartyByID: queries.NewGetPartyByIDQuery(repo),

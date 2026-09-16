@@ -22,9 +22,11 @@ func NewUpdatePartyCommand(repo ports.PartyRepository) *UpdatePartyCommand {
 }
 
 type UpdatePartyInput struct {
-	ID    string
-	Name  *string
-	Roles *[]string
+	ID           string
+	Name         *string
+	Roles        *[]string
+	SchemeID     *string
+	TaxpayerKind *string
 }
 
 func (cmd *UpdatePartyCommand) Execute(ctx context.Context, input UpdatePartyInput) (*domain.Party, error) {
@@ -48,6 +50,20 @@ func (cmd *UpdatePartyCommand) Execute(ctx context.Context, input UpdatePartyInp
 	changed, err := party.UpdateProfile(input.Name, rolesVO, cmd.now())
 	if err != nil {
 		return mapDomainValidation(err)
+	}
+	if input.SchemeID != nil {
+		ok, err := party.FillScheme(*input.SchemeID, cmd.now())
+		if err != nil {
+			return mapDomainValidation(err)
+		}
+		changed = changed || ok
+	}
+	if input.TaxpayerKind != nil {
+		ok, err := party.FillTaxpayerKind(*input.TaxpayerKind, cmd.now())
+		if err != nil {
+			return mapDomainValidation(err)
+		}
+		changed = changed || ok
 	}
 	if !changed {
 		return party, nil

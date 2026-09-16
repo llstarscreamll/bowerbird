@@ -15,7 +15,7 @@ func TestUpdatePartyCommand_RejectsEmptyRoles(t *testing.T) {
 	repo := newMemoryPartyRepo()
 	resolve := NewResolveOrCreateFromIssuerCommand(repo)
 	resolve.newID = func() string { return "01PARTY000000000000000001" }
-	party, err := resolve.Execute(context.Background(), "900", "Acme")
+	party, err := resolve.Execute(context.Background(), IssuerProfile{TaxID: "900", Name: "Acme"})
 	require.NoError(t, err)
 
 	update := NewUpdatePartyCommand(repo)
@@ -31,7 +31,7 @@ func TestUpdatePartyCommand_PreservesTaxID(t *testing.T) {
 	repo := newMemoryPartyRepo()
 	resolve := NewResolveOrCreateFromIssuerCommand(repo)
 	resolve.newID = func() string { return "01PARTY000000000000000001" }
-	party, err := resolve.Execute(context.Background(), "900", "Acme")
+	party, err := resolve.Execute(context.Background(), IssuerProfile{TaxID: "900", Name: "Acme"})
 	require.NoError(t, err)
 
 	update := NewUpdatePartyCommand(repo)

@@ -14,6 +14,7 @@ type Commands struct {
 	ResolveOrCreateFromIssuer *commands.ResolveOrCreateFromIssuerCommand
 	CreateParty               *commands.CreatePartyCommand
 	UpdateParty               *commands.UpdatePartyCommand
+	PartyChannels             *commands.PartyChannelsCommand
 }
 
 type Queries struct {

@@ -25,8 +25,19 @@ func NewIssuerPartyLookup(cmd *commands.ResolveOrCreateFromIssuerCommand) api.Is
 	return &issuerPartyLookup{resolve: cmd}
 }
 
-func (l *issuerPartyLookup) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
-	party, err := l.resolve.Execute(ctx, taxID, name)
+func (l *issuerPartyLookup) ResolveIssuer(ctx context.Context, profile api.IssuerProfile) (string, error) {
+	addrs := make([]commands.IssuerAddress, 0, len(profile.Addresses))
+	for _, a := range profile.Addresses {
+		addrs = append(addrs, commands.IssuerAddress{
+			Line: a.Line, City: a.City, Department: a.Department,
+			PostalZone: a.PostalZone, CountryCode: a.CountryCode, Kind: a.Kind,
+		})
+	}
+	party, err := l.resolve.Execute(ctx, commands.IssuerProfile{
+		TaxID: profile.TaxID, Name: profile.Name, SchemeID: profile.SchemeID,
+		TaxpayerKind: profile.TaxpayerKind, TaxLevelCode: profile.TaxLevelCode,
+		Emails: profile.Emails, Phones: profile.Phones, Addresses: addrs,
+	})
 	if err != nil {
 		return "", err
 	}

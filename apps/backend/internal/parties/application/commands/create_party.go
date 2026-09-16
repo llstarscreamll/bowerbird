@@ -25,9 +25,10 @@ func NewCreatePartyCommand(repo ports.PartyRepository) *CreatePartyCommand {
 }
 
 type CreatePartyInput struct {
-	Name  string
-	TaxID string
-	Roles []string
+	Name     string
+	TaxID    string
+	SchemeID string
+	Roles    []string
 }
 
 func (cmd *CreatePartyCommand) Execute(ctx context.Context, input CreatePartyInput) (*domain.Party, error) {
@@ -52,6 +53,9 @@ func (cmd *CreatePartyCommand) Execute(ctx context.Context, input CreatePartyInp
 	if err != nil {
 		return mapDomainValidation(err)
 	}
+	if _, err := party.FillScheme(input.SchemeID, cmd.now()); err != nil {
+		return mapDomainValidation(err)
+	}
 	if err := cmd.repo.Create(ctx, party); err != nil {
 		return nil, err
 	}
@@ -63,7 +67,14 @@ func mapDomainValidation(err error) (*domain.Party, error) {
 		errors.Is(err, domain.ErrMissingPartyName) ||
 		errors.Is(err, domain.ErrPartyIDRequired) ||
 		errors.Is(err, domain.ErrMissingRoles) ||
-		errors.Is(err, domain.ErrInvalidRole) {
+		errors.Is(err, domain.ErrInvalidRole) ||
+		errors.Is(err, domain.ErrInvalidScheme) ||
+		errors.Is(err, domain.ErrInvalidTaxpayerKind) ||
+		errors.Is(err, domain.ErrInvalidEmail) ||
+		errors.Is(err, domain.ErrMissingPhone) ||
+		errors.Is(err, domain.ErrMissingAddress) ||
+		errors.Is(err, domain.ErrInvalidAddressKind) ||
+		errors.Is(err, domain.ErrInvalidChannelSource) {
 		return nil, appErrors.New(appErrors.CodeValidation, err.Error())
 	}
 	return nil, err
