@@ -133,16 +133,18 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Línea {{ line.line_number || i + 1 }}</p>
                         <p class="mt-1 text-base font-medium leading-snug break-words">{{ line.description || 'Sin descripción' }}</p>
                         <p class="mt-1.5 grid gap-1 text-sm sm:grid-cols-3">
-                          <span
-                            ><span class="text-muted-foreground">Cód. adquiriente:</span> <span class="font-mono tabular-nums">{{ line.buyer_code || '—' }}</span></span
-                          >
-                          >
-                          <span
-                            ><span class="text-muted-foreground">SKU emisor:</span> <span class="font-mono tabular-nums">{{ line.seller_sku || '—' }}</span></span
-                          >
-                          <span
-                            ><span class="text-muted-foreground">GTIN:</span> <span class="font-mono tabular-nums">{{ line.gtin || '—' }}</span></span
-                          >
+                          <span>
+                            <span class="text-muted-foreground">Cód. adquiriente:</span>
+                            <span class="font-mono tabular-nums">{{ line.buyer_code || '—' }}</span>
+                          </span>
+                          <span>
+                            <span class="text-muted-foreground">SKU emisor:</span>
+                            <span class="font-mono tabular-nums">{{ line.seller_sku || '—' }}</span>
+                          </span>
+                          <span>
+                            <span class="text-muted-foreground">GTIN:</span>
+                            <span class="font-mono tabular-nums">{{ line.gtin || '—' }}</span>
+                          </span>
                         </p>
                       </div>
                       <span hlmBadge [variant]="lineBadgeVariant(line)">{{ lineStatusLabel(line) }}</span>
@@ -206,7 +208,6 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                         [invoiceId]="inv.id"
                         [lineId]="line.id"
                         [description]="line.description"
-                        [buyerCode]="line.buyer_code"
                         [sellerSku]="line.seller_sku"
                         [gtin]="line.gtin"
                         [locked]="!!line.link_locked"

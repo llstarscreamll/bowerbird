@@ -18,18 +18,6 @@ import { CatalogSearchHit, LineDecisionPayload, rememberPreview } from '../../..
   imports: [DecimalPipe, FormsModule, NgIcon, HlmBadgeImports, HlmButtonImports, HlmCheckboxImports, HlmCommandImports, HlmSpinnerImports],
   host: { class: 'block space-y-3' },
   template: `
-    <div class="grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
-      <p>
-        Cód. adquiriente: <span class="font-mono text-foreground">{{ buyerCode() || '—' }}</span>
-      </p>
-      <p>
-        SKU emisor: <span class="font-mono text-foreground">{{ sellerSku() || '—' }}</span>
-      </p>
-      <p>
-        GTIN: <span class="font-mono text-foreground">{{ gtin() || '—' }}</span>
-      </p>
-    </div>
-
     @if (locked()) {
       <button hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="unlock()">Desbloquear</button>
     } @else {
@@ -110,7 +98,6 @@ export class CatalogLinkerComponent implements OnInit {
   readonly lineId = input.required<string>();
   readonly invoiceId = input.required<string>();
   readonly description = input('');
-  readonly buyerCode = input('');
   readonly sellerSku = input('');
   readonly gtin = input('');
   readonly locked = input(false);

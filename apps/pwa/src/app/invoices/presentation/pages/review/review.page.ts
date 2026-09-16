@@ -51,7 +51,6 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
                 [invoiceId]="line.invoice_header_id"
                 [lineId]="line.id"
                 [description]="line.description"
-                [buyerCode]="line.buyer_code"
                 [sellerSku]="line.seller_sku"
                 [gtin]="line.gtin"
                 [locked]="!!line.link_locked"
