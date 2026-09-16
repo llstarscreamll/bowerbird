@@ -31,7 +31,8 @@ If `pnpm` is not available yet, invoke the script directly:
    [Development quality](./quality/development-quality.md).
 4. Verifies project MCP registration files (`.cursor/mcp.json`, `opencode.json`).
 
-After setup, copy env/secrets as described below, then start infra/dev.
+After setup, copy env/secrets as described below, then start the stack with
+`mise run dev`.
 
 Optional: `mise x -- pnpm run dev` to use the repo toolchain without changing
 globals.
@@ -40,17 +41,28 @@ globals.
 
 ### Environment (repo root)
 
+`ENV_FILE` selects which dotenv file to load. Relative paths resolve from the
+repo root. Loaders (`scripts/with-env.sh`, Playwright, Pulumi) apply that file
+with override so a parent shell cannot leak the wrong values.
+
+| File        | Use for                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| `.env`      | Daily local stack (`mise run dev`), Pulumi deploy, ad-hoc e2e          |
+| `.env.test` | `mise run test:full` only. Copied from `.env.test.example` if missing. |
+
 1. Copy `.env.example` → `.env` at the monorepo root.
-2. For local API: keep `DEPLOYMENT_TARGET=onprem` and `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
-3. Provide secrets (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`, `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
-4. For AWS/Pulumi deploy: set `ENV`, `AWS_ACCOUNT_ID`, `AWS_REGION=us-east-1`,
-   `ROOT_DOMAIN`, Cloudflare, Neon, and Gemini keys in the same file.
+2. For local API: keep `DEPLOYMENT_TARGET=onprem` and
+   `RABBITMQ_URL=amqp://bowerbird:bowerbird@localhost:5672/`.
+3. Provide secrets (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`,
+   `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
+4. For AWS/Pulumi deploy: set `ENV`, `AWS_ACCOUNT_ID`,
+   `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, Cloudflare, Neon, and Gemini keys
+   in `.env` (not `.env.test`).
 
-Backend, infra, and e2e scripts load the root `.env` automatically (`pnpm` / `turbo` tasks included).
-
-| Source      | Use for                                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| Root `.env` | Backend (local/onprem), Pulumi (`ENV`, account, domains, Neon, Cloudflare), optional E2E origins |
+| Source           | Use for                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| Root `.env`      | Backend (local/onprem), Pulumi (`ENV`, account, domains, Neon, Cloudflare), optional E2E origins |
+| Root `.env.test` | Isolated automated test loop. Local dummy values only.                                           |
 
 Typical local backend values:
 
@@ -60,9 +72,15 @@ Typical local backend values:
 - `AWS_ACCESS_KEY_ID=bowerbird` / `AWS_SECRET_ACCESS_KEY=bowerbirdsecret`
 - `S3_BUCKET_NAME=bowerbird-local-bucket`
 - `S3_PRESIGN_ENDPOINT_URL=https://media.bowerbird.dev`
-- `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` / `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK compatibility)
+- `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` /
+  `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK compatibility)
 
-For raw Go commands from `apps/backend`: `set -a && . ../../.env && set +a`.
+For raw Go commands from `apps/backend`:
+
+```bash
+../../scripts/with-env.sh go test ./...
+ENV_FILE=.env.test ../../scripts/with-env.sh go test ./...
+```
 
 Deployment artifacts live under `apps/deploy/`. AWS Pulumi and the on-prem
 fleet are parallel tracks (`pnpm run deploy` runs both).
@@ -146,10 +164,15 @@ If volumes were wiped, Caddy may regenerate the CA — re-export and re-trust. F
 ## Dev
 
 ```bash
-pnpm run dev
+mise run dev
 ```
 
-Starts Postgres, RabbitMQ, MinIO, Caddy, Go API (Air), PWA, and backend workers (`relay`, `events-consumer`, `jobs-consumer`, `scheduler`). All backend processes use **Air** hot reload. Prefer `*.bowerbird.dev` hosts (cookies/routing).
+`pnpm run dev` runs the same script. Both load `.env` via `ENV_FILE`.
+
+Starts Postgres, RabbitMQ, MinIO, Caddy, Go API (Air), PWA, and backend
+workers (`relay`, `events-consumer`, `jobs-consumer`, `scheduler`). All
+backend processes use **Air** hot reload. Prefer `*.bowerbird.dev` hosts
+(cookies/routing).
 
 Manual workers (if needed):
 
@@ -167,7 +190,39 @@ See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./
 - API: `https://app.bowerbird.dev/api/v1/...` (`/api/health` on the same host)
 - Media: `https://media.bowerbird.dev/bowerbird-local-bucket/<key>`
 
-`infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO, Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old LocalStack) are removed automatically.
+`infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO,
+Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old
+LocalStack) are removed automatically.
+
+## Full test loop
+
+```bash
+mise run test:full
+```
+
+Canonical command for the entire local test suite (agents and humans).
+
+Prerequisites: `mise install`, Docker, `/etc/hosts` entries for
+`app.bowerbird.dev`, and **no** running `mise run dev` (the script aborts if
+the API is already up).
+
+This is the deterministic local suite. It:
+
+1. Ensures `.env.test` exists (copies `.env.test.example` if needed).
+2. Deletes the Postgres Docker volume (local DB data is destroyed).
+3. Starts infra, migrates, and seeds `acme`.
+4. Runs Go tests (`go test ./...`) and PWA unit tests.
+5. Starts API/PWA/workers, waits for health, installs Playwright Chromium.
+6. Runs Playwright e2e (`desktop-chromium` + `http` projects only; WebKit
+   skipped — use `pnpm run test:e2e:install:all && pnpm run test:e2e` for the
+   full browser matrix).
+
+Success: exit code **0** and `[test:full] Done`.
+
+`pnpm run test:full` is the same script (`scripts/test-full.sh`). `pnpm run test` does **not** reset
+the database and does **not** run e2e.
+
+List Mise tasks with `mise tasks`.
 
 ## E2E against local, staging, or production
 
@@ -199,8 +254,9 @@ enabled when the target backend is in `local` or `development` mode.
 
 ## Commands
 
-`setup:local` · `infra:up` · `infra:down` · `build` · `test` · `lint` · `format` ·
-`format:check` · `deploy`
+`setup:local` · `mise run dev` · `mise run test:full` · `infra:up` ·
+`infra:down` · `build` · `test` · `lint` · `format` · `format:check` ·
+`deploy`
 
 Also: [Development quality](./quality/development-quality.md) ·
 [CodeGraph](./tooling/codegraph.md) · [MinIO](./tooling/minio.md)

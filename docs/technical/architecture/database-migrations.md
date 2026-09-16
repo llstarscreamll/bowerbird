@@ -39,15 +39,27 @@ pnpm --filter @bowerbird/infra migrate
 
 ## Local full reset
 
+Automated full suite (Postgres reset, migrations, Go + PWA unit tests, Playwright
+e2e via `mise run test:full`):
+
+```bash
+mise run test:full
+```
+
+That wipes the **Postgres volume only**, then migrates and seeds. It does
+not remove MinIO or Caddy volumes.
+
+Nuclear reset (Postgres, MinIO, RabbitMQ, and Caddy volumes):
+
 ```bash
 docker compose down -v
 pnpm run infra:up
 pnpm run migrate:all
 ```
 
-Wipes Postgres, MinIO, RabbitMQ, and Caddy volumes. Re-seed with `pnpm run seed` if needed.
+Re-seed with `pnpm run seed` if needed.
 
-Postgres-only:
+Postgres-only (same data wipe as `test:full`, without running tests):
 
 ```bash
 docker compose down

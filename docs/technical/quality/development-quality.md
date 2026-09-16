@@ -22,6 +22,23 @@ project MCP config files. Details: [Getting started](../getting-started.md).
 Manual commands in the following sections remain the source of truth when you
 need to install or refresh a single skill/MCP.
 
+## Deterministic tests
+
+**Run the full local suite** (Postgres wipe, migrations, Go + PWA unit tests,
+Playwright e2e):
+
+```bash
+mise run test:full
+```
+
+Use this after implementing or fixing behavior — not package-scoped `go test -run …`
+or partial e2e alone. Stop `mise run dev` first; success is exit **0** and
+`[test:full] Done`.
+
+Details: [Getting started — Full test loop](../getting-started.md#full-test-loop).
+`pnpm run test:full` is equivalent. `pnpm run test` is unit/integration only
+and does not reset the database or run e2e.
+
 ## Agent skills
 
 Prefer curated skills (frontend, performance, architecture, security) from trusted sources such as [tech-leads-club/agent-skills](https://github.com/tech-leads-club/agent-skills).

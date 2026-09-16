@@ -27,7 +27,7 @@ How it works and how to run it.
 - [AWS secrets](./technical/deployment/ssm-secrets.md)
 - [MinIO](./technical/tooling/minio.md)
 - [CodeGraph](./technical/tooling/codegraph.md)
-- [Dev quality](./technical/quality/development-quality.md)
+- [Dev quality](./technical/quality/development-quality.md) · [Full test loop](./technical/getting-started.md#full-test-loop) (`mise run test:full`)
 
 ## Product (`docs/product/`)
 

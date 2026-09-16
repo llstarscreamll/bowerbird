@@ -13,24 +13,26 @@
 
 - Run `mise install` first. Versions are pinned: Node `24`, Go `1.25`, pnpm `11.5` (`.mise.toml`, `.nvmrc`, root `package.json`, `apps/backend/go.mod`).
 - Use `pnpm` only. Workspace roots are `apps/*`, `packages/*`, and `apps/deploy/*` (`pnpm-workspace.yaml`), orchestrated by Turbo (`turbo.json`).
-- Single repo-root `.env` / `.env.example` for backend, AWS Pulumi, on-prem fleet, and e2e. Packages load it themselves; Turbo uses `envMode: loose` + `globalDependencies: [".env"]`. Keep `apps/deploy/onprem/.env` on each client VM (Compose secrets). Do not commit `apps/deploy/onprem/hosts.json`.
+- Env files: `ENV_FILE` selects the repo-root dotenv (default `.env`). Loaders (`scripts/with-env.sh`, Playwright, Pulumi) honor it and override existing keys. Daily work uses `.env`; the full test loop uses `.env.test` (from `.env.test.example`). Turbo uses `envMode: loose` + `globalDependencies: [".env", ".env.test"]`. Keep `apps/deploy/onprem/.env` on each client VM (Compose secrets). Do not commit `apps/deploy/onprem/hosts.json`.
 
 ## Commands that matter
 
-- Root dev flow: `pnpm run dev` (always runs `pnpm run infra:up` first, then `turbo run dev`).
-- Root verification flow: `pnpm run lint && pnpm run test && pnpm run build`.
+- Local stack: `mise run dev` (loads `.env`, starts infra + API/PWA/workers). `pnpm run dev` is the same script.
+- **Full test suite (canonical verification)**: `mise run test:full`. Runs the entire local loop — wipe Postgres, load `.env.test`, migrate/seed, Go tests (`go test ./...`), PWA unit tests, then e2e (`desktop-chromium` + `http`; WebKit skipped). Stop `mise run dev` first (script fails if the API is already up). Destroys local Postgres data. **After implementing or fixing behavior, verify with this command**; do not substitute package-scoped `go test -run …` or partial e2e. Success: exit **0** and `[test:full] Done`. Equivalent: `pnpm run test:full` (`scripts/test-full.sh`). Full browser matrix (incl. WebKit): `pnpm run test:e2e:install:all` then `pnpm run test:e2e`.
+- Fast unit/integration only (no DB reset, no e2e): `pnpm run test`.
+- Root verification without e2e: `pnpm run lint && pnpm run test && pnpm run build`.
 - Root deploy: `pnpm run deploy` runs AWS (`@bowerbird/infra`) and on-prem fleet (`@bowerbird/onprem`) in parallel. Use `deploy:aws` / `deploy:onprem` for one track. On-prem skips if `apps/deploy/onprem/hosts.json` is missing or empty.
 - Backend targeted: `pnpm --filter @bowerbird/backend dev|lint|test|build|migrate:all`.
 - Backend tests: always `pnpm --filter @bowerbird/backend test` (full `go test ./...`). Never verify with package-scoped or `-run` filtered `go test`.
 - PWA targeted: `pnpm --filter @bowerbird/pwa dev|lint|test|build`.
-- E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:browser|test:e2e:http|test:e2e:ui`.
+- E2E targeted: `pnpm --filter @bowerbird/e2e lint|test:e2e|test:e2e:local|test:e2e:browser|test:e2e:http|test:e2e:ui`.
 - AWS deploy (`apps/deploy/aws`, `@bowerbird/infra`): `pnpm --filter @bowerbird/infra lint|test|build|synth|deploy|migrate`. `deploy` invokes the migrate Lambda when that package changes, then publishes the other Lambdas and web assets.
 - On-prem fleet (`apps/deploy/onprem`, `@bowerbird/onprem`): `pnpm --filter @bowerbird/onprem lint|test|synth|deploy`. Pulumi SSHs each inventory host and loads Compose images tagged `ONPREM_RELEASE`.
 
 ## Backend (`apps/backend`)
 
 - Entrypoints live under `cmd/onprem/` (local + client VM) and `cmd/aws/lambda/` (AWS Lambda).
-- API entrypoint is `cmd/onprem/api/main.go`; AWS HTTP is `cmd/aws/lambda/http`. Local `dev` uses Air (`.air.toml`) and sources the repo-root `.env` if present.
+- API entrypoint is `cmd/onprem/api/main.go`; AWS HTTP is `cmd/aws/lambda/http`. Local `dev` uses Air (`.air.toml`) and loads `ENV_FILE` (default `.env`).
 - Worker entrypoints: `cmd/onprem/relay`, `cmd/onprem/events-consumer`, `cmd/onprem/jobs-consumer`, `cmd/onprem/scheduler`. Background workers (`dev:relay`, `dev:events-consumer`, `dev:jobs-consumer`, `dev:scheduler`) use Air configs `.air.worker-*.toml` with the same reload behavior.
 - AWS Lambda entrypoints: `cmd/aws/lambda/http`, `cmd/aws/lambda/outbox-relay`, `cmd/aws/lambda/eventbridge`, `cmd/aws/lambda/sqs`, `cmd/aws/lambda/scheduler`.
 - Feature architecture: every bounded context is `internal/<bc>/` with this public surface:
@@ -53,7 +55,7 @@
 ## PWA (`apps/pwa`)
 
 - Angular standalone + zoneless app. Wiring is in `src/app/app.config.ts`, routes in `src/app/app.routes.ts`.
-- Serve command is fixed to `ng serve --host 0.0.0.0 --port 4200`; `angular.json` only allows host `app.bowerbird.dev`.
+- Dev server: `scripts/dev.sh` wraps `ng serve --host 0.0.0.0 --port 4200` (graceful Turbo shutdown); `angular.json` only allows host `app.bowerbird.dev`.
 - Tenant routing: Tenant pages are children of the `/:tenantId` route and wrapped by `TenantLayoutComponent`.
 - Tenant header is derived from the `tenantId` param via `core/interceptors/tenant.interceptor.ts`.
 - Error Handling & UI Feedback: `error.interceptor.ts` globally handles JSON:API responses and logs `meta._debug` to the console.
@@ -68,13 +70,13 @@
 
 ## E2E Testing (`apps/e2e`)
 
-- Uses Playwright. Always run `pnpm run test:e2e:install` to ensure the local browser is present before running tests.
+- **Run the full suite with** `mise run test:full` — self-contained (infra reset, migrations, unit tests, dev stack for e2e, Playwright install, `test:e2e:local`). See [Getting started](docs/technical/getting-started.md#full-test-loop).
+- Uses Playwright. `test:full` installs Chromium automatically; for ad-hoc e2e run `pnpm run test:e2e:install` first.
 - Specs are split into two Playwright projects: `tests/browser/` (real browser) and `tests/http/` (API contracts). Shared clients/factories live in `tests/support/`.
 - Default origins are local (`https://app.bowerbird.dev` for PWA and API, `https://media.bowerbird.dev` for MinIO). Override with `E2E_BASE_URL`, `E2E_API_BASE_URL`, and `E2E_MEDIA_BASE_URL` (see `.env.example`).
-- Local runs require the backend (`pnpm run dev`) with `app.bowerbird.dev` accessible (Caddy routes `/api*` to the Go API).
+- Ad-hoc e2e (stack already running via `mise run dev`): `pnpm run test:e2e:local` (chromium + http), `pnpm run test:e2e` (all projects incl. WebKit), `pnpm run test:e2e:browser`, `pnpm run test:e2e:http`, `pnpm run test:e2e:ui` (interactive).
 - To test the full auth flow, the backend must be in `local` or `development` mode so the `/api/v1/auth/register-local` endpoint is enabled.
 - UI doesn't have a signup form yet, so fixtures rely on the API `registerLocalOrFail` directly for setup.
-- Commands from root: `pnpm run test:e2e` (all), `pnpm run test:e2e:browser`, `pnpm run test:e2e:http`, `pnpm run test:e2e:ui` (interactive).
 
 ## Local infra and deploy constraints
 
