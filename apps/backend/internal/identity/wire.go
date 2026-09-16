@@ -79,6 +79,7 @@ func NewHTTPHandler(mux *http.ServeMux, app *application.Application, controlDB 
 		microsoftConfig,
 		strings.TrimRight(cfg.FrontendURL, "/"),
 		cfg.JWT.RefreshTTL,
+		cfg.AppEnv,
 	)
 	handler.Register(mux, authMiddleware, cfg)
 

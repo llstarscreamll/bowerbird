@@ -28,6 +28,18 @@ type AuthHandler struct {
 	authLimiter     *ratelimit.Limiter
 }
 
+const (
+	authRateLimit      = 20
+	authRateLimitLocal = 1000
+)
+
+func authAttemptLimit(appEnv string) int {
+	if appEnv == "local" {
+		return authRateLimitLocal
+	}
+	return authRateLimit
+}
+
 func NewAuthHandler(
 	cmds application.Commands,
 	identityService *application.IdentityService,
@@ -35,6 +47,7 @@ func NewAuthHandler(
 	microsoftConfig *oauth2.Config,
 	frontendURL string,
 	refreshTTL time.Duration,
+	appEnv string,
 ) *AuthHandler {
 	return &AuthHandler{
 		cmds:            cmds,
@@ -43,7 +56,7 @@ func NewAuthHandler(
 		microsoftConfig: microsoftConfig,
 		frontendURL:     frontendURL,
 		refreshTTL:      refreshTTL,
-		authLimiter:     ratelimit.New(20, time.Minute),
+		authLimiter:     ratelimit.New(authAttemptLimit(appEnv), time.Minute),
 	}
 }
 
