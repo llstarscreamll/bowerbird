@@ -4,11 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 cd "$ROOT/apps/deploy/onprem"
 
-if [[ -f "$ROOT/.env" ]]; then
+env_file="${ENV_FILE:-.env}"
+if [[ "$env_file" != /* ]]; then
+  env_file="$ROOT/$env_file"
+fi
+if [[ -f "$env_file" ]]; then
   set -a
-  # shellcheck disable=SC1091
-  . "$ROOT/.env"
+  # shellcheck disable=SC1090
+  . "$env_file"
   set +a
+  export ENV_FILE="$env_file"
 fi
 
 HOSTS_FILE="${ONPREM_HOSTS_FILE:-$ROOT/apps/deploy/onprem/hosts.json}"

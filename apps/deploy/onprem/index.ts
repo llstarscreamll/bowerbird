@@ -5,7 +5,8 @@ import { deployFleet } from './src/fleet';
 import { loadHosts } from './src/hosts';
 
 const repoRoot = path.resolve(__dirname, '../../..');
-const envPath = path.join(repoRoot, '.env');
+const envFileRaw = process.env.ENV_FILE?.trim();
+const envPath = envFileRaw ? (path.isAbsolute(envFileRaw) ? envFileRaw : path.resolve(repoRoot, envFileRaw)) : path.join(repoRoot, '.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }

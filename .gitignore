@@ -22,6 +22,7 @@ apps/deploy/onprem/hosts.json
 .env
 .env.*
 !.env.example
+!.env.test.example
 secrets.json
 secrets.*.json
 .mise.local.toml
