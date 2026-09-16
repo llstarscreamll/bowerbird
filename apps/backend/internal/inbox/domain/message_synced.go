@@ -44,9 +44,19 @@ func (m *InboxMessage) NotificationAfterPersist(inserted bool, ctx SyncNotificat
 	return m.messageSyncedEvent(ctx)
 }
 
-// NotificationAfterCapture returns a domain event when this message first has full content.
+// NotificationAfterCapture returns a domain event when this message first has
+// full content and looks like an electronic-invoice capture.
 func (m *InboxMessage) NotificationAfterCapture(priorHadFullContent bool, ctx SyncNotificationContext) (*MessageSynced, error) {
 	if !m.HasFullContent() || priorHadFullContent {
+		return nil, nil
+	}
+	if ctx.ProviderMessage == nil || !LooksLikeInvoiceCapture(
+		ctx.ProviderMessage.Subject,
+		ctx.ProviderMessage.Snippet,
+		ctx.ProviderMessage.PlainTextBody,
+		ctx.ProviderMessage.HTMLBody,
+		ctx.ProviderMessage.Sender,
+	) {
 		return nil, nil
 	}
 	return m.messageSyncedEvent(ctx)
@@ -79,6 +89,10 @@ func (m *InboxMessage) messageSyncedEvent(ctx SyncNotificationContext) (*Message
 	}
 	if ctx.ProviderMessage.PlainTextBody != "" {
 		event.Body = ctx.ProviderMessage.PlainTextBody
+	} else if ctx.ProviderMessage.HTMLBody != "" {
+		event.Body = ctx.ProviderMessage.HTMLBody
+	} else if ctx.ProviderMessage.Snippet != "" {
+		event.Body = ctx.ProviderMessage.Snippet
 	}
 	if ctx.ProviderMessage.Sender != "" {
 		event.Sender = ctx.ProviderMessage.Sender

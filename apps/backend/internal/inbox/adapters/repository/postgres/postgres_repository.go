@@ -273,7 +273,7 @@ func (r *PostgresRepository) ListMessageViews(ctx context.Context, filter inboxP
 	if filter.OnlyInvoices {
 		conditions = append(conditions, `EXISTS (
 			SELECT 1 FROM email_attachments a
-			WHERE a.message_id = m.id AND (a.filename ILIKE '%.xml' OR a.filename ILIKE '%.pdf')
+			WHERE a.message_id = m.id AND (a.filename ILIKE '%.xml' OR a.filename ILIKE '%.pdf' OR a.filename ILIKE '%.zip')
 		)`)
 	}
 
@@ -307,7 +307,7 @@ func (r *PostgresRepository) ListMessageViews(ctx context.Context, filter inboxP
 			m.is_draft,
 			COALESCE(m.received_at, m.created_at) AS received_at,
 			CASE
-				WHEN EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND (a.filename ILIKE '%%.xml' OR a.filename ILIKE '%%.pdf')) THEN 'new'
+				WHEN EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND (a.filename ILIKE '%%.xml' OR a.filename ILIKE '%%.pdf' OR a.filename ILIKE '%%.zip')) THEN 'new'
 				ELSE 'skipped'
 			END AS processing_status,
 			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%%.xml') AS has_xml,
@@ -385,13 +385,12 @@ func (r *PostgresRepository) GetMessageViewByID(ctx context.Context, messageID, 
 			COALESCE(
 				NULLIF(m.raw_data->>'plain_text_body', ''),
 				NULLIF(m.raw_data->>'PlainTextBody', ''),
-				COALESCE(m.snippet, ''),
 				''
 			) AS body_text,
 			m.raw_data,
 			COALESCE(m.received_at, m.created_at) AS received_at,
 			CASE
-				WHEN EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND (a.filename ILIKE '%.xml' OR a.filename ILIKE '%.pdf')) THEN 'new'
+				WHEN EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND (a.filename ILIKE '%.xml' OR a.filename ILIKE '%.pdf' OR a.filename ILIKE '%.zip')) THEN 'new'
 				ELSE 'skipped'
 			END AS processing_status,
 			EXISTS(SELECT 1 FROM email_attachments a WHERE a.message_id = m.id AND a.filename ILIKE '%.xml') AS has_xml,
@@ -550,6 +549,70 @@ func (r *PostgresRepository) GetInboxMessageByProviderID(ctx context.Context, ac
 	snapshot.Folder = domain.MailFolder(folder)
 	snapshot.SyncStatus = domain.MessageSyncStatus(status)
 	return domain.RehydrateInboxMessage(snapshot), nil
+}
+
+func (r *PostgresRepository) ListMetadataStubs(ctx context.Context, connectionID string, limit int) ([]*domain.InboxMessage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	pool, err := r.registry.GetPool(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant db pool: %w", err)
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT id
+		FROM email_messages
+		WHERE account_id = $1
+		  AND NOT EXISTS (SELECT 1 FROM email_attachments a WHERE a.message_id = email_messages.id)
+		  AND COALESCE(raw_data->>'plain_text_body', '') = ''
+		  AND COALESCE(raw_data->>'html_body', '') = ''
+		  AND (
+			subject ~ '[0-9]{8,12}[[:space:]]*;'
+			OR COALESCE(subject, '') ILIKE '%factura%'
+			OR COALESCE(subject, '') ILIKE '%invoice%'
+			OR COALESCE(snippet, '') ILIKE '%factura%'
+			OR COALESCE(snippet, '') ILIKE '%invoice%'
+			OR COALESCE(snippet, '') ILIKE '%documento electr%'
+			OR COALESCE(snippet, '') ILIKE '%fichero .zip%'
+			OR COALESCE(snippet, '') ILIKE '%archivo .zip%'
+			OR COALESCE(snippet, '') ILIKE '%nomina electr%'
+			OR COALESCE(snippet, '') ILIKE '%nómina electr%'
+			OR COALESCE(sender_email, '') ILIKE '%saphety%'
+			OR COALESCE(sender_email, '') ILIKE '%paperless%'
+			OR COALESCE(sender_email, '') ILIKE '%carvajal%'
+			OR COALESCE(sender_email, '') ILIKE '%facelec%'
+			OR COALESCE(sender_email, '') ILIKE '%dte.%'
+		  )
+		ORDER BY received_at DESC NULLS LAST
+		LIMIT $2
+	`, connectionID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list metadata stubs: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0, limit)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan metadata stub id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	stubs := make([]*domain.InboxMessage, 0, len(ids))
+	for _, id := range ids {
+		msg, err := r.GetInboxMessageByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		stubs = append(stubs, msg)
+	}
+	return stubs, nil
 }
 
 func (r *PostgresRepository) UpdateInboxMessageFlags(ctx context.Context, message *domain.InboxMessage) error {

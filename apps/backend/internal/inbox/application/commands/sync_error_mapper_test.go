@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	connectionsapi "github.com/bowerbird/internal/connections/api"
@@ -72,6 +73,27 @@ func TestClassifySyncError_GmailQuotaExceededIsRateLimited(t *testing.T) {
 	}
 	if isSkippableAttachmentError(err) {
 		t.Fatal("quota 403 must not be skipped as a forbidden attachment")
+	}
+	if !isFatalStubHydrateError(err) {
+		t.Fatal("quota 403 must abort stub hydration")
+	}
+}
+
+func TestIsFatalStubHydrateError(t *testing.T) {
+	if isFatalStubHydrateError(errors.New("get provider message m-1: message not found")) {
+		t.Fatal("deleted provider message must not abort stub hydration")
+	}
+	if isFatalStubHydrateError(errors.New("get provider message m-1: get message request failed with status 404")) {
+		t.Fatal("404 must not abort stub hydration")
+	}
+	if isFatalStubHydrateError(fmt.Errorf("too large: %w", errPayloadRejected)) {
+		t.Fatal("rejected payload must not abort stub hydration")
+	}
+	if !isFatalStubHydrateError(errors.New("get provider message m-1: get message request failed with status 401")) {
+		t.Fatal("401 must abort stub hydration")
+	}
+	if !isFatalStubHydrateError(errors.New("get provider message m-1: request failed with status 429")) {
+		t.Fatal("429 must abort stub hydration")
 	}
 }
 

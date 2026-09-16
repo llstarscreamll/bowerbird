@@ -252,6 +252,10 @@ func (c *SyncAccountCommand) syncAccount(ctx context.Context, tenantID string, a
 	}
 
 	deadline := c.syncDeadline(ctx, time.Now())
+	if err := c.hydrateCaptureStubs(ctx, tenantID, account, mailClient, deadline); err != nil {
+		return err
+	}
+
 	complete := false
 	if cursor.HistoryID() != "" {
 		complete, err = c.syncAccountFromHistory(ctx, tenantID, account, cursor, mailClient, deadline)
@@ -698,6 +702,50 @@ func (c *SyncAccountCommand) syncAccountFromHistory(
 
 func (c *SyncAccountCommand) hitMessageCap(processed int) bool {
 	return c.maxMessagesPerRun > 0 && processed >= c.maxMessagesPerRun
+}
+
+const metadataStubHydrateLimit = 50
+
+func (c *SyncAccountCommand) hydrateCaptureStubs(
+	ctx context.Context,
+	tenantID string,
+	account connectionsapi.ConnectionInfo,
+	client domain.MailProviderClient,
+	deadline time.Time,
+) error {
+	stubs, err := c.messageRepo.ListMetadataStubs(ctx, account.ID, metadataStubHydrateLimit)
+	if err != nil {
+		return fmt.Errorf("list metadata stubs: %w", err)
+	}
+
+	processed := 0
+	for _, stub := range stubs {
+		if shouldYieldSync(deadline) || c.hitMessageCap(processed) {
+			return nil
+		}
+		if stub == nil || stub.HasFullContent() {
+			continue
+		}
+		hint := stub.CaptureHint()
+		if hint == nil || !hint.NeedsFullContent() {
+			continue
+		}
+		if err := c.processSingleMessage(ctx, tenantID, account, domain.MessageRef{ID: stub.ProviderMessageID()}, client, true); err != nil {
+			if isFatalStubHydrateError(err) {
+				return err
+			}
+			c.logger.Warn("inbox.hydrate stub skipped",
+				"tenant_id", tenantID,
+				"account_id", account.ID,
+				"provider_message_id", stub.ProviderMessageID(),
+				"error", err,
+			)
+			processed++
+			continue
+		}
+		processed++
+	}
+	return nil
 }
 
 func (c *SyncAccountCommand) refreshExistingMessage(

@@ -443,6 +443,163 @@ func TestSyncAccountCommand_YieldsBeforeFinishingBackfill(t *testing.T) {
 	assert.Equal(t, "m-2", repo.upsertedMessages[1].ProviderMessageID())
 }
 
+func TestSyncAccountCommand_FetchesFullContentForSaphetyMetadata(t *testing.T) {
+	repo := newFakeInboxRepo()
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		refs: []domain.MessageRef{{ID: "m-saphety"}},
+		messages: map[string]*domain.MailMessage{
+			"m-saphety": {
+				ID:            "m-saphety",
+				ThreadID:      "t-1",
+				Subject:       "860512780;universidad nacional abierta y a distancia;FVRC2573887;01;universidad nacional abierta y a distancia",
+				Sender:        "noreply@saphety.com.co",
+				Snippet:       "le ha emitido el documento electrónico abajo indicado, en un fichero .zip.",
+				PlainTextBody: "Estimados Señores, documento electrónico adjunto en un fichero .zip.",
+				Attachments: []domain.MailAttachmentRef{
+					{AttachmentID: "att-zip", Filename: "FVRC2573887.zip", MimeType: "application/zip", Size: 120},
+				},
+			},
+		},
+	}
+	publisher := &fakeInboxEventPublisher{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Equal(t, []string{"m-saphety"}, providerClient.getMetadataCalls)
+	assert.Equal(t, []string{"m-saphety"}, providerClient.getMessageCalls)
+	require.Len(t, providerClient.downloadAttachmentCalls, 1)
+	assert.Equal(t, "att-zip", providerClient.downloadAttachmentCalls[0].attachmentID)
+	require.Len(t, publisher.published, 1)
+}
+
+func TestSyncAccountCommand_HydratesExistingSaphetyStub(t *testing.T) {
+	now := time.Now().UTC()
+	subject := "860512780;universidad nacional abierta y a distancia;FVRC2573887;01;universidad nacional abierta y a distancia"
+	snippet := "le ha emitido el documento electrónico abajo indicado, en un fichero .zip."
+	sender := "noreply@saphety.com.co"
+	stub, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
+		ID:                "msg-1",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "19fb078e7964e6d9",
+		Subject:           &subject,
+		SenderEmail:       &sender,
+		Snippet:           &snippet,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		RawData:           []byte(`{"id":"19fb078e7964e6d9","snippet":"documento electronico"}`),
+	})
+	require.NoError(t, err)
+
+	repo := newFakeInboxRepo()
+	repo.messagesByID[stub.ID()] = stub
+	repo.messagesByKey["acc-1:19fb078e7964e6d9"] = stub
+	cursor, err := domain.NewSyncCursor("acc-1", &now)
+	require.NoError(t, err)
+	require.NoError(t, cursor.AdvanceHistory("hist-1"))
+	repo.cursors["acc-1"] = cursor
+
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		historyID: "hist-1",
+		messages: map[string]*domain.MailMessage{
+			"19fb078e7964e6d9": {
+				ID:            "19fb078e7964e6d9",
+				Subject:       subject,
+				Sender:        sender,
+				Snippet:       snippet,
+				PlainTextBody: snippet,
+				Attachments: []domain.MailAttachmentRef{
+					{AttachmentID: "att-zip", Filename: "FVRC2573887.zip", MimeType: "application/zip", Size: 120},
+				},
+			},
+		},
+	}
+	publisher := &fakeInboxEventPublisher{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.Equal(t, []string{"19fb078e7964e6d9"}, providerClient.getMessageCalls)
+	require.Len(t, providerClient.downloadAttachmentCalls, 1)
+	require.Len(t, publisher.published, 1)
+}
+
+func TestSyncAccountCommand_HydrateStubNotFoundContinuesSync(t *testing.T) {
+	now := time.Now().UTC()
+	subject := "860512780;universidad nacional abierta y a distancia;FVRC2573887;01;universidad nacional abierta y a distancia"
+	snippet := "le ha emitido el documento electrónico abajo indicado, en un fichero .zip."
+	sender := "noreply@saphety.com.co"
+
+	missing, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
+		ID:                "msg-missing",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "gone-1",
+		Subject:           &subject,
+		SenderEmail:       &sender,
+		Snippet:           &snippet,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		RawData:           []byte(`{"id":"gone-1","snippet":"documento electronico"}`),
+	})
+	require.NoError(t, err)
+	okStub, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
+		ID:                "msg-ok",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "live-1",
+		Subject:           &subject,
+		SenderEmail:       &sender,
+		Snippet:           &snippet,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+		RawData:           []byte(`{"id":"live-1","snippet":"documento electronico"}`),
+	})
+	require.NoError(t, err)
+
+	repo := newFakeInboxRepo()
+	repo.messagesByID[missing.ID()] = missing
+	repo.messagesByKey["acc-1:gone-1"] = missing
+	repo.messagesByID[okStub.ID()] = okStub
+	repo.messagesByKey["acc-1:live-1"] = okStub
+	cursor, err := domain.NewSyncCursor("acc-1", &now)
+	require.NoError(t, err)
+	require.NoError(t, cursor.AdvanceHistory("hist-1"))
+	repo.cursors["acc-1"] = cursor
+
+	connectionsSvc := &fakeConnectionsInternalService{
+		activeConnections: []connectionsapi.ConnectionInfo{{ID: "acc-1", Provider: "gmail", ProviderAccountEmail: "user@gmail.com"}},
+	}
+	providerClient := &fakeProviderClient{
+		historyID: "hist-1",
+		messages: map[string]*domain.MailMessage{
+			"live-1": {
+				ID:            "live-1",
+				Subject:       subject,
+				Sender:        sender,
+				Snippet:       snippet,
+				PlainTextBody: snippet,
+				Attachments: []domain.MailAttachmentRef{
+					{AttachmentID: "att-zip", Filename: "FVRC2573887.zip", MimeType: "application/zip", Size: 120},
+				},
+			},
+		},
+	}
+	publisher := &fakeInboxEventPublisher{}
+	cmd := inboxCommands.NewSyncAccountCommand(repo, repo, connectionsSvc, &fakeProviderFactory{client: providerClient}, publisher, &fakeFileStore{}, fakeUnitOfWork{})
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+
+	require.NoError(t, cmd.Execute(ctx, inboxCommands.SyncAccountCommandInput{AccountID: "acc-1"}))
+	assert.ElementsMatch(t, []string{"gone-1", "live-1"}, providerClient.getMessageCalls)
+	require.Len(t, providerClient.downloadAttachmentCalls, 1)
+	assert.Equal(t, "live-1", providerClient.downloadAttachmentCalls[0].messageID)
+	require.Len(t, publisher.published, 1)
+}
+
 func TestSyncAccountCommand_HydrateFetchesFullBody(t *testing.T) {
 	repo := newFakeInboxRepo()
 	connectionsSvc := &fakeConnectionsInternalService{
@@ -522,6 +679,27 @@ func (f *fakeInboxRepo) GetInboxMessageByProviderID(ctx context.Context, account
 		return nil, domain.ErrInboxMessageNotFound
 	}
 	return msg, nil
+}
+
+func (f *fakeInboxRepo) ListMetadataStubs(ctx context.Context, connectionID string, limit int) ([]*domain.InboxMessage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	stubs := make([]*domain.InboxMessage, 0)
+	for _, msg := range f.messagesByID {
+		if msg == nil || msg.ConnectionID() != connectionID || msg.HasFullContent() {
+			continue
+		}
+		hint := msg.CaptureHint()
+		if hint == nil || !hint.NeedsFullContent() {
+			continue
+		}
+		stubs = append(stubs, msg)
+		if len(stubs) >= limit {
+			break
+		}
+	}
+	return stubs, nil
 }
 
 func (f *fakeInboxRepo) UpdateInboxMessageFlags(ctx context.Context, message *domain.InboxMessage) error {
@@ -653,9 +831,6 @@ func (f *fakeProviderClient) GetMessageMetadata(ctx context.Context, userID, mes
 	cloned.PlainTextBody = ""
 	cloned.HTMLBody = ""
 	cloned.Attachments = nil
-	if len(message.Attachments) > 0 {
-		cloned.Attachments = append([]domain.MailAttachmentRef(nil), message.Attachments...)
-	}
 	return &cloned, nil
 }
 

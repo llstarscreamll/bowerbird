@@ -46,3 +46,19 @@ func TestCreateInvoicesFromInboxMessageQueuesWhenLegalEntityExists(t *testing.T)
 	require.NoError(t, err)
 	require.Len(t, publisher.jobs, 1)
 }
+
+func TestCreateInvoicesFromInboxMessageQueuesSaphetyDIANMail(t *testing.T) {
+	publisher := &inboxEnqueueSpy{}
+	cmd := NewCreateInvoicesFromInboxMessageCommand(publisher, matchingReceivers())
+	err := cmd.Execute(context.Background(), contractEvents.InboxMessageReceived{
+		EventID:           "evt_1",
+		TenantID:          "tenant_1",
+		MessageInternalID: "m_1",
+		Subject:           "860512780;universidad nacional abierta y a distancia;FVRC2573887;01;universidad nacional abierta y a distancia",
+		Body:              "Estimados Señores, le ha emitido el documento electrónico abajo indicado, en un fichero .zip.",
+		Sender:            "noreply@saphety.com.co",
+		AttachmentRefs:    []contractEvents.AttachmentRef{{Filename: "FVRC2573887.zip", MimeType: "application/zip"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, publisher.jobs, 1)
+}

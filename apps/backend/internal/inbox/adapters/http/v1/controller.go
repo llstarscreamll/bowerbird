@@ -163,7 +163,7 @@ func (c *Controller) GetMessage(w http.ResponseWriter, r *http.Request) error {
 		return appErrors.Wrap(err, appErrors.CodeInternal, "failed to get message")
 	}
 
-	if c.hydrateMessageCommand != nil && !message.HasBody() {
+	if c.hydrateMessageCommand != nil && (message.ProviderMessage == nil || !message.ProviderMessage.HasFullContent()) {
 		if hydrateErr := c.hydrateMessageCommand.Execute(r.Context(), messageID); hydrateErr != nil {
 			slog.Warn("inbox.hydrate failed", "message_id", messageID, "error", hydrateErr)
 		} else {

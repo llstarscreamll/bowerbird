@@ -85,3 +85,32 @@ func TestNotificationAfterCaptureOnlyWhenFirstFullContent(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, again)
 }
+
+func TestNotificationAfterCaptureSkipsNewsletter(t *testing.T) {
+	now := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	stub, err := domain.NewInboxMessageAsSynced(domain.NewInboxMessageInput{
+		ID:                "msg-1",
+		ConnectionID:      "acc-1",
+		ProviderMessageID: "provider-msg-1",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	require.NoError(t, err)
+
+	mail := &domain.MailMessage{
+		ID:            "provider-msg-1",
+		Subject:       "Reunión semanal",
+		PlainTextBody: "agenda",
+	}
+	require.NoError(t, stub.ApplyProviderMessage(mail, []byte(`{"plain_text_body":"agenda"}`), now))
+
+	event, err := stub.NotificationAfterCapture(false, domain.SyncNotificationContext{
+		EventID:         "evt-1",
+		TenantSlug:      "tenant-a",
+		AccountID:       "acc-1",
+		Provider:        "gmail",
+		ProviderMessage: mail,
+	})
+	require.NoError(t, err)
+	require.Nil(t, event)
+}

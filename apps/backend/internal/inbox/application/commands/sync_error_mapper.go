@@ -134,6 +134,15 @@ func isReauthError(statusCode int, errText string) bool {
 		strings.Contains(errText, "reauth")
 }
 
+func isFatalStubHydrateError(err error) bool {
+	if err == nil || errors.Is(err, errPayloadRejected) {
+		return false
+	}
+	errText := strings.ToLower(err.Error())
+	statusCode := parseStatusCode(errText)
+	return isRateLimitedError(statusCode, errText) || isReauthError(statusCode, errText)
+}
+
 func isSkippableAttachmentError(err error) bool {
 	if err == nil {
 		return false

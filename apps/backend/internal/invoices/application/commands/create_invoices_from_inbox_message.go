@@ -48,10 +48,6 @@ func (cmd *CreateInvoicesFromInboxMessageCommand) Execute(ctx context.Context, e
 		cmd.logger.Info("invoicing event skipped: no legal entity", "tenant_slug", event.TenantID, "message_id", event.MessageInternalID)
 		return nil
 	}
-	if !hasInvoiceKeyword(event.Subject, event.Body) {
-		cmd.logger.Info("invoicing event skipped: missing invoice keyword", "tenant_slug", event.TenantID, "message_id", event.MessageInternalID)
-		return nil
-	}
 
 	if !hasSupportedAttachment(event.AttachmentRefs) {
 		cmd.logger.Info("invoicing event skipped: missing supported attachments", "tenant_slug", event.TenantID, "message_id", event.MessageInternalID)
@@ -105,31 +101,6 @@ func hasSupportedAttachment(refs []contractEvents.AttachmentRef) bool {
 
 		mime := strings.ToLower(strings.TrimSpace(ref.MimeType))
 		if strings.Contains(mime, "pdf") || strings.Contains(mime, "xml") || strings.Contains(mime, "zip") {
-			return true
-		}
-	}
-
-	return false
-}
-
-func hasInvoiceKeyword(subject, body string) bool {
-	combined := strings.ToLower(strings.TrimSpace(subject + "\n" + body))
-	if combined == "" {
-		return false
-	}
-
-	keywords := []string{
-		"factura electronica",
-		"facturación electrónica",
-		"factura electrónica",
-		"facturacion electronica",
-		"facturacion",
-		"factura",
-		"invoice",
-	}
-
-	for _, keyword := range keywords {
-		if strings.Contains(combined, keyword) {
 			return true
 		}
 	}
