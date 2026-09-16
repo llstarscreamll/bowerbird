@@ -47,12 +47,30 @@ func NewApplication(
 
 	inboxRepository := inboxRepo.NewPostgresRepository(registry)
 
-	var syncAccountCommand *commands.SyncAccountCommand
-	var syncAllAccountsCommand *commands.SyncAllAccountsCommand
-	var modifyMessageCommand *commands.ModifyMessageCommand
-	var sendMessageCommand *commands.SendMessageCommand
-	var downloadAttachmentCommand *commands.DownloadAttachmentCommand
+	providerFactory := provider.NewDefaultFactoryWithConfig(provider.DefaultFactoryConfig{
+		Gmail: gmail.OAuthConfig{
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+		},
+		Microsoft: microsoft.OAuthConfig{
+			ClientID:     cfg.MicrosoftClientID,
+			ClientSecret: cfg.MicrosoftClientSecret,
+		},
+	})
 
+	syncAllAccountsCommand := commands.NewSyncAllAccountsCommand(
+		connectionsService,
+		commands.NewOutboxSyncAccountJobDispatcher(jobQueue),
+	)
+	modifyMessageCommand := commands.NewModifyMessageCommand(inboxRepository, connectionsService, providerFactory)
+	sendMessageCommand := commands.NewSendMessageCommand(inboxRepository, connectionsService, providerFactory)
+
+	var downloadAttachmentCommand *commands.DownloadAttachmentCommand
+	if fileStore != nil {
+		downloadAttachmentCommand = commands.NewDownloadAttachmentCommand(inboxRepository, fileStore)
+	}
+
+	var syncAccountCommand *commands.SyncAccountCommand
 	if mailSyncEnabled(cfg) {
 		if eventBus == nil {
 			panic("event bus is required for inbox sync")
@@ -60,17 +78,6 @@ func NewApplication(
 		if fileStore == nil {
 			panic("file store is required for inbox sync")
 		}
-
-		providerFactory := provider.NewDefaultFactoryWithConfig(provider.DefaultFactoryConfig{
-			Gmail: gmail.OAuthConfig{
-				ClientID:     cfg.GoogleClientID,
-				ClientSecret: cfg.GoogleClientSecret,
-			},
-			Microsoft: microsoft.OAuthConfig{
-				ClientID:     cfg.MicrosoftClientID,
-				ClientSecret: cfg.MicrosoftClientSecret,
-			},
-		})
 
 		syncAccountCommand = commands.NewSyncAccountCommand(
 			inboxRepository,
@@ -80,14 +87,6 @@ func NewApplication(
 			eventBus,
 			fileStore,
 			database.NewRegistryUnitOfWork(registry),
-		)
-		modifyMessageCommand = commands.NewModifyMessageCommand(inboxRepository, connectionsService, providerFactory)
-		sendMessageCommand = commands.NewSendMessageCommand(inboxRepository, connectionsService, providerFactory)
-		downloadAttachmentCommand = commands.NewDownloadAttachmentCommand(inboxRepository, fileStore)
-
-		syncAllAccountsCommand = commands.NewSyncAllAccountsCommand(
-			connectionsService,
-			commands.NewOutboxSyncAccountJobDispatcher(jobQueue),
 		)
 	}
 

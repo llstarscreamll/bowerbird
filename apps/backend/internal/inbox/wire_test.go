@@ -31,3 +31,11 @@ func TestRegisterSchedulesIncludesRuleWhenMicrosoftConfigured(t *testing.T) {
 	require.Len(t, rules, 1)
 	assert.Equal(t, inboxContracts.InboxSyncAllAccountsType, rules[0].JobType)
 }
+
+func TestMailSyncEnabledRequiresOAuthCredentials(t *testing.T) {
+	assert.False(t, mailSyncEnabled(config.Config{}))
+	assert.True(t, mailSyncEnabled(config.Config{
+		GoogleClientID:     "id",
+		GoogleClientSecret: "secret",
+	}))
+}
