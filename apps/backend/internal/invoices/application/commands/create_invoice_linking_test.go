@@ -39,7 +39,7 @@ type partyResolverStub struct {
 	id string
 }
 
-func (p *partyResolverStub) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
+func (p *partyResolverStub) ResolveIssuer(ctx context.Context, profile ports.IssuerProfile) (string, error) {
 	return p.id, nil
 }
 

@@ -22,6 +22,19 @@ type Party struct {
 	SchemeID       string
 	TaxLevelCode   string
 	RegistrationID string
+	TaxpayerKind   string
+	Emails         []string
+	Phones         []string
+	Addresses      []PartyAddress
+}
+
+type PartyAddress struct {
+	Line        string
+	City        string
+	Department  string
+	PostalZone  string
+	CountryCode string
+	Kind        string
 }
 
 type TaxTotal struct {

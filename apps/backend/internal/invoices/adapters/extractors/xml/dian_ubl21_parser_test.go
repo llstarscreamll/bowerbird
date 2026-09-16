@@ -126,6 +126,21 @@ func TestDIANUBL21ParserParseInvoiceXMLFromAttachedDocumentRealExample(t *testin
 	if doc.Issuer.Name != "I SHOP COLOMBIA SAS" || doc.Issuer.TaxID != "900277370" {
 		t.Fatalf("unexpected issuer: %#v", doc.Issuer)
 	}
+	if doc.Issuer.SchemeID != "31" || doc.Issuer.TaxpayerKind != "1" {
+		t.Fatalf("unexpected issuer fiscal identity: scheme=%q kind=%q", doc.Issuer.SchemeID, doc.Issuer.TaxpayerKind)
+	}
+	if doc.Issuer.TaxLevelCode != "O-13;O-15;O-23" {
+		t.Fatalf("unexpected issuer tax level: %q", doc.Issuer.TaxLevelCode)
+	}
+	if len(doc.Issuer.Emails) != 1 || doc.Issuer.Emails[0] != "dte_9002773704@dte.paperless.com.co" {
+		t.Fatalf("unexpected issuer emails: %#v", doc.Issuer.Emails)
+	}
+	if len(doc.Issuer.Phones) != 1 || doc.Issuer.Phones[0] != "(1) 3289133" {
+		t.Fatalf("unexpected issuer phones: %#v", doc.Issuer.Phones)
+	}
+	if len(doc.Issuer.Addresses) != 1 || doc.Issuer.Addresses[0].City != "TUNJA" {
+		t.Fatalf("unexpected issuer addresses: %#v", doc.Issuer.Addresses)
+	}
 	if doc.Receiver.Name != "JOHAN ALVAREZ" || doc.Receiver.TaxID != "1057581292" {
 		t.Fatalf("unexpected receiver: %#v", doc.Receiver)
 	}

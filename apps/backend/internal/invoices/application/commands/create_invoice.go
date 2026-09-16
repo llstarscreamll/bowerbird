@@ -125,7 +125,7 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 	}
 	cmd.logger.Info("invoice persisted atomically", "header_id", headerID, "cufe", header.CUFE, "lines", len(lines))
 
-	if err := cmd.applyLinking(ctx, header, lines); err != nil {
+	if err := cmd.applyLinking(ctx, header, input.Invoice.Issuer, lines); err != nil {
 		cmd.logger.Error("invoice catalog linking failed after persist", "header_id", headerID, "error", err)
 		return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, fmt.Errorf("catalog linking: %w", err)
 	}
@@ -133,10 +133,10 @@ func (cmd *CreateInvoiceCommand) Execute(ctx context.Context, input CreateInvoic
 	return &CreateInvoiceResult{HeaderID: headerID, LineIDs: lineIDs}, nil
 }
 
-func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
+func (cmd *CreateInvoiceCommand) applyLinking(ctx context.Context, header domain.InvoiceHeaderRecord, issuer domain.Party, lines []domain.InvoiceLineRecord) error {
 	var partyID string
 	var resolveErr error
-	resolved, err := cmd.partyResolver.ResolveIssuerPartyID(ctx, header.IssuerTaxID, header.IssuerName)
+	resolved, err := cmd.partyResolver.ResolveIssuer(ctx, ports.IssuerProfileFromParty(issuer))
 	if err != nil {
 		resolveErr = err
 	} else {

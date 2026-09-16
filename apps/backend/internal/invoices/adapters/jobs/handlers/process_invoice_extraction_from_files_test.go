@@ -114,7 +114,7 @@ func (processorPasswordResolver) MarkUsed(ctx context.Context, secretID string) 
 
 type processorPartyResolver struct{}
 
-func (processorPartyResolver) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
+func (processorPartyResolver) ResolveIssuer(ctx context.Context, profile invoicingPorts.IssuerProfile) (string, error) {
 	return "", nil
 }
 

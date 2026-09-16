@@ -47,7 +47,42 @@ type InvoiceRepository interface {
 // IssuerPartyResolver resolves or creates a party from invoice issuer fields.
 // Returns empty partyID when tax id is missing.
 type IssuerPartyResolver interface {
-	ResolveIssuerPartyID(ctx context.Context, taxID, name string) (partyID string, err error)
+	ResolveIssuer(ctx context.Context, profile IssuerProfile) (partyID string, err error)
+}
+
+type IssuerAddress struct {
+	Line        string
+	City        string
+	Department  string
+	PostalZone  string
+	CountryCode string
+	Kind        string
+}
+
+type IssuerProfile struct {
+	TaxID        string
+	Name         string
+	SchemeID     string
+	TaxpayerKind string
+	TaxLevelCode string
+	Emails       []string
+	Phones       []string
+	Addresses    []IssuerAddress
+}
+
+func IssuerProfileFromParty(party domain.Party) IssuerProfile {
+	addrs := make([]IssuerAddress, 0, len(party.Addresses))
+	for _, a := range party.Addresses {
+		addrs = append(addrs, IssuerAddress{
+			Line: a.Line, City: a.City, Department: a.Department,
+			PostalZone: a.PostalZone, CountryCode: a.CountryCode, Kind: a.Kind,
+		})
+	}
+	return IssuerProfile{
+		TaxID: party.TaxID, Name: party.Name, SchemeID: party.SchemeID,
+		TaxpayerKind: party.TaxpayerKind, TaxLevelCode: party.TaxLevelCode,
+		Emails: party.Emails, Phones: party.Phones, Addresses: addrs,
+	}
 }
 
 type CatalogLineResolveInput struct {

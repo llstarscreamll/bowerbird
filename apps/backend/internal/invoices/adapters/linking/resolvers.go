@@ -21,8 +21,19 @@ func NewPartyResolverAdapter(lookup partiesapi.IssuerPartyLookup) *PartyResolver
 	return &PartyResolverAdapter{lookup: lookup}
 }
 
-func (a *PartyResolverAdapter) ResolveIssuerPartyID(ctx context.Context, taxID, name string) (string, error) {
-	return a.lookup.ResolveIssuerPartyID(ctx, taxID, name)
+func (a *PartyResolverAdapter) ResolveIssuer(ctx context.Context, profile ports.IssuerProfile) (string, error) {
+	addrs := make([]partiesapi.IssuerAddress, 0, len(profile.Addresses))
+	for _, addr := range profile.Addresses {
+		addrs = append(addrs, partiesapi.IssuerAddress{
+			Line: addr.Line, City: addr.City, Department: addr.Department,
+			PostalZone: addr.PostalZone, CountryCode: addr.CountryCode, Kind: addr.Kind,
+		})
+	}
+	return a.lookup.ResolveIssuer(ctx, partiesapi.IssuerProfile{
+		TaxID: profile.TaxID, Name: profile.Name, SchemeID: profile.SchemeID,
+		TaxpayerKind: profile.TaxpayerKind, TaxLevelCode: profile.TaxLevelCode,
+		Emails: profile.Emails, Phones: profile.Phones, Addresses: addrs,
+	})
 }
 
 var _ ports.IssuerPartyResolver = (*PartyResolverAdapter)(nil)

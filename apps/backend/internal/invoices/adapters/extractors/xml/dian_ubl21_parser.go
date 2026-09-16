@@ -158,15 +158,78 @@ func extractEmbeddedInvoice(data []byte) (string, error) {
 func mapParty(input partyContainer) domain.Party {
 	partyTaxScheme := input.Party.PartyTaxScheme
 	companyID := firstNonEmpty(partyTaxScheme.CompanyID.Value, input.Party.PartyLegalEntity.CompanyID.Value, input.Party.PartyIdentification.ID.Value)
-	schemeID := firstNonEmpty(partyTaxScheme.CompanyID.SchemeID, input.Party.PartyLegalEntity.CompanyID.SchemeID, input.Party.PartyIdentification.ID.SchemeID)
+	schemeID := identificationScheme(partyTaxScheme.CompanyID, input.Party.PartyLegalEntity.CompanyID, input.Party.PartyIdentification.ID)
 	name := firstNonEmpty(input.Party.PartyName.Name, partyTaxScheme.RegistrationName, input.Party.PartyLegalEntity.RegistrationName)
+	emails := []string{}
+	if mail := strings.TrimSpace(input.Party.Contact.ElectronicMail); mail != "" {
+		emails = append(emails, mail)
+	}
+	phones := []string{}
+	if tel := strings.TrimSpace(input.Party.Contact.Telephone); tel != "" {
+		phones = append(phones, tel)
+	}
+	addresses := uniquePartyAddresses(
+		mapUBLAddress(input.Party.PhysicalLocation.Address, "physical"),
+		mapUBLAddress(input.Party.PartyTaxScheme.RegistrationAddress, "registration"),
+	)
 	return domain.Party{
 		Name:           strings.TrimSpace(name),
 		TaxID:          strings.TrimSpace(companyID),
 		SchemeID:       strings.TrimSpace(schemeID),
 		TaxLevelCode:   strings.TrimSpace(partyTaxScheme.TaxLevelCode),
 		RegistrationID: strings.TrimSpace(partyTaxScheme.RegistrationName),
+		TaxpayerKind:   strings.TrimSpace(input.AdditionalAccountID),
+		Emails:         emails,
+		Phones:         phones,
+		Addresses:      addresses,
 	}
+}
+
+func identificationScheme(ids ...valueWithAttrs) string {
+	for _, id := range ids {
+		if id.SchemeName == "31" || id.SchemeName == "13" {
+			return id.SchemeName
+		}
+	}
+	for _, id := range ids {
+		if id.SchemeID == "31" || id.SchemeID == "13" {
+			return id.SchemeID
+		}
+	}
+	for _, id := range ids {
+		if v := firstNonEmpty(id.SchemeName, id.SchemeID); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func mapUBLAddress(input address, kind string) domain.PartyAddress {
+	return domain.PartyAddress{
+		Line:        strings.TrimSpace(input.AddressLine.Line),
+		City:        strings.TrimSpace(input.CityName),
+		Department:  strings.TrimSpace(input.CountrySubentity),
+		PostalZone:  strings.TrimSpace(input.PostalZone),
+		CountryCode: strings.TrimSpace(input.Country.IdentificationCode),
+		Kind:        kind,
+	}
+}
+
+func uniquePartyAddresses(addrs ...domain.PartyAddress) []domain.PartyAddress {
+	out := make([]domain.PartyAddress, 0, len(addrs))
+	seen := map[string]struct{}{}
+	for _, addr := range addrs {
+		key := strings.ToLower(addr.Line) + "|" + strings.ToLower(addr.City) + "|" + strings.ToLower(addr.Department) + "|" + strings.ToUpper(addr.CountryCode)
+		if key == "|||" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, addr)
+	}
+	return out
 }
 
 func parseFloat(value string) float64 {
@@ -234,7 +297,8 @@ type externalReference struct {
 }
 
 type partyContainer struct {
-	Party party `xml:"Party"`
+	AdditionalAccountID string `xml:"AdditionalAccountID"`
+	Party               party  `xml:"Party"`
 }
 
 type party struct {
