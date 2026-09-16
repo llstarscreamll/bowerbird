@@ -134,7 +134,8 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
                         <p class="mt-1 text-base font-medium leading-snug break-words">{{ line.description || 'Sin descripción' }}</p>
                         <p class="mt-1.5 grid gap-1 text-sm sm:grid-cols-3">
                           <span
-                            ><span class="text-muted-foreground">Adquirente:</span> <span class="font-mono tabular-nums">{{ line.buyer_code || '—' }}</span></span
+                            ><span class="text-muted-foreground">Cód. adquiriente:</span> <span class="font-mono tabular-nums">{{ line.buyer_code || '—' }}</span></span
+                          >
                           >
                           <span
                             ><span class="text-muted-foreground">SKU emisor:</span> <span class="font-mono tabular-nums">{{ line.seller_sku || '—' }}</span></span

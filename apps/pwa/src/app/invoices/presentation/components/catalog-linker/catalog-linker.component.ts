@@ -20,7 +20,7 @@ import { CatalogSearchHit, LineDecisionPayload, rememberPreview } from '../../..
   template: `
     <div class="grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
       <p>
-        Adquirente: <span class="font-mono text-foreground">{{ buyerCode() || '—' }}</span>
+        Cód. adquiriente: <span class="font-mono text-foreground">{{ buyerCode() || '—' }}</span>
       </p>
       <p>
         SKU emisor: <span class="font-mono text-foreground">{{ sellerSku() || '—' }}</span>

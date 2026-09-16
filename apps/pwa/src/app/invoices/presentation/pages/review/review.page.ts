@@ -42,7 +42,7 @@ import { CatalogLinkerComponent } from '../../components/catalog-linker/catalog-
                 <div>
                   <p class="font-medium">{{ line.description || 'Sin descripción' }}</p>
                   <p class="text-xs text-muted-foreground">
-                    Adquirente: {{ line.buyer_code || '—' }} · SKU: {{ line.seller_sku || '—' }} · GTIN: {{ line.gtin || '—' }} · Estado: {{ line.link_status }}
+                    Cód. adquiriente: {{ line.buyer_code || '—' }} · SKU: {{ line.seller_sku || '—' }} · GTIN: {{ line.gtin || '—' }} · Estado: {{ line.link_status }}
                   </p>
                 </div>
                 <a class="text-xs text-primary underline" [routerLink]="['/', tenantPrefix(), 'invoices', line.invoice_header_id]">Ver factura</a>
