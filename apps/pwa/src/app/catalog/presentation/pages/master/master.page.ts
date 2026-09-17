@@ -15,7 +15,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
 import { FileUploadComponent } from '../../../../core/presentation/components/file-upload';
 import { CatalogStore } from '../../../application/catalog.store';
 import { CatalogImportStore } from '../../../application/catalog-import.store';
-import { creationSourceLabel } from '../../../domain/catalog.model';
+import { creationSourceLabel, kindLabel, statusLabel } from '../../../domain/catalog.model';
 import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsActive, catalogImportStatusLabel } from '../../../domain/catalog-import.model';
 
 @Component({
@@ -124,10 +124,10 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
                   <td hlmTd class="font-medium">{{ item.name }}</td>
                   <td hlmTd class="text-muted-foreground">{{ item.internal_code || '—' }}</td>
                   <td hlmTd>
-                    <span hlmBadge variant="secondary">{{ item.kind }}</span>
+                    <span hlmBadge variant="secondary">{{ kindLabel(item.kind) }}</span>
                   </td>
                   <td hlmTd>{{ creationSourceLabel(item.creation_source) }}</td>
-                  <td hlmTd>{{ item.status }}</td>
+                  <td hlmTd>{{ statusLabel(item.status) }}</td>
                 </tr>
               } @empty {
                 <tr hlmTr>
@@ -196,6 +196,8 @@ export class MasterPage implements OnInit {
   readonly store = inject(CatalogStore);
   readonly imports = inject(CatalogImportStore);
   readonly creationSourceLabel = creationSourceLabel;
+  readonly kindLabel = kindLabel;
+  readonly statusLabel = statusLabel;
   readonly catalogImportStatusLabel = catalogImportStatusLabel;
   readonly catalogImportIsActive = catalogImportIsActive;
   readonly accept = CATALOG_IMPORT_ACCEPT;

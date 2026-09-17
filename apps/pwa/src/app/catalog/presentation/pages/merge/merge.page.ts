@@ -10,7 +10,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { CatalogStore } from '../../../application/catalog.store';
 import { CatalogHttpService } from '../../../infrastructure/catalog.http.service';
-import { CatalogAlias, CatalogItem, CATALOG_KINDS, creationSourceLabel, pickDefaultSurvivor } from '../../../domain/catalog.model';
+import { CatalogAlias, CatalogItem, creationSourceLabel, kindLabel, pickDefaultSurvivor, statusLabel } from '../../../domain/catalog.model';
 
 type AliasPreview = CatalogAlias & { keep: boolean; fromItemId: string };
 
@@ -115,7 +115,7 @@ type AliasPreview = CatalogAlias & { keep: boolean; fromItemId: string };
               <tr class="border-b border-border">
                 <td class="py-2 pr-3 text-muted-foreground">Estado</td>
                 @for (item of items(); track item.id) {
-                  <td class="py-2 pr-3">{{ item.status }}</td>
+                  <td class="py-2 pr-3">{{ statusLabel(item.status) }}</td>
                 }
               </tr>
               <tr>
@@ -181,6 +181,8 @@ type AliasPreview = CatalogAlias & { keep: boolean; fromItemId: string };
 export class MergePage implements OnInit {
   readonly store = inject(CatalogStore);
   readonly creationSourceLabel = creationSourceLabel;
+  readonly kindLabel = kindLabel;
+  readonly statusLabel = statusLabel;
   private readonly http = inject(CatalogHttpService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -270,10 +272,6 @@ export class MergePage implements OnInit {
     if (!this.survivorId()) return false;
     if (this.needsCodeChoice() && !this.codeItemId()) return false;
     return true;
-  }
-
-  kindLabel(kind: string): string {
-    return CATALOG_KINDS.find((row) => row.value === kind)?.label || kind;
   }
 
   submit(): void {

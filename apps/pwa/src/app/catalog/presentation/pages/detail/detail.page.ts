@@ -13,7 +13,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { generateUlid } from '../../../../core/utils/ulid';
 import { PartiesHttpService } from '../../../../parties/infrastructure/parties.http.service';
 import { CatalogStore } from '../../../application/catalog.store';
-import { CatalogAlias, creationSourceLabel } from '../../../domain/catalog.model';
+import { CatalogAlias, creationSourceLabel, kindLabel, statusLabel } from '../../../domain/catalog.model';
 
 @Component({
   selector: 'app-catalog-item-detail',
@@ -59,7 +59,7 @@ import { CatalogAlias, creationSourceLabel } from '../../../domain/catalog.model
           <div class="grid gap-3 text-sm">
             <div>
               <p class="text-muted-foreground">Tipo</p>
-              <span hlmBadge variant="secondary">{{ item.kind }}</span>
+              <span hlmBadge variant="secondary">{{ kindLabel(item.kind) }}</span>
             </div>
             <div>
               <p class="text-muted-foreground">Origen</p>
@@ -67,7 +67,7 @@ import { CatalogAlias, creationSourceLabel } from '../../../domain/catalog.model
             </div>
             <div>
               <p class="text-muted-foreground">Estado</p>
-              <p class="font-medium">{{ item.status }}</p>
+              <p class="font-medium">{{ statusLabel(item.status) }}</p>
             </div>
             <div>
               <p class="text-muted-foreground">Código interno</p>
@@ -151,6 +151,8 @@ import { CatalogAlias, creationSourceLabel } from '../../../domain/catalog.model
 export class DetailItemPage implements OnInit {
   readonly store = inject(CatalogStore);
   readonly creationSourceLabel = creationSourceLabel;
+  readonly kindLabel = kindLabel;
+  readonly statusLabel = statusLabel;
   private readonly route = inject(ActivatedRoute);
   private readonly parties = inject(PartiesHttpService);
 

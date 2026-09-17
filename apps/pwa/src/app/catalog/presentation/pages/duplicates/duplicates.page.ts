@@ -7,7 +7,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { CatalogStore } from '../../../application/catalog.store';
-import { DuplicateCluster, clusterReasonLabel, creationSourceLabel } from '../../../domain/catalog.model';
+import { DuplicateCluster, clusterReasonLabel, creationSourceLabel, statusLabel } from '../../../domain/catalog.model';
 
 @Component({
   selector: 'app-catalog-duplicates',
@@ -57,7 +57,7 @@ import { DuplicateCluster, clusterReasonLabel, creationSourceLabel } from '../..
                   <li class="rounded-md border border-border p-3 text-sm">
                     <p class="font-medium">{{ item.name }}</p>
                     <p class="mt-1 text-muted-foreground">
-                      {{ item.internal_code || 'Sin código interno' }} · {{ creationSourceLabel(item.creation_source) }} · {{ item.status }} · {{ item.line_count }} líneas
+                      {{ item.internal_code || 'Sin código interno' }} · {{ creationSourceLabel(item.creation_source) }} · {{ statusLabel(item.status) }} · {{ item.line_count }} líneas
                     </p>
                     @if (item.aliases?.length) {
                       <p class="mt-1 font-mono text-xs text-muted-foreground">
@@ -80,6 +80,7 @@ export class DuplicatesPage implements OnInit {
   readonly store = inject(CatalogStore);
   readonly clusterReasonLabel = clusterReasonLabel;
   readonly creationSourceLabel = creationSourceLabel;
+  readonly statusLabel = statusLabel;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

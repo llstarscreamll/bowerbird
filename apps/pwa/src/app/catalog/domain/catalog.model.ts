@@ -110,6 +110,23 @@ function survivorScore(item: Pick<CatalogItem, 'status' | 'internal_code' | 'cre
   return score;
 }
 
+export function kindLabel(kind: string): string {
+  return CATALOG_KINDS.find((row) => row.value === kind)?.label || kind;
+}
+
+export function statusLabel(status: string): string {
+  switch (status) {
+    case 'provisional':
+      return 'Provisional';
+    case 'confirmed':
+      return 'Confirmado';
+    case 'merged':
+      return 'Fusionado';
+    default:
+      return status;
+  }
+}
+
 export function creationSourceLabel(source: string): string {
   switch (source) {
     case 'manual':
