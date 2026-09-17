@@ -53,9 +53,21 @@ import { catalogImportColumnLabel, catalogImportIsActive, catalogImportProgressP
         <div class="flex justify-center py-16"><hlm-spinner class="size-8" /></div>
       } @else if (imp(); as item) {
         <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div class="min-w-0">
             <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Carga masiva</h1>
-            <p class="mt-1 text-sm text-muted-foreground">{{ item.created_at | date: 'medium' }}</p>
+            <p class="mt-1 min-w-0 text-sm text-muted-foreground">
+              Solicitada por
+              <span class="font-medium text-foreground">{{ item.requested_by.name }}</span>
+              · {{ item.created_at | date: 'medium' }}
+              <span class="block truncate">{{ item.requested_by.email }}</span>
+            </p>
+            @if (item.cancelled_by; as cancelledBy) {
+              <p class="mt-1 text-sm text-muted-foreground">
+                Cancelada por
+                <span class="font-medium text-foreground">{{ cancelledBy.name }}</span>
+                · {{ cancelledBy.email }}
+              </p>
+            }
           </div>
           <div class="flex flex-wrap items-center gap-2">
             <span hlmBadge>{{ catalogImportStatusLabel(item.status) }}</span>
@@ -84,17 +96,6 @@ import { catalogImportColumnLabel, catalogImportIsActive, catalogImportProgressP
               <p class="text-lg font-semibold">{{ item.failed_count }}</p>
             </div>
           </div>
-        </hlm-card>
-
-        <hlm-card class="space-y-2 p-6">
-          <h2 class="font-semibold">Solicitado por</h2>
-          <p>{{ item.requested_by.name }}</p>
-          <p class="text-sm text-muted-foreground">{{ item.requested_by.email }}</p>
-          @if (item.cancelled_by) {
-            <h2 class="pt-4 font-semibold">Cancelado por</h2>
-            <p>{{ item.cancelled_by.name }}</p>
-            <p class="text-sm text-muted-foreground">{{ item.cancelled_by.email }}</p>
-          }
         </hlm-card>
 
         @if (item.failure_reason) {
