@@ -65,28 +65,28 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportStat
           <table hlmTable>
             <thead hlmTHead>
               <tr hlmTr>
-                <th hlmTh>Fecha</th>
-                <th hlmTh>Estado</th>
+                <th hlmTh>Solicitante</th>
                 <th hlmTh>Creados</th>
                 <th hlmTh>Actualizados</th>
                 <th hlmTh>Errores</th>
-                <th hlmTh>Solicitante</th>
+                <th hlmTh>Estado</th>
+                <th hlmTh>Fecha</th>
               </tr>
             </thead>
             <tbody hlmTBody>
               @for (imp of store.imports(); track imp.id) {
                 <tr hlmTr class="cursor-pointer hover:bg-muted/40" (click)="openDetail(imp.id)">
-                  <td hlmTd>{{ imp.created_at | date: 'short' }}</td>
                   <td hlmTd>
-                    <span hlmBadge variant="secondary">{{ catalogImportStatusLabel(imp.status) }}</span>
+                    <p class="font-medium">{{ imp.requested_by.name }}</p>
+                    <p class="text-xs text-muted-foreground">{{ imp.requested_by.email }}</p>
                   </td>
                   <td hlmTd>{{ imp.created_count }}</td>
                   <td hlmTd>{{ imp.updated_count }}</td>
                   <td hlmTd>{{ imp.failed_count }}</td>
                   <td hlmTd>
-                    <p class="font-medium">{{ imp.requested_by.name }}</p>
-                    <p class="text-xs text-muted-foreground">{{ imp.requested_by.email }}</p>
+                    <span hlmBadge variant="secondary">{{ catalogImportStatusLabel(imp.status) }}</span>
                   </td>
+                  <td hlmTd>{{ imp.created_at | date: 'short' }}</td>
                 </tr>
               } @empty {
                 <tr hlmTr>
