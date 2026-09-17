@@ -10,6 +10,8 @@ import (
 	appErrors "github.com/bowerbird/internal/platform/errors"
 )
 
+const maxMergeItems = 20
+
 type MergeItemsCommand struct {
 	items   ports.ItemRepository
 	aliases ports.AliasRepository
@@ -70,8 +72,8 @@ func (cmd *MergeItemsCommand) Execute(ctx context.Context, input MergeItemsInput
 	if len(filtered) < 1 {
 		return appErrors.New(appErrors.CodeValidation, "source_ids is required")
 	}
-	if 1+len(filtered) > 5 {
-		return appErrors.New(appErrors.CodeValidation, "merge accepts at most 5 items")
+	if 1+len(filtered) > maxMergeItems {
+		return appErrors.New(appErrors.CodeValidation, "merge accepts at most 20 items")
 	}
 
 	survivor, err := cmd.items.GetItemByID(ctx, survivorID)

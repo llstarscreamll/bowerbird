@@ -191,6 +191,22 @@ func TestMergeItemsRejectsSingleSourceThatIsSurvivor(t *testing.T) {
 	assert.Equal(t, appErrors.CodeValidation, appErr.Code)
 }
 
+func TestMergeItemsRejectsMoreThanMaxItems(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	sources := make([]string, maxMergeItems)
+	for i := range sources {
+		sources[i] = string(rune('B' + i))
+	}
+	items := &memItems{items: map[string]domain.Item{"A": testItem("A", "One", "INT-A", now)}}
+	cmd := NewMergeItemsCommand(items, &memAliases{}, &memMerge{items: items, aliases: &memAliases{}}, &memLinks{})
+	err := cmd.Execute(context.Background(), MergeItemsInput{SurvivorID: "A", SourceIDs: sources})
+	var appErr *appErrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, appErrors.CodeValidation, appErr.Code)
+	assert.Contains(t, appErr.Error(), "at most 20")
+}
+
 func TestMergeItemsDefaultsNameAndKindWhenOmitted(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)

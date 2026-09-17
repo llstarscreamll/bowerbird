@@ -53,6 +53,9 @@ export const CATALOG_KINDS = [
   { value: 'unknown', label: 'Desconocido' },
 ] as const;
 
+export const CATALOG_MERGE_MIN_ITEMS = 2;
+export const CATALOG_MERGE_MAX_ITEMS = 20;
+
 export interface MergeItemsInput {
   survivor_id: string;
   source_ids: string[];

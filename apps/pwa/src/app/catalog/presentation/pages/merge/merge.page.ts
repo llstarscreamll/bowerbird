@@ -10,7 +10,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { CatalogStore } from '../../../application/catalog.store';
 import { CatalogHttpService } from '../../../infrastructure/catalog.http.service';
-import { CatalogAlias, CatalogItem, creationSourceLabel, kindLabel, pickDefaultSurvivor, statusLabel } from '../../../domain/catalog.model';
+import { CATALOG_MERGE_MAX_ITEMS, CATALOG_MERGE_MIN_ITEMS, CatalogAlias, CatalogItem, creationSourceLabel, kindLabel, pickDefaultSurvivor, statusLabel } from '../../../domain/catalog.model';
 
 type AliasPreview = CatalogAlias & { keep: boolean; fromItemId: string };
 
@@ -254,9 +254,9 @@ export class MergePage implements OnInit {
           .filter(Boolean),
       ),
     ];
-    if (ids.length < 2 || ids.length > 5) {
+    if (ids.length < CATALOG_MERGE_MIN_ITEMS || ids.length > CATALOG_MERGE_MAX_ITEMS) {
       this.loading.set(false);
-      this.error.set('Selecciona entre 2 y 5 ítems para fusionar.');
+      this.error.set(`Selecciona entre ${CATALOG_MERGE_MIN_ITEMS} y ${CATALOG_MERGE_MAX_ITEMS} ítems para fusionar.`);
       return;
     }
     forkJoin(ids.map((id) => this.http.getItem(id))).subscribe({

@@ -16,7 +16,7 @@ import { HlmTableImports } from '@spartan-ng/helm/table';
 import { FileUploadComponent } from '../../../../core/presentation/components/file-upload';
 import { CatalogStore } from '../../../application/catalog.store';
 import { CatalogImportStore } from '../../../application/catalog-import.store';
-import { creationSourceLabel, kindLabel, statusLabel } from '../../../domain/catalog.model';
+import { CATALOG_MERGE_MAX_ITEMS, CATALOG_MERGE_MIN_ITEMS, creationSourceLabel, kindLabel, statusLabel } from '../../../domain/catalog.model';
 import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsActive, catalogImportStatusLabel } from '../../../domain/catalog-import.model';
 
 @Component({
@@ -42,6 +42,18 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
   ],
   host: { class: 'flex-1 flex flex-col min-h-0 w-full overflow-y-auto p-8' },
   template: `
+    @if (selectedCount() >= 2) {
+      <div class="pointer-events-none sticky top-[calc(100%-4.5rem)] z-40 h-0 w-full" role="region" aria-label="Acciones en lote">
+        <div
+          class="pointer-events-auto absolute left-1/2 flex w-max max-w-full -translate-x-1/2 animate-in fade-in-0 slide-in-from-bottom-3 items-center gap-3 rounded-full bg-foreground py-2 ps-3 pe-2 text-background shadow-2xl duration-200"
+        >
+          <span class="flex size-6 items-center justify-center rounded-full bg-background/20 text-xs font-semibold">{{ selectedCount() }}</span>
+          <p class="text-sm font-medium">ítems seleccionados</p>
+          <button hlmBtn type="button" size="sm" [disabled]="selectedCount() > maxMergeItems" (click)="mergeSelected()">Fusionar</button>
+        </div>
+      </div>
+    }
+
     <div class="mx-auto w-full max-w-5xl space-y-6">
       <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -165,13 +177,6 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
       </hlm-card>
     </div>
 
-    @if (selectedCount() >= 2) {
-      <div class="sticky bottom-4 mx-auto flex w-full max-w-5xl items-center justify-between gap-3 rounded-lg border border-border bg-background p-3 shadow-lg">
-        <p class="text-sm">{{ selectedCount() }} ítems seleccionados</p>
-        <button hlmBtn type="button" [disabled]="selectedCount() > 5" (click)="mergeSelected()">Fusionar {{ selectedCount() }} ítems</button>
-      </div>
-    }
-
     <hlm-dialog [state]="imports.dialogOpen() ? 'open' : 'closed'" (closed)="imports.closeDialog()">
       <hlm-dialog-content *brnDialogContent class="sm:max-w-lg">
         <hlm-dialog-header>
@@ -215,6 +220,7 @@ export class MasterPage implements OnInit {
   readonly statusLabel = statusLabel;
   readonly catalogImportStatusLabel = catalogImportStatusLabel;
   readonly catalogImportIsActive = catalogImportIsActive;
+  readonly maxMergeItems = CATALOG_MERGE_MAX_ITEMS;
   readonly accept = CATALOG_IMPORT_ACCEPT;
   readonly maxBytes = CATALOG_IMPORT_MAX_FILE_BYTES;
   private readonly router = inject(Router);
@@ -241,7 +247,7 @@ export class MasterPage implements OnInit {
 
   mergeSelected(): void {
     const ids = [...this.selected()];
-    if (ids.length < 2 || ids.length > 5) return;
+    if (ids.length < CATALOG_MERGE_MIN_ITEMS || ids.length > CATALOG_MERGE_MAX_ITEMS) return;
     void this.router.navigate(['merge'], { relativeTo: this.route, queryParams: { ids: ids.join(',') } });
   }
 
