@@ -97,17 +97,66 @@ export function clusterReasonLabel(reason: string): string {
   }
 }
 
-export function pickDefaultSurvivor(items: Array<Pick<CatalogItem, 'id' | 'status' | 'internal_code' | 'creation_source' | 'created_at'> & { line_count?: number }>): string {
+type SurvivorCandidate = Pick<CatalogItem, 'id' | 'status' | 'internal_code' | 'creation_source' | 'created_at'>;
+
+export function previewMergeInternalCode(survivor: Pick<CatalogItem, 'internal_code'>, items: Array<Pick<CatalogItem, 'id' | 'internal_code'>>, chosenCodeItemId: string): string | null {
+  if (survivor.internal_code) return survivor.internal_code;
+
+  const distinctCodes = [...new Set(items.map((item) => item.internal_code).filter((code): code is string => Boolean(code)))];
+
+  if (distinctCodes.length > 1) {
+    return items.find((item) => item.id === chosenCodeItemId)?.internal_code ?? null;
+  }
+
+  return distinctCodes[0] ?? null;
+}
+
+export function isMergeInternalCodeInherited(survivor: Pick<CatalogItem, 'internal_code'>, items: Array<Pick<CatalogItem, 'internal_code'>>, resolvedCode: string | null): boolean {
+  if (!resolvedCode || survivor.internal_code) return false;
+  const distinctCodes = [...new Set(items.map((item) => item.internal_code).filter((code): code is string => Boolean(code)))];
+  return distinctCodes.length === 1 && distinctCodes[0] === resolvedCode;
+}
+
+export function pickDefaultSurvivor(items: SurvivorCandidate[]): string {
   const ranked = [...items].sort((a, b) => survivorScore(b) - survivorScore(a));
   return ranked[0]?.id ?? '';
 }
 
-function survivorScore(item: Pick<CatalogItem, 'status' | 'internal_code' | 'creation_source' | 'created_at'> & { line_count?: number }): number {
+export function survivorSuggestionTooltip(winner: SurvivorCandidate, allItems: SurvivorCandidate[]): string {
+  const others = allItems.filter((item) => item.id !== winner.id);
+  if (others.length === 0) return 'Único ítem del grupo.';
+
+  const reasons: string[] = [];
+  if (winner.status === 'confirmed' && others.some((item) => item.status !== 'confirmed')) {
+    reasons.push('es el único confirmado');
+  } else if (winner.status === 'confirmed') {
+    reasons.push('está confirmado');
+  }
+
+  if (winner.internal_code && others.some((item) => !item.internal_code)) {
+    reasons.push('tiene código interno');
+  }
+
+  const winnerCurated = winner.creation_source === 'manual' || winner.creation_source === 'import';
+  if (winnerCurated && others.every((item) => item.creation_source === 'invoice')) {
+    reasons.push(winner.creation_source === 'manual' ? 'fue creado manualmente' : 'proviene de carga masiva');
+  }
+
+  if (reasons.length === 0) return 'Desempate por ser el registro más antiguo del grupo.';
+  return `Sugerido porque ${joinReasons(reasons)}.`;
+}
+
+function joinReasons(reasons: string[]): string {
+  if (reasons.length === 1) return reasons[0];
+  if (reasons.length === 2) return `${reasons[0]} y ${reasons[1]}`;
+  return `${reasons.slice(0, -1).join(', ')} y ${reasons[reasons.length - 1]}`;
+}
+
+function survivorScore(item: SurvivorCandidate): number {
   let score = 0;
   if (item.status === 'confirmed') score += 10_000;
   if (item.internal_code) score += 1_000;
   if (item.creation_source === 'manual' || item.creation_source === 'import') score += 100;
-  score += (item.line_count ?? 0) * 10;
   const created = Date.parse(item.created_at);
   if (!Number.isNaN(created)) score += Math.max(0, 2_000_000_000_000 - created) / 1_000_000;
   return score;
