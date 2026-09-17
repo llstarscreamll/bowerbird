@@ -41,12 +41,12 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportStat
             <ng-icon name="lucideArrowLeft" />
             Catálogo
           </a>
-          <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Importaciones</h1>
-          <p class="mt-1 text-sm text-muted-foreground">Historial de procesos masivos de ítems.</p>
+          <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Cargas masivas</h1>
+          <p class="mt-1 text-sm text-muted-foreground">Historial de cargas masivas de ítems.</p>
         </div>
         <button hlmBtn type="button" (click)="store.openDialog()">
           <ng-icon name="lucideUpload" />
-          Importar
+          Cargar
         </button>
       </header>
 
@@ -90,7 +90,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportStat
                 </tr>
               } @empty {
                 <tr hlmTr>
-                  <td hlmTd colspan="6" class="py-10 text-center text-muted-foreground">Aún no hay importaciones.</td>
+                  <td hlmTd colspan="6" class="py-10 text-center text-muted-foreground">Aún no hay cargas masivas.</td>
                 </tr>
               }
             </tbody>
@@ -107,7 +107,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportStat
     <hlm-dialog [state]="store.dialogOpen() ? 'open' : 'closed'" (closed)="store.closeDialog()">
       <hlm-dialog-content *brnDialogContent class="sm:max-w-lg">
         <hlm-dialog-header>
-          <h2 hlmDialogTitle>Importar catálogo</h2>
+          <h2 hlmDialogTitle>Cargar catálogo</h2>
         </hlm-dialog-header>
         <div class="space-y-4">
           <app-file-upload
@@ -132,7 +132,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportStat
         <hlm-dialog-footer>
           <button hlmBtn variant="outline" brnDialogClose [disabled]="store.submitting()">Cancelar</button>
           <button hlmBtn [disabled]="!store.canSubmitImport()" (click)="submitImport()">
-            {{ store.submitting() ? 'Encolando…' : 'Importar' }}
+            {{ store.submitting() ? 'Encolando…' : 'Cargar' }}
           </button>
         </hlm-dialog-footer>
       </hlm-dialog-content>

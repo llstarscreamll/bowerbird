@@ -55,11 +55,11 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
           </a>
           <a hlmBtn variant="outline" routerLink="imports">
             <ng-icon name="lucideList" />
-            Importaciones
+            Cargas masivas
           </a>
           <button hlmBtn variant="outline" type="button" (click)="imports.openDialog()">
             <ng-icon name="lucideUpload" />
-            Importar
+            Cargar
           </button>
           <a hlmBtn routerLink="new">
             <ng-icon name="lucidePlus" />
@@ -72,7 +72,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
         <a class="block" [routerLink]="['imports', active.id]">
           <div hlmAlert>
             <ng-icon name="lucideInfo" hlmAlertIcon />
-            <h4 hlmAlertTitle>Importación {{ catalogImportStatusLabel(active.status) }}</h4>
+            <h4 hlmAlertTitle>Carga masiva {{ catalogImportStatusLabel(active.status) }}</h4>
             <p hlmAlertDescription>Hay un proceso {{ catalogImportIsActive(active.status) ? 'en curso' : active.status }}. Ver monitor.</p>
           </div>
         </a>
@@ -160,7 +160,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
     <hlm-dialog [state]="imports.dialogOpen() ? 'open' : 'closed'" (closed)="imports.closeDialog()">
       <hlm-dialog-content *brnDialogContent class="sm:max-w-lg">
         <hlm-dialog-header>
-          <h2 hlmDialogTitle>Importar catálogo</h2>
+          <h2 hlmDialogTitle>Cargar catálogo</h2>
         </hlm-dialog-header>
         <div class="space-y-4">
           <app-file-upload
@@ -185,7 +185,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
         <hlm-dialog-footer>
           <button hlmBtn variant="outline" brnDialogClose [disabled]="imports.submitting()">Cancelar</button>
           <button hlmBtn [disabled]="!imports.canSubmitImport()" (click)="submitImport()">
-            {{ imports.submitting() ? 'Encolando…' : 'Importar' }}
+            {{ imports.submitting() ? 'Encolando…' : 'Cargar' }}
           </button>
         </hlm-dialog-footer>
       </hlm-dialog-content>

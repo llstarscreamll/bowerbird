@@ -59,7 +59,7 @@ export class CatalogImportStore {
         this.listCursor.set(page.cursor);
         this.loading.set(false);
       },
-      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo cargar el historial de importaciones.'),
+      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo obtener el historial de cargas masivas.'),
     });
   }
 
@@ -75,7 +75,7 @@ export class CatalogImportStore {
       },
       error: (err: HttpErrorResponse) => {
         this.loadingMore.set(false);
-        this.handleError(err, 'No se pudieron cargar más importaciones.');
+        this.handleError(err, 'No se pudieron obtener más cargas masivas.');
       },
     });
   }
@@ -89,7 +89,7 @@ export class CatalogImportStore {
         this.loading.set(false);
         this.loadErrors(id, true);
       },
-      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo cargar la importación.'),
+      error: (err: HttpErrorResponse) => this.handleError(err, 'No se pudo abrir la carga masiva.'),
     });
   }
 
@@ -149,11 +149,11 @@ export class CatalogImportStore {
       tap((imp) => {
         this.cancelling.set(false);
         this.selected.set(imp);
-        this.toast.showSuccess('Importación cancelada.');
+        this.toast.showSuccess('Carga masiva cancelada.');
       }),
       catchError((err: HttpErrorResponse) => {
         this.cancelling.set(false);
-        this.handleError(err, 'No se pudo cancelar la importación.');
+        this.handleError(err, 'No se pudo cancelar la carga masiva.');
         return of(null);
       }),
     );
@@ -206,11 +206,11 @@ export class CatalogImportStore {
         this.submitting.set(false);
         this.dialogOpen.set(false);
         this.resetUpload();
-        this.toast.showSuccess('Importación encolada.');
+        this.toast.showSuccess('Carga masiva encolada.');
       }),
       catchError((err: HttpErrorResponse) => {
         this.submitting.set(false);
-        this.handleError(err, 'No se pudo encolar la importación.');
+        this.handleError(err, 'No se pudo encolar la carga masiva.');
         return of(null);
       }),
     );

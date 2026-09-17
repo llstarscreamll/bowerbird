@@ -134,7 +134,7 @@ export function creationSourceLabel(source: string): string {
     case 'invoice':
       return 'Desde factura';
     case 'import':
-      return 'Importación';
+      return 'Carga masiva';
     default:
       return source;
   }

@@ -38,7 +38,7 @@ import { catalogImportColumnLabel, catalogImportIsActive, catalogImportProgressP
     <div class="mx-auto w-full max-w-5xl space-y-6">
       <a hlmBtn variant="ghost" size="sm" routerLink=".." class="-ms-2">
         <ng-icon name="lucideArrowLeft" />
-        Importaciones
+        Cargas masivas
       </a>
 
       @if (store.errorMessage(); as err) {
@@ -54,7 +54,7 @@ import { catalogImportColumnLabel, catalogImportIsActive, catalogImportProgressP
       } @else if (imp(); as item) {
         <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Importación</h1>
+            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Carga masiva</h1>
             <p class="mt-1 text-sm text-muted-foreground">{{ item.created_at | date: 'medium' }}</p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -150,12 +150,12 @@ import { catalogImportColumnLabel, catalogImportIsActive, catalogImportProgressP
     <hlm-alert-dialog [state]="confirmCancel() ? 'open' : 'closed'" (closed)="confirmCancel.set(false)">
       <hlm-alert-dialog-content *brnAlertDialogContent>
         <hlm-alert-dialog-header>
-          <h2 hlmAlertDialogTitle>¿Cancelar la importación?</h2>
+          <h2 hlmAlertDialogTitle>¿Cancelar la carga masiva?</h2>
           <p hlmAlertDialogDescription>El lote en curso puede terminar (hasta 5.000 filas). Los ítems ya upsertados no se revierten.</p>
         </hlm-alert-dialog-header>
         <hlm-alert-dialog-footer>
           <button hlmBtn variant="outline" type="button" (click)="confirmCancel.set(false)">Seguir</button>
-          <button hlmBtn variant="destructive" type="button" [disabled]="store.cancelling()" (click)="cancel()">Cancelar importación</button>
+          <button hlmBtn variant="destructive" type="button" [disabled]="store.cancelling()" (click)="cancel()">Cancelar carga masiva</button>
         </hlm-alert-dialog-footer>
       </hlm-alert-dialog-content>
     </hlm-alert-dialog>
