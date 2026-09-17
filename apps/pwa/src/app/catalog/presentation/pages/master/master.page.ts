@@ -10,6 +10,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { HlmTableImports } from '@spartan-ng/helm/table';
 import { FileUploadComponent } from '../../../../core/presentation/components/file-upload';
@@ -34,6 +35,7 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
     HlmAlertImports,
     HlmBadgeImports,
     HlmButtonImports,
+    HlmDropdownMenuImports,
     HlmDialogImports,
     BrnDialogContent,
     BrnDialogClose,
@@ -46,27 +48,40 @@ import { CATALOG_IMPORT_ACCEPT, CATALOG_IMPORT_MAX_FILE_BYTES, catalogImportIsAc
           <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Catálogo</h1>
           <p class="mt-1 text-sm text-muted-foreground">Ítems (productos, servicios, activos) vinculados desde líneas de factura.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <a hlmBtn variant="outline" routerLink="duplicates">
-            Resolver duplicados
-            @if (store.duplicateClusters().length > 0) {
-              <span hlmBadge class="ml-2" variant="secondary">{{ store.duplicateClusters().length }}</span>
-            }
-          </a>
-          <a hlmBtn variant="outline" routerLink="imports">
-            <ng-icon name="lucideList" />
-            Cargas masivas
-          </a>
-          <button hlmBtn variant="outline" type="button" (click)="imports.openDialog()">
-            <ng-icon name="lucideUpload" />
-            Cargar
-          </button>
+        <div class="flex shrink-0 items-center gap-2">
+          <div class="flex items-center">
+            <button hlmBtn variant="outline" type="button" class="rounded-r-none" (click)="imports.openDialog()">
+              <ng-icon name="lucideUpload" />
+              Cargar
+            </button>
+            <button hlmBtn variant="outline" size="icon" type="button" class="rounded-l-none border-l-0" aria-label="Más acciones de carga" [hlmDropdownMenuTrigger]="importActionsMenu">
+              <ng-icon name="lucideChevronDown" />
+            </button>
+            <ng-template #importActionsMenu>
+              <hlm-dropdown-menu class="w-48">
+                <a hlmDropdownMenuItem routerLink="imports">
+                  <ng-icon name="lucideList" />
+                  Cargas masivas
+                </a>
+              </hlm-dropdown-menu>
+            </ng-template>
+          </div>
           <a hlmBtn routerLink="new">
             <ng-icon name="lucidePlus" />
             Nuevo
           </a>
         </div>
       </header>
+
+      @if (store.duplicateClusters().length > 0) {
+        <a class="block" routerLink="duplicates">
+          <div hlmAlert>
+            <ng-icon name="lucideTriangleAlert" hlmAlertIcon />
+            <h4 hlmAlertTitle>Duplicados pendientes</h4>
+            <p hlmAlertDescription>{{ store.duplicateClusters().length }} grupo{{ store.duplicateClusters().length === 1 ? '' : 's' }} que parecen el mismo producto.</p>
+          </div>
+        </a>
+      }
 
       @if (imports.activeImport(); as active) {
         <a class="block" [routerLink]="['imports', active.id]">
