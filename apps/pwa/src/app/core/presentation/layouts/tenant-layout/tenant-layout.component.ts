@@ -155,14 +155,6 @@ import { InstallPromptHostComponent, PwaInstallCoordinator } from '../../../pwa-
                   </a>
                 </li>
               }
-              @if (permissions.canReadSecrets()) {
-                <li hlmSidebarMenuItem>
-                  <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'secrets']" routerLinkActive #secretsLink="routerLinkActive" [isActive]="secretsLink.isActive" [tooltip]="'Credenciales'">
-                    <ng-icon name="lucideKeyRound" />
-                    <span>Credenciales</span>
-                  </a>
-                </li>
-              }
               <li hlmSidebarMenuItem>
                 <a hlmSidebarMenuButton [routerLink]="['/', tenantId(), 'settings']" routerLinkActive #settingsLink="routerLinkActive" [isActive]="settingsLink.isActive" [tooltip]="'Configuración'">
                   <ng-icon name="lucideSettings" />
