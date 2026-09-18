@@ -24,11 +24,11 @@ golang-migrate use Neon's **direct** connection URL
 
 ## AWS (Neon)
 
-`pnpm run deploy` invokes the migrate Lambda when that function's
-package changes (it ships `migrations/controlplane` and
-`migrations/tenant`). The invoke runs **before** Pulumi updates the
-other Lambdas and web objects, and uses Neon's **direct** URL
-(`database_direct_url`).
+`pnpm run deploy:aws` (or root `pnpm run deploy`) invokes the migrate
+Lambda when that function's package changes (it ships
+`migrations/controlplane` and `migrations/tenant`). The invoke runs
+**before** Pulumi updates the other Lambdas and web objects, and uses
+Neon's **direct** URL (`database_direct_url`).
 
 If the invoke fails, Pulumi stops the apply so application code is not
 released against an unmigrated schema. Re-run out of band with:

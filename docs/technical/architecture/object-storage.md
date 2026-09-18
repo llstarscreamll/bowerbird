@@ -16,6 +16,9 @@ All file I/O goes through the `FileStore` port (`internal/platform/storage/s3`).
 
 See [MinIO](../tooling/minio.md) for local bootstrap and credentials.
 
+On AWS (`DEPLOYMENT_TARGET=aws`) the adapter uses the S3 REST endpoint.
+`S3_PRESIGN_ENDPOINT_URL` and `media.*` DNS are local/on-prem only.
+
 ## Metadata sanitization (adapter boundary)
 
 S3 user metadata values must be **US-ASCII**. Non-ASCII characters in metadata headers (e.g. Unicode narrow no-break space `U+202F` in macOS screenshot filenames like `Screenshot … at 8.12.01 AM.png`) cause `PutObject` to fail with `SignatureDoesNotMatch` on MinIO and can fail on AWS S3 as well.

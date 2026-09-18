@@ -36,10 +36,10 @@ Relay iterates **all active tenants** from the control-plane on every profile (o
 
 ## Consumers
 
-| Profile        | Events                    | Jobs                   |
-| -------------- | ------------------------- | ---------------------- |
-| onprem / local | `events-consumer` (AMQP)  | `jobs-consumer` (AMQP) |
-| aws            | Lambda `events-processor` | Lambda `sqs-processor` |
+| Profile        | Events                           | Jobs                           |
+| -------------- | -------------------------------- | ------------------------------ |
+| onprem / local | `events-consumer` (AMQP)         | `jobs-consumer` (AMQP)         |
+| aws            | Lambda `${ENV}-bowerbird-events` | Lambda `${ENV}-bowerbird-jobs` |
 
 Handlers are shared via `internal/platform/messaging.WireMessagingHandlers`.
 
@@ -88,14 +88,17 @@ The clock has no tenant list. Each rule publishes one job with empty
 `tenant_slug`. Handlers that need tenants list them from the control
 plane.
 
-| Name             | Schedule          | Job                      | Handler                           |
-| ---------------- | ----------------- | ------------------------ | --------------------------------- |
-| `outbox-sweeper` | `rate(1 hour)`    | `platform.OutboxSweeper` | List tenants; purge each DB       |
-| `inbox-sync-all` | `rate(5 minutes)` | `InboxSyncAllAccounts`   | List tenants; enqueue per account |
+| Name                   | Schedule (on-prem) | Job                           | Handler                           |
+| ---------------------- | ------------------ | ----------------------------- | --------------------------------- |
+| `outbox-sweeper`       | `rate(1 hour)`     | `platform.OutboxSweeper`      | List tenants; purge each DB       |
+| `inbox-sync-all`       | `rate(5 minutes)`  | `InboxSyncAllAccounts`        | List tenants; enqueue per account |
+| `catalog-import-purge` | `0 5 * * *`        | `CatalogImportPurgeRequested` | List tenants; purge stale imports |
 
-`rate()` matches EventBridge. Crontab is Unix 5-field UTC (not AWS
-`cron()` 6-field / `?`). Translate crontab to EventBridge cron when
-you add AWS rules later.
+`rate()` matches EventBridge Scheduler. Crontab is Unix 5-field UTC.
+AWS uses 6-field EventBridge cron with `?` (`catalog-import-purge` →
+`cron(0 5 * * ? *)`). See [AWS deploy](../deployment/aws.md#schedules).
+
+`inbox-sync-all` is omitted unless Google or Microsoft OAuth is set.
 
 Child work (`InboxSyncAccount`) still goes through `TaskQueue` /
 outbox and stays tenant-scoped. Entitlement checks run inside the

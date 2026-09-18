@@ -72,11 +72,11 @@ EventBridge directly.
 | `microsoft_client_secret` | string  | Microsoft mail OAuth client secret           |
 | `gemini_model`            | string  | Gemini model id (default `gemini-2.0-flash`) |
 | `gemini_endpoint`         | string  | Gemini API base URL                          |
-| `app_env`                 | string  | Runtime environment label                    |
+| `app_env`                 | string  | Runtime environment label (`ENV`)            |
 | `allowed_origins`         | string  | Comma-separated CORS origins                 |
 | `frontend_url`            | string  | PWA base URL                                 |
 | `backend_url`             | string  | Public API origin (same host as the PWA)     |
-| `debug`                   | boolean | Enable debug mode                            |
+| `debug`                   | boolean | Enable debug mode (not written by Pulumi)    |
 
 ## Not in the parameter (Lambda env only)
 
@@ -99,8 +99,12 @@ Pulumi fills both from the Neon project outputs.
 
 ## Example payload
 
+Pulumi always writes `app_env`, `allowed_origins`, `frontend_url`, and
+`backend_url` alongside the required keys.
+
 ```json
 {
+  "app_env": "prod",
   "database_url": "postgres://bowerbird:secret@ep-xxx-pooler.us-east-1.aws.neon.tech/bowerbird?sslmode=require",
   "database_direct_url": "postgres://bowerbird:secret@ep-xxx.us-east-1.aws.neon.tech/bowerbird?sslmode=require",
   "sqs_queue_url": "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/prod-bowerbird-jobs",
@@ -117,7 +121,10 @@ Pulumi fills both from the Neon project outputs.
   "tenant_secrets_encryption_key": "base64-encoded-32-byte-key",
   "jwt_access_secret": "generated-access-secret",
   "jwt_refresh_secret": "generated-refresh-secret",
-  "messaging_attestation_secret": "generated-attestation-secret"
+  "messaging_attestation_secret": "generated-attestation-secret",
+  "allowed_origins": "https://app.example.com,https://example.com",
+  "frontend_url": "https://app.example.com",
+  "backend_url": "https://app.example.com"
 }
 ```
 

@@ -23,7 +23,9 @@ Pulumi stack: Lambda, API Gateway, CloudFront, Neon, Cloudflare DNS, SSM.
 pnpm run deploy:aws
 ```
 
-First-time stack: `cd apps/deploy/aws && pulumi stack init "$ENV"`.
+Do not deploy with the local MinIO dummy `AWS_ACCESS_KEY_ID`. Use
+`ENV_FILE=.env.aws` or an AWS profile. First-time stack:
+`cd apps/deploy/aws && pulumi stack init "$ENV"`.
 
 Details: [AWS deploy](../../docs/technical/deployment/aws.md).
 

@@ -57,7 +57,9 @@ with override so a parent shell cannot leak the wrong values.
    `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
 4. For AWS/Pulumi deploy: set `ENV`, `AWS_ACCOUNT_ID`,
    `AWS_REGION=us-east-1`, `ROOT_DOMAIN`, Cloudflare, Neon, and Gemini keys
-   in `.env` (not `.env.test`).
+   in `.env` (not `.env.test`). Do not deploy with the local MinIO dummy
+   `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. Use `ENV_FILE=.env.aws`
+   or an AWS profile. See [AWS deploy](./deployment/aws.md).
 
 | Source           | Use for                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------------ |
@@ -256,7 +258,7 @@ enabled when the target backend is in `local` or `development` mode.
 
 `setup:local` · `mise run dev` · `mise run test:full` · `infra:up` ·
 `infra:down` · `build` · `test` · `lint` · `format` · `format:check` ·
-`deploy`
+`deploy` · `deploy:aws` · `deploy:onprem`
 
 Also: [Development quality](./quality/development-quality.md) ·
 [CodeGraph](./tooling/codegraph.md) · [MinIO](./tooling/minio.md)

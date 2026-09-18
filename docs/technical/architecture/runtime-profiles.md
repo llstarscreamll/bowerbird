@@ -70,20 +70,20 @@ Postgres is **Neon** (pooled URL for Lambdas, direct URL for migrations and
 
 ## Platform adapters (by concern)
 
-| Concern          | Package                                        | `onprem`                                                   | `aws`                                                         |
-| ---------------- | ---------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| Config / secrets | `internal/platform/config`                     | `.env`                                                     | SSM Parameter Store SecureString JSON                         |
-| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                             | EventBridge                                                   |
-| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                            | SQS                                                           |
-| Broker transport | `internal/platform/messaging`                  | AMQP                                                       | AWS SDK                                                       |
-| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint                                             | AWS S3                                                        |
-| Scheduler        | `internal/platform/scheduler`                  | Named-rule process (`cmd/onprem/scheduler`) → `DeliverJob` | EventBridge rules → `cmd/aws/lambda/scheduler` → `DeliverJob` |
+| Concern          | Package                                        | `onprem`                                                   | `aws`                                                             |
+| ---------------- | ---------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| Config / secrets | `internal/platform/config`                     | `.env`                                                     | SSM Parameter Store SecureString JSON                             |
+| Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                             | EventBridge                                                       |
+| Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                            | SQS                                                               |
+| Broker transport | `internal/platform/messaging`                  | AMQP                                                       | AWS SDK                                                           |
+| Object storage   | `internal/platform/storage/s3`                 | MinIO endpoint                                             | AWS S3                                                            |
+| Scheduler        | `internal/platform/scheduler`                  | Named-rule process (`cmd/onprem/scheduler`) → `DeliverJob` | EventBridge Scheduler → `cmd/aws/lambda/scheduler` → `DeliverJob` |
 
 On-prem rules use EventBridge `rate(N unit)` or Unix crontab (5
-fields, UTC). AWS EventBridge cron is 6-field with `?`; map crontab
-when adding equivalent rules. The clock does not write `outbox_jobs`
-and does not list tenants: one platform job per rule; handlers fan
-out.
+fields, UTC). AWS EventBridge Scheduler cron is 6-field with `?`;
+`apps/deploy/aws/src/stack.ts` must list the same rule names. The
+clock does not write `outbox_jobs` and does not list tenants: one
+platform job per rule; handlers fan out.
 
 Feature modules expose `RegisterEvents` and/or `RegisterJobs` on
 `wire.go`. Modules with periodic jobs also expose `RegisterSchedules`.

@@ -97,6 +97,7 @@ application.
 | `cmd/aws/lambda/eventbridge`  | AWS events consumer            |
 | `cmd/aws/lambda/sqs`          | AWS jobs consumer              |
 | `cmd/aws/lambda/scheduler`    | AWS named-rule ticks           |
+| `cmd/aws/lambda/migrate`      | AWS control-plane + tenant SQL |
 
 Local dev runs API + workers via Air; see [Getting started](../getting-started.md).
 
