@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "./out-tsc/app",
+    "types": []
+  },
+  "include": ["src/main.ts", "src/app/**/*.ts", "src/app/shared/ui/**/src/**/*.ts", "../../../packages/typescript/system-notices/src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

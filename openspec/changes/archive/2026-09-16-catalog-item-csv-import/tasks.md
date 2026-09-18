@@ -30,5 +30,5 @@
 
 ## 7. Verificación
 
-- [x] 7.1 Tests backend del change + `pnpm --filter @bowerbird/backend test`
+- [x] 7.1 Tests backend del change + `pnpm --filter @atta/backend test`
 - [x] 7.2 E2E HTTP de imports y list paginado

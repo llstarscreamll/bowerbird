@@ -6,10 +6,10 @@ Every HTTP request should propagate `correlation_id` into outbox rows and broker
 
 ## Dead letters
 
-| Profile | Events/jobs DLQ                                     |
-| ------- | --------------------------------------------------- |
-| onprem  | RabbitMQ `bowerbird.deadletter` via `bowerbird.dlx` |
-| aws     | SQS DLQ (`maxReceiveCount` ≈ 5)                     |
+| Profile | Events/jobs DLQ                           |
+| ------- | ----------------------------------------- |
+| onprem  | RabbitMQ `atta.deadletter` via `atta.dlx` |
+| aws     | SQS DLQ (`maxReceiveCount` ≈ 5)           |
 
 Consumer NACK with requeue on transient errors; poison messages land in DLQ after repeated failures.
 

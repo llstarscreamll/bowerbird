@@ -10,7 +10,7 @@
 
 ## Phase 2: Connections domain foundation
 
-- [ ] 2.1 Create `apps/backend/internal/connections` layout (application, domain, infrastructure, presentation).
+- [ ] 2.1 Create `apps/atta/backend/internal/connections` layout (application, domain, infrastructure, presentation).
 - [ ] 2.2 Define `Connection`, `SharingPolicy`, `GrantedScopes` domain models.
 - [ ] 2.3 Implement `postgres_repository.go` for connections.
 - [ ] 2.4 Move OAuth handler logic (Google login, callback) from `identity`/`inbox` into `connections/presentation/http`.

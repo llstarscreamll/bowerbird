@@ -1,6 +1,6 @@
 ## Why
 
-Un segundo cliente exige desplegar Bowerbird en VM Docker sin AWS. El backend publica directo a EventBridge/SQS sin outbox. Se necesita transactional outbox homogéneo y **el mismo pipeline en todos los deployment profiles**: outbox → relay → broker → consumers → handlers.
+Un segundo cliente exige desplegar Atta en VM Docker sin AWS. El backend publica directo a EventBridge/SQS sin outbox. Se necesita transactional outbox homogéneo y **el mismo pipeline en todos los deployment profiles**: outbox → relay → broker → consumers → handlers.
 
 ## What Changes
 

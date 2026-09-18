@@ -18,14 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      ENV_FILE: .env.test
+      ENV_FILE: apps/atta/.env.test
     steps:
       - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup-monorepo
 
       - name: Use test env
-        run: cp .env.test.example .env.test
+        run: cp apps/atta/.env.test.example apps/atta/.env.test
 
       - name: Lint
         run: pnpm run lint

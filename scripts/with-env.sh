@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Load ENV_FILE (default .env at repo root). When executed, run the remaining args.
+# Load ENV_FILE (default apps/atta/.env, relative to repo root).
 # Usage: with-env.sh <command> [args...]
 #        source scripts/with-env.sh
 
@@ -9,13 +9,13 @@ fi
 
 _with_env_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _repo_root="$(cd "${_with_env_dir}/.." && pwd)"
-_env_file="${ENV_FILE:-.env}"
+_env_file="${ENV_FILE:-apps/atta/.env}"
 if [[ "${_env_file}" != /* ]]; then
   _env_file="${_repo_root}/${_env_file}"
 fi
 
 if [[ ! -f "${_env_file}" ]]; then
-  printf 'with-env: missing env file: %s (ENV_FILE=%s)\n' "${_env_file}" "${ENV_FILE:-.env}" >&2
+  printf 'with-env: missing env file: %s (ENV_FILE=%s)\n' "${_env_file}" "${ENV_FILE:-apps/atta/.env}" >&2
   unset _with_env_dir _repo_root _env_file
   if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     return 1

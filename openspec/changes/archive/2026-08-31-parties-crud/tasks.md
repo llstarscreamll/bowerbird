@@ -25,6 +25,6 @@
 
 ## 5. Verificación
 
-- [x] 5.1 `pnpm --filter @bowerbird/backend test` y `pnpm --filter @bowerbird/pwa lint`
+- [x] 5.1 `pnpm --filter @atta/backend test` y `pnpm --filter @atta/web lint`
 - [x] 5.2 Flujo manual create → list → edit; NIT inmutable
 - [x] 5.3 Ingesta factura con NIT existente sigue enlazando party (integración `IssuerPartyResolver` intacta)

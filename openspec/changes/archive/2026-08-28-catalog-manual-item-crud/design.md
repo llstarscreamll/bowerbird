@@ -56,7 +56,7 @@ Ver `proposal.md` para motivación y non-goals.
 
 ### 4. Retirar `stockable` (YAGNI hasta inventario)
 
-- **Enfoque**: Eliminar el campo de `domain.Item`, repositorio postgres, serializers HTTP y modelo PWA. Editar **in-place** `apps/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si define la columna) para que `catalog_items` no incluya `stockable`. No añadir `000014_…`.
+- **Enfoque**: Eliminar el campo de `domain.Item`, repositorio postgres, serializers HTTP y modelo PWA. Editar **in-place** `apps/atta/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si define la columna) para que `catalog_items` no incluya `stockable`. No añadir `000014_…`.
 - **Rationale**: El flag no participa en ninguna capacidad actual; inventar stockabilidad ahora contamina el maestro. Cuando exista inventario, se modelará con el lenguaje de ese bounded context.
 - **Alternativa rechazada**: Dejar columna nullable “dormant” — mantiene deuda de schema sin valor.
 - **Alternativa rechazada**: Migración nueva solo para `DROP COLUMN` — innecesaria en desarrollo activo con migraciones aún editables.

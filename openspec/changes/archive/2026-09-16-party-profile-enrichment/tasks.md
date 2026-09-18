@@ -27,4 +27,4 @@
 
 ## 6. Verification
 
-- [x] 6.1 `pnpm --filter @bowerbird/backend test` (e2e HTTP parties no corre: API local 502)
+- [x] 6.1 `pnpm --filter @atta/backend test` (e2e HTTP parties no corre: API local 502)

@@ -39,10 +39,10 @@ Enseñar el cruce línea→ítem es opaco (el linker siempre graba `remember`+`l
 
 ## Impact
 
-- **Backend catalog** (`apps/backend/internal/catalog`): dominio Alias/GTIN, `RememberDecision` (1 TX aliases+memory), `ResolveInvoiceLine` por acuerdo, OHS `api.InvoiceSupport` por capacidades, HTTP aliases, writer único de tablas catalog.
-- **Backend invoices** (`apps/backend/internal/invoices`): parser ACL UBL → `LineIdentifiers` (GTIN clasificado **aquí**, sin paquete compartido), persistencia de línea **BREAKING**, `CatalogACL` traduce OHS, `ApplyLineDecision` (unlock; remember → un call OHS), writer único de `invoice_lines`.
+- **Backend catalog** (`apps/atta/backend/internal/catalog`): dominio Alias/GTIN, `RememberDecision` (1 TX aliases+memory), `ResolveInvoiceLine` por acuerdo, OHS `api.InvoiceSupport` por capacidades, HTTP aliases, writer único de tablas catalog.
+- **Backend invoices** (`apps/atta/backend/internal/invoices`): parser ACL UBL → `LineIdentifiers` (GTIN clasificado **aquí**, sin paquete compartido), persistencia de línea **BREAKING**, `CatalogACL` traduce OHS, `ApplyLineDecision` (unlock; remember → un call OHS), writer único de `invoice_lines`.
 - **Migraciones tenant**: columnas de línea + backfill clasificando `item_code` existente; drop de `item_code` tras backfill; `source` en aliases.
-- **PWA** (`apps/pwa/src/app/catalog`, `invoices`): detalle de ítem con tabla de cruce; linker con evidencias + remember/lock/unlock; master/review/detalle de factura sin `item_code` único.
-- **E2E** (`apps/e2e/tests/http`): contratos catalog aliases e invoice lines.
+- **PWA** (`apps/atta/web/src/app/catalog`, `invoices`): detalle de ítem con tabla de cruce; linker con evidencias + remember/lock/unlock; master/review/detalle de factura sin `item_code` único.
+- **E2E** (`apps/atta/e2e/tests/http`): contratos catalog aliases e invoice lines.
 - **Docs**: `docs/domain/GLOSSARY.md`.
 - **No infra AWS nueva.**

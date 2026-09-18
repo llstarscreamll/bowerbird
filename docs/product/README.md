@@ -13,6 +13,7 @@ Capture the _what_ and _why_ for business features. Put implementation detail in
 
 | Path          | Role                 |
 | ------------- | -------------------- |
+| `naming.md`   | Canopy / Atta names  |
 | `features.md` | Living catalog       |
 | `features/`   | Feature specs        |
 | `_templates/` | New-feature template |

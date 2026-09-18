@@ -1,6 +1,6 @@
 # Domain Dictionary
 
-This glossary defines the ubiquitous language for the Bowerbird project, mapping Colombian business and e-invoicing concepts (Spanish) to their exact representation in the codebase (English).
+This glossary defines the ubiquitous language for the Atta project, mapping Colombian business and e-invoicing concepts (Spanish) to their exact representation in the codebase (English).
 
 **Rule for LLMs and Developers:** ALWAYS use the exact English term defined in the "Code (EN)" column for variables, structs, classes, API routes, and database tables.
 

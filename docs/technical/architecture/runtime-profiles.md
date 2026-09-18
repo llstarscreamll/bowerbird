@@ -2,10 +2,10 @@
 
 `DEPLOYMENT_TARGET` selects infrastructure adapters at boot. Application code (use cases, domain, contracts) stays the same; only platform wiring changes.
 
-| Profile  | When                                         | Messaging         | Object storage        | Secrets               |
-| -------- | -------------------------------------------- | ----------------- | --------------------- | --------------------- |
-| `onprem` | Local dev, client VM (`apps/deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Plain `.env`          |
-| `aws`    | Production SaaS (`apps/deploy/aws/` Pulumi)  | EventBridge + SQS | AWS S3                | SSM SecureString JSON |
+| Profile  | When                                              | Messaging         | Object storage        | Secrets                     |
+| -------- | ------------------------------------------------- | ----------------- | --------------------- | --------------------------- |
+| `onprem` | Local dev, client VM (`apps/atta/deploy/onprem/`) | RabbitMQ          | MinIO (S3-compatible) | Product `.env` (`ENV_FILE`) |
+| `aws`    | Production SaaS (`apps/atta/deploy/aws/` Pulumi)  | EventBridge + SQS | AWS S3                | SSM SecureString JSON       |
 
 See [On-prem stack](./onprem-runtime.md), [On-prem fleet](../deployment/onprem.md),
 [AWS deploy](../deployment/aws.md), [AWS secrets](../deployment/ssm-secrets.md).
@@ -20,7 +20,7 @@ Application code never publishes directly to RabbitMQ, EventBridge, or SQS. See 
 
 ## Local infrastructure
 
-Root `docker-compose.yml` (started by `pnpm run infra:up`):
+`apps/atta/docker-compose.yml` (started by `mise //apps/atta:infra:up`):
 
 | Service      | Role                                                    |
 | ------------ | ------------------------------------------------------- |
@@ -30,11 +30,11 @@ Root `docker-compose.yml` (started by `pnpm run infra:up`):
 | `minio-init` | One-shot bucket bootstrap (`infra:up` profile)          |
 | `caddy`      | HTTPS reverse proxy (`network_mode: host`)              |
 
-Caddy routes (see root `Caddyfile`):
+Caddy routes (see `apps/atta/Caddyfile`):
 
-- `app.bowerbird.dev` → Angular `:4200`
-- `app.bowerbird.dev/api*` → Go API `:8080`
-- `media.bowerbird.dev` → MinIO `:9000` (presigned uploads/downloads)
+- `app.atta.dev` → Angular `:4200`
+- `app.atta.dev/api*` → Go API `:8080`
+- `media.atta.dev` → MinIO `:9000` (presigned uploads/downloads)
 
 There is **no LocalStack** and **no Redis** in the local stack.
 
@@ -42,15 +42,15 @@ There is **no LocalStack** and **no Redis** in the local stack.
 
 ### On-prem / local dev
 
-| Process         | Entrypoint                   | Dev runner                                   |
-| --------------- | ---------------------------- | -------------------------------------------- |
-| HTTP API        | `cmd/onprem/api`             | `pnpm --filter @bowerbird/backend dev` (Air) |
-| Outbox relay    | `cmd/onprem/relay`           | `dev:relay`                                  |
-| Events consumer | `cmd/onprem/events-consumer` | `dev:events-consumer`                        |
-| Jobs consumer   | `cmd/onprem/jobs-consumer`   | `dev:jobs-consumer`                          |
-| Scheduler       | `cmd/onprem/scheduler`       | `dev:scheduler`                              |
+| Process         | Entrypoint                   | Dev runner                              |
+| --------------- | ---------------------------- | --------------------------------------- |
+| HTTP API        | `cmd/onprem/api`             | `pnpm --filter @atta/backend dev` (Air) |
+| Outbox relay    | `cmd/onprem/relay`           | `dev:relay`                             |
+| Events consumer | `cmd/onprem/events-consumer` | `dev:events-consumer`                   |
+| Jobs consumer   | `cmd/onprem/jobs-consumer`   | `dev:jobs-consumer`                     |
+| Scheduler       | `cmd/onprem/scheduler`       | `dev:scheduler`                         |
 
-Root `pnpm run dev` starts infra, API, all four workers, and the PWA via Turbo.
+`mise //apps/atta:dev` starts infra, API, all four workers, and the PWA via Turbo.
 
 Workers and the API use **Air** hot reload (`.air.toml`, `.air.worker-*.toml`).
 
@@ -72,7 +72,7 @@ Postgres is **Neon** (pooled URL for Lambdas, direct URL for migrations and
 
 | Concern          | Package                                        | `onprem`                                                   | `aws`                                                             |
 | ---------------- | ---------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| Config / secrets | `internal/platform/config`                     | `.env`                                                     | SSM Parameter Store SecureString JSON                             |
+| Config / secrets | `internal/platform/config`                     | `apps/atta/.env` via `ENV_FILE`                            | SSM Parameter Store SecureString JSON                             |
 | Events publish   | `internal/platform/outbox` + `events/adapters` | RabbitMQ topic                                             | EventBridge                                                       |
 | Jobs enqueue     | `internal/platform/outbox` + `jobs/adapters`   | RabbitMQ direct                                            | SQS                                                               |
 | Broker transport | `internal/platform/messaging`                  | AMQP                                                       | AWS SDK                                                           |
@@ -81,7 +81,7 @@ Postgres is **Neon** (pooled URL for Lambdas, direct URL for migrations and
 
 On-prem rules use EventBridge `rate(N unit)` or Unix crontab (5
 fields, UTC). AWS EventBridge Scheduler cron is 6-field with `?`;
-`apps/deploy/aws/src/stack.ts` must list the same rule names. The
+`apps/atta/deploy/aws/src/stack.ts` must list the same rule names. The
 clock does not write `outbox_jobs` and does not list tenants: one
 platform job per rule; handlers fan out.
 
@@ -93,11 +93,11 @@ adapters.
 
 ## Broker topology (onprem)
 
-| Channel            | RabbitMQ                                                |
-| ------------------ | ------------------------------------------------------- |
-| Integration events | Exchange `bowerbird.events` (topic)                     |
-| Background jobs    | Exchange `bowerbird.jobs` → queue `bowerbird.jobs.work` |
-| Dead letters       | DLX `bowerbird.dlx` → queue `bowerbird.deadletter`      |
+| Channel            | RabbitMQ                                      |
+| ------------------ | --------------------------------------------- |
+| Integration events | Exchange `atta.events` (topic)                |
+| Background jobs    | Exchange `atta.jobs` → queue `atta.jobs.work` |
+| Dead letters       | DLX `atta.dlx` → queue `atta.deadletter`      |
 
 Job queue bindings are declared at worker boot from registered `JobHandler.JobType()` values.
 

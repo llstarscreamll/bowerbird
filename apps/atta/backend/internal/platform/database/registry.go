@@ -1,0 +1,152 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/atta/internal/platform/auth"
+	appErrors "github.com/atta/internal/platform/errors"
+	"github.com/atta/internal/platform/tenant"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Registry manages database connection pools for multiple tenants.
+type Registry struct {
+	mu            sync.RWMutex
+	pools         map[string]*pgxpool.Pool
+	controlDB     *pgxpool.Pool
+	baseConfigURL string // Base URL format, e.g., postgres://user:pass@host:5432/%s
+}
+
+// NewRegistry initializes a new Registry with the control plane database pool.
+func NewRegistry(controlDB *pgxpool.Pool, baseConfigURL string) *Registry {
+	return &Registry{
+		pools:         make(map[string]*pgxpool.Pool),
+		controlDB:     controlDB,
+		baseConfigURL: baseConfigURL,
+	}
+}
+
+// GetPool returns the connection pool for the tenant slug in the context.
+// If the pool doesn't exist, it resolves the database name and creates a new one.
+func (r *Registry) GetPool(ctx context.Context) (*pgxpool.Pool, error) {
+	tenantSlug, err := tenant.TenantIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Always re-check membership for authenticated callers (do not trust pool cache alone).
+	dbName, err := r.resolveTenantDatabase(ctx, tenantSlug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve tenant db: %w", err)
+	}
+
+	// Prefer caching by physical db name so id/slug aliases share one pool.
+	cacheKey := dbName
+
+	r.mu.RLock()
+	pool, exists := r.pools[cacheKey]
+	r.mu.RUnlock()
+	if exists {
+		return pool, nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if pool, exists := r.pools[cacheKey]; exists {
+		return pool, nil
+	}
+
+	dbURL := fmt.Sprintf(r.baseConfigURL, dbName)
+	newPool, err := Connect(ctx, dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to tenant db %s: %w", tenantSlug, err)
+	}
+
+	r.pools[cacheKey] = newPool
+	return newPool, nil
+}
+
+// GetPoolByDBName allows direct access to a database pool using the physical db_name.
+// This is useful during tenant creation or explicit cross-tenant operations where
+// the tenant context is not set.
+func (r *Registry) GetPoolByDBName(ctx context.Context, dbName string) (*pgxpool.Pool, error) {
+	// Fast path: read lock
+	r.mu.RLock()
+	pool, exists := r.pools[dbName] // we use dbName as key here for this specific path
+	r.mu.RUnlock()
+	if exists {
+		return pool, nil
+	}
+
+	// Slow path
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Double check
+	if pool, exists := r.pools[dbName]; exists {
+		return pool, nil
+	}
+
+	dbURL := fmt.Sprintf(r.baseConfigURL, dbName)
+	newPool, err := Connect(ctx, dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to tenant db by name %s: %w", dbName, err)
+	}
+
+	r.pools[dbName] = newPool
+	return newPool, nil
+}
+
+// AssertMember returns ERR_FORBIDDEN when the user is not an active member of the tenant.
+func (r *Registry) AssertMember(ctx context.Context, identifier, userID string) error {
+	_, err := r.lookupMemberDatabase(ctx, identifier, userID)
+	return err
+}
+
+func (r *Registry) lookupMemberDatabase(ctx context.Context, identifier, userID string) (string, error) {
+	var dbName string
+	query := `
+		SELECT t.db_name
+		FROM tenants t
+		INNER JOIN tenant_memberships m
+			ON m.tenant_id = t.id
+			AND m.user_id = $2
+			AND m.deleted_at IS NULL
+		WHERE (t.id = $1 OR t.slug = $1) AND t.status = 'active'
+	`
+	err := r.controlDB.QueryRow(ctx, query, identifier, userID).Scan(&dbName)
+	if err != nil {
+		return "", appErrors.New(appErrors.CodeForbidden, "tenant access denied")
+	}
+	return dbName, nil
+}
+
+// resolveTenantDatabase looks up the database name for a given tenant identifier (ID or slug).
+// When the request carries authenticated user claims, membership is required (blocks cross-tenant IDOR).
+// Background workers set tenant context without claims and keep the unrestricted lookup.
+func (r *Registry) resolveTenantDatabase(ctx context.Context, identifier string) (string, error) {
+	if claims, ok := auth.ClaimsFromContext(ctx); ok {
+		return r.lookupMemberDatabase(ctx, identifier, claims.UserID)
+	}
+
+	var dbName string
+	query := `SELECT db_name FROM tenants WHERE (id = $1 OR slug = $1) AND status = 'active'`
+	err := r.controlDB.QueryRow(ctx, query, identifier).Scan(&dbName)
+	if err != nil {
+		return "", err
+	}
+	return dbName, nil
+}
+
+// CloseAll closes all connection pools.
+func (r *Registry) CloseAll() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, pool := range r.pools {
+		pool.Close()
+	}
+	r.controlDB.Close()
+}

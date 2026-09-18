@@ -1,0 +1,24 @@
+package v1
+
+import (
+	"net/http"
+
+	"github.com/atta/internal/platform/config"
+	"github.com/atta/internal/platform/http/api"
+)
+
+type Router struct {
+	controller *Controller
+}
+
+func NewRouter(controller *Controller) *Router {
+	if controller == nil {
+		panic("health controller is required")
+	}
+
+	return &Router{controller: controller}
+}
+
+func (h *Router) Register(mux *http.ServeMux, cfg config.Config) {
+	mux.Handle("GET /api/health", api.Wrap(h.controller.Health, cfg))
+}

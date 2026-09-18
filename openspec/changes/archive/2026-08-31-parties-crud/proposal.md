@@ -32,7 +32,7 @@ _(ninguna — se extiende la capability existente)_
 | ----------- | --------------------------------------------------------------------------- |
 | Backend     | `internal/parties/` (sin tocar `invoices`/`catalog` salvo wiring existente) |
 | Integración | `IssuerPartyResolver` sin cambio; create manual solo vía HTTP               |
-| PWA         | `apps/pwa/src/app/parties/`, `app.routes.ts`                                |
+| PWA         | `apps/atta/web/src/app/parties/`, `app.routes.ts`                           |
 | Spec        | `openspec/specs/parties/spec.md` (delta)                                    |
 
 Sin migraciones, eventos ni cambios de infra.

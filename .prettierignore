@@ -6,10 +6,10 @@ node_modules/
 cdk.out/
 dist/
 coverage/
-apps/backend/bin/
-apps/backend/tmp/
-apps/pwa/dist/
-apps/pwa/coverage/
-apps/deploy/aws/dist/
-apps/deploy/onprem/dist/
+apps/atta/backend/bin/
+apps/atta/backend/tmp/
+apps/atta/pwa/dist/
+apps/atta/pwa/coverage/
+apps/atta/deploy/aws/dist/
+apps/atta/deploy/onprem/dist/
 pnpm-lock.yaml

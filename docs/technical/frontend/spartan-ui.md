@@ -4,7 +4,7 @@
 
 ## Layout
 
-- Helm under `apps/pwa/src/app/shared/ui/` (`@spartan-ng/cli`)
+- Helm under `apps/atta/pwa/src/app/shared/ui/` (`@spartan-ng/cli`)
 - Import `@spartan-ng/helm/<component>`
 - Lucide icons in `shared/icons/app-icons.ts`, provided in `app.config.ts`
 
@@ -34,7 +34,7 @@ CSS variables in `src/styles.css`. Dark mode via `classList.toggle('dark', …)`
 
 ## Add a component
 
-From `apps/pwa`:
+From `apps/atta/pwa`:
 
 ```bash
 npx ng g @spartan-ng/cli:ui <name> --defaults --directory=src/app/shared/ui

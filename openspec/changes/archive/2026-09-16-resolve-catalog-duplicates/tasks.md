@@ -2,9 +2,9 @@
 
 ## 1. Code Specifications (BDD as Code)
 
-- [x] 1.1 HTTP e2e `apps/e2e/tests/http/catalog/search-duplicate-clusters.spec.ts`
-- [x] 1.2 HTTP e2e `apps/e2e/tests/http/catalog/create-item-merge.spec.ts` (unión de aliases, 410 merged, validación, 409 InternalCode, auth)
-- [x] 1.3 HTTP e2e `apps/e2e/tests/http/catalog/create-not-duplicates.spec.ts`
+- [x] 1.1 HTTP e2e `apps/atta/e2e/tests/http/catalog/search-duplicate-clusters.spec.ts`
+- [x] 1.2 HTTP e2e `apps/atta/e2e/tests/http/catalog/create-item-merge.spec.ts` (unión de aliases, 410 merged, validación, 409 InternalCode, auth)
+- [x] 1.3 HTTP e2e `apps/atta/e2e/tests/http/catalog/create-not-duplicates.spec.ts`
 
 ## 2. Backend catalog
 
@@ -33,5 +33,5 @@
 
 ## 6. Verification
 
-- [x] 6.1 `pnpm --filter @bowerbird/backend test` — paquetes catalog/invoices/HTTP merge OK. Fallos restantes: smoke `tenant_acme` ausente en Postgres fresco (preexistente).
+- [x] 6.1 `pnpm --filter @atta/backend test` — paquetes catalog/invoices/HTTP merge OK. Fallos restantes: smoke `tenant_acme` ausente en Postgres fresco (preexistente).
 - [ ] 6.2 `pnpm run test:e2e:http` — specs listas; API local 502 (backend no levantado). Requiere migrate:all + API.

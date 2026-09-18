@@ -6,7 +6,7 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
 
 **Goals:**
 
-- Paquete workspace `@bowerbird/system-notices` con orquestador reutilizable (una notice visible, prioridad, scope).
+- Paquete workspace `@canopy/system-notices` con orquestador reutilizable (una notice visible, prioridad, scope).
 - Sub-unidades PWA: `core/analytics/`, `core/pwa-install/` — notices concretas implementan `SystemNotice` del paquete.
 - Aggregate `InstallEngagement` con VOs, intent methods y domain events; application delgada.
 - Notices concretas como **adapters** del port `SystemNotice` — delegan en commands/coordinator, sin reglas de engagement.
@@ -16,7 +16,7 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
 **Non-Goals:**
 
 - Endpoint backend analytics (fase 2).
-- Publicar `@bowerbird/system-notices` en npm registry externo (solo workspace interno).
+- Publicar `@canopy/system-notices` en npm registry externo (solo workspace interno).
 - Acoplar install-promotion a `HlmSidebarService` u otros módulos de presentación.
 - Lógica de elegibilidad o cooldowns en layouts o `app.component`.
 
@@ -26,7 +26,7 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ apps/pwa — composition roots (delgados)                         │
+│ apps/atta/web — composition roots (delgados)                         │
 │  app.config.ts     → provideSystemNotices() + providePwaInstall │
 │  app.component     → bb-system-notices-host (scope: global)     │
 │  tenant-layout     → bb-system-notices-host (scope: tenant)     │
@@ -34,7 +34,7 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
 └──────────┬──────────────────────────────┬───────────────────────┘
            │                              │
   ┌────────▼──────────────┐    ┌──────────▼──────────┐
-  │ @bowerbird/           │    │ core/pwa-install     │
+  │ @atta/           │    │ core/pwa-install     │
   │ system-notices        │◀───│ notices + domain     │
   │ (orquestación UI)     │    └──────────┬──────────┘
   └───────────────────────┘               │
@@ -44,7 +44,7 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
                                └─────────────────────┘
 ```
 
-### Criterio de split — `@bowerbird/system-notices`
+### Criterio de split — `@canopy/system-notices`
 
 | Criterio           | ¿Aplica? | Señal                                                                             |
 | ------------------ | -------- | --------------------------------------------------------------------------------- |
@@ -75,21 +75,21 @@ Hoy `PwaService` captura `beforeinstallprompt` y `app.component.ts` renderiza un
 
 **Composition root único:** `app.config.ts` es el único lugar que registra notices (`multi: true` en token `SYSTEM_NOTICE`). `providePwaInstall()` contribuye notices concretas; **no** instancia el orchestrator ni importa su interior.
 
-| Unidad           | Ubicación                        | Responsabilidad                      | Superficie pública                                                                                  |
-| ---------------- | -------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| `system-notices` | `packages/system-notices/`       | Cola, prioridad, scope, host Angular | `SystemNotice`, `SystemNoticesOrchestrator`, `SystemNoticesHostComponent`, `provideSystemNotices()` |
-| `analytics`      | `apps/pwa/.../core/analytics/`   | Eventos de producto                  | `AnalyticsPort.track()`                                                                             |
-| `pwa-install`    | `apps/pwa/.../core/pwa-install/` | Runtime, aggregate, notices PWA      | `PwaInstallCoordinator`, commands, `providePwaInstall()`, notice classes                            |
+| Unidad           | Ubicación                             | Responsabilidad                      | Superficie pública                                                                                  |
+| ---------------- | ------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `system-notices` | `packages/ts/system-notices/`         | Cola, prioridad, scope, host Angular | `SystemNotice`, `SystemNoticesOrchestrator`, `SystemNoticesHostComponent`, `provideSystemNotices()` |
+| `analytics`      | `apps/atta/web/.../core/analytics/`   | Eventos de producto                  | `AnalyticsPort.track()`                                                                             |
+| `pwa-install`    | `apps/atta/web/.../core/pwa-install/` | Runtime, aggregate, notices PWA      | `PwaInstallCoordinator`, commands, `providePwaInstall()`, notice classes                            |
 
 **Regla de dependencia:**
 
 ```
-@bowerbird/system-notices  →  (sin dep de pwa-install ni Bowerbird domain)
-core/pwa-install           →  @bowerbird/system-notices, core/analytics
-apps/pwa layouts           →  @bowerbird/system-notices (host), pwa-install (coordinator)
+@canopy/system-notices  →  (sin dep de pwa-install ni Atta domain)
+core/pwa-install           →  @canopy/system-notices, core/analytics
+apps/atta/web layouts           →  @canopy/system-notices (host), pwa-install (coordinator)
 ```
 
-`@bowerbird/system-notices` MUST NOT import código de `apps/pwa` ni conocer PWA install, engagement ni analytics.
+`@canopy/system-notices` MUST NOT import código de `apps/atta/web` ni conocer PWA install, engagement ni analytics.
 
 ### Principios aplicados
 
@@ -98,7 +98,7 @@ apps/pwa layouts           →  @bowerbird/system-notices (host), pwa-install (c
 | **Boundaries**              | Cada sub-unidad exporta vía `index.ts`; internals no re-exportados                                                                                 |
 | **State isolation**         | `system-notices`: cola en memoria (sesión). `pwa-install`: `bb:pwa:*` vía repository. `analytics`: stateless. Sin storage compartido entre módulos |
 | **Composability**           | Package sin conocer consumers; notices registradas en composition root vía token `SYSTEM_NOTICE`                                                   |
-| **Deployment independence** | `@bowerbird/system-notices` build/lint/test en CI aislado (`pnpm --filter`)                                                                        |
+| **Deployment independence** | `@canopy/system-notices` build/lint/test en CI aislado (`pnpm --filter`)                                                                           |
 | **Explicit communication**  | Notices implementan `SystemNotice`; analytics vía `AnalyticsPort`; runtime vía `PwaRuntimePort`                                                    |
 | **Replaceability**          | `AnalyticsPort`, `EngagementStoragePort`, `PwaRuntimePort`, `ViewportPort` — adapters intercambiables en tests                                     |
 | **Independence**            | Aggregate + VOs testables sin Angular ni storage                                                                                                   |
@@ -120,7 +120,7 @@ apps/pwa layouts           →  @bowerbird/system-notices (host), pwa-install (c
 ## Layout de módulos
 
 ```
-packages/system-notices/                    # @bowerbird/system-notices
+packages/ts/system-notices/                    # @canopy/system-notices
 ├── package.json
 ├── project.json / ng-packagr or tsc config
 ├── src/
@@ -134,12 +134,12 @@ packages/system-notices/                    # @bowerbird/system-notices
 │   └── index.ts                            # public API del package
 └── README.md
 
-apps/pwa/src/app/core/analytics/
+apps/atta/web/src/app/core/analytics/
 ├── application/ports/analytics.port.ts
 ├── infrastructure/console-analytics.adapter.ts
 └── index.ts
 
-apps/pwa/src/app/core/pwa-install/
+apps/atta/web/src/app/core/pwa-install/
 ├── domain/
 │   ├── value-objects/ ...
 │   ├── install-engagement.aggregate.ts
@@ -149,7 +149,7 @@ apps/pwa/src/app/core/pwa-install/
 │   ├── commands/ ...
 │   ├── pwa-install.coordinator.ts
 │   ├── engagement-event.handler.ts
-│   └── notices/                            # implements SystemNotice from @bowerbird/system-notices
+│   └── notices/                            # implements SystemNotice from @canopy/system-notices
 │       ├── pwa-update.notice.ts
 │       ├── pwa-install-chromium.notice.ts
 │       └── pwa-ios-install.notice.ts
@@ -158,11 +158,11 @@ apps/pwa/src/app/core/pwa-install/
 └── index.ts
 ```
 
-### Package `@bowerbird/system-notices` — decisiones
+### Package `@canopy/system-notices` — decisiones
 
 | Aspecto               | Decisión                                                                                          |
 | --------------------- | ------------------------------------------------------------------------------------------------- |
-| **Nombre**            | `@bowerbird/system-notices` (workspace `packages/system-notices/`)                                |
+| **Nombre**            | `@canopy/system-notices` (workspace `packages/ts/system-notices/`)                                |
 | **Peer deps**         | `@angular/core` (solo entry `angular/`); core orchestrator sin Angular                            |
 | **Exports**           | `./` → port + orchestrator; `./angular` → host + `provideSystemNotices`                           |
 | **Estado**            | Cola en memoria (sesión) — owned by orchestrator inside package                                   |
@@ -170,7 +170,7 @@ apps/pwa/src/app/core/pwa-install/
 | **Observabilidad**    | Eventos `system_notice_*` emitidos por package; `pwa_*` por pwa-install                           |
 | **Fail independence** | `show()`/`dismiss()` en notice concreta no propagan; orchestrator continúa cola                   |
 
-**Alternativa rechazada:** `core/system-notices/` dentro de `apps/pwa` — no reutilizable por otras apps del monorepo ni testeable aisladamente en CI del package.
+**Alternativa rechazada:** `core/system-notices/` dentro de `apps/atta/web` — no reutilizable por otras apps del monorepo ni testeable aisladamente en CI del package.
 
 **Alternativa rechazada:** publicar en npm externo — over-engineering; workspace package es suficiente.
 
@@ -178,9 +178,9 @@ apps/pwa/src/app/core/pwa-install/
 
 ### 1. Package workspace + sub-unidades PWA en lugar de servicios planos
 
-**Por qué:** `core/services/pwa.service.ts` mezcla runtime, señales UI y SW. El orquestador de notices es cross-cutting y vive en `@bowerbird/system-notices`; PWA install es consumer con notices concretas.
+**Por qué:** `core/services/pwa.service.ts` mezcla runtime, señales UI y SW. El orquestador de notices es cross-cutting y vive en `@canopy/system-notices`; PWA install es consumer con notices concretas.
 
-**Alternativa rechazada:** todo en `core/services/` o `core/system-notices/` dentro de `apps/pwa`.
+**Alternativa rechazada:** todo en `core/services/` o `core/system-notices/` dentro de `apps/atta/web`.
 
 ### 2. `SystemNotice` como port composable
 
@@ -203,7 +203,7 @@ provideSystemNotices(),   // orchestrator + host infra
 providePwaInstall(),      // multi-provide SYSTEM_NOTICE: update, install-chromium, install-ios
 ```
 
-Host importado desde `@bowerbird/system-notices/angular`. Notices concretas viven en `pwa-install/application/notices/` e implementan el port del package.
+Host importado desde `@canopy/system-notices/angular`. Notices concretas viven en `pwa-install/application/notices/` e implementan el port del package.
 
 | Notice                 | Priority | Scope    |
 | ---------------------- | -------- | -------- |
@@ -213,7 +213,7 @@ Host importado desde `@bowerbird/system-notices/angular`. Notices concretas vive
 
 **Alternativa rechazada:** orchestrator hardcodeado con imports de notices — no composable ni testeable.
 
-**Nota DDD:** `@bowerbird/system-notices` es **infraestructura de orquestación UI**, no bounded context con modelo de dominio. `SystemNoticesOrchestrator` = application service genérico (cola/prioridad). Sin aggregate ni domain events en el package.
+**Nota DDD:** `@canopy/system-notices` es **infraestructura de orquestación UI**, no bounded context con modelo de dominio. `SystemNoticesOrchestrator` = application service genérico (cola/prioridad). Sin aggregate ni domain events en el package.
 
 ### 3. Bounded context `pwa-install` — lenguaje ubicuo
 
@@ -363,7 +363,7 @@ Presenters solo reciben copy + callbacks. Lógica de `canShow`, dismiss y analyt
 | iOS Safari       | `IosInstallSheetPresenter`                     |
 | Pull model       | `tenant-layout` → `coordinator.openFromMenu()` |
 
-Copy (spec): título «Instala Bowerbird», cuerpo «Tu espacio de trabajo, a un toque.»; iOS «Añade Bowerbird a tu inicio».
+Copy (spec): título «Instala Atta», cuerpo «Tu espacio de trabajo, a un toque.»; iOS «Añade Atta a tu inicio».
 
 ### 10. iOS detection (infrastructure, no expuesto)
 
@@ -384,7 +384,7 @@ Fase 2: `HttpAnalyticsAdapter` sin cambiar consumidores.
 ### 12. Composición en hosts
 
 ```typescript
-// app.component — import from @bowerbird/system-notices/angular
+// app.component — import from @canopy/system-notices/angular
 <bb-system-notices-host scope="global" />
 
 // tenant-layout
@@ -410,15 +410,15 @@ Quitar cards fijas de `app.component.ts`. Deprecar `PwaService` monolítico; mig
 
 ## Modular compliance checklist (pre-implementación)
 
-- [ ] `@bowerbird/system-notices` no importa `apps/pwa` ni domain Bowerbird
-- [ ] `packages/system-notices/src/index.ts` exporta solo port + orchestrator + token; `./angular` exporta host + `provideSystemNotices`
+- [ ] `@canopy/system-notices` no importa `apps/atta/web` ni domain Atta
+- [ ] `packages/ts/system-notices/src/index.ts` exporta solo port + orchestrator + token; `./angular` exporta host + `provideSystemNotices`
 - [ ] Orchestrator internals (cola, sorting) no re-exportados en public API
-- [ ] `pnpm --filter @bowerbird/system-notices test` pasa en CI aislado
-- [ ] `apps/pwa/package.json` declara `"@bowerbird/system-notices": "workspace:*"`
+- [ ] `pnpm --filter @canopy/system-notices test` pasa en CI aislado
+- [ ] `apps/atta/web/package.json` declara `"@canopy/system-notices": "workspace:*"`
 - [ ] `providePwaInstall()` solo hace `multi` provide de `SYSTEM_NOTICE`; no crea orchestrator
 - [ ] `index.ts` de sub-unidades PWA lista solo exports públicos
 - [ ] Ningún layout importa `infrastructure/` de `pwa-install` ni internals del package
-- [ ] Grep/dependency check: `packages/system-notices` sin imports de `apps/`
+- [ ] Grep/dependency check: `packages/ts/system-notices` sin imports de `apps/`
 - [ ] Grep: `bb:pwa:` solo en `engagement-storage.repository.ts`
 - [ ] `AnalyticsPort.track` envuelto en try/catch en adapter
 - [ ] Eventos atribuibles: `system_notice_*` (package) vs `pwa_*` (pwa-install)
@@ -435,7 +435,7 @@ Quitar cards fijas de `app.component.ts`. Deprecar `PwaService` monolítico; mig
 
 ## Migration Plan
 
-1. Scaffold `packages/system-notices/` + wire en `pnpm-workspace.yaml` / Turbo.
+1. Scaffold `packages/ts/system-notices/` + wire en `pnpm-workspace.yaml` / Turbo.
 2. Implementar orchestrator + host Angular en el package; tests aislados.
 3. Crear sub-unidades PWA (`analytics`, `pwa-install`) + notices que implementan `SystemNotice`.
 4. Registrar providers en `app.config.ts`; montar hosts; eliminar cards legacy.

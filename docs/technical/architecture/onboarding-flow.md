@@ -4,7 +4,7 @@ Provisioning a new tenant (organization) is more than an insert: create identity
 
 ## Use case
 
-`apps/backend/internal/organization/application/create.go`:
+`apps/atta/backend/internal/organization/application/create.go`:
 
 1. Validate slug (alphanumeric + hyphens); derive `db_name` (for example `tenant_acme_corp`).
 2. Ensure slug uniqueness in the control plane.
@@ -19,7 +19,7 @@ Provisioning a new tenant (organization) is more than an insert: create identity
 - Control plane insert OK, DB create fails → orphaned catalog row; HTTP 500.
 - DB create OK, migrate fails → empty / partial schema.
 
-**Recovery:** `pnpm run migrate:all` walks active tenants and finishes missing migrations (also used in deploy pipelines).
+**Recovery:** `mise //apps/atta:migrate:all` walks active tenants and finishes missing migrations (also used in deploy pipelines).
 
 ## API
 

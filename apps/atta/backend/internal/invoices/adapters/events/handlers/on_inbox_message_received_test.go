@@ -1,0 +1,62 @@
+package handlers
+
+import (
+	"context"
+	"testing"
+
+	contractevents "github.com/atta/internal/contracts/events"
+	invoicingcommands "github.com/atta/internal/invoices/application/commands"
+	platformEvents "github.com/atta/internal/platform/events"
+	"github.com/atta/internal/platform/jobs"
+)
+
+type alwaysMatchReceivers struct{}
+
+func (alwaysMatchReceivers) HasAny(context.Context) (bool, error) { return true, nil }
+
+func (alwaysMatchReceivers) ReceiverMatches(context.Context, string) (bool, error) {
+	return true, nil
+}
+
+type fakePublisher struct {
+	enqueued int
+}
+
+func (p *fakePublisher) Enqueue(ctx context.Context, job jobs.Job) error {
+	p.enqueued++
+	return nil
+}
+
+func TestOnInboxMessageReceivedRoutesEvent(t *testing.T) {
+	publisher := &fakePublisher{}
+	cmd := invoicingcommands.NewCreateInvoicesFromInboxMessageCommand(publisher, alwaysMatchReceivers{})
+	handler := NewOnInboxMessageReceived(cmd)
+
+	detail, err := contractevents.MarshalInboxMessageReceived(contractevents.InboxMessageReceived{
+		EventID:           "evt_1",
+		TenantID:          "tenant_1",
+		AccountID:         "acc_1",
+		Provider:          "gmail",
+		ProviderMessageID: "msg_1",
+		MessageInternalID: "m_1",
+		Subject:           "Factura electronica",
+		AttachmentRefs: []contractevents.AttachmentRef{
+			{Filename: "factura.xml"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal detail failed: %v", err)
+	}
+
+	err = handler.Handle(context.Background(), platformEvents.IntegrationEvent{
+		DetailType: contractevents.InboxMessageReceivedDetailType,
+		Detail:     detail,
+	})
+	if err != nil {
+		t.Fatalf("handle event failed: %v", err)
+	}
+
+	if publisher.enqueued != 1 {
+		t.Fatalf("expected 1 enqueued job, got %d", publisher.enqueued)
+	}
+}

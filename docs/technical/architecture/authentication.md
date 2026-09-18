@@ -26,7 +26,7 @@ Register IdP redirect URIs on the app host:
   `{app origin}/api/v1/connections/microsoft/callback`
 
 `BACKEND_URL` is that same origin (local default
-`https://app.bowerbird.dev`).
+`https://app.atta.dev`).
 
 1. After OAuth exchange, backend sets the refresh cookie and 302s to `/lobby` with no tokens in the URL.
 2. `authGuard` sees no in-memory access token and calls refresh.

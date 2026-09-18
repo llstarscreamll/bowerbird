@@ -18,7 +18,7 @@ El change `pwa-install-ux` introdujo `core/analytics/` con `AnalyticsPort`, doma
 - Integrar PostHog, Amplitude, Sentry u otro vendor de analytics/observabilidad.
 - Endpoint backend de analytics (fase 2 descartada definitivamente).
 - Métricas operativas por tenant (facturas, proveedores, inbox) — fuera de alcance; ver exploración previa sobre tenant DB queries.
-- Cambios en `@bowerbird/system-notices` ni en la UX de instalación PWA.
+- Cambios en `@canopy/system-notices` ni en la UX de instalación PWA.
 
 ## Capabilities
 

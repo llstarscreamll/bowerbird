@@ -37,7 +37,7 @@ El módulo de catálogo solo permite listar ítems; la creación ocurre de forma
 
 ## Impact
 
-- **Backend** (`apps/backend/internal/catalog`): enriquecer `domain.Item` (factories + métodos de intención + VOs; **sin** `Stockable`); commands delgados `CreateItem` / `UpdateItem`; HTTP `POST` / `PATCH` sobre `/api/v1/catalog/items`; read model `ItemView` con `internal_sku`; puerto Alias con batch; validación ULID, unicidad de SKU, TX create/set-SKU; limpiar repo/HTTP de `stockable`.
-- **Migraciones**: editar `apps/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si aplica) para no crear la columna `stockable` — sin archivo de migración nuevo.
-- **PWA** (`apps/pwa/src/app/catalog`): rutas `new` / `:itemId` / `:itemId/edit`; store + HTTP service; formulario compartido sin `stockable`; util ULID técnica reutilizable.
+- **Backend** (`apps/atta/backend/internal/catalog`): enriquecer `domain.Item` (factories + métodos de intención + VOs; **sin** `Stockable`); commands delgados `CreateItem` / `UpdateItem`; HTTP `POST` / `PATCH` sobre `/api/v1/catalog/items`; read model `ItemView` con `internal_sku`; puerto Alias con batch; validación ULID, unicidad de SKU, TX create/set-SKU; limpiar repo/HTTP de `stockable`.
+- **Migraciones**: editar `apps/atta/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si aplica) para no crear la columna `stockable` — sin archivo de migración nuevo.
+- **PWA** (`apps/atta/web/src/app/catalog`): rutas `new` / `:itemId` / `:itemId/edit`; store + HTTP service; formulario compartido sin `stockable`; util ULID técnica reutilizable.
 - **Specs**: delta sobre `openspec/specs/catalog`.

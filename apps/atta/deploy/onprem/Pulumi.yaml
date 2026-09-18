@@ -1,0 +1,7 @@
+name: atta-onprem
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Atta on-prem fleet (SSH + Docker Compose)
+main: index.ts

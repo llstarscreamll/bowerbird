@@ -7,18 +7,18 @@ cdk.out/
 .build/
 .pulumi/
 coverage/
-apps/backend/bin/
-apps/backend/tmp/
-apps/pwa/.angular/
-apps/pwa/.turbo/
-apps/pwa/dist/
-apps/pwa/coverage/
-apps/pwa/node_modules/
-apps/deploy/aws/node_modules/
-apps/deploy/onprem/hosts.json
+apps/atta/backend/bin/
+apps/atta/backend/tmp/
+apps/atta/pwa/.angular/
+apps/atta/pwa/.turbo/
+apps/atta/pwa/dist/
+apps/atta/pwa/coverage/
+apps/atta/pwa/node_modules/
+apps/atta/deploy/aws/node_modules/
+apps/atta/deploy/onprem/hosts.json
 .cache
 
-# Entornos y Secretos
+# Entornos y Secretos (por producto: apps/<product>/.env)
 .env
 .env.*
 !.env.example
@@ -39,4 +39,5 @@ agent/
 .DS_Store
 .vscode/
 .idea/
+atta-local-ca.crt
 bowerbird-local-ca.crt

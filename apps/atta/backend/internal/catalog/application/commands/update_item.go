@@ -1,0 +1,90 @@
+package commands
+
+import (
+	"context"
+	"time"
+
+	"github.com/atta/internal/catalog/application/ports"
+	"github.com/atta/internal/catalog/domain"
+	appErrors "github.com/atta/internal/platform/errors"
+)
+
+type UpdateItemCommand struct {
+	items ports.ItemRepository
+	now   func() time.Time
+}
+
+func NewUpdateItemCommand(items ports.ItemRepository) *UpdateItemCommand {
+	if items == nil {
+		panic("item repository is required")
+	}
+	return &UpdateItemCommand{items: items, now: time.Now}
+}
+
+type UpdateItemInput struct {
+	ID           string
+	Name         *string
+	Kind         *string
+	Status       *string
+	InternalCode *string
+}
+
+func (cmd *UpdateItemCommand) Execute(ctx context.Context, input UpdateItemInput) error {
+	item, err := cmd.items.GetItemByID(ctx, input.ID)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		return appErrors.New(appErrors.CodeNotFound, "catalog item not found")
+	}
+	if item.IsMerged() {
+		return appErrors.New(appErrors.CodeGone, "catalog item was merged").WithMeta("merged_into_id", item.MergedIntoID)
+	}
+
+	now := cmd.now().UTC()
+
+	if input.Name != nil {
+		if err := item.Rename(*input.Name, now); err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
+	}
+	if input.Kind != nil {
+		kind, err := domain.ParseItemKind(*input.Kind)
+		if err != nil {
+			return appErrors.New(appErrors.CodeValidation, "invalid item kind")
+		}
+		if err := item.ChangeKind(kind, now); err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
+	}
+
+	var provided domain.InternalCode
+	if input.InternalCode != nil {
+		parsed, err := domain.ParseInternalCode(*input.InternalCode)
+		if err != nil {
+			return appErrors.New(appErrors.CodeValidation, "internal_code is required")
+		}
+		provided = parsed
+	}
+
+	confirmRequested := false
+	if input.Status != nil {
+		var err error
+		confirmRequested, err = item.InterpretMasterStatusChange(*input.Status)
+		if err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
+	}
+
+	if confirmRequested {
+		if err := item.Confirm(provided, now); err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
+	} else if input.InternalCode != nil {
+		if err := item.AssignInternalCode(provided, now); err != nil {
+			return appErrors.New(appErrors.CodeValidation, err.Error())
+		}
+	}
+
+	return cmd.items.UpdateItem(ctx, *item)
+}

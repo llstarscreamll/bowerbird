@@ -16,7 +16,7 @@
 ### T1: Migration mail model
 
 - **What**: Columns folder/flags/recipients/snippet + cursor history_id
-- **Where**: `apps/backend/migrations/tenant/000009_standard_mail_client.{up,down}.sql`
+- **Where**: `apps/atta/backend/migrations/tenant/000009_standard_mail_client.{up,down}.sql`
 - **Depends on**: —
 - **Done when**: Migration applies; down reverses
 - **Req**: MAIL-01
@@ -80,7 +80,7 @@
 ### T9: PWA mail client UI
 
 - **What**: Folders, flags, compose, simple threads, attachments, pagination
-- **Where**: `apps/pwa/src/app/inbox/**`
+- **Where**: `apps/atta/pwa/src/app/inbox/**`
 - **Depends on**: T6, T7
 - **Done when**: Store calls new endpoints; dead buttons wired
 - **Req**: MAIL-02, MAIL-03, MAIL-06, MAIL-07

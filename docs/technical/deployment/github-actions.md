@@ -13,13 +13,13 @@ secrets at runtime live in [AWS secrets](./ssm-secrets.md), not in GitHub.
 | `prod`    | `master`   | —                  | `prod`       | Not wired        |
 
 Use that same string for the AWS `Environment` tag, resource prefix
-(`staging-bowerbird-*`), SSM path (`/bowerbird/staging/secrets`), and
+(`staging-atta-*`), SSM path (`/atta/staging/secrets`), and
 the Neon default branch. Do not name the stack `develop` or `test`.
 
-| Workflow                           | When it runs                                                  | What it does                             |
-| ---------------------------------- | ------------------------------------------------------------- | ---------------------------------------- |
-| `.github/workflows/ci.yml`         | Every pull request; every push to `develop` and `master`      | `pnpm run lint`, `test`, and `build`     |
-| `.github/workflows/deploy-aws.yml` | Push to `develop` (docs-only paths skipped); **Run workflow** | `pnpm run deploy:aws` with `ENV=staging` |
+| Workflow                           | When it runs                                                  | What it does                                                     |
+| ---------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `.github/workflows/ci.yml`         | Every pull request; every push to `develop` and `master`      | `pnpm run lint`, `test`, and `build` using `apps/atta/.env.test` |
+| `.github/workflows/deploy-aws.yml` | Push to `develop` (docs-only paths skipped); **Run workflow** | `pnpm run build` then `@atta/infra` deploy with `ENV=staging`    |
 
 The deploy job authenticates to AWS with GitHub OIDC (`id-token: write`).
 Do not store `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` in GitHub.
@@ -41,7 +41,7 @@ if any required value is missing.
    [Neon Console](https://console.neon.tech) (region `aws-us-east-1`,
    default branch `staging`). Copy the project id. Create an API key that
    can read that project. See [AWS deploy — Neon](./aws.md#neon).
-3. **Pulumi Cloud.** Confirm the `bowerbird` project exists in your org.
+3. **Pulumi Cloud.** Confirm the `atta` project exists in your org.
    Create an access token at
    [Pulumi access tokens](https://app.pulumi.com/account/tokens).
 4. **AWS IAM (OIDC).** Create the GitHub OIDC provider and a deploy role
@@ -50,7 +50,7 @@ if any required value is missing.
 
 ## GitHub setup
 
-Do this in the GitHub UI for `llstarscreamll/bowerbird` (or your fork).
+Do this in the GitHub UI for `llstarscreamll/canopy` (or your fork).
 You need permission to manage Environments, Actions secrets, and branch
 protection.
 
@@ -78,18 +78,18 @@ secrets.
 On the **staging** environment page, under **Environment variables**,
 add:
 
-| Name                   | Required | Example                                        |
-| ---------------------- | -------- | ---------------------------------------------- |
-| `AWS_ROLE_ARN`         | yes      | `arn:aws:iam::123456789012:role/bowerbird-gha` |
-| `AWS_ACCOUNT_ID`       | yes      | `123456789012`                                 |
-| `ROOT_DOMAIN`          | yes      | `staging.money-path.co`                        |
-| `NEON_PROJECT_ID`      | yes      | Neon project id for staging                    |
-| `APP_SUBDOMAIN`        | no       | `app`                                          |
-| `MEDIA_SUBDOMAIN`      | no       | `media`                                        |
-| `API_ORIGIN_SUBDOMAIN` | no       | `api`                                          |
-| `GEMINI_MODEL`         | no       | `gemini-2.0-flash`                             |
-| `GEMINI_ENDPOINT`      | no       | `https://generativelanguage.googleapis.com`    |
-| `ALARM_EMAIL`          | no       | `ops@example.com`                              |
+| Name                   | Required | Example                                     |
+| ---------------------- | -------- | ------------------------------------------- |
+| `AWS_ROLE_ARN`         | yes      | `arn:aws:iam::123456789012:role/atta-gha`   |
+| `AWS_ACCOUNT_ID`       | yes      | `123456789012`                              |
+| `ROOT_DOMAIN`          | yes      | `staging.money-path.co`                     |
+| `NEON_PROJECT_ID`      | yes      | Neon project id for staging                 |
+| `APP_SUBDOMAIN`        | no       | `app`                                       |
+| `MEDIA_SUBDOMAIN`      | no       | `media`                                     |
+| `API_ORIGIN_SUBDOMAIN` | no       | `api`                                       |
+| `GEMINI_MODEL`         | no       | `gemini-2.0-flash`                          |
+| `GEMINI_ENDPOINT`      | no       | `https://generativelanguage.googleapis.com` |
+| `ALARM_EMAIL`          | no       | `ops@example.com`                           |
 
 The workflow hardcodes `ENV=staging` and `AWS_REGION=us-east-1`. Do not
 add those as variables.
@@ -157,7 +157,7 @@ No extra OIDC toggle is required in GitHub.
    `ssmParameterName`, `neonProjectId`.
 
 The job installs Node 24, pnpm 11.5.1, Go 1.25, and Pulumi 3.x, assumes
-`AWS_ROLE_ARN`, then runs `pnpm run deploy:aws`
+`AWS_ROLE_ARN`, then runs `pnpm run build && turbo run deploy --filter=@atta/infra`
 (`pulumi stack select --create staging` and `pulumi up --yes`). First
 CloudFront / ACM apply can take most of the 60-minute job timeout.
 
@@ -175,7 +175,7 @@ deploys to `us-east-1`.
      --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
    ```
 
-2. Create an IAM role (for example `bowerbird-gha`). Restrict `sub` to
+2. Create an IAM role (for example `atta-gha`). Restrict `sub` to
    this repository and the **staging** environment.
 
    Jobs with `environment: staging` present a subject like:
@@ -230,10 +230,10 @@ deploys to `us-east-1`.
 
 ## What GitHub does not own
 
-| Concern                 | Where it lives                                  |
-| ----------------------- | ----------------------------------------------- |
-| Pulumi stack state      | Pulumi Cloud (`bowerbird` / `staging`)          |
-| JWT and encryption keys | Pulumi state + SSM `/bowerbird/staging/secrets` |
-| Neon project lifecycle  | Neon Console (`NEON_PROJECT_ID` is lookup-only) |
-| On-prem fleet           | Not in these workflows                          |
-| Local deploy            | `ENV_FILE=.env.aws pnpm run deploy:aws`         |
+| Concern                 | Where it lives                                            |
+| ----------------------- | --------------------------------------------------------- |
+| Pulumi stack state      | Pulumi Cloud (`atta` / `staging`)                         |
+| JWT and encryption keys | Pulumi state + SSM `/atta/staging/secrets`                |
+| Neon project lifecycle  | Neon Console (`NEON_PROJECT_ID` is lookup-only)           |
+| On-prem fleet           | Not in these workflows                                    |
+| Local deploy            | `ENV_FILE=apps/atta/.env.aws mise //apps/atta:deploy:aws` |

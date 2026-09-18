@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-Bowerbird must enable and disable products and features per tenant, managed by platform operators (above any organization). First cut: Mail product and Send feature, without cutting invoice capture.
+Atta must enable and disable products and features per tenant, managed by platform operators (above any organization). First cut: Mail product and Send feature, without cutting invoice capture.
 
 ## Goals
 

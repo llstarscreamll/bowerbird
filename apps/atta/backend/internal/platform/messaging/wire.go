@@ -1,0 +1,132 @@
+package messaging
+
+import (
+	catalogModule "github.com/atta/internal/catalog"
+	connectionsModule "github.com/atta/internal/connections"
+	entitlementsModule "github.com/atta/internal/entitlements"
+	filesModule "github.com/atta/internal/files"
+	inboxModule "github.com/atta/internal/inbox"
+	invoicesModule "github.com/atta/internal/invoices"
+	legalentitiesModule "github.com/atta/internal/legalentities"
+	partiesModule "github.com/atta/internal/parties"
+	"github.com/atta/internal/platform"
+	awsConfig "github.com/atta/internal/platform/awsconfig"
+	"github.com/atta/internal/platform/config"
+	platformCrypto "github.com/atta/internal/platform/crypto"
+	platformEvents "github.com/atta/internal/platform/events"
+	platformJobs "github.com/atta/internal/platform/jobs"
+	"github.com/atta/internal/platform/messaging/attestation"
+	"github.com/atta/internal/platform/outbox/relay"
+	"github.com/atta/internal/platform/outbox/relay/broker"
+	awsbroker "github.com/atta/internal/platform/outbox/relay/broker/aws"
+	rabbitmqbroker "github.com/atta/internal/platform/outbox/relay/broker/rabbitmq"
+	outboxSweeper "github.com/atta/internal/platform/outbox/sweeper"
+	"github.com/atta/internal/platform/scheduler"
+	secretsModule "github.com/atta/internal/secrets"
+)
+
+type Handlers struct {
+	Events platformEvents.Router
+	Jobs   platformJobs.Router
+}
+
+func WireMessagingHandlers(platformModule *platform.Dependencies) Handlers {
+	cfg := platformModule.Config
+	entitlementsApp := entitlementsModule.NewApplication(platformModule.ControlDB)
+
+	secretsCipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.TenantSecretsEncryptionKey)
+	if err != nil {
+		panic("tenant secrets cipher is required")
+	}
+	secretsApp := secretsModule.NewApplication(platformModule.TenantRegistry, secretsCipher)
+
+	partiesApp := partiesModule.NewApplication(platformModule.TenantRegistry)
+	catalogApp := catalogModule.NewApplication(platformModule.TenantRegistry, platformModule.TaskQueue, filesModule.NewTenantObjects(platformModule.FileStore))
+	legalentitiesApp := legalentitiesModule.NewApplication(platformModule.TenantRegistry, platformModule.EventBus)
+
+	cipher, err := platformCrypto.NewAESCipherFromBase64Key(cfg.InboxCredentialsEncryptionKey)
+	if err != nil {
+		panic("inbox credentials cipher is required")
+	}
+	connectionsApp := connectionsModule.NewApplication(platformModule.TenantRegistry, cipher)
+	connectionsService := connectionsModule.NewInternalService(connectionsApp)
+
+	inboxApp := inboxModule.NewApplication(
+		cfg,
+		connectionsService,
+		platformModule.EventBus,
+		platformModule.FileStore,
+		platformModule.TenantRegistry,
+		platformModule.TaskQueue,
+	)
+
+	invoicingApp := invoicesModule.NewApplication(
+		cfg,
+		platformModule.EventBus,
+		platformModule.TaskQueue,
+		platformModule.FileStore,
+		platformModule.TenantRegistry,
+		secretsModule.NewDocumentPasswordResolver(secretsApp),
+		catalogModule.NewInvoiceSupport(catalogApp),
+		partiesModule.NewIssuerPartyLookup(partiesApp),
+		legalentitiesModule.NewReceiverDirectory(legalentitiesApp),
+		inboxModule.NewInvoiceBackfillSource(inboxApp),
+	)
+	catalogModule.BindItemLinks(catalogApp, invoicesModule.NewItemLinkSupport(invoicingApp))
+
+	invoiceEvents := invoicesModule.RegisterEvents(invoicingApp)
+	invoiceJobs := invoicesModule.RegisterJobs(invoicingApp)
+	inboxEvents := inboxModule.RegisterEvents(entitlementsApp, platformModule.TaskQueue)
+	tenantLister := relay.NewControlPlaneTenantLister(platformModule.ControlDB)
+	inboxJobs := inboxModule.RegisterJobs(inboxApp, entitlementsApp, tenantLister)
+	catalogJobs := catalogModule.RegisterJobs(catalogApp, tenantLister)
+	sweeper := outboxSweeper.NewHandler(platformModule.TenantRegistry, tenantLister, 0)
+
+	eventHandlers := append(append([]platformEvents.IntegrationEventHandler{}, invoiceEvents...), inboxEvents...)
+	jobHandlers := append(append(append(append([]platformJobs.JobHandler{}, invoiceJobs...), inboxJobs...), catalogJobs...), sweeper)
+	verifier := attestation.NewVerifier(cfg.MessagingAttestationSecret)
+
+	return Handlers{
+		Events: platformEvents.NewRouter(verifier, eventHandlers...),
+		Jobs:   platformJobs.NewRouter(verifier, jobHandlers...),
+	}
+}
+
+func WireScheduler(deps *platform.Dependencies) (*scheduler.Engine, func(), error) {
+	transport, closeTransport, err := NewBrokerTransport(deps)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	rules := append(scheduler.PlatformRules(), inboxModule.RegisterSchedules(deps.Config)...)
+	rules = append(rules, catalogModule.RegisterSchedules()...)
+	engine, err := scheduler.NewEngine(transport, rules)
+	if err != nil {
+		closeTransport()
+		return nil, func() {}, err
+	}
+	return engine, closeTransport, nil
+}
+
+func NewBrokerTransport(deps *platform.Dependencies) (broker.Transport, func(), error) {
+	cfg := deps.Config
+	jobKeys := WireMessagingHandlers(deps).Jobs.JobTypes()
+
+	switch cfg.DeploymentTarget {
+	case config.DeploymentTargetAWS:
+		return awsbroker.NewTransport(
+			awsConfig.NewEventBridgeClient(deps.AWSConfig, cfg.AWSEndpointURL),
+			awsConfig.NewSQSClient(deps.AWSConfig, cfg.AWSEndpointURL),
+			cfg.EventBusName,
+			cfg.SQSQueueURL,
+			cfg.MessagingAttestationSecret,
+		), func() {}, nil
+	default:
+		conn := rabbitmqbroker.NewConnection(cfg.RabbitMQURL)
+		transport, err := rabbitmqbroker.NewTransport(conn, cfg.MessagingAttestationSecret, jobKeys...)
+		if err != nil {
+			_ = conn.Close()
+			return nil, func() {}, err
+		}
+		return transport, func() { _ = conn.Close() }, nil
+	}
+}

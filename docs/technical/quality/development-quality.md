@@ -28,16 +28,15 @@ need to install or refresh a single skill/MCP.
 Playwright e2e):
 
 ```bash
-mise run test:full
+mise //apps/atta:test:full
 ```
 
 Use this after implementing or fixing behavior — not package-scoped `go test -run …`
-or partial e2e alone. Stop `mise run dev` first; success is exit **0** and
+or partial e2e alone. Stop `mise //apps/atta:dev` first; success is exit **0** and
 `[test:full] Done`.
 
 Details: [Getting started — Full test loop](../getting-started.md#full-test-loop).
-`pnpm run test:full` is equivalent. `pnpm run test` is unit/integration only
-and does not reset the database or run e2e.
+`pnpm run test` is unit/integration only and does not reset the database or run e2e.
 
 ## Agent skills
 

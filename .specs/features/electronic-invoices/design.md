@@ -65,7 +65,7 @@ Covers:
 
 ## 5. Application components
 
-### 5.1 `apps/backend/internal/inbox`
+### 5.1 `apps/atta/backend/internal/inbox`
 
 | Path                                                  | Role                                   |
 | ----------------------------------------------------- | -------------------------------------- |
@@ -77,7 +77,7 @@ Covers:
 | `infra/provider/gmail_client.go`, `outlook_client.go` | Provider adapters (iterative)          |
 | `infra/repository/postgres/*.go`                      | Tenant repos for accounts/messages     |
 
-### 5.2 `apps/backend/internal/invoicing`
+### 5.2 `apps/atta/backend/internal/invoicing`
 
 | Path                                         | Role                                         |
 | -------------------------------------------- | -------------------------------------------- |
@@ -91,7 +91,7 @@ Covers:
 | `infra/storage/s3_reader.go`                 | Read documents from S3                       |
 | `infra/repository/postgres/*.go`             | Persist invoice and lines with `raw_data`    |
 
-### 5.3 `apps/pwa`
+### 5.3 `apps/atta/pwa`
 
 | Path                                                            | Role                                    |
 | --------------------------------------------------------------- | --------------------------------------- |

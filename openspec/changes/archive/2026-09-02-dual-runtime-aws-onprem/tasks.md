@@ -1,7 +1,7 @@
 ## 1. Inventario y baseline
 
-- [x] 1.1 Inventariar símbolos AWS-leak con `rg` en `apps/backend`; guardar lista en PR/notas
-- [x] 1.2 Baseline `pnpm --filter @bowerbird/backend test` y `lint` en HEAD limpio; exit 0
+- [x] 1.1 Inventariar símbolos AWS-leak con `rg` en `apps/atta/backend`; guardar lista en PR/notas
+- [x] 1.2 Baseline `pnpm --filter @atta/backend test` y `lint` en HEAD limpio; exit 0
 - [x] 1.3 Documentar en design D5/D6/D7: pipeline homogéneo relay→broker→consumers; RabbitMQ onprem; EventBridge+SQS aws
 
 ## 2. Ports vendor-agnostic (platform) — rename big-bang
@@ -45,7 +45,7 @@
 - [x] 7.2 `platform/outbox/store` custom (D14); tests rollback, claim concurrente, reintento
 - [x] 7.3 `OutboxEventPublisher` + `OutboxTaskQueue`; sin publish directo broker
 - [x] 7.4 `BrokerTransport` interface + `broker/aws` (EventBridge + SQS); tests mocks SDK
-- [x] 7.5 `broker/rabbitmq`: topology (`bowerbird.events` topic, `bowerbird.jobs` direct, `bowerbird.dlx`), publish confirm, headers tenant; tests con RabbitMQ testcontainer o compose
+- [x] 7.5 `broker/rabbitmq`: topology (`atta.events` topic, `atta.jobs` direct, `atta.dlx`), publish confirm, headers tenant; tests con RabbitMQ testcontainer o compose
 - [x] 7.6 Relay core fair multi-tenant (aws); test 2 tenants
 - [x] 7.7 `SyncAccountCommand` UoW atómico; test
 - [x] 7.8 MinIO on-prem; smoke presign

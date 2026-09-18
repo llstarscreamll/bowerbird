@@ -41,4 +41,4 @@
 
 - [x] 8.1 Glosario: GTIN, código del adquirente (`buyer_code`), cruce vs `InternalCode`
 - [x] 8.2 E2E HTTP: aliases CRUD, línea con tres ids, unlock, decisión remember adjunta aliases
-- [x] 8.3 `pnpm --filter @bowerbird/backend test` y `pnpm --filter @bowerbird/pwa test`
+- [x] 8.3 `pnpm --filter @atta/backend test` y `pnpm --filter @atta/web test`

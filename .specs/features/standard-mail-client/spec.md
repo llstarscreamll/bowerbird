@@ -2,13 +2,13 @@
 
 ## Problem statement
 
-Bowerbird's inbox is an invoice-ingestion channel: forward Gmail sync, flat message lists, no real mail use. The product must become a standard mail client (folders, read/unread, threads, compose/reply, archive) without breaking existing DIAN extraction.
+Atta's inbox is an invoice-ingestion channel: forward Gmail sync, flat message lists, no real mail use. The product must become a standard mail client (folders, read/unread, threads, compose/reply, archive) without breaking existing DIAN extraction.
 
 ## Goals
 
 - [ ] User navigates Inbox, Sent, Drafts, Archive, Trash, and Starred across connected accounts.
 - [ ] User marks read/unread, stars, archives, or deletes a message; the change syncs to the provider.
-- [ ] User composes, replies, and sends mail from Bowerbird.
+- [ ] User composes, replies, and sends mail from Atta.
 - [ ] Sync is incremental (History/delta), async, and does not republish invoicing events on re-sync.
 - [ ] Gmail and Microsoft Graph sync the same mail model.
 
@@ -64,7 +64,7 @@ Bowerbird's inbox is an invoice-ingestion channel: forward Gmail sync, flat mess
 
 ### P1: Compose and send ⭐ MVP
 
-**User story**: As a user, I want to compose a new message or reply and send from Bowerbird.
+**User story**: As a user, I want to compose a new message or reply and send from Atta.
 
 **Why P1**: Without send it is not a mail client.
 

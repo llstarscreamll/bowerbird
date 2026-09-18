@@ -7,6 +7,7 @@ Split by audience. Link across layers; do not duplicate.
 How it works and how to run it.
 
 - [Getting started](./technical/getting-started.md)
+- [Monorepo layout](./technical/architecture/monorepo.md)
 - [Backend API](./technical/architecture/backend-api.md)
 - [Runtime profiles (onprem vs AWS)](./technical/architecture/runtime-profiles.md)
 - [Outbox relay](./technical/architecture/outbox-relay.md)
@@ -21,19 +22,20 @@ How it works and how to run it.
 - [Inbox & invoicing](./technical/architecture/inbox-invoicing.md)
 - [Database migrations](./technical/architecture/database-migrations.md)
 - [Spartan UI](./technical/frontend/spartan-ui.md)
-- [Deploy layouts (AWS + on-prem fleet)](../apps/deploy/README.md)
+- [Deploy layouts (AWS + on-prem fleet)](../apps/atta/deploy/README.md)
 - [AWS deploy](./technical/deployment/aws.md)
 - [GitHub setup (CI and staging deploy)](./technical/deployment/github-actions.md)
 - [On-prem fleet](./technical/deployment/onprem.md)
 - [AWS secrets](./technical/deployment/ssm-secrets.md)
 - [MinIO](./technical/tooling/minio.md)
 - [CodeGraph](./technical/tooling/codegraph.md)
-- [Dev quality](./technical/quality/development-quality.md) · [Full test loop](./technical/getting-started.md#full-test-loop) (`mise run test:full`)
+- [Dev quality](./technical/quality/development-quality.md) · [Full test loop](./technical/getting-started.md#full-test-loop) (`mise //apps/atta:test:full`)
 
 ## Product (`docs/product/`)
 
 What we ship and why.
 
+- [Naming (Canopy and Atta)](./product/naming.md)
 - [Product conventions](./product/README.md)
 - [Feature catalog](./product/features.md)
 - [Dictionary](./product/dictionary.md)

@@ -34,8 +34,8 @@ Los tenants necesitan cargar su catálogo maestro (cientos de miles a millones d
 
 ## Impact
 
-- **Backend** (`apps/backend/internal/catalog`, `platform/storage`, `platform/http/host`, `platform/messaging`): dominio, migración tenant `000018`, jobs, HTTP, FileStore streaming.
-- **PWA** (`apps/pwa/src/app/catalog`): páginas `imports` / `imports/:id`, dialog de carga, master paginado, linker con `page[size]`.
-- **Infra AWS** (`apps/deploy/aws/src/stack.ts`): schedule `catalog-import-purge`.
-- **E2E** (`apps/e2e/tests/http/catalog`): contratos de import y list paginado.
+- **Backend** (`apps/atta/backend/internal/catalog`, `platform/storage`, `platform/http/host`, `platform/messaging`): dominio, migración tenant `000018`, jobs, HTTP, FileStore streaming.
+- **PWA** (`apps/atta/web/src/app/catalog`): páginas `imports` / `imports/:id`, dialog de carga, master paginado, linker con `page[size]`.
+- **Infra AWS** (`apps/atta/deploy/aws/src/stack.ts`): schedule `catalog-import-purge`.
+- **E2E** (`apps/atta/e2e/tests/http/catalog`): contratos de import y list paginado.
 - **Specs**: delta sobre `openspec/specs/catalog`.

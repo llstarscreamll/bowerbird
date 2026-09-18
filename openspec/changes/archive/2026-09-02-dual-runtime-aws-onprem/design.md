@@ -70,25 +70,25 @@ platform/outbox/relay
 
 ### D6 — Pipeline homogéneo relay → broker → consumers
 
-| Profile       | Relay runner                      | Broker (events)                       | Broker (jobs)                     | Consumers                                   |
-| ------------- | --------------------------------- | ------------------------------------- | --------------------------------- | ------------------------------------------- |
-| **onprem**    | `outbox-relay` (loop)             | RabbitMQ **topic** `bowerbird.events` | RabbitMQ **direct** + work queues | `events-consumer`, `jobs-consumer`          |
-| **aws**       | Lambda `outbox-relay` (Scheduler) | EventBridge                           | SQS                               | Lambdas `events-processor`, `sqs-processor` |
-| **local dev** | = onprem                          | RabbitMQ en compose raíz              | idem                              | idem                                        |
+| Profile       | Relay runner                      | Broker (events)                  | Broker (jobs)                     | Consumers                                   |
+| ------------- | --------------------------------- | -------------------------------- | --------------------------------- | ------------------------------------------- |
+| **onprem**    | `outbox-relay` (loop)             | RabbitMQ **topic** `atta.events` | RabbitMQ **direct** + work queues | `events-consumer`, `jobs-consumer`          |
+| **aws**       | Lambda `outbox-relay` (Scheduler) | EventBridge                      | SQS                               | Lambdas `events-processor`, `sqs-processor` |
+| **local dev** | = onprem                          | RabbitMQ en compose raíz         | idem                              | idem                                        |
 
 - Handlers **mismos**; entrypoints distintos (contenedores Go vs Lambda).
 - **Alternativa rechazada:** in-process on-prem — rompe paridad con aws/GCP y concentra blast radius.
 
 ### D7 — RabbitMQ on-prem (topología v1)
 
-| Kind   | Exchange           | Tipo     | Routing key                                             | Consumer queue                                       |
-| ------ | ------------------ | -------- | ------------------------------------------------------- | ---------------------------------------------------- |
-| Events | `bowerbird.events` | `topic`  | `{type}` (CloudEvent type) p.ej. `InboxMessageReceived` | `bowerbird.events.handlers` (binding `#` o por type) |
-| Jobs   | `bowerbird.jobs`   | `direct` | `{JobType}` p.ej. `InvoiceExtractionRequested`          | `bowerbird.jobs.work`                                |
+| Kind   | Exchange      | Tipo     | Routing key                                             | Consumer queue                                  |
+| ------ | ------------- | -------- | ------------------------------------------------------- | ----------------------------------------------- |
+| Events | `atta.events` | `topic`  | `{type}` (CloudEvent type) p.ej. `InboxMessageReceived` | `atta.events.handlers` (binding `#` o por type) |
+| Jobs   | `atta.jobs`   | `direct` | `{JobType}` p.ej. `InvoiceExtractionRequested`          | `atta.jobs.work`                                |
 
 - Payload Events: Estándar **CloudEvents 1.0 JSON** (attributes: id, source, specversion, type, time, data, tenant_slug, correlation_id).
 - Payload Jobs: JSON envelope interno (ya que son RPC diferido, no eventos de dominio) + headers `tenant_slug`, `message_id`, `correlation_id`.
-- **DLQ:** Dead-Letter Exchange (`bowerbird.dlx`) y cola dead-letter (`bowerbird.deadletter`) unificadas obligatorias en on-prem; política de reintento con backoff en código del consumer, finalizando en el DLX tras N intentos fallidos (~SQS `maxReceiveCount` ≈ 5).
+- **DLQ:** Dead-Letter Exchange (`atta.dlx`) y cola dead-letter (`atta.deadletter`) unificadas obligatorias en on-prem; política de reintento con backoff en código del consumer, finalizando en el DLX tras N intentos fallidos (~SQS `maxReceiveCount` ≈ 5).
 - Declaración de topology en bootstrap script o al arrancar relay/consumers (idempotente).
 - **Alternativa rechazada:** NATS JetStream — viable pero RabbitMQ más maduro para DLQ/work queues on-prem.
 
@@ -149,7 +149,7 @@ type BrokerTransport interface {
 
 - `DEPLOYMENT_TARGET=onprem` en dev; `APP_ENV=local` independiente.
 - **RabbitMQ** en `docker-compose.yml` raíz; servicios relay + consumers vía Turbo o compose profile.
-- Secretos: `apps/backend/.env`; sin LocalStack messaging/SSM para flujo diario.
+- Secretos: `apps/atta/backend/.env`; sin LocalStack messaging/SSM para flujo diario.
 - **Overhead:** RabbitMQ ~100–200 MB RAM — aceptable; **menor** que LocalStack events+sqs + pollers API.
 - Paridad local ↔ cliente on-prem ↔ patrón aws (todos relay→broker→consumers).
 

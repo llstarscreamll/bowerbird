@@ -39,7 +39,7 @@ Tactical intensity: **mínima**. No hay invariante de dominio; es layout. No ext
 
 ### Layout (Phase 3 — presentation only)
 
-`apps/pwa/src/app/catalog/presentation/pages/master/master.page.ts`. Feature convention: store orquesta, página delgada.
+`apps/atta/web/src/app/catalog/presentation/pages/master/master.page.ts`. Feature convention: store orquesta, página delgada.
 
 ```
 ┌─────────────────────────────────────────────────────────┐

@@ -58,7 +58,7 @@ flowchart TD
 ### Domain mail model
 
 - **Purpose**: Folder, flags, and recipients on `InboxMessage`.
-- **Location**: `apps/backend/internal/inbox/domain/`
+- **Location**: `apps/atta/backend/internal/inbox/domain/`
 - **Interfaces**: `ApplyProviderLabels`, `MailFolder`, `OutgoingMail`
 - **Reuses**: `NewInboxMessageFromProvider`
 

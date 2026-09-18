@@ -8,11 +8,11 @@ Orquestar notificaciones de sistema transversales (prioridad, scope, una visible
 
 ### Requirement: Paquete workspace independiente
 
-El orquestador de system notices MUST publicarse como `@bowerbird/system-notices` en `packages/system-notices/`. MUST ser consumible vía `workspace:*` desde apps del monorepo. MUST NOT depender de código de aplicaciones consumidoras.
+El orquestador de system notices MUST publicarse como `@canopy/system-notices` en `packages/typescript/system-notices/`. MUST ser consumible vía `workspace:*` desde apps del monorepo. MUST NOT depender de código de aplicaciones consumidoras.
 
 #### Scenario: Consumo desde PWA
 
-- **WHEN** `apps/pwa` declara dependencia `@bowerbird/system-notices`
+- **WHEN** `apps/atta/pwa` declara dependencia `@canopy/system-notices`
 - **THEN** puede importar `SystemNotice`, `SystemNoticesOrchestrator` y el host Angular sin acoplar el package a `pwa-install`
 
 ### Requirement: Contrato SystemNotice
@@ -35,7 +35,7 @@ El orchestrator MUST garantizar que solo una notice se muestra a la vez. Al reso
 
 ### Requirement: Host Angular con filtro por scope
 
-El paquete MUST exportar un componente host (`@bowerbird/system-notices/angular`) que acepte `scope: 'global' | 'tenant'` y evalúe únicamente notices de ese scope.
+El paquete MUST exportar un componente host (`@canopy/system-notices/angular`) que acepte `scope: 'global' | 'tenant'` y evalúe únicamente notices de ese scope.
 
 #### Scenario: Host tenant
 
@@ -49,7 +49,7 @@ El núcleo del orchestrator (`SystemNoticesOrchestrator`) MUST ser framework-agn
 #### Scenario: Test unitario aislado
 
 - **WHEN** se ejecutan tests del package con notices mock
-- **THEN** pasan sin levantar `apps/pwa` ni Angular TestBed para el orchestrator core
+- **THEN** pasan sin levantar `apps/atta/pwa` ni Angular TestBed para el orchestrator core
 
 ### Requirement: Aislamiento de estado del orchestrator
 
@@ -67,7 +67,7 @@ El entry `./` del package MUST exportar únicamente `SystemNotice`, `SYSTEM_NOTI
 #### Scenario: Consumer importa API pública
 
 - **WHEN** `pwa-install` implementa una notice
-- **THEN** solo importa desde `@bowerbird/system-notices` (port + token), no desde paths internos del package
+- **THEN** solo importa desde `@canopy/system-notices` (port + token), no desde paths internos del package
 
 ### Requirement: Fail independence en ciclo de notices
 

@@ -16,7 +16,7 @@ runs:
     - uses: actions/setup-go@v5
       with:
         go-version: '1.25'
-        cache-dependency-path: apps/backend/go.sum
+        cache-dependency-path: apps/atta/backend/go.sum
 
     - name: Install workspace dependencies
       shell: bash

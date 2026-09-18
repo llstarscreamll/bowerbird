@@ -20,9 +20,9 @@
 ## 4. PWA
 
 - [x] 4.1 Añadir `creation_source` a models HTTP/store de `parties/` y `catalog/`; mapear labels ES ("Manual", "Desde factura")
-- [x] 4.2 Mostrar origen en master y detail de Contactos y Catálogo; build PWA sin errores (`pnpm --filter @bowerbird/pwa build`)
+- [x] 4.2 Mostrar origen en master y detail de Contactos y Catálogo; build PWA sin errores (`pnpm --filter @atta/web build`)
 
 ## 5. Verificación
 
-- [x] 5.1 `pnpm --filter @bowerbird/backend test` y `pnpm --filter @bowerbird/pwa lint` pasan
+- [x] 5.1 `pnpm --filter @atta/backend test` y `pnpm --filter @atta/web lint` pasan
 - [x] 5.2 `openspec validate entity-creation-source --strict` pasa

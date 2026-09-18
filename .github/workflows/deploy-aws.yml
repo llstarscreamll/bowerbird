@@ -68,7 +68,7 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: us-east-1
-          role-session-name: bowerbird-gha-${{ github.run_id }}
+          role-session-name: atta-gha-${{ github.run_id }}
           role-duration-seconds: 3600
 
       - uses: pulumi/actions@v6
@@ -76,4 +76,4 @@ jobs:
           pulumi-version: ^3
 
       - name: Deploy AWS stack
-        run: pnpm run deploy:aws
+        run: pnpm run build && turbo run deploy --filter=@atta/infra

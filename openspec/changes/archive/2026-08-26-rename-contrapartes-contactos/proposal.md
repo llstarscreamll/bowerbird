@@ -21,6 +21,6 @@ _(Ninguna)_
 
 ## Impact
 
-- Frontend: Componentes de layout, menú principal y módulo de Parties y Facturas (`apps/pwa`).
+- Frontend: Componentes de layout, menú principal y módulo de Parties y Facturas (`apps/atta/web`).
 - Documentación: Glosario de dominio (`docs/domain/GLOSSARY.md`).
 - Backend: Sin impacto.

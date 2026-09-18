@@ -88,7 +88,7 @@ UpdatePartyCommand:  repo.GetByID → UpdateProfile → repo.Update
 ResolveOrCreateFromIssuer: sin cambio de contrato externo
 ```
 
-## PWA (`apps/pwa/src/app/parties/`)
+## PWA (`apps/atta/web/src/app/parties/`)
 
 Espejo de `catalog/`: capas aisladas, store como único orchestrator de estado, pages delgadas.
 

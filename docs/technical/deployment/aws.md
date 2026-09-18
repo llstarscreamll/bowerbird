@@ -2,9 +2,9 @@
 
 Dual-runtime overview: [Runtime profiles](../architecture/runtime-profiles.md).
 
-Pulumi program: `apps/deploy/aws/` (`@bowerbird/infra`). On-prem fleet is a
-**separate** Pulumi project (`apps/deploy/onprem/`) — see
-[On-prem fleet](./onprem.md) and [Deploy](../../../apps/deploy/README.md).
+Pulumi program: `apps/atta/deploy/aws/` (`@atta/infra`). On-prem fleet is a
+**separate** Pulumi project (`apps/atta/deploy/onprem/`) — see
+[On-prem fleet](./onprem.md) and [Deploy](../../../apps/atta/deploy/README.md).
 
 This stack deploys the **aws/lambda** target. Postgres runs on **Neon**, not
 Amazon RDS. DNS is in **Cloudflare**. Application secrets live in **SSM
@@ -17,7 +17,7 @@ Parameter Store** (`SecureString`) under a customer-managed KMS key.
 | PWA                | Private S3 + CloudFront (OAC, TLS 1.2+, WAF)                                                                       |
 | HTTP API           | CloudFront `/api*` → API Gateway DomainName (`api.*`, default endpoint off) + Go Lambda (`provided.al2023`, arm64) |
 | Jobs               | SQS + Lambda, with a 14-day DLQ                                                                                    |
-| Integration events | EventBridge custom bus (`source` prefix `bowerbird.`) + Lambda                                                     |
+| Integration events | EventBridge custom bus (`source` prefix `atta.`) + Lambda                                                          |
 | Outbox relay       | EventBridge Scheduler `rate(1 minute)` → relay Lambda                                                              |
 | Platform schedules | EventBridge Scheduler → scheduler Lambda (`outbox-sweeper`, `catalog-import-purge`, optional `inbox-sync-all`)     |
 | Object storage     | Private S3 bucket (KMS), browser CORS for the app origin; presigns use the S3 REST endpoint                        |
@@ -52,7 +52,7 @@ the AWS account.
 
 ## Domains
 
-Set these in the repo-root `.env`. Cloudflare must already host `ROOT_DOMAIN`.
+Set these in `apps/atta/.env`. Cloudflare must already host `ROOT_DOMAIN`.
 
 | Variable               | Example         | DNS record                                                                                          |
 | ---------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
@@ -78,7 +78,7 @@ Generated once and stored in Pulumi state + Parameter Store:
 - Messaging attestation secret
 
 Pass `GEMINI_API_KEY` (required) and optional OAuth client IDs/secrets
-through `.env` at deploy time. They are copied into the SecureString
+through `apps/atta/.env` at deploy time. They are copied into the SecureString
 parameter, not Lambda environment variables.
 
 ## Neon
@@ -91,7 +91,7 @@ Use one project per `ENV`. Recommended settings:
 
 - Region `aws-us-east-1` (same as `AWS_REGION`)
 - Postgres 16
-- Default database and role `bowerbird` (the role needs `CREATEDB` for
+- Default database and role `atta` (the role needs `CREATEDB` for
   tenant databases)
 - Default branch named after `ENV` (`staging`, `prod`)
 - Prod: protect the default branch, 7-day restore window, no scale-to-zero,
@@ -99,10 +99,10 @@ Use one project per `ENV`. Recommended settings:
 - Non-prod: 6-hour restore window, suspend after 5 minutes, autoscaling
   0.25–2 CU
 
-Set `NEON_API_KEY` and `NEON_PROJECT_ID` in `.env`. Pulumi looks up that
-project and copies the default-branch **pooled** URL into `database_url`
-and the **direct** URL into `database_direct_url`. If the lookup fails,
-the apply fails.
+Set `NEON_API_KEY` and `NEON_PROJECT_ID` in `apps/atta/.env`. Pulumi
+looks up that project and copies the default-branch **pooled** URL into
+`database_url` and the **direct** URL into `database_direct_url`. If the
+lookup fails, the apply fails.
 
 Tune compute, PITR, snapshots, and branch protection in the Neon Console.
 Those settings are not in this stack.
@@ -111,51 +111,51 @@ After the first `pulumi up`, control-plane migrations already ran as
 part of that apply (see Deploy). Re-run them out of band with:
 
 ```bash
-pnpm --filter @bowerbird/infra migrate
+pnpm --filter @atta/infra migrate
 ```
 
 That invokes the migrate Lambda, which uses the **direct** Neon URL.
 
 ## Deploy
 
-Use **`pnpm run deploy:aws`**. Root `pnpm run deploy` runs AWS **and** the
-on-prem fleet in parallel.
+Use **`mise //apps/atta:deploy:aws`**. `mise //apps/atta:deploy` runs AWS
+**and** the on-prem fleet in parallel.
 
 1. Install the Pulumi CLI (`mise install` includes it) and log in
    (`pulumi login`).
-2. Copy `.env.example` → `.env` and fill AWS, Cloudflare, Neon
-   (`NEON_API_KEY`, `NEON_PROJECT_ID`), and Gemini values. Create the
-   Neon project first (see [Neon](#neon)). Do **not** deploy with the
-   local MinIO dummy keys
-   (`AWS_ACCESS_KEY_ID=bowerbird`). Pulumi and the AWS SDK read those
+2. Copy `apps/atta/.env.example` → `apps/atta/.env` and fill AWS,
+   Cloudflare, Neon (`NEON_API_KEY`, `NEON_PROJECT_ID`), and Gemini
+   values. Create the Neon project first (see [Neon](#neon)). Do **not**
+   deploy with the local MinIO dummy keys
+   (`AWS_ACCESS_KEY_ID=atta`). Pulumi and the AWS SDK read those
    names. Use an IAM role/profile, or a dedicated file:
 
    ```bash
-   ENV_FILE=.env.aws pnpm run deploy:aws
+   ENV_FILE=apps/atta/.env.aws mise //apps/atta:deploy:aws
    ```
 
    Omit `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in that file so the
    SDK uses the shared credentials file or SSO.
 
 3. Select the stack named after `ENV` (`pulumi stack select --create`
-   on `pnpm run deploy:aws` creates it if missing):
+   on `mise //apps/atta:deploy:aws` creates it if missing):
 
    ```bash
-   cd apps/deploy/aws
+   cd apps/atta/deploy/aws
    pulumi stack select --create "$ENV"
    ```
 
 4. Build and deploy from the repo root:
 
    ```bash
-   pnpm run deploy:aws
+   mise //apps/atta:deploy:aws
    ```
 
    That runs `pnpm run build` (PWA assets + Go Lambda zips) then
-   `pulumi up --yes` for `@bowerbird/infra`. Preview without applying:
+   `pulumi up --yes` for `@atta/infra`. Preview without applying:
 
    ```bash
-   pnpm --filter @bowerbird/infra synth
+   pnpm --filter @atta/infra synth
    ```
 
    When the migrate Lambda package changes (control-plane or tenant SQL
@@ -169,7 +169,8 @@ on-prem fleet in parallel.
 
 CI and staging apply from GitHub:
 [GitHub setup (CI and staging deploy)](./github-actions.md).
-Pushes to `develop` run `pnpm run deploy:aws` with `ENV=staging`. The
+Pushes to `develop` run `pnpm run build && turbo run deploy --filter=@atta/infra`
+with `ENV=staging`. The
 workflow assumes an IAM role via OIDC; configure the GitHub **staging**
 environment secrets and variables before the first run. `master` / `prod`
 is not wired yet.
@@ -195,7 +196,7 @@ EventBridge Scheduler (not EventBridge rules). Unix crontab on-prem is
   `media`), `API_ORIGIN_SUBDOMAIN` (default `api`), `ALARM_EMAIL`,
   `GEMINI_MODEL`, `GEMINI_ENDPOINT`, Google/Microsoft OAuth client ids
   and secrets.
-- Web assets come from `apps/pwa/dist/pwa/browser` (the root build
+- Web assets come from `apps/atta/pwa/dist/pwa/browser` (the root build
   produces this before Pulumi runs).
 - S3 web deploy does not prune hashed bundles, so old clients can still load
   previous chunks.

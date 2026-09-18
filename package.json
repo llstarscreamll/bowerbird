@@ -1,43 +1,23 @@
 {
-  "name": "bowerbird-monorepo",
+  "name": "canopy",
   "private": true,
   "version": "0.1.0",
   "engines": {
     "node": "24.x"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*",
-    "apps/deploy/*",
-    "apps/deploy/aws/sdks/neon"
+    "apps/*/*",
+    "apps/*/deploy/*",
+    "apps/*/deploy/aws/sdks/neon",
+    "packages/typescript/*"
   ],
   "scripts": {
     "setup:local": "./scripts/setup-local.sh",
-    "dev": "pnpm run infra:up && turbo run dev dev:relay dev:events-consumer dev:jobs-consumer dev:scheduler --filter=@bowerbird/backend --filter=@bowerbird/pwa",
-    "test:full": "./scripts/test-full.sh",
-    "seed": "pnpm --filter @bowerbird/backend run seed",
     "build": "turbo run build",
-    "migrate:controlplane": "pnpm --filter @bowerbird/backend run migrate:controlplane",
-    "migrate:tenants": "pnpm --filter @bowerbird/backend run migrate:tenants",
-    "migrate:all": "pnpm --filter @bowerbird/backend run migrate:all",
     "test": "turbo run test",
-    "test:e2e:install": "pnpm --filter @bowerbird/e2e run test:e2e:install",
-    "test:e2e:install:all": "pnpm --filter @bowerbird/e2e run test:e2e:install:all",
-    "test:e2e": "turbo run test:e2e --filter=@bowerbird/e2e",
-    "test:e2e:local": "pnpm --filter @bowerbird/e2e run test:e2e:local",
-    "test:e2e:browser": "pnpm --filter @bowerbird/e2e run test:e2e:browser",
-    "test:e2e:http": "pnpm --filter @bowerbird/e2e run test:e2e:http",
-    "test:e2e:headed": "pnpm --filter @bowerbird/e2e run test:e2e:headed",
-    "test:e2e:ui": "pnpm --filter @bowerbird/e2e run test:e2e:ui",
     "lint": "turbo run lint",
     "format": "prettier \"**/*.{ts,tsx,md,mdx}\" --write",
     "format:check": "prettier \"**/*.{ts,tsx,md,mdx}\" --check",
-    "caddy:trust": "./scripts/caddy-trust.sh",
-    "infra:up": "docker compose up -d --wait --wait-timeout 180 --remove-orphans && docker compose --profile init run --rm --no-TTY minio-init",
-    "infra:down": "docker compose down",
-    "deploy": "pnpm run build && turbo run deploy --filter=@bowerbird/infra --filter=@bowerbird/onprem",
-    "deploy:aws": "pnpm run build && turbo run deploy --filter=@bowerbird/infra",
-    "deploy:onprem": "turbo run deploy --filter=@bowerbird/onprem",
     "prepare": "husky"
   },
   "devDependencies": {

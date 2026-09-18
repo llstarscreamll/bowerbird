@@ -36,19 +36,19 @@ Relay iterates **all active tenants** from the control-plane on every profile (o
 
 ## Consumers
 
-| Profile        | Events                           | Jobs                           |
-| -------------- | -------------------------------- | ------------------------------ |
-| onprem / local | `events-consumer` (AMQP)         | `jobs-consumer` (AMQP)         |
-| aws            | Lambda `${ENV}-bowerbird-events` | Lambda `${ENV}-bowerbird-jobs` |
+| Profile        | Events                      | Jobs                      |
+| -------------- | --------------------------- | ------------------------- |
+| onprem / local | `events-consumer` (AMQP)    | `jobs-consumer` (AMQP)    |
+| aws            | Lambda `${ENV}-atta-events` | Lambda `${ENV}-atta-jobs` |
 
 Handlers are shared via `internal/platform/messaging.WireMessagingHandlers`.
 
 ## Brokers
 
-| Profile | Events                            | Jobs                                                     |
-| ------- | --------------------------------- | -------------------------------------------------------- |
-| onprem  | RabbitMQ topic `bowerbird.events` | RabbitMQ direct `bowerbird.jobs` → `bowerbird.jobs.work` |
-| aws     | EventBridge                       | SQS                                                      |
+| Profile | Events                       | Jobs                                           |
+| ------- | ---------------------------- | ---------------------------------------------- |
+| onprem  | RabbitMQ topic `atta.events` | RabbitMQ direct `atta.jobs` → `atta.jobs.work` |
+| aws     | EventBridge                  | SQS                                            |
 
 Job queue bindings are declared at worker boot from registered `JobHandler.JobType()` values (composition root), not hard-coded in platform.
 
@@ -60,19 +60,19 @@ Jobs use an internal JSON envelope + headers (`tenant_slug`,
 ticks) omit `tenant_slug`; HMAC binds the reserved subject
 `_platform`. Events stay tenant-scoped.
 
-Dead letters: RabbitMQ `bowerbird.dlx` / `bowerbird.deadletter`; AWS SQS DLQ.
+Dead letters: RabbitMQ `atta.dlx` / `atta.deadletter`; AWS SQS DLQ.
 
 ## Runners (local/onprem)
 
 ```bash
-pnpm --filter @bowerbird/backend dev          # api
-pnpm --filter @bowerbird/backend dev:relay
-pnpm --filter @bowerbird/backend dev:events-consumer
-pnpm --filter @bowerbird/backend dev:jobs-consumer
-pnpm --filter @bowerbird/backend dev:scheduler
+pnpm --filter @atta/backend dev          # api
+pnpm --filter @atta/backend dev:relay
+pnpm --filter @atta/backend dev:events-consumer
+pnpm --filter @atta/backend dev:jobs-consumer
+pnpm --filter @atta/backend dev:scheduler
 ```
 
-Or root `pnpm run dev` (Turbo runs api + workers + PWA).
+Or `mise //apps/atta:dev` (Turbo runs api + workers + PWA).
 
 ## Scheduler (on-prem)
 

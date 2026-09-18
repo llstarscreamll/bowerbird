@@ -34,6 +34,6 @@
 
 ## 6. Verificación cruzada
 
-- [x] 6.1 `pnpm --filter @bowerbird/backend test` (catalog+invoices) en verde
-- [x] 6.2 `pnpm --filter @bowerbird/pwa lint` (y tests unitarios PWA si aplican) en verde
+- [x] 6.1 `pnpm --filter @atta/backend test` (catalog+invoices) en verde
+- [x] 6.2 `pnpm --filter @atta/web lint` (y tests unitarios PWA si aplican) en verde
 - [x] 6.3 Smoke: cola en Facturas; decision desde cola y detalle actualiza `linking_status`; fallo validate item no muta línea; Catálogo sin cola

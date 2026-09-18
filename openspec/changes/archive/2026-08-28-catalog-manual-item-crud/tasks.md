@@ -1,6 +1,6 @@
 ## 1. Backend — quitar `stockable` + schema
 
-- [x] 1.1 Editar `apps/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si aplica) para eliminar la columna `stockable` de `catalog_items` — **sin** migración nueva; verificar que el SQL ya no menciona `stockable`
+- [x] 1.1 Editar `apps/atta/backend/migrations/tenant/000012_catalog.up.sql` (y `.down.sql` si aplica) para eliminar la columna `stockable` de `catalog_items` — **sin** migración nueva; verificar que el SQL ya no menciona `stockable`
 - [x] 1.2 Eliminar `Stockable` de `domain.Item`, repositorio postgres (INSERT/UPDATE/SELECT) y serializers HTTP existentes (GET list/get); verificar que el paquete catalog compila y tests existentes pasan (o se actualizan)
 
 ## 2. Backend — domain (modelo rico)

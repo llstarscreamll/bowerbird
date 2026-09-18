@@ -1,0 +1,23 @@
+package queries
+
+import (
+	"context"
+
+	"github.com/atta/internal/tenant/application/ports"
+	"github.com/atta/internal/tenant/domain"
+)
+
+type GetTenantQuery struct {
+	repo ports.TenantRepository
+}
+
+func NewGetTenantQuery(repo ports.TenantRepository) *GetTenantQuery {
+	if repo == nil {
+		panic("tenant repository is required")
+	}
+	return &GetTenantQuery{repo: repo}
+}
+
+func (q *GetTenantQuery) Execute(ctx context.Context, id, userID string) (*domain.Tenant, error) {
+	return q.repo.GetByID(ctx, id, userID)
+}

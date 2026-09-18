@@ -1,0 +1,7 @@
+name: atta
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Atta AWS Lambda + Neon + Cloudflare DNS
+main: index.ts

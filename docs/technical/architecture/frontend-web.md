@@ -18,9 +18,9 @@ Keep feature orchestration in `*/application/*store.ts`; keep presentation thin.
 
 ## Shared UI
 
-- Components: `apps/pwa/src/app/core/presentation/components/`
-- Layouts: `apps/pwa/src/app/core/presentation/layouts/`
-- Helm primitives: `apps/pwa/src/app/shared/ui/` — see [Spartan UI](../frontend/spartan-ui.md)
+- Components: `apps/atta/pwa/src/app/core/presentation/components/`
+- Layouts: `apps/atta/pwa/src/app/core/presentation/layouts/`
+- Helm primitives: `apps/atta/pwa/src/app/shared/ui/` — see [Spartan UI](../frontend/spartan-ui.md)
 - Tokens: semantic classes from `styles.css` (`bg-background`, `text-muted-foreground`), not hardcoded palettes
 
 ### Feedback
@@ -46,15 +46,15 @@ Keep feature orchestration in `*/application/*store.ts`; keep presentation thin.
 - Config: `app.config.ts`, `angular.json`, `ngsw-config.json`,
   `public/manifest.webmanifest`
 - API origin: `src/environments/environment.ts` (`apiUrl`). Local
-  points at `https://app.bowerbird.dev`. The production build uses an
+  points at `https://app.atta.dev`. The production build uses an
   empty `apiUrl` so `/api/v1/...` stays same-origin on CloudFront and
   on-prem.
 
 ## Verify PWA build
 
 ```bash
-pnpm --filter @bowerbird/pwa build
-pnpm --filter @bowerbird/pwa preview:pwa
+pnpm --filter @atta/pwa build
+pnpm --filter @atta/pwa preview:web
 ```
 
 Open `http://localhost:4300` → DevTools → Application.

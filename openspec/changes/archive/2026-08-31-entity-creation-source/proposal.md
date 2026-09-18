@@ -34,5 +34,5 @@ _(ninguna)_
 | Migraciones | `migrations/tenant/000011_parties.up.sql`, `000012_catalog.up.sql`                         |
 | Backend     | `internal/parties/`, `internal/catalog/` (domain, commands, repository, HTTP)              |
 | Integración | `invoices/adapters/linking/` sin cambio de contrato; factories internos propagan `invoice` |
-| PWA         | `apps/pwa/src/app/parties/`, `apps/pwa/src/app/catalog/`                                   |
+| PWA         | `apps/atta/web/src/app/parties/`, `apps/atta/web/src/app/catalog/`                         |
 | Specs       | deltas `parties`, `catalog`                                                                |

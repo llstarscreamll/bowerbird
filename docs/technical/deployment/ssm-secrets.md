@@ -17,13 +17,13 @@ non-secret routing only.
 | -------------------- | ------- | ----------------------------------- |
 | `SSM_PARAMETER_NAME` | (none)  | Required on `DEPLOYMENT_TARGET=aws` |
 
-Pulumi writes `/bowerbird/${ENV}/secrets` as a Standard-tier
+Pulumi writes `/atta/${ENV}/secrets` as a Standard-tier
 `SecureString` (`keyId` = stack CMK) and sets `SSM_PARAMETER_NAME` on
 every Lambda.
 
 `config.Load()` calls `GetParameter` with `WithDecryption: true` and
 unmarshals snake_case JSON into
-`apps/backend/internal/platform/config/config.go`. Empty
+`apps/atta/backend/internal/platform/config/config.go`. Empty
 `SSM_PARAMETER_NAME` on AWS is a boot error; there is no Secrets
 Manager path.
 
@@ -106,11 +106,11 @@ Pulumi always writes `app_env`, `allowed_origins`, `frontend_url`, and
 ```json
 {
   "app_env": "prod",
-  "database_url": "postgres://bowerbird:secret@ep-xxx-pooler.us-east-1.aws.neon.tech/bowerbird?sslmode=require",
-  "database_direct_url": "postgres://bowerbird:secret@ep-xxx.us-east-1.aws.neon.tech/bowerbird?sslmode=require",
-  "sqs_queue_url": "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/prod-bowerbird-jobs",
-  "event_bus_name": "prod-bowerbird-bus",
-  "s3_bucket_name": "prod-bowerbird-ACCOUNT-objects",
+  "database_url": "postgres://atta:secret@ep-xxx-pooler.us-east-1.aws.neon.tech/atta?sslmode=require",
+  "database_direct_url": "postgres://atta:secret@ep-xxx.us-east-1.aws.neon.tech/atta?sslmode=require",
+  "sqs_queue_url": "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/prod-atta-jobs",
+  "event_bus_name": "prod-atta-bus",
+  "s3_bucket_name": "prod-atta-ACCOUNT-objects",
   "google_client_id": "your-google-client-id.apps.googleusercontent.com",
   "google_client_secret": "your-google-client-secret",
   "microsoft_client_id": "your-microsoft-client-id",

@@ -10,4 +10,4 @@ All implementation tasks are done.
 - [x] PWA PermissionsStore + secrets settings page
 - [x] Wire API / SQS; unit tests
 
-Operational (local/env, not code): configure MinIO via `.env` and run `pnpm run infra:up`; run tenant migrations (`migrate:all`).
+Operational (local/env, not code): configure MinIO via `apps/atta/.env` and run `mise //apps/atta:infra:up`; run tenant migrations (`mise //apps/atta:migrate:all`).

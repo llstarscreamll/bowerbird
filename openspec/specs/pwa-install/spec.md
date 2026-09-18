@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Promover la instalación de Bowerbird como PWA de forma contextual y no invasiva, respetando el engagement del usuario y ofreciendo acceso permanente desde el menú del tenant.
+Promover la instalación de Atta como PWA de forma contextual y no invasiva, respetando el engagement del usuario y ofreciendo acceso permanente desde el menú del tenant.
 
 ## Requirements
 
@@ -70,7 +70,7 @@ El sistema MUST registrar visitas por sesión de navegador y MUST considerar ele
 
 En plataformas Chromium con `beforeinstallprompt` capturado, el sistema MUST mostrar un snackbar auto-dismiss (≈6 s) en viewport desktop y un bottom sheet en viewport mobile. El copy MUST ser conciso:
 
-- **Título:** «Instala Bowerbird»
+- **Título:** «Instala Atta»
 - **Cuerpo:** «Tu espacio de trabajo, a un toque.»
 - **Acción primaria:** «Instalar»
 - **Acción secundaria (mobile sheet):** «Continuar en navegador»
@@ -90,7 +90,7 @@ En plataformas Chromium con `beforeinstallprompt` capturado, el sistema MUST mos
 
 En iOS Safari (sin `beforeinstallprompt`), cuando el usuario es elegible y la app no está en modo standalone, el sistema MUST mostrar un bottom sheet instructivo en lugar del prompt nativo. Copy:
 
-- **Título:** «Añade Bowerbird a tu inicio»
+- **Título:** «Añade Atta a tu inicio»
 - **Cuerpo:** pasos numerados: Compartir → «Añadir a pantalla de inicio» → Confirmar
 - **Cierre:** «Entendido»
 
@@ -140,7 +140,7 @@ Mientras la app sea instalable (Chromium) o aplicable la guía iOS, el menú de 
 
 ### Requirement: System notices unificado
 
-Las notificaciones de sistema (actualización de service worker e instalación PWA) MUST gestionarse mediante el paquete workspace `@bowerbird/system-notices`, que expone el contrato `SystemNotice` y un orquestador que muestra una sola notice a la vez por prioridad. Cada notice MUST declarar un `scope` (`global` o `tenant`). Las notices de instalación MUST tener scope `tenant`; la de actualización MUST tener scope `global`. La notice de actualización MUST tener prioridad sobre la de instalación. El paquete MUST NOT depender de código de dominio Bowerbird ni de `pwa-install`.
+Las notificaciones de sistema (actualización de service worker e instalación PWA) MUST gestionarse mediante el paquete workspace `@canopy/system-notices`, que expone el contrato `SystemNotice` y un orquestador que muestra una sola notice a la vez por prioridad. Cada notice MUST declarar un `scope` (`global` o `tenant`). Las notices de instalación MUST tener scope `tenant`; la de actualización MUST tener scope `global`. La notice de actualización MUST tener prioridad sobre la de instalación. El paquete MUST NOT depender de código de dominio Atta ni de `pwa-install`.
 
 #### Scenario: Update e install elegibles simultáneamente
 
@@ -154,8 +154,8 @@ Las notificaciones de sistema (actualización de service worker e instalación P
 
 #### Scenario: Package aislado del dominio PWA
 
-- **WHEN** se inspeccionan las dependencias de `@bowerbird/system-notices`
-- **THEN** no hay imports desde `apps/pwa` ni módulos de negocio Bowerbird
+- **WHEN** se inspeccionan las dependencias de `@canopy/system-notices`
+- **THEN** no hay imports desde `apps/atta/pwa` ni módulos de negocio Atta
 
 ### Requirement: Registro de notices en composition root
 
@@ -181,5 +181,5 @@ El sistema MUST NOT mostrar promoción automática ni guía iOS cuando la app co
 
 #### Scenario: App instalada
 
-- **WHEN** el usuario abre Bowerbird en modo standalone
+- **WHEN** el usuario abre Atta en modo standalone
 - **THEN** no se muestra promoción de instalación ni guía iOS

@@ -1,4 +1,4 @@
-# AWS-leak inventory (apps/backend)
+# AWS-leak inventory (apps/atta/backend)
 
 Symbols and locations to vendor-neutralize during dual-runtime change.
 

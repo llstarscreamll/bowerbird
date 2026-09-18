@@ -1,0 +1,385 @@
+package s3
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
+	platformStorage "github.com/atta/internal/platform/storage"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	awsS3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+)
+
+type apiClient interface {
+	HeadObject(ctx context.Context, params *awsS3.HeadObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.HeadObjectOutput, error)
+	PutObject(ctx context.Context, params *awsS3.PutObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.PutObjectOutput, error)
+	GetObject(ctx context.Context, params *awsS3.GetObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.GetObjectOutput, error)
+	CopyObject(ctx context.Context, params *awsS3.CopyObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.CopyObjectOutput, error)
+	DeleteObject(ctx context.Context, params *awsS3.DeleteObjectInput, optFns ...func(*awsS3.Options)) (*awsS3.DeleteObjectOutput, error)
+}
+
+type ObjectStore struct {
+	client         apiClient
+	presignClient  presignAPIClient
+	bucket         string
+	uploadDuration time.Duration
+}
+
+type presignAPIClient interface {
+	PresignPutObject(ctx context.Context, params *awsS3.PutObjectInput, optFns ...func(*awsS3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
+	PresignGetObject(ctx context.Context, params *awsS3.GetObjectInput, optFns ...func(*awsS3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
+}
+
+var _ platformStorage.FileStore = (*ObjectStore)(nil)
+
+func NewObjectStore(client *awsS3.Client, bucket string) *ObjectStore {
+	return &ObjectStore{
+		client:         client,
+		presignClient:  awsS3.NewPresignClient(client),
+		bucket:         bucket,
+		uploadDuration: 15 * time.Minute,
+	}
+}
+
+func NewObjectStoreWithClient(client apiClient, bucket string) *ObjectStore {
+	return &ObjectStore{client: client, bucket: bucket, uploadDuration: 15 * time.Minute}
+}
+
+func NewObjectStoreWithClients(client apiClient, presignClient presignAPIClient, bucket string) *ObjectStore {
+	return &ObjectStore{client: client, presignClient: presignClient, bucket: bucket, uploadDuration: 15 * time.Minute}
+}
+
+func (s *ObjectStore) WriteFileIfAbsent(ctx context.Context, input platformStorage.WriteFileIfAbsentInput) (*platformStorage.WriteFileIfAbsentResult, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+	if len(input.Data) == 0 {
+		return nil, fmt.Errorf("data is required")
+	}
+
+	_, err := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	})
+	if err == nil {
+		return &platformStorage.WriteFileIfAbsentResult{Written: true, SizeBytes: int64(len(input.Data))}, nil
+	}
+
+	if !isNotFoundError(err) {
+		return nil, fmt.Errorf("head object: %w", err)
+	}
+
+	if _, err := s.client.PutObject(ctx, &awsS3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(input.Path),
+		Body:        bytes.NewReader(input.Data),
+		ContentType: aws.String(defaultContentType(input.ContentType)),
+		Metadata:    platformStorage.SanitizeObjectMetadata(input.Metadata),
+	}); err != nil {
+		return nil, fmt.Errorf("put object: %w", err)
+	}
+
+	return &platformStorage.WriteFileIfAbsentResult{Written: true, SizeBytes: int64(len(input.Data))}, nil
+}
+
+func (s *ObjectStore) ReadFile(ctx context.Context, input platformStorage.ReadFileInput) ([]byte, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	res, err := s.client.GetObject(ctx, &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get object: %w", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read object body: %w", err)
+	}
+
+	return body, nil
+}
+
+func (s *ObjectStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	params := &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	}
+	if input.Offset > 0 {
+		params.Range = aws.String(fmt.Sprintf("bytes=%d-", input.Offset))
+	}
+	res, err := s.client.GetObject(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("get object: %w", err)
+	}
+	size := int64(0)
+	if res.ContentLength != nil {
+		size = *res.ContentLength
+	}
+	if res.ContentRange != nil {
+		if total := parseContentRangeTotal(*res.ContentRange); total > 0 {
+			size = total
+		}
+	} else if input.Offset > 0 {
+		head, headErr := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+			Bucket: aws.String(s.bucket),
+			Key:    aws.String(input.Path),
+		})
+		if headErr == nil && head.ContentLength != nil {
+			size = *head.ContentLength
+		}
+	}
+	return &platformStorage.OpenFileResult{Body: res.Body, SizeBytes: size}, nil
+}
+
+func parseContentRangeTotal(raw string) int64 {
+	// bytes start-end/total
+	slash := strings.LastIndex(raw, "/")
+	if slash < 0 || slash+1 >= len(raw) {
+		return 0
+	}
+	var total int64
+	if _, err := fmt.Sscanf(raw[slash+1:], "%d", &total); err != nil {
+		return 0
+	}
+	return total
+}
+
+func (s *ObjectStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	if s.client == nil {
+		return fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return fmt.Errorf("path is required")
+	}
+	if strings.TrimSpace(input.DestPath) == "" {
+		return fmt.Errorf("dest path is required")
+	}
+
+	res, err := s.client.GetObject(ctx, &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	})
+	if err != nil {
+		return fmt.Errorf("get object: %w", err)
+	}
+	defer res.Body.Close()
+
+	file, err := os.OpenFile(input.DestPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return fmt.Errorf("open dest file: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, res.Body); err != nil {
+		return fmt.Errorf("write dest file: %w", err)
+	}
+	return nil
+}
+
+func (s *ObjectStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
+	if s.client == nil {
+		return false, fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return false, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return false, fmt.Errorf("path is required")
+	}
+
+	_, err := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	})
+	if err == nil {
+		return true, nil
+	}
+	if isNotFoundError(err) {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("head object: %w", err)
+}
+
+func (s *ObjectStore) MoveFile(ctx context.Context, input platformStorage.MoveFileInput) error {
+	if s.client == nil {
+		return fmt.Errorf("s3 client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.SourcePath) == "" {
+		return fmt.Errorf("source path is required")
+	}
+	if strings.TrimSpace(input.DestinationPath) == "" {
+		return fmt.Errorf("destination path is required")
+	}
+	if input.SourcePath == input.DestinationPath {
+		return nil
+	}
+
+	copySource := s.bucket + "/" + input.SourcePath
+	if _, err := s.client.CopyObject(ctx, &awsS3.CopyObjectInput{
+		Bucket:            aws.String(s.bucket),
+		Key:               aws.String(input.DestinationPath),
+		CopySource:        aws.String(copySource),
+		MetadataDirective: awsS3Types.MetadataDirectiveCopy,
+	}); err != nil {
+		return fmt.Errorf("copy object: %w", err)
+	}
+
+	if _, err := s.client.DeleteObject(ctx, &awsS3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.SourcePath),
+	}); err != nil {
+		return fmt.Errorf("delete source object: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ObjectStore) PresignUpload(ctx context.Context, input platformStorage.PresignUploadInput) (*platformStorage.PresignUploadResult, error) {
+	if s.presignClient == nil {
+		return nil, fmt.Errorf("s3 presign client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	expiresIn := input.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = s.uploadDuration
+	}
+
+	sanitizedMetadata := platformStorage.SanitizeObjectMetadata(input.Metadata)
+	presignedRequest, err := s.presignClient.PresignPutObject(ctx, &awsS3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(input.Path),
+		ContentType: aws.String(defaultContentType(input.ContentType)),
+		Metadata:    sanitizedMetadata,
+	}, func(opts *awsS3.PresignOptions) {
+		opts.Expires = expiresIn
+	})
+	if err != nil {
+		return nil, fmt.Errorf("presign put object: %w", err)
+	}
+
+	headers := platformStorage.MetadataToPresignHeaders(sanitizedMetadata)
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	headers["Content-Type"] = defaultContentType(input.ContentType)
+
+	return &platformStorage.PresignUploadResult{
+		URL:       presignedRequest.URL,
+		Method:    "PUT",
+		Headers:   headers,
+		ExpiresAt: time.Now().Add(expiresIn),
+		Reference: platformStorage.FileReference{
+			Bucket: s.bucket,
+			Key:    input.Path,
+		},
+		UploadPath: input.Path,
+	}, nil
+}
+
+func (s *ObjectStore) PresignDownload(ctx context.Context, input platformStorage.PresignDownloadInput) (*platformStorage.PresignDownloadResult, error) {
+	if s.presignClient == nil {
+		return nil, fmt.Errorf("s3 presign client is required")
+	}
+	if strings.TrimSpace(s.bucket) == "" {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if strings.TrimSpace(input.Path) == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	expiresIn := input.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = s.uploadDuration
+	}
+
+	presignedRequest, err := s.presignClient.PresignGetObject(ctx, &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(input.Path),
+	}, func(opts *awsS3.PresignOptions) {
+		opts.Expires = expiresIn
+	})
+	if err != nil {
+		return nil, fmt.Errorf("presign get object: %w", err)
+	}
+
+	return &platformStorage.PresignDownloadResult{
+		URL:       presignedRequest.URL,
+		Method:    "GET",
+		ExpiresAt: time.Now().Add(expiresIn),
+		Reference: platformStorage.FileReference{
+			Bucket: s.bucket,
+			Key:    input.Path,
+		},
+	}, nil
+}
+
+func defaultContentType(contentType string) string {
+	if strings.TrimSpace(contentType) == "" {
+		return "application/octet-stream"
+	}
+	return contentType
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var notFound *awsS3Types.NotFound
+	if errors.As(err, &notFound) {
+		return true
+	}
+
+	errText := strings.ToLower(err.Error())
+	return strings.Contains(errText, "not found") ||
+		strings.Contains(errText, "status code: 404") ||
+		strings.Contains(errText, "statuscode: 404") ||
+		strings.Contains(errText, "nosuchkey")
+}

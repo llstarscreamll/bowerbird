@@ -99,7 +99,7 @@ El relay MUST claim filas outbox y publicarlas al broker del deployment profile.
 
 ### Requirement: Entrega on-prem vía RabbitMQ
 
-En deployment profile `onprem`, el relay MUST publicar integration events al exchange topic `bowerbird.events` y background jobs al exchange direct `bowerbird.jobs` de RabbitMQ. Los handlers MUST ejecutarse en procesos consumer separados (`events-consumer`, `jobs-consumer`), no en el relay.
+En deployment profile `onprem`, el relay MUST publicar integration events al exchange topic `atta.events` y background jobs al exchange direct `atta.jobs` de RabbitMQ. Los handlers MUST ejecutarse en procesos consumer separados (`events-consumer`, `jobs-consumer`), no en el relay.
 
 #### Scenario: Evento publicado a RabbitMQ
 

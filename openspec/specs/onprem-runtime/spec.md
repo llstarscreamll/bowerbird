@@ -22,7 +22,7 @@ En profile `onprem`, identity, entitlements, memberships y la base control-plane
 #### Scenario: Login sin SaaS
 
 - **WHEN** un usuario inicia sesión contra la API on-prem
-- **THEN** la autenticación y autorización se resuelven con datos locales (control-plane DB) sin dependencia de servicios HTTP remotos de Bowerbird SaaS
+- **THEN** la autenticación y autorización se resuelven con datos locales (control-plane DB) sin dependencia de servicios HTTP remotos de Atta SaaS
 
 ### Requirement: Tenant DB fija en el servidor
 
@@ -82,7 +82,7 @@ El deployment profile `aws` MUST usar el mismo modelo outbox y relay→broker→
 
 El entorno de desarrollo local MUST usar `DEPLOYMENT_TARGET=onprem` con RabbitMQ en Docker, relay y consumers — idéntico al cliente on-prem. MUST NOT usar LocalStack EventBridge/SQS ni pollers embebidos en API.
 
-#### Scenario: pnpm run dev con RabbitMQ
+#### Scenario: mise //apps/atta:dev con RabbitMQ
 
 - **WHEN** un desarrollador ejecuta el flujo local documentado
 - **THEN** RabbitMQ está disponible, relay publica outbox y consumers procesan mensajes sin LocalStack messaging
@@ -90,7 +90,7 @@ El entorno de desarrollo local MUST usar `DEPLOYMENT_TARGET=onprem` con RabbitMQ
 #### Scenario: Secretos locales vía .env
 
 - **WHEN** el backend arranca en desarrollo local
-- **THEN** carga configuración desde el `.env` en la raíz del monorepo incluyendo conexión RabbitMQ
+- **THEN** carga configuración desde `apps/atta/.env` (vía `ENV_FILE`) incluyendo conexión RabbitMQ
 
 ### Requirement: Trazabilidad y Correlation IDs
 

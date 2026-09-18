@@ -1,0 +1,74 @@
+[env]
+ENV_FILE = "apps/atta/.env"
+
+[tasks."infra:up"]
+description = "Start Atta Compose (Postgres, RabbitMQ, MinIO, Caddy)"
+run = "scripts/infra-up.sh"
+
+[tasks."infra:down"]
+description = "Stop Atta Compose"
+run = "scripts/infra-down.sh"
+
+[tasks.dev]
+description = "Local infra + API + PWA + workers"
+run = "scripts/dev.sh"
+
+[tasks."test:full"]
+description = "Wipe Postgres, Go + PWA tests, e2e (chromium + http)"
+run = "scripts/test-full.sh"
+env = { ENV_FILE = "apps/atta/.env.test" }
+
+[tasks.seed]
+description = "Seed the local Atta tenant"
+run = "pnpm --filter @atta/backend seed"
+
+[tasks."migrate:all"]
+description = "Control-plane then tenant migrations"
+run = "pnpm --filter @atta/backend migrate:all"
+
+[tasks."migrate:controlplane"]
+run = "pnpm --filter @atta/backend migrate:controlplane"
+
+[tasks."migrate:tenants"]
+run = "pnpm --filter @atta/backend migrate:tenants"
+
+[tasks."caddy:trust"]
+description = "Trust the local Caddy CA"
+run = "scripts/caddy-trust.sh"
+
+[tasks."test:e2e"]
+description = "Playwright (stack must already be running)"
+run = "pnpm --filter @atta/e2e test:e2e"
+
+[tasks."test:e2e:local"]
+run = "pnpm --filter @atta/e2e test:e2e:local"
+
+[tasks."test:e2e:install"]
+run = "pnpm --filter @atta/e2e test:e2e:install"
+
+[tasks."test:e2e:install:all"]
+run = "pnpm --filter @atta/e2e test:e2e:install:all"
+
+[tasks."test:e2e:browser"]
+run = "pnpm --filter @atta/e2e test:e2e:browser"
+
+[tasks."test:e2e:http"]
+run = "pnpm --filter @atta/e2e test:e2e:http"
+
+[tasks."test:e2e:ui"]
+run = "pnpm --filter @atta/e2e test:e2e:ui"
+
+[tasks.deploy]
+description = "Build + Pulumi AWS and on-prem fleet"
+dir = "{{config_root}}/../.."
+run = "pnpm run build && turbo run deploy --filter=@atta/infra --filter=@atta/onprem"
+
+[tasks."deploy:aws"]
+description = "Build + Pulumi AWS track"
+dir = "{{config_root}}/../.."
+run = "pnpm run build && turbo run deploy --filter=@atta/infra"
+
+[tasks."deploy:onprem"]
+description = "Pulumi on-prem fleet"
+dir = "{{config_root}}/../.."
+run = "turbo run deploy --filter=@atta/onprem"

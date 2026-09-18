@@ -1,8 +1,8 @@
 packages:
-  - apps/*
-  - packages/*
-  - apps/deploy/*
-  - apps/deploy/aws/sdks/neon
+  - apps/*/*
+  - apps/*/deploy/*
+  - apps/*/deploy/aws/sdks/neon
+  - packages/typescript/*
 allowBuilds:
   '@parcel/watcher': true
   '@pulumi/command': true

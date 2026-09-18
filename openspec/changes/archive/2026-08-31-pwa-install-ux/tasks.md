@@ -1,6 +1,6 @@
-## 0. Package `@bowerbird/system-notices`
+## 0. Package `@canopy/system-notices`
 
-- [x] 0.1 Scaffold `packages/system-notices/` (`package.json`, build config, `src/index.ts`, `src/angular/`); verificar `pnpm --filter @bowerbird/system-notices build` y dependency `workspace:*` en PWA
+- [x] 0.1 Scaffold `packages/ts/system-notices/` (`package.json`, build config, `src/index.ts`, `src/angular/`); verificar `pnpm --filter @canopy/system-notices build` y dependency `workspace:*` en PWA
 - [x] 0.2 Implementar `SystemNotice` port + `SYSTEM_NOTICE` token + `SystemNoticesOrchestrator` con tests aislados; verificar prioridad, una-notice-activa y fail independence en `show()`
 - [x] 0.3 Implementar `SystemNoticesHostComponent` + `provideSystemNotices()` en entry `./angular`; exportar solo API pública; verificar filtro por `scope`
 
@@ -28,6 +28,6 @@
 
 ## 5. Verificación
 
-- [x] 5.1 `pnpm --filter @bowerbird/system-notices lint|test` y `pnpm --filter @bowerbird/pwa lint` pasan
+- [x] 5.1 `pnpm --filter @canopy/system-notices lint|test` y `pnpm --filter @atta/web lint` pasan
 - [x] 5.2 Checklists DDD + modular en `design.md` (aggregate-only invariants, grep notices, `bb:pwa:` aislado)
 - [ ] 5.3 Flujos manuales: snackbar, sheet, iOS, pull menú, update > install, cooldowns

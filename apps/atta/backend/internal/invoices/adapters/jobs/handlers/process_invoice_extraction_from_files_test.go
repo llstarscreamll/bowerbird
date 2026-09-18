@@ -1,0 +1,182 @@
+package handlers
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	invoicingCommands "github.com/atta/internal/invoices/application/commands"
+	invoicingPorts "github.com/atta/internal/invoices/application/ports"
+	contractJobs "github.com/atta/internal/invoices/contracts/jobs"
+	"github.com/atta/internal/invoices/domain"
+	"github.com/atta/internal/platform/jobs"
+	platformStorage "github.com/atta/internal/platform/storage"
+	"github.com/atta/internal/platform/tenant"
+)
+
+type alwaysMatchReceivers struct{}
+
+func (alwaysMatchReceivers) HasAny(context.Context) (bool, error) { return true, nil }
+
+func (alwaysMatchReceivers) ReceiverMatches(context.Context, string) (bool, error) {
+	return true, nil
+}
+
+type processorFileStore struct{}
+
+func (s *processorFileStore) WriteFileIfAbsent(ctx context.Context, input platformStorage.WriteFileIfAbsentInput) (*platformStorage.WriteFileIfAbsentResult, error) {
+	return nil, nil
+}
+
+func (s *processorFileStore) ReadFile(ctx context.Context, input platformStorage.ReadFileInput) ([]byte, error) {
+	return []byte("<Invoice><ID>INV-1</ID><UUID>CUFE-1</UUID></Invoice>"), nil
+}
+
+func (s *processorFileStore) OpenFile(ctx context.Context, input platformStorage.OpenFileInput) (*platformStorage.OpenFileResult, error) {
+	return nil, nil
+}
+
+func (s *processorFileStore) DownloadFile(ctx context.Context, input platformStorage.DownloadFileInput) error {
+	return os.WriteFile(input.DestPath, []byte("PK\x03\x04"), 0o600)
+}
+
+func (s *processorFileStore) Exists(ctx context.Context, input platformStorage.ExistsFileInput) (bool, error) {
+	return true, nil
+}
+
+func (s *processorFileStore) MoveFile(ctx context.Context, input platformStorage.MoveFileInput) error {
+	return nil
+}
+
+func (s *processorFileStore) PresignUpload(ctx context.Context, input platformStorage.PresignUploadInput) (*platformStorage.PresignUploadResult, error) {
+	return nil, nil
+}
+
+func (s *processorFileStore) PresignDownload(ctx context.Context, input platformStorage.PresignDownloadInput) (*platformStorage.PresignDownloadResult, error) {
+	return nil, nil
+}
+
+type processorRepo struct{}
+
+func (r *processorRepo) ExistsBySource(ctx context.Context, sourceName string, sourceID string) (bool, error) {
+	return false, nil
+}
+
+func (r *processorRepo) ExistsInvoiceByCUFE(ctx context.Context, cufe string) (bool, error) {
+	return false, nil
+}
+
+func (r *processorRepo) GetInvoiceByID(ctx context.Context, id string) (*domain.InvoiceHeaderRecord, []domain.InvoiceLineRecord, error) {
+	return nil, nil, nil
+}
+
+func (r *processorRepo) ListInvoices(ctx context.Context, limit int, query string) ([]domain.InvoiceHeaderRecord, bool, error) {
+	return nil, false, nil
+}
+
+func (r *processorRepo) PersistInvoiceAtomic(ctx context.Context, header domain.InvoiceHeaderRecord, lines []domain.InvoiceLineRecord) error {
+	return nil
+}
+
+func (r *processorRepo) ApplyCatalogLinking(ctx context.Context, headerID string, issuerPartyID *string, linkingStatus string, lines []invoicingPorts.LineLinkUpdate) error {
+	return nil
+}
+
+type processorXMLExtractor struct{}
+
+func (e *processorXMLExtractor) ParseInvoiceXML(data []byte) (*domain.InvoiceDocument, error) {
+	return &domain.InvoiceDocument{
+		CUFE:          "CUFE-1",
+		InvoiceID:     "INV-1",
+		Issuer:        domain.Party{Name: "Issuer", TaxID: "123"},
+		Receiver:      domain.Party{Name: "Receiver", TaxID: "456"},
+		CurrencyCode:  "COP",
+		PayableAmount: 10,
+		Lines:         []domain.InvoiceLine{{LineID: "1", ItemDescription: "x", Quantity: 1, UnitPrice: 10, LineExtension: 10}},
+	}, nil
+}
+
+type processorLLMExtractor struct{}
+
+func (e *processorLLMExtractor) ExtractFromPDF(ctx context.Context, pdfData []byte) (*domain.InvoiceDocument, error) {
+	return nil, nil
+}
+
+type processorPasswordResolver struct{}
+
+func (processorPasswordResolver) ResolveCandidates(ctx context.Context) ([]invoicingPorts.PasswordCandidate, error) {
+	return nil, nil
+}
+
+func (processorPasswordResolver) MarkUsed(ctx context.Context, secretID string) error {
+	return nil
+}
+
+type processorPartyResolver struct{}
+
+func (processorPartyResolver) ResolveIssuer(ctx context.Context, profile invoicingPorts.IssuerProfile) (string, error) {
+	return "", nil
+}
+
+type processorLineResolver struct{}
+
+func (processorLineResolver) ResolveLine(ctx context.Context, input invoicingPorts.CatalogLineResolveInput) (*invoicingPorts.CatalogLineResolveResult, error) {
+	return &invoicingPorts.CatalogLineResolveResult{Status: "unmatched"}, nil
+}
+
+func newProcessorCommand() *invoicingCommands.CreateInvoicesFromFilesCommand {
+	repo := &processorRepo{}
+	return invoicingCommands.NewCreateInvoicesFromFilesCommand(
+		&processorFileStore{},
+		&processorXMLExtractor{},
+		&processorLLMExtractor{},
+		repo,
+		processorPasswordResolver{},
+		invoicingCommands.NewCreateInvoiceCommand(repo, processorPartyResolver{}, processorLineResolver{}, alwaysMatchReceivers{}),
+	)
+}
+
+func TestProcessInvoiceExtractionRequestedHandlesMessage(t *testing.T) {
+	cmd := newProcessorCommand()
+	processor := NewProcessInvoiceExtractionFromFiles(cmd)
+
+	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job_1",
+		SourceName: "inbox-message",
+		SourceID:   "msg_1",
+		Files: []contractJobs.File{
+			{Path: "k1", Filename: "factura.xml"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal detail failed: %v", err)
+	}
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant_1")
+	err = processor.Handle(ctx, jobs.JobMessage{MessageID: "msg-1", Body: detail})
+	if err != nil {
+		t.Fatalf("handle message failed: %v", err)
+	}
+}
+
+func TestProcessInvoiceExtractionRequestedRequiresTenantInContext(t *testing.T) {
+	cmd := newProcessorCommand()
+	processor := NewProcessInvoiceExtractionFromFiles(cmd)
+
+	detail, err := contractJobs.MarshalInvoiceExtractionRequested(contractJobs.ExtractInvoicesFromFilesJob{
+		ID:         "job_1",
+		SourceName: "inbox-message",
+		SourceID:   "msg_1",
+		Files: []contractJobs.File{
+			{Path: "k1", Filename: "factura.xml"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal detail failed: %v", err)
+	}
+
+	err = processor.Handle(context.Background(), jobs.JobMessage{MessageID: "msg-1", Body: detail})
+	if err == nil {
+		t.Fatal("expected tenant id error")
+	}
+}

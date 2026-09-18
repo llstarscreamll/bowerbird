@@ -13,7 +13,7 @@
 
 ## 3. Frontend: Componente Composible de Catálogo
 
-- [x] 3.1 Crear el componente `app-catalog-linker` dentro de `apps/pwa/src/app/catalog/presentation/components/`.
+- [x] 3.1 Crear el componente `app-catalog-linker` dentro de `apps/atta/web/src/app/catalog/presentation/components/`.
 - [x] 3.2 Implementar en `app-catalog-linker` el autocompletado (Spartan UI `hlm-command`) consumiendo el endpoint de búsqueda con debounce (via `CatalogStore` o servicio dedicado).
 - [x] 3.3 Conectar los botones y acciones internas del linker (vincular, rechazar, nuevo provisional) al `CatalogStore`, emitiendo un Output `(resolved)` cuando termine.
 

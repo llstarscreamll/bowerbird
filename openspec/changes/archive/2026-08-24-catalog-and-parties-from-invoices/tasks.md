@@ -3,7 +3,7 @@
 - [x] 1.1 Add tenant migration for `parties` (id, tax_id, name, roles, status, timestamps) with unique index on non-empty `tax_id`
 - [x] 1.2 Add tenant migration for `catalog_items`, `catalog_item_aliases`, `catalog_match_memories`
 - [x] 1.3 Add nullable `issuer_party_id` on `invoice_headers` and link columns on `invoice_lines` (`item_id`, `link_status`, `link_method`, `link_locked`, `suggestions`)
-- [x] 1.4 Verify migrations up/down via `pnpm --filter @bowerbird/backend migrate:all` (or project-equivalent) against local Postgres
+- [x] 1.4 Verify migrations up/down via `pnpm --filter @atta/backend migrate:all` (or project-equivalent) against local Postgres
 
 ## 2. Backend parties module
 
@@ -40,6 +40,6 @@
 
 ## 6. Verification
 
-- [x] 6.1 Backend: `pnpm --filter @bowerbird/backend lint && pnpm --filter @bowerbird/backend test` for parties, catalog, invoices packages touched
-- [x] 6.2 PWA: `pnpm --filter @bowerbird/pwa lint` (and targeted tests if added)
+- [x] 6.1 Backend: `pnpm --filter @atta/backend lint && pnpm --filter @atta/backend test` for parties, catalog, invoices packages touched
+- [x] 6.2 PWA: `pnpm --filter @atta/web lint` (and targeted tests if added)
 - [x] 6.3 Manual smoke on local stack: ingest or fixture invoice → party + provisional item → correct match with remember → second invoice auto-links via memory

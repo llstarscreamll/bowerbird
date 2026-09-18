@@ -27,4 +27,4 @@ El frontend (Angular PWA) actualmente utiliza el término "Contrapartes" para re
 
 ## Risks / Trade-offs
 
-- **Risk:** Olvidar instancias ocultas en modales o tooltips. → _Mitigación:_ Se utilizará búsqueda exhaustiva (grep) por "contraparte" en todo `apps/pwa` para asegurar cobertura completa.
+- **Risk:** Olvidar instancias ocultas en modales o tooltips. → _Mitigación:_ Se utilizará búsqueda exhaustiva (grep) por "contraparte" en todo `apps/atta/web` para asegurar cobertura completa.

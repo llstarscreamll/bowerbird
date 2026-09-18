@@ -6,7 +6,7 @@ New `connections` bounded context; `inbox` depends on it via an ACL/port.
 
 ### `connections` bounded context
 
-Domain: `apps/backend/internal/connections`
+Domain: `apps/atta/backend/internal/connections`
 
 **Aggregate: `Connection`**
 

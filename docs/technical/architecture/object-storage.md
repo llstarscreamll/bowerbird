@@ -4,15 +4,15 @@ All file I/O goes through the `FileStore` port (`internal/platform/storage/s3`).
 
 ## Configuration
 
-| Variable                                      | Purpose                                                                         |
-| --------------------------------------------- | ------------------------------------------------------------------------------- |
-| `S3_BUCKET_NAME`                              | Target bucket                                                                   |
-| `AWS_REGION`                                  | SDK region (required even for MinIO)                                            |
-| `MINIO_ENDPOINT_URL`                          | Custom S3 endpoint (onprem only; omit on AWS)                                   |
-| `S3_PRESIGN_ENDPOINT_URL`                     | Public URL for browser presigned uploads (local: `https://media.bowerbird.dev`) |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials                                                                     |
-| `AWS_REQUEST_CHECKSUM_CALCULATION`            | Set `when_required` for MinIO compatibility                                     |
-| `AWS_RESPONSE_CHECKSUM_VALIDATION`            | Set `when_required` for MinIO compatibility                                     |
+| Variable                                      | Purpose                                                                    |
+| --------------------------------------------- | -------------------------------------------------------------------------- |
+| `S3_BUCKET_NAME`                              | Target bucket                                                              |
+| `AWS_REGION`                                  | SDK region (required even for MinIO)                                       |
+| `MINIO_ENDPOINT_URL`                          | Custom S3 endpoint (onprem only; omit on AWS)                              |
+| `S3_PRESIGN_ENDPOINT_URL`                     | Public URL for browser presigned uploads (local: `https://media.atta.dev`) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials                                                                |
+| `AWS_REQUEST_CHECKSUM_CALCULATION`            | Set `when_required` for MinIO compatibility                                |
+| `AWS_RESPONSE_CHECKSUM_VALIDATION`            | Set `when_required` for MinIO compatibility                                |
 
 See [MinIO](../tooling/minio.md) for local bootstrap and credentials.
 

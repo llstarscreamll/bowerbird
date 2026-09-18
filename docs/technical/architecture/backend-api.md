@@ -103,10 +103,10 @@ Local dev runs API + workers via Air; see [Getting started](../getting-started.m
 
 ## Config and secrets
 
-| Profile                          | Secrets source                                                                                  |
-| -------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `onprem` (local + client deploy) | Plain `.env` (`DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys)  |
-| `aws`                            | SSM SecureString JSON at `SSM_PARAMETER_NAME` — see [AWS secrets](../deployment/ssm-secrets.md) |
+| Profile                          | Secrets source                                                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `onprem` (local + client deploy) | Product dotenv via `ENV_FILE` (default `apps/atta/.env`: `DATABASE_URL`, `RABBITMQ_URL`, `MINIO_ENDPOINT_URL`, encryption keys, API keys) |
+| `aws`                            | SSM SecureString JSON at `SSM_PARAMETER_NAME` — see [AWS secrets](../deployment/ssm-secrets.md)                                           |
 
 ## Local development runtime
 

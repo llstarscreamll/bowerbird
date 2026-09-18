@@ -1,7 +1,0 @@
-name: bowerbird
-runtime:
-  name: nodejs
-  options:
-    typescript: true
-description: Bowerbird AWS Lambda + Neon + Cloudflare DNS
-main: index.ts

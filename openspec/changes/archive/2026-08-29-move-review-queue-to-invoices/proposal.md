@@ -34,7 +34,7 @@ La cola de revisión y las decisiones de vinculación viven en Catálogo, pero e
 
 ## Impact
 
-- **Backend**: `apps/backend/internal/catalog` (quitar `InvoiceLineLinkRepository` del repo catalog, partir `RememberDecision`, retirar rutas HTTP); `apps/backend/internal/invoices` (nuevos query/command, puertos ACL ampliados, repo de links, HTTP).
-- **PWA**: `apps/pwa/src/app/invoices` (página review + store/HTTP); `apps/pwa/src/app/catalog` (quitar review); `app-catalog-linker` permanece como widget UI reutilizable.
+- **Backend**: `apps/atta/backend/internal/catalog` (quitar `InvoiceLineLinkRepository` del repo catalog, partir `RememberDecision`, retirar rutas HTTP); `apps/atta/backend/internal/invoices` (nuevos query/command, puertos ACL ampliados, repo de links, HTTP).
+- **PWA**: `apps/atta/web/src/app/invoices` (página review + store/HTTP); `apps/atta/web/src/app/catalog` (quitar review); `app-catalog-linker` permanece como widget UI reutilizable.
 - **API**: breaking en rutas `/catalog/...` de cola/decisions; clientes internos (solo PWA hoy) migran en el mismo change.
 - **Specs**: deltas en `openspec/specs/catalog` y `openspec/specs/invoices`.

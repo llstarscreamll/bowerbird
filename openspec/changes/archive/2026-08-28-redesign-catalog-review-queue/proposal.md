@@ -22,11 +22,11 @@ La cola de revisión actual (`Cola de revisión`) es apenas un esqueleto funcion
 
 ## Impact
 
-- **Frontend (`@apps/pwa`)**:
+- **Frontend (`@apps/atta/web`)**:
   - Creación de componente compartido `app-catalog-linker` exportado por el módulo de catálogo (aislamiento e independencia UI).
-  - Refactor en `apps/pwa/src/app/catalog/presentation/pages/review` usando el nuevo componente.
-  - Refactor en la tarjeta de línea de `apps/pwa/src/app/invoices/presentation/pages/detail` usando el nuevo componente.
-  - Actualización de columnas en `apps/pwa/src/app/invoices/presentation/pages/master`.
-- **Backend (`apps/backend`)**:
+  - Refactor en `apps/atta/web/src/app/catalog/presentation/pages/review` usando el nuevo componente.
+  - Refactor en la tarjeta de línea de `apps/atta/web/src/app/invoices/presentation/pages/detail` usando el nuevo componente.
+  - Actualización de columnas en `apps/atta/web/src/app/invoices/presentation/pages/master`.
+- **Backend (`apps/atta/backend`)**:
   - La query `ListReviewQueueQuery` del módulo de catálogo poblará los nombres localmente.
   - La query `GetInvoiceByIDQuery` del módulo de facturas utilizará un puerto interno (Anti-Corruption Layer) hacia el módulo de catálogo para resolver los nombres, previniendo el acoplamiento cruzado de bases de datos (reach-through).

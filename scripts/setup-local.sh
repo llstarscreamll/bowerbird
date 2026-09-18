@@ -94,7 +94,7 @@ EOF
   install_agent_skills
   install_mcp_servers
 
-  log "Done. Next: cp .env.example .env (repo root), then mise run dev"
+  log "Done. Next: cp apps/atta/.env.example apps/atta/.env, then mise //apps/atta:dev"
   log "See docs/technical/getting-started.md"
 }
 

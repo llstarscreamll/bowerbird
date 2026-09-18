@@ -11,4 +11,4 @@
 For project architecture and conventions, please consult `AGENTS.md` and `openspec/config.yaml`.
 
 # Verification
-After code changes, run the full local test suite: `mise run test:full` (see AGENTS.md). Stop `mise run dev` first.
+After code changes, run the full local test suite: `mise //apps/atta:test:full` (see AGENTS.md). Stop `mise //apps/atta:dev` first.

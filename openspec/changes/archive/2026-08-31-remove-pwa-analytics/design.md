@@ -15,7 +15,7 @@ El aggregate `InstallEngagement` devuelve `{ engagement, events[] }` aunque la l
 **Non-Goals:**
 
 - Integrar PostHog, Sentry u otro vendor ahora.
-- Tocar `@bowerbird/system-notices`, presenters ni reglas de engagement.
+- Tocar `@canopy/system-notices`, presenters ni reglas de engagement.
 - Backend de analytics ni métricas operativas por tenant.
 
 ## Decisions
@@ -62,7 +62,7 @@ La lógica interna (`wasEligible`, umbral 2ª visita) se mantiene; solo se elimi
 
 | Acción      | Ruta                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------- |
-| Eliminar    | `apps/pwa/src/app/core/analytics/`                                                                                  |
+| Eliminar    | `apps/atta/web/src/app/core/analytics/`                                                                             |
 | Eliminar    | `core/pwa-install/application/engagement-event.handler.ts`                                                          |
 | Eliminar    | `core/pwa-install/application/pwa-analytics.events.ts`                                                              |
 | Eliminar    | `core/pwa-install/domain/events/install-engagement.events.ts`                                                       |
@@ -74,7 +74,7 @@ La lógica interna (`wasEligible`, umbral 2ª visita) se mantiene; solo se elimi
 ## Grafo de dependencias (después)
 
 ```
-core/pwa-install  →  @bowerbird/system-notices
+core/pwa-install  →  @canopy/system-notices
                    (sin core/analytics)
 ```
 
@@ -92,7 +92,7 @@ core/pwa-install  →  @bowerbird/system-notices
 2. Quitar `track()` de notices y coordinator.
 3. Eliminar handler, analytics module y `provideAnalytics()`.
 4. Ajustar tests del módulo `pwa-install`.
-5. `pnpm --filter @bowerbird/pwa lint && test && build`.
+5. `pnpm --filter @atta/web lint && test && build`.
 
 Rollback: revert del commit; no hay migración de datos ni API pública afectada.
 
