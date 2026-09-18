@@ -42,9 +42,9 @@ EventBridge Scheduler's minimum rate is one minute, so AWS relay ticks at
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Operational excellence | Pulumi TypeScript, tagged resources, CloudWatch alarms, X-Ray                                                                                                                                                                           |
 | Security               | CMK (rotation, CloudFront OAC on the web bucket), SSM SecureString, IAM per function, S3 Block Public Access, CloudFront + API Gateway WAF (IP reputation, Common, Known Bad Inputs, SQLi), TLS 1.2+, Cloudflare DNS validation for ACM |
-| Reliability            | Multi-AZ CloudFront/API Gateway/Lambda, SQS DLQ, Lambda DLQ, EventBridge Scheduler DLQ, Neon HA + 7-day PITR on prod                                                                                                                    |
+| Reliability            | Multi-AZ CloudFront/API Gateway/Lambda, SQS DLQ, Lambda DLQ, EventBridge Scheduler DLQ. Neon HA and PITR are set on the project in the Neon Console, not in this stack                                                                  |
 | Performance            | Lambda arm64, Neon pooler for bursty connections, CloudFront cache split (hashed vs entry)                                                                                                                                              |
-| Cost                   | No NAT/RDS/RDS Proxy, Lambda + Neon scale-to-zero on non-prod (`suspendTimeoutSeconds`)                                                                                                                                                 |
+| Cost                   | No NAT/RDS/RDS Proxy. Non-prod Neon scale-to-zero is a Console setting (`suspendTimeout`)                                                                                                                                               |
 | Sustainability         | Graviton Lambdas, serverless data plane                                                                                                                                                                                                 |
 
 Account-level GuardDuty and CloudTrail stay outside this stack. Enable them on
@@ -83,17 +83,29 @@ parameter, not Lambda environment variables.
 
 ## Neon
 
-Pulumi creates one Neon project per `ENV`:
+Create the Neon project **once** in the [Neon Console](https://console.neon.tech)
+(or the Neon CLI). This Pulumi program does **not** create, replace, or
+delete it. `pulumi up` and `pulumi destroy` cannot drop Postgres.
 
-- Region: `NEON_REGION_ID` (default `aws-us-east-1`)
-- Database / role: `bowerbird`
-- Default branch named after `ENV`
-- History window: 7 days on prod (`604800`), 6 hours otherwise
-- Pooled connection → Lambda `database_url`
-- Direct connection → migrate Lambda and tenant `CREATE DATABASE`
+Use one project per `ENV`. Recommended settings:
 
-Set `NEON_API_KEY` (and optional `NEON_ORG_ID`) in `.env`. The provider reads
-the key from the Pulumi Neon provider config.
+- Region `aws-us-east-1` (same as `AWS_REGION`)
+- Postgres 16
+- Default database and role `bowerbird` (the role needs `CREATEDB` for
+  tenant databases)
+- Default branch named after `ENV` (`staging`, `prod`)
+- Prod: protect the default branch, 7-day restore window, no scale-to-zero,
+  autoscaling 0.25–4 CU
+- Non-prod: 6-hour restore window, suspend after 5 minutes, autoscaling
+  0.25–2 CU
+
+Set `NEON_API_KEY` and `NEON_PROJECT_ID` in `.env`. Pulumi looks up that
+project and copies the default-branch **pooled** URL into `database_url`
+and the **direct** URL into `database_direct_url`. If the lookup fails,
+the apply fails.
+
+Tune compute, PITR, snapshots, and branch protection in the Neon Console.
+Those settings are not in this stack.
 
 After the first `pulumi up`, control-plane migrations already ran as
 part of that apply (see Deploy). Re-run them out of band with:
@@ -111,8 +123,10 @@ on-prem fleet in parallel.
 
 1. Install the Pulumi CLI (`mise install` includes it) and log in
    (`pulumi login`).
-2. Copy `.env.example` → `.env` and fill AWS, Cloudflare, Neon, and Gemini
-   values. Do **not** deploy with the local MinIO dummy keys
+2. Copy `.env.example` → `.env` and fill AWS, Cloudflare, Neon
+   (`NEON_API_KEY`, `NEON_PROJECT_ID`), and Gemini values. Create the
+   Neon project first (see [Neon](#neon)). Do **not** deploy with the
+   local MinIO dummy keys
    (`AWS_ACCESS_KEY_ID=bowerbird`). Pulumi and the AWS SDK read those
    names. Use an IAM role/profile, or a dedicated file:
 
@@ -123,12 +137,12 @@ on-prem fleet in parallel.
    Omit `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in that file so the
    SDK uses the shared credentials file or SSO.
 
-3. Create or select the stack named after `ENV`:
+3. Select the stack named after `ENV` (`pulumi stack select --create`
+   on `pnpm run deploy:aws` creates it if missing):
 
    ```bash
    cd apps/deploy/aws
-   pulumi stack init "$ENV"   # first time only
-   pulumi stack select "$ENV"
+   pulumi stack select --create "$ENV"
    ```
 
 4. Build and deploy from the repo root:
@@ -153,6 +167,13 @@ on-prem fleet in parallel.
    (`webUrl`, `apiUrl`, `ssmParameterName`, `neonProjectId`,
    `jobsQueueUrl`, `migrateFunctionName`).
 
+CI and staging apply from GitHub:
+[GitHub setup (CI and staging deploy)](./github-actions.md).
+Pushes to `develop` run `pnpm run deploy:aws` with `ENV=staging`. The
+workflow assumes an IAM role via OIDC; configure the GitHub **staging**
+environment secrets and variables before the first run. `master` / `prod`
+is not wired yet.
+
 ## Schedules
 
 EventBridge Scheduler (not EventBridge rules). Unix crontab on-prem is
@@ -169,12 +190,11 @@ EventBridge Scheduler (not EventBridge rules). Unix crontab on-prem is
 
 - `AWS_REGION` must be `us-east-1` (CloudFront ACM + CloudFront WAF).
 - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`,
-  `NEON_API_KEY`, and `GEMINI_API_KEY` are required.
+  `NEON_API_KEY`, `NEON_PROJECT_ID`, and `GEMINI_API_KEY` are required.
 - Optional: `APP_SUBDOMAIN` (default `app`), `MEDIA_SUBDOMAIN` (default
-  `media`), `API_ORIGIN_SUBDOMAIN` (default `api`), `NEON_ORG_ID`,
-  `NEON_REGION_ID` (default `aws-us-east-1`),
-  `NEON_PG_VERSION` (default `16`), `ALARM_EMAIL`, `GEMINI_MODEL`,
-  `GEMINI_ENDPOINT`, Google/Microsoft OAuth client ids and secrets.
+  `media`), `API_ORIGIN_SUBDOMAIN` (default `api`), `ALARM_EMAIL`,
+  `GEMINI_MODEL`, `GEMINI_ENDPOINT`, Google/Microsoft OAuth client ids
+  and secrets.
 - Web assets come from `apps/pwa/dist/pwa/browser` (the root build
   produces this before Pulumi runs).
 - S3 web deploy does not prune hashed bundles, so old clients can still load

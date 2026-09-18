@@ -33,8 +33,9 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
   const neonProvider = new neon.Provider('neon', { apiKey: cfg.neonApiKey });
   const cfProvider = new cloudflare.Provider('cloudflare', { apiToken: cfg.cloudflareApiToken });
   const awsOpts = { provider: awsProvider };
-  const neonOpts = { provider: neonProvider, protect: true };
   const cfOpts = { provider: cfProvider };
+
+  const neonProject = neon.getProjectOutput({ id: cfg.neonProjectId }, { provider: neonProvider });
 
   const key = new aws.kms.Key(
     'app',
@@ -46,27 +47,6 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     awsOpts,
   );
   new aws.kms.Alias('app', { name: `alias/${prefix}`, targetKeyId: key.id }, awsOpts);
-
-  const neonProject = new neon.Project(
-    'pg',
-    {
-      name: `${prefix}-pg`,
-      regionId: cfg.neonRegionId,
-      pgVersion: cfg.neonPgVersion,
-      orgId: cfg.neonOrgId,
-      historyRetentionSeconds: cfg.isProd ? 604800 : 21600,
-      defaultBranchProtected: cfg.isProd,
-      branch: {
-        name: cfg.envName,
-        databaseName: 'bowerbird',
-        roleName: 'bowerbird',
-      },
-      autoscalingLimitMinCu: 0.25,
-      autoscalingLimitMaxCu: cfg.isProd ? 4 : 2,
-      suspendTimeoutSeconds: cfg.isProd ? 0 : 300,
-    },
-    neonOpts,
-  );
 
   const objectsBucket = new aws.s3.Bucket(
     'objects',
@@ -139,8 +119,8 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 
   const secretString = pulumi
     .all({
-      pooled: neonProject.connectionUriPooler,
-      direct: neonProject.connectionUri,
+      pooled: pulumi.secret(neonProject.connectionUriPooler),
+      direct: pulumi.secret(neonProject.connectionUri),
       jobsQueueUrl: jobsQueue.url,
       eventBusName: eventBus.name,
       objectsBucket: objectsBucket.bucket,
@@ -652,7 +632,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     webUrl: pulumi.interpolate`https://${cfg.appDomain}`,
     apiUrl: pulumi.interpolate`https://${cfg.appDomain}`,
     ssmParameterName: secretsParam.name,
-    neonProjectId: neonProject.id,
+    neonProjectId: pulumi.output(cfg.neonProjectId),
     jobsQueueUrl: jobsQueue.url,
     migrateFunctionName: migrateFn.name,
     apiOriginDomain: pulumi.output(cfg.apiOriginDomain),

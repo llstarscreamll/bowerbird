@@ -83,7 +83,7 @@
 - `docker-compose.yml` runs Postgres `5432`, RabbitMQ `5672`, MinIO `9000/9001`, Caddy `80/443`.
 - `Caddyfile` maps `app.bowerbird.dev` → Angular `:4200`, `app.bowerbird.dev/api*` → Go API `:8080`, and `media.bowerbird.dev` → MinIO `:9000`; use `app.bowerbird.dev` locally for cookie/routing behavior.
 - AWS Pulumi entrypoint is `apps/deploy/aws/index.ts` (`@bowerbird/infra`) and loads the repo-root `.env`:
-  - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, and `GEMINI_API_KEY` must be set.
+  - `ENV`, `AWS_ACCOUNT_ID`, `ROOT_DOMAIN`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, `NEON_PROJECT_ID`, and `GEMINI_API_KEY` must be set.
   - `AWS_REGION` must be `us-east-1` (CloudFront certificates and CloudFront WAF).
   - Postgres is Neon (not RDS). DNS is Cloudflare.
 - Web deploy consumes `apps/pwa/dist/pwa/browser`; build PWA before AWS deploy.

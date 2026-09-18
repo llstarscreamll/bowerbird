@@ -23,9 +23,7 @@ export interface InfraConfig {
   apiOriginDomain: string;
   cloudflareApiToken: string;
   neonApiKey: string;
-  neonOrgId?: string;
-  neonRegionId: string;
-  neonPgVersion: number;
+  neonProjectId: string;
   geminiApiKey: string;
   geminiModel: string;
   geminiEndpoint: string;
@@ -48,7 +46,8 @@ function required(name: string): string {
 }
 
 function optional(name: string, fallback = ''): string {
-  return process.env[name]?.trim() ?? fallback;
+  const value = process.env[name]?.trim();
+  return value ? value : fallback;
 }
 
 export function loadConfig(): InfraConfig {
@@ -77,9 +76,7 @@ export function loadConfig(): InfraConfig {
     apiOriginDomain: `${apiOriginSubdomain}.${rootDomain}`,
     cloudflareApiToken: required('CLOUDFLARE_API_TOKEN'),
     neonApiKey: required('NEON_API_KEY'),
-    neonOrgId: optional('NEON_ORG_ID') || undefined,
-    neonRegionId: optional('NEON_REGION_ID', 'aws-us-east-1'),
-    neonPgVersion: Number(optional('NEON_PG_VERSION', '16')),
+    neonProjectId: required('NEON_PROJECT_ID'),
     geminiApiKey: required('GEMINI_API_KEY'),
     geminiModel: optional('GEMINI_MODEL', 'gemini-2.0-flash'),
     geminiEndpoint: optional('GEMINI_ENDPOINT', 'https://generativelanguage.googleapis.com'),

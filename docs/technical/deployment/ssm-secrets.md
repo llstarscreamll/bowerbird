@@ -95,7 +95,8 @@ Use the pooler hostname (`-pooler`) for `database_url`. PgBouncer
 transaction mode cannot run `CREATE DATABASE` or some migration session
 features, so `database_direct_url` must omit `-pooler`.
 
-Pulumi fills both from the Neon project outputs.
+Pulumi fills both from a lookup of `NEON_PROJECT_ID` (the stack does not
+create or delete the Neon project).
 
 ## Example payload
 
