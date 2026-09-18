@@ -103,6 +103,3 @@ Atta Pulumi project: `atta` (on-prem: `atta-onprem`). Resource prefix
 `${ENV}-atta`. SSM path `/atta/${ENV}/secrets`. EventBridge sources
 use the `atta.` prefix. RabbitMQ topology uses `atta.events` /
 `atta.jobs`.
-
-If you still have a Pulumi project or SSM parameter named `bowerbird`,
-rename or re-apply deliberately — those identities are not aliases.

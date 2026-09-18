@@ -1,5 +1,9 @@
 # Getting started
 
+This repo is **Canopy** (habitat monorepo). The commercial product is
+**Atta** (`apps/atta`). See [Naming](../product/naming.md) and
+[Monorepo layout](./architecture/monorepo.md).
+
 ## Requirements
 
 - mise
@@ -11,7 +15,8 @@ Pinned in `.mise.toml`: Node `24`, Go `1.25`, pnpm `11.5`, Air `latest`.
 
 ## Setup
 
-`mise` must already be on your `PATH`. Then run the local setup script (idempotent):
+`mise` must already be on your `PATH`. Then run the local setup script
+(idempotent):
 
 ```bash
 pnpm run setup:local
@@ -25,11 +30,13 @@ If `pnpm` is not available yet, invoke the script directly:
 
 `setup:local` / `scripts/setup-local.sh`:
 
-1. Installs the mise toolchain from `.mise.toml` (`node`, `go`, `pnpm`, `air`).
+1. Installs the mise toolchain from `.mise.toml` (`node`, `go`, `pnpm`,
+   `air`).
 2. Runs `pnpm install` for the workspace.
 3. Installs agent skills and MCP CLIs documented in
    [Development quality](./quality/development-quality.md).
-4. Verifies project MCP registration files (`.cursor/mcp.json`, `opencode.json`).
+4. Verifies project MCP registration files (`.cursor/mcp.json`,
+   `opencode.json`).
 
 After setup, copy env/secrets as described below, then start Atta with
 `mise //apps/atta:dev` (or `mise :dev` from `apps/atta`).
@@ -44,17 +51,20 @@ from the current package. Loaders (`scripts/with-env.sh`, Playwright,
 Pulumi) apply that file with override so a parent shell cannot leak
 another product's values.
 
-Default: `apps/atta/.env`.
+Default: `apps/atta/.env`. Put product secrets under `apps/atta/` — not
+in a Canopy-root `.env`.
 
-| File                  | Use for                                                                        |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `apps/atta/.env`      | Daily local stack (`mise //apps/atta:dev`), Pulumi, ad-hoc e2e                 |
-| `apps/atta/.env.test` | `mise //apps/atta:test:full` only. Copied from `.env.test.example` if missing. |
-| `apps/atta/.env.aws`  | Optional AWS deploy file (no MinIO dummy keys)                                 |
+| File                           | Use for                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------ |
+| `apps/atta/.env`               | Daily local stack (`mise //apps/atta:dev`), Pulumi, ad-hoc e2e                 |
+| `apps/atta/.env.test`          | `mise //apps/atta:test:full` only. Copied from `.env.test.example` if missing. |
+| `apps/atta/.env.aws`           | Optional AWS deploy file (no MinIO dummy keys)                                 |
+| `apps/atta/deploy/onprem/.env` | Per client VM Compose secrets. Not loaded by `ENV_FILE`.                       |
 
 1. Copy `apps/atta/.env.example` → `apps/atta/.env`.
 2. For local API: keep `DEPLOYMENT_TARGET=onprem` and
-   `RABBITMQ_URL=amqp://atta:atta@localhost:5672/`.
+   `RABBITMQ_URL=amqp://atta:atta@localhost:5672/`. Local DB user/db is
+   `atta`.
 3. Provide secrets (`GEMINI_API_KEY`, `INBOX_CREDENTIALS_ENCRYPTION_KEY`,
    `TENANT_SECRETS_ENCRYPTION_KEY`, `DATABASE_URL`, `S3_BUCKET_NAME`).
 4. For AWS/Pulumi deploy: set `ENV`, `AWS_ACCOUNT_ID`,
@@ -66,12 +76,6 @@ Default: `apps/atta/.env`.
    `ENV_FILE=apps/atta/.env.aws` or an AWS profile. See
    [AWS deploy](./deployment/aws.md).
 
-| Source                         | Use for                                                                                          |
-| ------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `apps/atta/.env`               | Backend (local/onprem), Pulumi (`ENV`, account, domains, Neon, Cloudflare), optional E2E origins |
-| `apps/atta/.env.test`          | Isolated automated test loop. Local dummy values only.                                           |
-| `apps/atta/deploy/onprem/.env` | Per client VM Compose secrets. Not loaded by `ENV_FILE`.                                         |
-
 Typical local backend values:
 
 - `DEPLOYMENT_TARGET=onprem`
@@ -81,7 +85,8 @@ Typical local backend values:
 - `S3_BUCKET_NAME=atta-local-bucket`
 - `S3_PRESIGN_ENDPOINT_URL=https://media.atta.dev`
 - `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` /
-  `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK compatibility)
+  `AWS_RESPONSE_CHECKSUM_VALIDATION=when_required` (MinIO SDK
+  compatibility)
 
 For raw Go commands from `apps/atta/backend`:
 
@@ -92,37 +97,11 @@ ENV_FILE=apps/atta/.env.test ../../../scripts/with-env.sh go test ./...
 
 Deployment artifacts live under `apps/atta/deploy/`. AWS Pulumi and the
 on-prem fleet are parallel tracks (`mise //apps/atta:deploy` runs both).
-`apps/atta/deploy/onprem/.env` is per client VM (Compose secrets).
-`apps/atta/deploy/onprem/hosts.json` is the fleet inventory (gitignored).
-
-## After the Bowerbird split
-
-This repo is **Canopy**. The product is **Atta**. Former
-`*.bowerbird.dev` hosts, Compose container names, and Pulumi project
-`bowerbird` are gone.
-
-1. Add the hosts below. Remove `app.bowerbird.dev` /
-   `media.bowerbird.dev` if they are still in `/etc/hosts`.
-2. Copy `apps/atta/.env.example` → `apps/atta/.env` (keep OAuth client
-   secrets). Local DB user/db is `atta`. Origins are
-   `https://app.atta.dev`. Move a leftover Canopy-root `.env` into
-   `apps/atta/` if you still have one.
-3. Stop leftover Compose containers from the old project name:
-
-   ```bash
-   docker rm -f bowerbird-postgres bowerbird-minio bowerbird-rabbitmq bowerbird-caddy \
-     canopy-postgres canopy-minio canopy-rabbitmq canopy-caddy
-   docker volume rm -f bowerbird_postgres_data bowerbird_minio_data bowerbird_caddy_data bowerbird_caddy_config \
-     canopy_postgres_data canopy_minio_data canopy_caddy_data canopy_caddy_config
-   ```
-
-4. Point Google/Microsoft OAuth redirect URIs at
-   `https://app.atta.dev`.
-5. AWS: Pulumi project is `atta`, SSM `/atta/${ENV}/secrets`, EventBridge
-   prefix `atta.`. Plan before the next `pulumi up` — resource names
-   change.
-6. On-prem images are `atta-onprem-app` / `atta-onprem-caddy`; default
-   remote dir is `/opt/atta`.
+Pulumi project: `atta` (on-prem: `atta-onprem`). SSM path
+`/atta/${ENV}/secrets`. EventBridge source prefix `atta.`. On-prem
+images: `atta-onprem-app` / `atta-onprem-caddy`; default remote dir
+`/opt/atta`. Fleet inventory: `apps/atta/deploy/onprem/hosts.json`
+(gitignored).
 
 ## Local DNS and HTTPS
 
@@ -132,6 +111,8 @@ Add to `/etc/hosts`:
 127.0.0.1   app.atta.dev
 127.0.0.1   media.atta.dev
 ```
+
+Point Google/Microsoft OAuth redirect URIs at `https://app.atta.dev`.
 
 Caddy (Compose) uses `network_mode: host` and proxies:
 
@@ -238,8 +219,7 @@ See [Runtime profiles](./architecture/runtime-profiles.md) and [Outbox relay](./
 - Media: `https://media.atta.dev/atta-local-bucket/<key>`
 
 `infra:up` / `dev` wait on healthchecks (Postgres, RabbitMQ, MinIO,
-Caddy 80/443) and bootstrap the MinIO bucket. Orphan containers (e.g. old
-LocalStack) are removed automatically.
+Caddy 80/443) and bootstrap the MinIO bucket.
 
 ## Full test loop
 

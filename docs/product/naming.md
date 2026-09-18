@@ -29,8 +29,7 @@ role division, optimize transport routes, and manage massive underground
 inventories without margin for error.
 
 Atta is the **current commercial system**: inbound invoicing, catalog,
-inbox, and the rest of the product surface that used to occupy the whole
-repo.
+inbox, and related product surfaces under `apps/atta`.
 
 Local Atta origins:
 

@@ -36,7 +36,7 @@ Caddy routes (see `apps/atta/Caddyfile`):
 - `app.atta.dev/api*` → Go API `:8080`
 - `media.atta.dev` → MinIO `:9000` (presigned uploads/downloads)
 
-There is **no LocalStack** and **no Redis** in the local stack.
+The local stack is Postgres, RabbitMQ, MinIO, and Caddy only.
 
 ## Process model
 
