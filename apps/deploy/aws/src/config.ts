@@ -17,8 +17,10 @@ export interface InfraConfig {
   rootDomain: string;
   appSubdomain: string;
   mediaSubdomain: string;
+  apiOriginSubdomain: string;
   appDomain: string;
   mediaDomain: string;
+  apiOriginDomain: string;
   cloudflareApiToken: string;
   neonApiKey: string;
   neonOrgId?: string;
@@ -59,6 +61,7 @@ export function loadConfig(): InfraConfig {
   const rootDomain = required('ROOT_DOMAIN');
   const appSubdomain = optional('APP_SUBDOMAIN', 'app');
   const mediaSubdomain = optional('MEDIA_SUBDOMAIN', 'media');
+  const apiOriginSubdomain = optional('API_ORIGIN_SUBDOMAIN', 'api');
 
   return {
     envName,
@@ -68,8 +71,10 @@ export function loadConfig(): InfraConfig {
     rootDomain,
     appSubdomain,
     mediaSubdomain,
+    apiOriginSubdomain,
     appDomain: `${appSubdomain}.${rootDomain}`,
     mediaDomain: `${mediaSubdomain}.${rootDomain}`,
+    apiOriginDomain: `${apiOriginSubdomain}.${rootDomain}`,
     cloudflareApiToken: required('CLOUDFLARE_API_TOKEN'),
     neonApiKey: required('NEON_API_KEY'),
     neonOrgId: optional('NEON_ORG_ID') || undefined,

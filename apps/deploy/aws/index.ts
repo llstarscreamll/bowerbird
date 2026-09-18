@@ -9,3 +9,4 @@ export const ssmParameterName = outputs.ssmParameterName;
 export const neonProjectId = outputs.neonProjectId;
 export const jobsQueueUrl = outputs.jobsQueueUrl;
 export const migrateFunctionName = outputs.migrateFunctionName;
+export const apiOriginDomain = outputs.apiOriginDomain;

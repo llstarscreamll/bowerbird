@@ -15,6 +15,7 @@ export interface StackOutputs {
   neonProjectId: pulumi.Output<string>;
   jobsQueueUrl: pulumi.Output<string>;
   migrateFunctionName: pulumi.Output<string>;
+  apiOriginDomain: pulumi.Output<string>;
 }
 
 const CLOUDFRONT_CACHE_OPTIMIZED = '658327ea-f89d-4fab-a63d-7e88639e58f6';
@@ -53,7 +54,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
       regionId: cfg.neonRegionId,
       pgVersion: cfg.neonPgVersion,
       orgId: cfg.neonOrgId,
-      historyRetentionSeconds: cfg.isProd ? 86400 : 21600,
+      historyRetentionSeconds: cfg.isProd ? 604800 : 21600,
       defaultBranchProtected: cfg.isProd,
       branch: {
         name: cfg.envName,
@@ -134,6 +135,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
   const jwtAccess = new random.RandomPassword('jwt-access', { length: 64, special: false });
   const jwtRefresh = new random.RandomPassword('jwt-refresh', { length: 64, special: false });
   const attestation = new random.RandomPassword('attestation', { length: 64, special: false });
+  const originVerify = new random.RandomPassword('origin-verify', { length: 32, special: false });
 
   const secretString = pulumi
     .all({
@@ -290,36 +292,39 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     'scheduler-invoke',
     {
       role: schedulerRole.id,
-      policy: pulumi.all([relayFn.arn, schedulerFn.arn]).apply(([relayArn, schedArn]) =>
+      policy: pulumi.all([relayFn.arn, schedulerFn.arn, lambdaDlq.arn]).apply(([relayArn, schedArn, dlqArn]) =>
         JSON.stringify({
           Version: '2012-10-17',
-          Statement: [{ Effect: 'Allow', Action: 'lambda:InvokeFunction', Resource: [relayArn, schedArn] }],
+          Statement: [
+            { Effect: 'Allow', Action: 'lambda:InvokeFunction', Resource: [relayArn, schedArn] },
+            { Effect: 'Allow', Action: 'sqs:SendMessage', Resource: dlqArn },
+          ],
         }),
       ),
     },
     awsOpts,
   );
 
-  scheduleLambda(prefix, 'outbox-relay', 'rate(1 minute)', relayFn.arn, schedulerRole.arn, '{}', awsOpts);
-  scheduleLambda(prefix, 'outbox-sweeper', 'rate(1 hour)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'outbox-sweeper' }), awsOpts);
-  scheduleLambda(prefix, 'catalog-import-purge', 'cron(0 5 * * ? *)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'catalog-import-purge' }), awsOpts);
+  scheduleLambda(prefix, 'outbox-relay', 'rate(1 minute)', relayFn.arn, schedulerRole.arn, '{}', lambdaDlq.arn, awsOpts);
+  scheduleLambda(prefix, 'outbox-sweeper', 'rate(1 hour)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'outbox-sweeper' }), lambdaDlq.arn, awsOpts);
+  scheduleLambda(prefix, 'catalog-import-purge', 'cron(0 5 * * ? *)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'catalog-import-purge' }), lambdaDlq.arn, awsOpts);
   const mailSyncEnabled = (Boolean(cfg.googleClientId) && Boolean(cfg.googleClientSecret)) || (Boolean(cfg.microsoftClientId) && Boolean(cfg.microsoftClientSecret));
   if (mailSyncEnabled) {
-    scheduleLambda(prefix, 'inbox-sync-all', 'rate(5 minutes)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'inbox-sync-all' }), awsOpts);
+    scheduleLambda(prefix, 'inbox-sync-all', 'rate(5 minutes)', schedulerFn.arn, schedulerRole.arn, JSON.stringify({ ruleName: 'inbox-sync-all' }), lambdaDlq.arn, awsOpts);
   }
 
   const cert = new aws.acm.Certificate(
     'edge',
     {
       domainName: cfg.rootDomain,
-      subjectAlternativeNames: [cfg.appDomain, cfg.mediaDomain],
+      subjectAlternativeNames: [cfg.appDomain, cfg.mediaDomain, cfg.apiOriginDomain],
       validationMethod: 'DNS',
     },
     awsOpts,
   );
 
   const zone = cloudflare.getZoneOutput({ name: cfg.rootDomain }, { provider: cfProvider });
-  const validationDomains = [cfg.rootDomain, cfg.appDomain, cfg.mediaDomain];
+  const validationDomains = [cfg.rootDomain, cfg.appDomain, cfg.mediaDomain, cfg.apiOriginDomain];
   const validationRecords = validationDomains.map((domain, i) => {
     const dvo = cert.domainValidationOptions.apply((opts) => opts.find((o) => o.domainName === domain) ?? opts[0]);
     return new cloudflare.Record(
@@ -351,6 +356,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     {
       name: `${prefix}-http`,
       protocolType: 'HTTP',
+      disableExecuteApiEndpoint: true,
     },
     awsOpts,
   );
@@ -407,6 +413,38 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
       sourceArn: pulumi.interpolate`${httpApi.executionArn}/*/*`,
     },
     awsOpts,
+  );
+
+  const apiDomain = new aws.apigatewayv2.DomainName(
+    'api',
+    {
+      domainName: cfg.apiOriginDomain,
+      domainNameConfiguration: {
+        certificateArn: certValidation.certificateArn,
+        endpointType: 'REGIONAL',
+        securityPolicy: 'TLS_1_2',
+      },
+    },
+    awsOpts,
+  );
+  const apiMapping = new aws.apigatewayv2.ApiMapping(
+    'api',
+    {
+      apiId: httpApi.id,
+      domainName: apiDomain.domainName,
+      stage: apiStage.name,
+    },
+    awsOpts,
+  );
+  const apiOriginDns = dnsRecord(
+    cfOpts,
+    zone.id,
+    cfg.apiOriginSubdomain,
+    'CNAME',
+    apiDomain.domainNameConfiguration.apply((config) => {
+      const entry = Array.isArray(config) ? config[0] : config;
+      return entry.targetDomainName;
+    }),
   );
 
   const oac = new aws.cloudfront.OriginAccessControl(
@@ -494,7 +532,8 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
         },
         {
           originId: 'api',
-          domainName: httpApi.apiEndpoint.apply((endpoint) => endpoint.replace(/^https?:\/\//, '')),
+          domainName: cfg.apiOriginDomain,
+          customHeaders: [{ name: 'X-Origin-Verify', value: originVerify.result }],
           customOriginConfig: {
             httpPort: 80,
             httpsPort: 443,
@@ -520,6 +559,36 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
         sslSupportMethod: 'sni-only',
         minimumProtocolVersion: 'TLSv1.2_2021',
       },
+    },
+    { ...awsOpts, dependsOn: [apiMapping, apiOriginDns] },
+  );
+
+  new aws.kms.KeyPolicy(
+    'app',
+    {
+      keyId: key.id,
+      policy: pulumi.all([distribution.arn, cfg.awsAccountId]).apply(([distArn, account]) =>
+        JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Sid: 'EnableIamUserPermissions',
+              Effect: 'Allow',
+              Principal: { AWS: `arn:aws:iam::${account}:root` },
+              Action: 'kms:*',
+              Resource: '*',
+            },
+            {
+              Sid: 'AllowCloudFrontServicePrincipalSSE-KMS',
+              Effect: 'Allow',
+              Principal: { Service: 'cloudfront.amazonaws.com' },
+              Action: ['kms:Decrypt', 'kms:Encrypt', 'kms:GenerateDataKey*'],
+              Resource: '*',
+              Condition: { StringEquals: { 'AWS:SourceArn': distArn } },
+            },
+          ],
+        }),
+      ),
     },
     awsOpts,
   );
@@ -549,7 +618,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
 
   syncWebAssets(cfg, webBucket, distribution, afterSchema);
 
-  const apiWaf = apiWebAcl(prefix, awsOpts);
+  const apiWaf = apiWebAcl(prefix, originVerify.result, awsOpts);
   new aws.wafv2.WebAclAssociation(
     'http-api',
     {
@@ -571,7 +640,10 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
       ['outbox-relay', relayFn],
       ['scheduler', schedulerFn],
     ],
-    jobsDlq,
+    [
+      ['jobs-dlq', jobsDlq],
+      ['lambda-dlq', lambdaDlq],
+    ],
     cfg,
     awsOpts,
   );
@@ -583,6 +655,7 @@ export function deployStack(cfg: InfraConfig): StackOutputs {
     neonProjectId: neonProject.id,
     jobsQueueUrl: jobsQueue.url,
     migrateFunctionName: migrateFn.name,
+    apiOriginDomain: pulumi.output(cfg.apiOriginDomain),
   };
 }
 
@@ -623,6 +696,21 @@ function hardenBucket(name: string, bucket: aws.s3.Bucket, keyArn: pulumi.Input<
   );
   new aws.s3.BucketVersioningV2(`${name}-ver`, { bucket: bucket.id, versioningConfiguration: { status: 'Enabled' } }, opts);
   new aws.s3.BucketOwnershipControls(`${name}-own`, { bucket: bucket.id, rule: { objectOwnership: 'BucketOwnerEnforced' } }, opts);
+  new aws.s3.BucketLifecycleConfigurationV2(
+    `${name}-lc`,
+    {
+      bucket: bucket.id,
+      rules: [
+        {
+          id: 'abort-incomplete-mpu',
+          status: 'Enabled',
+          filter: { prefix: '' },
+          abortIncompleteMultipartUpload: { daysAfterInitiation: 7 },
+        },
+      ],
+    },
+    opts,
+  );
   if (extra?.cors) {
     new aws.s3.BucketCorsConfigurationV2(`${name}-cors`, { bucket: bucket.id, corsRules: extra.cors }, opts);
   }
@@ -677,8 +765,8 @@ function goLambda(
       Statement: [
         {
           Effect: 'Allow',
-          Action: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents'],
-          Resource: `arn:aws:logs:${cfg.awsRegion}:${cfg.awsAccountId}:*`,
+          Action: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+          Resource: `arn:aws:logs:${cfg.awsRegion}:${cfg.awsAccountId}:log-group:/aws/lambda/${prefix}-${name}:*`,
         },
         { Effect: 'Allow', Action: ['xray:PutTraceSegments', 'xray:PutTelemetryRecords'], Resource: '*' },
         { Effect: 'Allow', Action: ['ssm:GetParameter', 'ssm:GetParameters'], Resource: parameterArn },
@@ -714,14 +802,23 @@ function goLambda(
   );
 }
 
-function scheduleLambda(prefix: string, name: string, expression: string, fnArn: pulumi.Input<string>, roleArn: pulumi.Input<string>, input: string, opts: AwsOpts): void {
+function scheduleLambda(
+  prefix: string,
+  name: string,
+  expression: string,
+  fnArn: pulumi.Input<string>,
+  roleArn: pulumi.Input<string>,
+  input: string,
+  dlqArn: pulumi.Input<string>,
+  opts: AwsOpts,
+): void {
   new aws.scheduler.Schedule(
     name,
     {
       name: `${prefix}-${name}`,
       scheduleExpression: expression,
       flexibleTimeWindow: { mode: 'OFF' },
-      target: { arn: fnArn, roleArn, input },
+      target: { arn: fnArn, roleArn, input, deadLetterConfig: { arn: dlqArn } },
     },
     opts,
   );
@@ -781,7 +878,7 @@ function spaWebAcl(prefix: string, opts: AwsOpts): aws.wafv2.WebAcl {
   );
 }
 
-function apiWebAcl(prefix: string, opts: AwsOpts): aws.wafv2.WebAcl {
+function apiWebAcl(prefix: string, originVerify: pulumi.Input<string>, opts: AwsOpts): aws.wafv2.WebAcl {
   return new aws.wafv2.WebAcl(
     'api',
     {
@@ -789,14 +886,40 @@ function apiWebAcl(prefix: string, opts: AwsOpts): aws.wafv2.WebAcl {
       scope: 'REGIONAL',
       defaultAction: { allow: {} },
       visibilityConfig: { cloudwatchMetricsEnabled: true, metricName: `${prefix}-api`, sampledRequestsEnabled: true },
-      rules: managedWafRules(),
+      rules: pulumi.output(originVerify).apply((secret): aws.types.input.wafv2.WebAclRule[] => [
+        {
+          name: 'RequireOriginVerify',
+          priority: 0,
+          action: { block: {} },
+          statement: {
+            notStatement: {
+              statements: [
+                {
+                  byteMatchStatement: {
+                    positionalConstraint: 'EXACTLY',
+                    searchString: secret,
+                    fieldToMatch: { singleHeader: { name: 'x-origin-verify' } },
+                    textTransformations: [{ priority: 0, type: 'NONE' }],
+                  },
+                },
+              ],
+            },
+          },
+          visibilityConfig: {
+            cloudwatchMetricsEnabled: true,
+            metricName: `${prefix}-origin-verify`,
+            sampledRequestsEnabled: true,
+          },
+        },
+        ...managedWafRules(),
+      ]),
     },
     opts,
   );
 }
 
 function managedWafRules(): aws.types.input.wafv2.WebAclRule[] {
-  const names = ['AWSManagedRulesCommonRuleSet', 'AWSManagedRulesKnownBadInputsRuleSet', 'AWSManagedRulesSQLiRuleSet'];
+  const names = ['AWSManagedRulesAmazonIpReputationList', 'AWSManagedRulesCommonRuleSet', 'AWSManagedRulesKnownBadInputsRuleSet', 'AWSManagedRulesSQLiRuleSet'];
   return names.map((name, i) => ({
     name,
     priority: i + 1,
@@ -806,8 +929,8 @@ function managedWafRules(): aws.types.input.wafv2.WebAclRule[] {
   }));
 }
 
-function dnsRecord(opts: { provider: cloudflare.Provider }, zoneId: pulumi.Input<string>, name: string, type: string, content: pulumi.Input<string>): void {
-  new cloudflare.Record(
+function dnsRecord(opts: { provider: cloudflare.Provider }, zoneId: pulumi.Input<string>, name: string, type: string, content: pulumi.Input<string>): cloudflare.Record {
+  return new cloudflare.Record(
     `dns-${name === '@' ? 'apex' : name}`,
     {
       zoneId,
@@ -907,45 +1030,49 @@ function contentTypeFor(file: string): string {
   return map[ext] ?? 'application/octet-stream';
 }
 
-function alarms(prefix: string, fns: Array<[string, aws.lambda.Function]>, dlq: aws.sqs.Queue, cfg: InfraConfig, opts: AwsOpts): void {
+function alarms(prefix: string, fns: Array<[string, aws.lambda.Function]>, queues: Array<[string, aws.sqs.Queue]>, cfg: InfraConfig, opts: AwsOpts): void {
   const topic = new aws.sns.Topic('alarms', { name: `${prefix}-alarms` }, opts);
   if (cfg.alarmEmail) {
     new aws.sns.TopicSubscription('alarms-email', { topic: topic.arn, protocol: 'email', endpoint: cfg.alarmEmail }, opts);
   }
   for (const [name, fn] of fns) {
+    for (const metricName of ['Errors', 'Throttles'] as const) {
+      new aws.cloudwatch.MetricAlarm(
+        `${name}-${metricName.toLowerCase()}`,
+        {
+          name: `${prefix}-${name}-${metricName.toLowerCase()}`,
+          comparisonOperator: 'GreaterThanThreshold',
+          evaluationPeriods: 1,
+          metricName,
+          namespace: 'AWS/Lambda',
+          period: 60,
+          statistic: 'Sum',
+          threshold: 0,
+          treatMissingData: 'notBreaching',
+          alarmActions: [topic.arn],
+          dimensions: { FunctionName: fn.name },
+        },
+        opts,
+      );
+    }
+  }
+  for (const [name, dlq] of queues) {
     new aws.cloudwatch.MetricAlarm(
-      `${name}-errors`,
+      `${name}-visible`,
       {
-        name: `${prefix}-${name}-errors`,
+        name: `${prefix}-${name}-visible`,
         comparisonOperator: 'GreaterThanThreshold',
         evaluationPeriods: 1,
-        metricName: 'Errors',
-        namespace: 'AWS/Lambda',
+        metricName: 'ApproximateNumberOfMessagesVisible',
+        namespace: 'AWS/SQS',
         period: 60,
-        statistic: 'Sum',
+        statistic: 'Maximum',
         threshold: 0,
         treatMissingData: 'notBreaching',
         alarmActions: [topic.arn],
-        dimensions: { FunctionName: fn.name },
+        dimensions: { QueueName: dlq.name },
       },
       opts,
     );
   }
-  new aws.cloudwatch.MetricAlarm(
-    'jobs-dlq',
-    {
-      name: `${prefix}-jobs-dlq-visible`,
-      comparisonOperator: 'GreaterThanThreshold',
-      evaluationPeriods: 1,
-      metricName: 'ApproximateNumberOfMessagesVisible',
-      namespace: 'AWS/SQS',
-      period: 60,
-      statistic: 'Maximum',
-      threshold: 0,
-      treatMissingData: 'notBreaching',
-      alarmActions: [topic.arn],
-      dimensions: { QueueName: dlq.name },
-    },
-    opts,
-  );
 }
