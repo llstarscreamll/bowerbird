@@ -17,15 +17,20 @@ Backend and PWA live in `apps/backend` and `apps/pwa`.
 
 ## AWS
 
-Pulumi stack: Lambda, API Gateway, CloudFront, Neon, Cloudflare DNS, SSM.
+Pulumi stack: Lambda, API Gateway, CloudFront, Cloudflare DNS, SSM.
+Create the Neon project once in the Neon Console; the stack only looks it
+up (`NEON_PROJECT_ID`).
 
 ```bash
 pnpm run deploy:aws
 ```
 
 Do not deploy with the local MinIO dummy `AWS_ACCESS_KEY_ID`. Use
-`ENV_FILE=.env.aws` or an AWS profile. First-time stack:
-`cd apps/deploy/aws && pulumi stack init "$ENV"`.
+`ENV_FILE=.env.aws` or an AWS profile. Missing stacks are created by
+`pulumi stack select --create "$ENV"`.
+
+GitHub Actions on `develop` deploys the `staging` stack via OIDC:
+[GitHub setup (CI and staging deploy)](../../docs/technical/deployment/github-actions.md).
 
 Details: [AWS deploy](../../docs/technical/deployment/aws.md).
 

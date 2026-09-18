@@ -8,7 +8,7 @@
     "test": "node --test --experimental-strip-types src/config.test.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "synth": "pnpm run build:lambdas && pulumi preview",
-    "deploy": "pnpm run build:lambdas && pulumi stack select \"$ENV\" && pulumi up --yes",
+    "deploy": "pnpm run build:lambdas && pulumi stack select --create \"$ENV\" && pulumi up --yes",
     "migrate": "pulumi stack output migrateFunctionName | xargs -I{} aws lambda invoke --function-name {} /tmp/bowerbird-migrate.json && cat /tmp/bowerbird-migrate.json"
   },
   "dependencies": {

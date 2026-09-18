@@ -23,6 +23,7 @@ How it works and how to run it.
 - [Spartan UI](./technical/frontend/spartan-ui.md)
 - [Deploy layouts (AWS + on-prem fleet)](../apps/deploy/README.md)
 - [AWS deploy](./technical/deployment/aws.md)
+- [GitHub setup (CI and staging deploy)](./technical/deployment/github-actions.md)
 - [On-prem fleet](./technical/deployment/onprem.md)
 - [AWS secrets](./technical/deployment/ssm-secrets.md)
 - [MinIO](./technical/tooling/minio.md)
