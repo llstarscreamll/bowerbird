@@ -39,5 +39,4 @@ agent/
 .DS_Store
 .vscode/
 .idea/
-atta-local-ca.crt
-bowerbird-local-ca.crt
+*.crt
